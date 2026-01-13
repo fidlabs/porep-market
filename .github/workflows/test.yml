@@ -1,0 +1,79 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+env:
+  FOUNDRY_PROFILE: ci
+
+jobs:
+  lint:
+    strategy:
+      fail-fast: true
+
+    name: Solhint linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Node
+        uses: actions/setup-node@v4
+
+      - name: Install solhint
+        run: npm install -g solhint@^6.0.1
+
+      - name: Run solhint
+        run: solhint 'src/**/*.sol' 'test/**/*.sol' 'script/**/*.sol' --max-warnings 0
+
+  build_and_test:
+    strategy:
+      fail-fast: true
+
+    name: Foundry project
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install Foundry
+        uses: foundry-rs/foundry-toolchain@v1
+        with:
+          version: v1.4.3
+
+      - name: Install lcov
+        run: sudo apt-get -y install lcov
+
+      - name: Run Forge fmt check
+        run: |
+          forge --version
+          forge fmt --check
+        id: fmt_solidity
+
+      - name: Run Forge tests
+        run: |
+          forge test -vvv
+        id: test_solidity
+
+      - name: Check test coverage
+        run: ./ci/check-full-coverage.sh
+
+      - name: Run Forge build
+        run: |
+          forge --version
+          forge build --build-info --sizes
+        id: build_solidity
+
+      - name: Test deploy script
+        run: |
+          anvil &
+          sleep 1
+          RPC_URL=localhost:8545 PRIVATE_KEY=0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80 ./script/deploy.sh
+
+      - name: Check if ABIs are up-to-date
+        run: ./ci/check-abis.sh

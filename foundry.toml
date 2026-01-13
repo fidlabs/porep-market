@@ -1,0 +1,10 @@
+[profile.default]
+src = "src"
+out = "out"
+libs = ["lib"]
+via_ir = true
+optimizer = true
+[lint]
+# disable mixed case lint errors because of Filecoin naming specifications
+exclude_lints = ["mixed-case-function", "mixed-case-variable"]
+# See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options
