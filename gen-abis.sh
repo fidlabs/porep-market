@@ -5,7 +5,7 @@ set -euo pipefail
 rm -rf abis
 mkdir abis
 
-for i in $(find src -name '*.sol'); do
+for i in $(find src -name '*.sol' ! -path "*/interfaces/*"); do
   echo "Generating ABI file for $i"
   i="$(basename "$i")"
   name="${i%.sol}"
