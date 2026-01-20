@@ -139,8 +139,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param _validatorRegistry The address of the validator registry
      * @param _spRegistry The address of the SP registry
+     * @param _clientSmartContract The address of the client smart contract
      */
-    function initialize(address _validatorRegistry, address _spRegistry, address _clientSmartContract) public initializer {
+    function initialize(address _validatorRegistry, address _spRegistry, address _clientSmartContract)
+        public
+        initializer
+    {
         __AccessControl_init();
         validatorRegistryContract = IValidatorRegistry(_validatorRegistry);
         SPRegistryContract = ISPRegistry(_spRegistry);
@@ -232,11 +236,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      */
     function completeDeal(uint256 dealId) external {
         _ensureDealExists(dealId);
+        if (msg.sender != clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         DealProposal storage deal = dealProposals[dealId];
         _ensureDealCorrectState(deal, DealState.Accepted);
-
-        if (msg.sender != clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         deal.state = DealState.Completed;
         emit DealCompleted(dealId, msg.sender, deal.provider);

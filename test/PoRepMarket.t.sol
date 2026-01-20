@@ -37,8 +37,12 @@ contract PoRepMarketTest is Test {
         providerFilActorId = CommonTypes.FilActorId.wrap(1);
 
         // solhint-disable gas-small-strings
-        bytes memory initData =
-        abi.encodeWithSignature("initialize(address,address,address)", address(validatorRegistry), address(spRegistry), clientSmartContractAddress);
+        bytes memory initData = abi.encodeWithSignature(
+            "initialize(address,address,address)",
+            address(validatorRegistry),
+            address(spRegistry),
+            clientSmartContractAddress
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
 
@@ -181,7 +185,9 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
 
         address notTheClientSmartContract = vm.addr(0x999);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, 1, notTheClientSmartContract));
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, 1, notTheClientSmartContract)
+        );
         vm.prank(notTheClientSmartContract);
         poRepMarket.completeDeal(dealId);
     }
