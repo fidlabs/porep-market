@@ -204,6 +204,7 @@ contract PoRepMarketTest is Test {
                 PoRepMarket.DealState.Accepted
             )
         );
+        vm.prank(clientSmartContractAddress);
         poRepMarket.completeDeal(dealId);
     }
 
@@ -223,6 +224,7 @@ contract PoRepMarketTest is Test {
                 PoRepMarket.DealState.Accepted
             )
         );
+        vm.prank(clientSmartContractAddress);
         poRepMarket.completeDeal(dealId);
     }
 
