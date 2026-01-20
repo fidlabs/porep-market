@@ -34,6 +34,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     IValidatorRegistry public validatorRegistryContract;
 
     /**
+     * @notice ClientSmartContract address
+     * @dev ClientSmartContract address is the address of the ClientSmartContract contract
+     */
+    address public clientSmartContract;
+
+    /**
      * @notice DealIdCounter
      * @dev DealIdCounter is the counter for the deal id
      */
@@ -112,7 +118,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
     error NotTheRegisteredValidator(uint256 dealId, address validator);
-    error NotTheRegisteredClient(uint256 dealId, address client);
+    error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheStorageProviderOwner(uint256 dealId, address owner, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
     error DealAlreadyFinished(uint256 dealId, DealState state);
@@ -134,10 +140,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @param _validatorRegistry The address of the validator registry
      * @param _spRegistry The address of the SP registry
      */
-    function initialize(address _validatorRegistry, address _spRegistry) public initializer {
+    function initialize(address _validatorRegistry, address _spRegistry, address _clientSmartContract) public initializer {
         __AccessControl_init();
         validatorRegistryContract = IValidatorRegistry(_validatorRegistry);
         SPRegistryContract = ISPRegistry(_spRegistry);
+        clientSmartContract = _clientSmartContract;
     }
 
     /**
@@ -229,7 +236,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
         DealProposal storage deal = dealProposals[dealId];
         _ensureDealCorrectState(deal, DealState.Accepted);
 
-        if (msg.sender != deal.client) revert NotTheRegisteredClient(dealId, msg.sender);
+        if (msg.sender != clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         deal.state = DealState.Completed;
         emit DealCompleted(dealId, msg.sender, deal.provider);

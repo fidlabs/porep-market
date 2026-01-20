@@ -20,22 +20,25 @@ contract PoRepMarketTest is Test {
     address public slcAddress;
     uint256 public railId;
     uint256 public dealId;
+    address public clientSmartContractAddress;
 
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
         spRegistry = new SPRegistryMock();
         validatorRegistry = new ValidatorRegistryMock();
-        validatorAddress = address(0x000);
-        providerFilActorId = CommonTypes.FilActorId.wrap(1);
-        clientAddress = address(0x002);
-        providerOwnerAddress = address(0x003);
-        slcAddress = address(0x004);
-        railId = 1;
-        validatorAddress = address(0x005);
+        validatorAddress = vm.addr(0x001);
+        clientSmartContractAddress = vm.addr(0x002);
+        clientAddress = vm.addr(0x003);
+        providerOwnerAddress = vm.addr(0x004);
+        slcAddress = vm.addr(0x005);
+        validatorAddress = vm.addr(0x006);
         dealId = 1;
+        railId = 1;
+        providerFilActorId = CommonTypes.FilActorId.wrap(1);
+
         // solhint-disable gas-small-strings
         bytes memory initData =
-            abi.encodeWithSignature("initialize(address,address)", address(validatorRegistry), address(spRegistry));
+        abi.encodeWithSignature("initialize(address,address,address)", address(validatorRegistry), address(spRegistry), clientSmartContractAddress);
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
 
@@ -159,9 +162,9 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        vm.prank(clientAddress);
+        vm.prank(clientSmartContractAddress);
         vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.DealCompleted(dealId, clientAddress, providerFilActorId);
+        emit PoRepMarket.DealCompleted(dealId, clientSmartContractAddress, providerFilActorId);
 
         poRepMarket.completeDeal(dealId);
     }
@@ -177,9 +180,9 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        address notTheClient = vm.addr(0x999);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredClient.selector, 1, notTheClient));
-        vm.prank(notTheClient);
+        address notTheClientSmartContract = vm.addr(0x999);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, 1, notTheClientSmartContract));
+        vm.prank(notTheClientSmartContract);
         poRepMarket.completeDeal(dealId);
     }
 
@@ -203,7 +206,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(100, 100, slcAddress);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
-        vm.prank(clientAddress);
+        vm.prank(clientSmartContractAddress);
         poRepMarket.completeDeal(dealId);
 
         vm.expectRevert(
