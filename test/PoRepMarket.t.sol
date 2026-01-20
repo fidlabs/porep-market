@@ -34,9 +34,8 @@ contract PoRepMarketTest is Test {
         validatorAddress = address(0x005);
         dealId = 1;
         // solhint-disable gas-small-strings
-        bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address)", address(validatorRegistry), address(spRegistry)
-        );
+        bytes memory initData =
+            abi.encodeWithSignature("initialize(address,address)", address(validatorRegistry), address(spRegistry));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
 
