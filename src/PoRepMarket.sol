@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable var-name-mixedcase, one-contract-per-file
+// solhint-disable var-name-mixedcase
 
 pragma solidity ^0.8.24;
 
@@ -8,12 +8,11 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/SPRegistry.sol";
 import {IValidatorRegistry} from "./interfaces/ValidatorRegistry.sol";
-import {IClient} from "./interfaces/Client.sol";
 
 /**
  * @title PoRepMarket contract
+ * @dev PoRepMarket contract is a contract that allows users to create and manage deal proposals for PoRep deals
  * @notice PoRepMarket contract
- * @dev PoRepMarket contract is a contract that allows users to create and get PoRep
  */
 contract PoRepMarket is Initializable, AccessControlUpgradeable {
     /**
@@ -33,12 +32,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @dev ValidatorRegistry address is the address of the ValidatorRegistry contract
      */
     IValidatorRegistry public validatorRegistryContract;
-
-    /**
-     * @notice ClientRegistry address
-     * @dev ClientRegistry address is the address of the ClientRegistry contract
-     */
-    IClient public clientContract;
 
     /**
      * @notice DealIdCounter
@@ -119,7 +112,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
     error NotTheRegisteredValidator(uint256 dealId, address validator);
-    error NotTheSPClient(uint256 dealId, address client);
+    error NotTheRegisteredClient(uint256 dealId, address client);
     error NotTheStorageProviderOwner(uint256 dealId, address owner, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
     error DealAlreadyFinished(uint256 dealId, DealState state);
@@ -140,13 +133,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param _validatorRegistry The address of the validator registry
      * @param _spRegistry The address of the SP registry
-     * @param _client The address of the client
      */
-    function initialize(address _validatorRegistry, address _spRegistry, address _client) public initializer {
+    function initialize(address _validatorRegistry, address _spRegistry) public initializer {
         __AccessControl_init();
         validatorRegistryContract = IValidatorRegistry(_validatorRegistry);
         SPRegistryContract = ISPRegistry(_spRegistry);
-        clientContract = IClient(_client);
     }
 
     /**
@@ -209,7 +200,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Accepts a deal
-     * @dev Accepts a deal by setting the accepted flag to true
+     * @dev Accepts a deal by setting the deal state to accepted
      * @param dealId The id of the deal proposal
      */
     function acceptDeal(uint256 dealId) external {
@@ -229,7 +220,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Completes a deal
-     * @dev Completes a deal by setting the completed flag to true
+     * @dev Completes a deal by setting the deal state to completed
      * @param dealId The id of the deal proposal
      */
     function completeDeal(uint256 dealId) external {
@@ -238,15 +229,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
         DealProposal storage deal = dealProposals[dealId];
         _ensureDealCorrectState(deal, DealState.Accepted);
 
-        address[] memory clients = clientContract.getSPClients(deal.provider);
-        bool isSPClient = false;
-        for (uint256 i = 0; i < clients.length; i++) {
-            if (clients[i] == msg.sender) {
-                isSPClient = true;
-                break;
-            }
-        }
-        if (!isSPClient) revert NotTheSPClient(dealId, msg.sender);
+        if (msg.sender != deal.client) revert NotTheRegisteredClient(dealId, msg.sender);
 
         deal.state = DealState.Completed;
         emit DealCompleted(dealId, msg.sender, deal.provider);
@@ -254,7 +237,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
 
     /**
      * @notice Accepts a deal
-     * @dev Accepts a deal by setting the accepted flag to true
+     * @dev Accepts a deal by setting the deal state to rejected
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external {

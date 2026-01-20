@@ -6,7 +6,6 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {ValidatorRegistryMock} from "./contracts/ValidatorRegistryMock.sol";
-import {ClientMock} from "./contracts/ClientMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
@@ -14,7 +13,6 @@ contract PoRepMarketTest is Test {
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
     ValidatorRegistryMock public validatorRegistry;
-    ClientMock public client;
     address public validatorAddress;
     CommonTypes.FilActorId public providerFilActorId;
     address public clientAddress;
@@ -27,7 +25,6 @@ contract PoRepMarketTest is Test {
         PoRepMarket impl = new PoRepMarket();
         spRegistry = new SPRegistryMock();
         validatorRegistry = new ValidatorRegistryMock();
-        client = new ClientMock();
         validatorAddress = address(0x000);
         providerFilActorId = CommonTypes.FilActorId.wrap(1);
         clientAddress = address(0x002);
@@ -38,13 +35,12 @@ contract PoRepMarketTest is Test {
         dealId = 1;
         // solhint-disable gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address)", address(validatorRegistry), address(spRegistry), address(client)
+            "initialize(address,address)", address(validatorRegistry), address(spRegistry)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
 
         spRegistry.setProvider(slcAddress, providerFilActorId);
-        client.setSPClient(providerFilActorId, clientAddress);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
         validatorRegistry.setValidator(validatorAddress, true);
     }
@@ -183,7 +179,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
 
         address notTheClient = vm.addr(0x999);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheSPClient.selector, 1, notTheClient));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredClient.selector, 1, notTheClient));
         vm.prank(notTheClient);
         poRepMarket.completeDeal(dealId);
     }
