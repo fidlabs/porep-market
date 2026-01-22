@@ -88,9 +88,12 @@ contract PoRepMarketTest is Test {
     }
 
     function testShouldIncrementDealIdCounter() public {
+        uint8 proposalsCount = 3;
+        uint8 startingId = 1;
         PoRepMarket.DealProposal memory p;
+
         // solhint-disable-next-line gas-strict-inequalities
-        for (uint256 i = 1; i <= 3; i++) {
+        for (uint8 i = startingId; i <= proposalsCount; i++) {
             vm.prank(vm.addr(i));
             poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
 
@@ -99,9 +102,15 @@ contract PoRepMarketTest is Test {
             assertEq(p.client, vm.addr(i));
         }
 
-        p = poRepMarket.getDealProposal(4);
+        p = poRepMarket.getDealProposal(proposalsCount + 1);
+        assertEq(p.dealId, 0);
         assertEq(p.dealId, 0);
         assertEq(p.client, address(0));
+        assertEq(CommonTypes.FilActorId.unwrap(p.provider), 0);
+        assertEq(p.SLC, address(0));
+        assertEq(p.validator, address(0));
+        assertEq(p.railId, 0);
+        assertEq(uint8(p.state), 0);
     }
 
     function testProposeDealRevertsWhenNoProviderFoundForDeal() public {
@@ -128,6 +137,19 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateValidatorAndRailId(dealId, railId);
     }
 
+    function testUpdateValidatorAndRailIdRevertsIfValidatorIsAlreadySet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidatorAndRailId(dealId, railId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ValidatorAlreadySet.selector, dealId));
+        poRepMarket.updateValidatorAndRailId(dealId, railId);
+    }
+
     function testUpdateValidatorAndRailIdRevertsIfNotTheRegisteredValidator() public {
         address notTheValidator = vm.addr(0x999);
         vm.prank(clientAddress);
@@ -135,9 +157,9 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredValidator.selector, 1, notTheValidator));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredValidator.selector, dealId, notTheValidator));
         vm.prank(notTheValidator);
-        poRepMarket.updateValidatorAndRailId(1, railId);
+        poRepMarket.updateValidatorAndRailId(dealId, railId);
     }
 
     function testAcceptDealEmitsDealAcceptedEvent() public {
@@ -152,17 +174,19 @@ contract PoRepMarketTest is Test {
     }
 
     function testAcceptDealRevertsWhenDealDoesNotExist() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.acceptDeal(dealId);
     }
 
     function testAcceptDealRevertsWhenNotTheStorageProviderOwner() public {
         address notTheOwner = vm.addr(0x999);
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(100, priceForDeal, slcAddress);
+        poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
 
         vm.expectRevert(
-            abi.encodeWithSelector(PoRepMarket.NotTheStorageProviderOwner.selector, 1, notTheOwner, providerFilActorId)
+            abi.encodeWithSelector(
+                PoRepMarket.NotTheStorageProviderOwner.selector, dealId, notTheOwner, providerFilActorId
+            )
         );
         vm.prank(notTheOwner);
         poRepMarket.acceptDeal(dealId);
@@ -200,7 +224,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testCompleteDealRevertsWhenDealDoesNotExist() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.completeDeal(dealId);
     }
 
@@ -212,7 +236,7 @@ contract PoRepMarketTest is Test {
 
         address notTheClientSmartContract = vm.addr(0x999);
         vm.expectRevert(
-            abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, 1, notTheClientSmartContract)
+            abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, dealId, notTheClientSmartContract)
         );
         vm.prank(notTheClientSmartContract);
         poRepMarket.completeDeal(dealId);
@@ -279,7 +303,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testRejectDealRevertsWhenDealDoesNotExist() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector, 1));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.rejectDeal(dealId);
     }
 
