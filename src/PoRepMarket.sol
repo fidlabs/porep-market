@@ -15,35 +15,26 @@ import {IValidatorRegistry} from "./interfaces/ValidatorRegistry.sol";
  * @notice PoRepMarket contract
  */
 contract PoRepMarket is Initializable, AccessControlUpgradeable {
-    /**
-     * @notice dealProposals mapping
-     * @dev dealProposals mapping is a mapping that contains the details of a deal proposal
-     */
-    mapping(uint256 dealId => DealProposal) public dealProposals;
+    // @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
+    struct DealProposalsStorage {
+        mapping(uint256 dealId => DealProposal) _dealProposals;
+        ISPRegistry _SPRegistryContract;
+        IValidatorRegistry _validatorRegistryContract;
+        address _clientSmartContract;
+        uint256 _dealIdCounter;
+    }
 
-    /**
-     * @notice SPRegistry address
-     * @dev SPRegistry address is the address of the SPRegistry contract
-     */
-    ISPRegistry public SPRegistryContract;
+    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DealProposalsStorage")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant DEAL_PROPOSALS_STORAGE_LOCATION =
+        0xea093611145db18b250f1cd58e07fc50de512902beb662a10f8e6d1dd55f6700;
 
-    /**
-     * @notice ValidatorRegistry address
-     * @dev ValidatorRegistry address is the address of the ValidatorRegistry contract
-     */
-    IValidatorRegistry public validatorRegistryContract;
-
-    /**
-     * @notice ClientSmartContract address
-     * @dev ClientSmartContract address is the address of the ClientSmartContract contract
-     */
-    address public clientSmartContract;
-
-    /**
-     * @notice DealIdCounter
-     * @dev DealIdCounter is the counter for the deal id
-     */
-    uint256 public dealIdCounter = 1;
+    // solhint-disable-next-line use-natspec
+    function _getDealProposalsStorage() private pure returns (DealProposalsStorage storage $) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            $.slot := DEAL_PROPOSALS_STORAGE_LOCATION
+        }
+    }
 
     /**
      * @notice DealState enum
@@ -122,9 +113,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     error NotTheStorageProviderOwner(uint256 dealId, address owner, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
     error DealAlreadyFinished(uint256 dealId, DealState state);
-    error DealDoesNotExist(uint256 dealId);
+    error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
     error NoProviderFoundForDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC);
+    error ValidatorAlreadySet(uint256 dealId);
 
     /**
      * @notice Constructor
@@ -146,9 +138,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
         initializer
     {
         __AccessControl_init();
-        validatorRegistryContract = IValidatorRegistry(_validatorRegistry);
-        SPRegistryContract = ISPRegistry(_spRegistry);
-        clientSmartContract = _clientSmartContract;
+
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        $._validatorRegistryContract = IValidatorRegistry(_validatorRegistry);
+        $._SPRegistryContract = ISPRegistry(_spRegistry);
+        $._clientSmartContract = _clientSmartContract;
     }
 
     /**
@@ -159,14 +153,16 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @param SLC The SLC address
      */
     function proposeDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC) external {
-        CommonTypes.FilActorId provider = SPRegistryContract.getProviderForDeal(SLC, expectedDealSize, priceForDeal);
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+
+        CommonTypes.FilActorId provider = $._SPRegistryContract.getProviderForDeal(SLC, expectedDealSize, priceForDeal);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal(expectedDealSize, priceForDeal, SLC);
         }
 
-        uint256 dealId = ++dealIdCounter;
+        uint256 dealId = ++$._dealIdCounter;
 
-        dealProposals[dealId] = DealProposal({
+        $._dealProposals[dealId] = DealProposal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
@@ -187,15 +183,22 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @param railId The id of the rail
      */
     function updateValidatorAndRailId(uint256 dealId, uint256 railId) external {
-        _ensureDealExists(dealId);
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposal storage dp = $._dealProposals[dealId];
 
-        if (!validatorRegistryContract.isCorrectValidator(msg.sender)) {
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, DealState.Accepted);
+
+        if (dp.validator != address(0)) {
+            revert ValidatorAlreadySet(dealId);
+        }
+
+        if (!$._validatorRegistryContract.isCorrectValidator(msg.sender)) {
             revert NotTheRegisteredValidator(dealId, msg.sender);
         }
 
-        DealProposal storage deal = dealProposals[dealId];
-        deal.validator = msg.sender;
-        deal.railId = railId;
+        dp.validator = msg.sender;
+        dp.railId = railId;
         emit ValidatorAndRailIdUpdated(dealId, msg.sender, railId);
     }
 
@@ -206,7 +209,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @return DealProposal The deal proposal
      */
     function getDealProposal(uint256 dealId) external view returns (DealProposal memory) {
-        return dealProposals[dealId];
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        return $._dealProposals[dealId];
     }
 
     /**
@@ -215,18 +219,18 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @param dealId The id of the deal proposal
      */
     function acceptDeal(uint256 dealId) external {
-        _ensureDealExists(dealId);
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposal storage dp = $._dealProposals[dealId];
 
-        DealProposal storage deal = dealProposals[dealId];
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, DealState.Proposed);
 
-        _ensureDealCorrectState(deal, DealState.Proposed);
-
-        if (!SPRegistryContract.isStorageProviderOwner(msg.sender, deal.provider)) {
-            revert NotTheStorageProviderOwner(dealId, msg.sender, deal.provider);
+        if (!$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
+            revert NotTheStorageProviderOwner(dealId, msg.sender, dp.provider);
         }
 
-        deal.state = DealState.Accepted;
-        emit DealAccepted(dealId, msg.sender, deal.provider);
+        dp.state = DealState.Accepted;
+        emit DealAccepted(dealId, msg.sender, dp.provider);
     }
 
     /**
@@ -235,53 +239,57 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
      * @param dealId The id of the deal proposal
      */
     function completeDeal(uint256 dealId) external {
-        _ensureDealExists(dealId);
-        if (msg.sender != clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposal storage dp = $._dealProposals[dealId];
 
-        DealProposal storage deal = dealProposals[dealId];
-        _ensureDealCorrectState(deal, DealState.Accepted);
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, DealState.Accepted);
 
-        deal.state = DealState.Completed;
-        emit DealCompleted(dealId, msg.sender, deal.provider);
+        if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
+
+        dp.state = DealState.Completed;
+        emit DealCompleted(dealId, msg.sender, dp.provider);
     }
 
     /**
-     * @notice Accepts a deal
-     * @dev Accepts a deal by setting the deal state to rejected
+     * @notice Rejects a deal
+     * @dev Rejects a deal by setting the deal state to rejected
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external {
-        _ensureDealExists(dealId);
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposal storage dp = $._dealProposals[dealId];
 
-        DealProposal storage deal = dealProposals[dealId];
-        if (deal.state == DealState.Completed || deal.state == DealState.Rejected) {
-            revert DealAlreadyFinished(dealId, deal.state);
+        _ensureDealExists(dp);
+
+        if (dp.state != DealState.Proposed && dp.state != DealState.Accepted) {
+            revert DealAlreadyFinished(dp.dealId, dp.state);
         }
 
-        if (msg.sender != deal.client && !SPRegistryContract.isStorageProviderOwner(msg.sender, deal.provider)) {
+        if (msg.sender != dp.client && !$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
             revert NotTheClientOrStorageProvider(dealId, msg.sender);
         }
 
-        deal.state = DealState.Rejected;
+        dp.state = DealState.Rejected;
         emit DealRejected(dealId, msg.sender);
     }
 
     /**
      * @notice Ensures a deal exists
      * @dev Ensures a deal exists by checking if the deal id exists
-     * @param dealId The id of the deal proposal
+     * @param dealProposal The id of the deal proposal
      */
-    function _ensureDealExists(uint256 dealId) internal view {
-        if (dealProposals[dealId].dealId == 0) revert DealDoesNotExist(dealId);
+    function _ensureDealExists(DealProposal memory dealProposal) internal pure {
+        if (dealProposal.dealId == 0) revert DealDoesNotExist();
     }
 
     /**
      * @notice Ensures a deal is in the correct state
      * @dev Ensures a deal is in the correct state by checking if the deal state is the expected state
-     * @param deal The deal proposal
+     * @param dp The deal proposal
      * @param expectedState The expected state
      */
-    function _ensureDealCorrectState(DealProposal memory deal, DealState expectedState) internal pure {
-        if (deal.state != expectedState) revert DealNotInExpectedState(deal.dealId, deal.state, expectedState);
+    function _ensureDealCorrectState(DealProposal memory dp, DealState expectedState) internal pure {
+        if (dp.state != expectedState) revert DealNotInExpectedState(dp.dealId, dp.state, expectedState);
     }
 }
