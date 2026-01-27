@@ -1,0 +1,108 @@
+[
+  {
+    "type": "function",
+    "name": "depositWithPermitAndCreateRailForDeal",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      },
+      {
+        "name": "payer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "payee",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "amount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "deadline",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "v",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "r",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "s",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "rateAllowance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "lockupAllowance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxLockupPeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "commissionRateBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "serviceFeeRecipient",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "poRepMarket",
+        "type": "address",
+        "internalType": "contract PoRepMarket"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateLockupPeriod",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newLockupPeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "lockupFixed",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]
