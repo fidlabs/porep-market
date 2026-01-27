@@ -137,29 +137,6 @@
         "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "modifyRailPayment",
-    "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "newRate",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -328,7 +305,7 @@
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "event",

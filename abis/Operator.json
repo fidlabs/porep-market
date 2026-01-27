@@ -72,11 +72,6 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "poRepMarket",
-        "type": "address",
-        "internalType": "contract PoRepMarket"
       }
     ],
     "outputs": [],
