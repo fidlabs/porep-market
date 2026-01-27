@@ -281,8 +281,6 @@ contract PoRepMarketTest is Test {
     function testRejectAsClientDealEmitsDealRejectedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
@@ -293,8 +291,6 @@ contract PoRepMarketTest is Test {
     function testRejectAsStorageProviderOwnerDealEmitsDealRejectedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(providerOwnerAddress);
         vm.expectEmit(true, true, true, true);
@@ -310,8 +306,6 @@ contract PoRepMarketTest is Test {
     function testRejectDealRevertsWhenNotTheClientOrStorageProviderOwner() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         address notTheClientOrStorageProviderOwner = vm.addr(0x999);
         vm.expectRevert(
@@ -320,21 +314,6 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(notTheClientOrStorageProviderOwner);
-        poRepMarket.rejectDeal(dealId);
-    }
-
-    function testRejectDealRevertsWhenDealAlreadyFinished() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
-        vm.prank(clientAddress);
-        poRepMarket.rejectDeal(dealId);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(PoRepMarket.DealAlreadyFinished.selector, dealId, PoRepMarket.DealState.Rejected)
-        );
-        vm.prank(clientAddress);
         poRepMarket.rejectDeal(dealId);
     }
 }

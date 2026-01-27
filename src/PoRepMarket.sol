@@ -112,7 +112,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheStorageProviderOwner(uint256 dealId, address owner, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
-    error DealAlreadyFinished(uint256 dealId, DealState state);
     error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
     error NoProviderFoundForDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC);
@@ -261,10 +260,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
         DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-
-        if (dp.state != DealState.Proposed && dp.state != DealState.Accepted) {
-            revert DealAlreadyFinished(dp.dealId, dp.state);
-        }
+        _ensureDealCorrectState(dp, DealState.Proposed);
 
         if (msg.sender != dp.client && !$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
             revert NotTheClientOrStorageProvider(dealId, msg.sender);

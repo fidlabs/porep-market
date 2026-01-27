@@ -19,19 +19,6 @@
   },
   {
     "type": "function",
-    "name": "SPRegistryContract",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract ISPRegistry"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "acceptDeal",
     "inputs": [
       {
@@ -45,19 +32,6 @@
   },
   {
     "type": "function",
-    "name": "clientSmartContract",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "completeDeal",
     "inputs": [
       {
@@ -68,68 +42,6 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "dealIdCounter",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "dealProposals",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "client",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "SLC",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "validator",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "state",
-        "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
-      },
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -381,19 +293,6 @@
     "stateMutability": "nonpayable"
   },
   {
-    "type": "function",
-    "name": "validatorRegistryContract",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "contract IValidatorRegistry"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
     "type": "event",
     "name": "DealAccepted",
     "inputs": [
@@ -629,30 +528,8 @@
   },
   {
     "type": "error",
-    "name": "DealAlreadyFinished",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "state",
-        "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "DealDoesNotExist",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    "inputs": []
   },
   {
     "type": "error",
@@ -772,6 +649,17 @@
         "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ValidatorAlreadySet",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   }
