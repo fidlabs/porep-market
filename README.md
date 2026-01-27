@@ -1,5 +1,47 @@
 # PoRep Market
 
+## Executive Summary: PoRep Market
+
+### 1. Overview
+The **PoRep Market** is a set of smart contracts and off-chain actors designed to automate, manage, and settle storage deals on the Filecoin network. It serves as a middleware that connects **Clients** (data owners) with **Storage Providers** (miners), ensuring that data is not only stored but maintained according to specific quality standards (Service Level Class).
+
+### 2. Key Value Propositions
+* **Automated Matchmaking:** Removes the need for manual negotiation by automatically selecting the best-fit Storage Provider (SP) based on capacity and service level class.
+* **Performance-Based Payments:** Unlike standard deals, this system uses "Smart Validators" to release payments only when performance metrics (SLIs) are met.
+* **Trustless Quality Assurance:** Integrates off-chain Oracles to verify real-world data on-chain.
+
+### 3. System Architecture & Roles
+
+The ecosystem is divided into three functional pillars:
+
+- **PoRep Market & Provider Selection**
+  * **PoRep Market:** The core orchestrator. It handles deal proposals, prices, and deal lifecycle updates.
+  * **SPRegistry:** A dynamic directory of active Storage Providers. It filters providers to ensure they have the capacity and technical capability to fulfill a client's request.
+
+- **Quality Control (SLA)**
+  * **ServiceLevelClass (SLC):** Defines the rules of the deal. It calculates a score for a provider.
+  * **OracleSLI:** It feeds off-chain performance data into the blockchain so the SLC contract can evaluate the provider.
+
+- **Financial Settlement & Operations**
+  * **Validator:** A specific Validator is deployed for each deal. It validates the provider's performance score before approving any payout.
+  * **FilecoinPay:** The underlying payment rail that executes the transfers once validated.
+  * **Client Smart Contract:** managing DataCap and tracking allocation metrics.
+
+### 4. Operational Workflow
+
+The lifecycle of a deal follows this high-level logic:
+
+1.  **Proposal:** A Client proposes a deal (size, price, service level). The **PoRep Market** consults the **SPRegistry** to reserve a suitable Provider.
+2.  **Setup:** A **Validator** contract is created to secure the funds and link to **FilecoinPay**.
+3.  **Execution:** The Client transfers data, and the Provider seals the data (Mining).
+4.  **Verification:** A **SettlementBot** periodically triggers a check. The Validator asks the **ServiceLevelClass** for a performance score based on **Oracle** data.
+5.  **Settlement:**
+    * **High Score:** Funds are released to the Provider.
+    * **Low Score:** Payouts are reduced or withheld based on the penalty logic.
+
+### 5. Conclusion
+The PoRep Market turns Filecoin storage from a simple yes/no deal into a practical service marketplace. Payments are released only when real performance requirements are met, which protects Clients from bad service and motivates Storage Providers to keep their infrastructure reliable and well-maintained.
+
 ## Glossary
 We expect following actors and contracts in the system:
 1. **Client** - person that has data and wants to store it 
@@ -21,8 +63,8 @@ We expect following actors and contracts in the system:
 
 **PoRep Market** is a smart contract responsible for managing deal proposals and updates. It allows clients to propose new deals, automatically selects a Storage Provider (SP) via an external registry, and stores deal proposals on-chain. 
 
-There will be following roles in this contract:
-* `ADMIN`, who can manage other roles and upgrade the contract
+There will be following role in this contract:
+* `ADMIN`, who can upgrade the contract
 
 Expected interface:
 ```
@@ -71,8 +113,8 @@ The main function it will implement is `transfer`, which copies the interface of
 
 It will also track how much a given **Client** allocated with a given **SP** for a given deal, so that the Validator can check the size of allocations made by the client and compare it with the actual size of **SP** data.
 
-There will be following roles in this contract:
-* `ADMIN`, who can manage other roles and upgrade the contract
+There will be following role in this contract:
+* `ADMIN`, who can upgrade the contract
 
 Expected interface:
 ```
@@ -93,7 +135,6 @@ struct Deal {
 }
 
 address PoRepMarket;
-mapping(address provider => SPDeal[]) SPDeals;
 // and items inherited from OpenZeppelin's AccessControl, UUPSUpgradeable and Multicall
 ```
 
@@ -102,6 +143,10 @@ mapping(address provider => SPDeal[]) SPDeals;
 **OracleSLI** is a contract that provides information about off-chain world. Details of logic and interface are between **OracleSLI** and **ServiceLevelClass**.
 
 **FIDLOracle** is a reference **Oracle** provided by FIDL that uses data from DataCapStats for SLIs. It will be upgradeable and implement a following interface:
+
+There will be following role in this contract:
+* `UPGRADER`, who can upgrade the contract
+* `ORACLE`, which allows to update SLI values
 
 ```
 interface FIDLOracle {
@@ -152,6 +197,8 @@ address OracleSLI;
 
 **SPRegistry** is a smart contract responsible for storing available Storage Providers (SPs) together with their service parameters. The contract participates in the selection of a Storage Provider based on required deal parameters provided by **PoRep Market**.
 
+The selection logic verifies whether a given SP supports the **ServiceLevelClass (SLC)** chosen by the client and whether its declared capacity is sufficient to handle the deal.
+
 Expected interface:
 ```
 interface SPRegistry {
@@ -163,7 +210,7 @@ interface SPRegistry {
     function isStorageProviderUsed(uint64 storageProvider) external;
     function getStorageEntity(address entityOwner) external;
     function getStorageEntities() external;
-    function selectSp("parameters will be added") external;
+    function selectSp(uint256 dealSize, address SLC) external;
 }
 ```
 Expected storage items:
@@ -203,7 +250,7 @@ Expected storage items:
 ```
 mapping(address validator => bool isValidator) public isValidator;
 ```
-// and items inherited from OpenZeppelin's AccessControl, UUPSUpgradeable
+// and items inherited from OpenZeppelin's AccessControl and the Beacon Proxy Factory upgradeable pattern
 
 ## Validator
 
@@ -222,6 +269,7 @@ interface Validator {
 
     function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256 rate) external;
     function updateLockupPeriod(uint256 dealID);
+    function railTerminated(uint256 railId, address terminator, uint256 endEpoch) external;
 }
 ```
 Expected storage items:
