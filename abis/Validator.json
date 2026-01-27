@@ -90,11 +90,6 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "poRepMarket",
-        "type": "address",
-        "internalType": "contract PoRepMarket"
       }
     ],
     "outputs": [],
@@ -187,6 +182,11 @@
       },
       {
         "name": "_clientSC",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
       }
@@ -349,7 +349,7 @@
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "event",

@@ -15,7 +15,7 @@ import {ClientSCMock} from "../test/contracts/ClientSCMock.sol";
 
 /**
  * @title Validator
- * @dev Implements payment validation logic for Filecoin Pay rails.
+ * @dev Implements payment validation logic for Filecoin Pay rails
  * @notice Validator contract for Filecoin Pay
  */
 contract Validator is Initializable, AccessControlUpgradeable, IValidator, Operator {
@@ -40,8 +40,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         address filecoinPay;
         address SLC;
         address clientSC;
+        address poRepMarket;
         CommonTypes.FilActorId provider;
-        mapping(uint256 railId => uint256 payoutEpoch) lastPayoutEpoch;
     }
 
     /**
@@ -67,13 +67,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param _SLC Address of the SLC contract
      * @param _provider FilActorId of the storage provider
      * @param _clientSC Address of the client smart contract
+     * @param _poRepMarket Address of the PoRepMarket contract
      */
     function initialize(
         address admin,
         address _filecoinPay,
         address _SLC,
         CommonTypes.FilActorId _provider,
-        address _clientSC
+        address _clientSC,
+        address _poRepMarket
     ) external initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -83,13 +85,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         $.SLC = _SLC;
         $.provider = _provider;
         $.clientSC = _clientSC;
+        $.poRepMarket = _poRepMarket;
     }
 
     // solhint-enable func-param-name-mixedcase
 
     // solhint-disable no-unused-vars
     /**
-     * @notice Validates a proposed payment amount for a payment rail.
+     * @notice Validates a proposed payment amount for a payment rail
      * @param railId ID of the payment rail
      * @param proposedAmount Proposed payment amount to validate
      * @param fromEpoch The epoch up to and including which the rail has already been settled
@@ -99,6 +102,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256 rate)
         external
+        view
         returns (ValidationResult memory result)
     {
         ValidatorStorage storage $ = _getValidatorStorage();
@@ -106,19 +110,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotFilecoinPay();
         }
 
-        uint256 last = $.lastPayoutEpoch[railId];
-        if (last != 0 && toEpoch < last + EPOCHS_IN_MONTH) {
+        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
             result.modifiedAmount = 0;
-            result.settleUpto = last;
+            result.settleUpto = fromEpoch;
             result.note = "too early for next payout";
             return result;
         }
 
         // Mock's usage (temporary)
         uint256 score = SLCMock($.SLC).getScore($.provider);
-        bool ok = ClientSCMock($.clientSC).verifyAllocatedDataCapEqualsSealed($.provider);
+        bool isDataSizeMatching = ClientSCMock($.clientSC).verifyAllocatedDataCapEqualsSealed($.provider);
 
-        if (!ok) {
+        if (!isDataSizeMatching) {
             result.modifiedAmount = 0;
             result.settleUpto = fromEpoch;
             result.note = "datacap mismatch";
@@ -134,11 +137,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         }
 
         result.settleUpto = toEpoch;
-        $.lastPayoutEpoch[railId] = toEpoch;
     }
 
     /**
-     * @notice Deposits tokens with permit and creates a payment rail for a deal.
+     * @notice Deposits tokens with permit and creates a payment rail for a deal
      * @param token The ERC20 token to deposit
      * @param payer The address paying the tokens
      * @param payee The address receiving the tokens
@@ -153,7 +155,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param commissionRateBps The commission rate in basis points for the payment rail
      * @param serviceFeeRecipient The recipient of service fees for the payment rail
      * @param dealId The ID of the deal associated with the payment rail
-     * @param poRepMarket The PoRepMarket contract instance
      */
     function depositWithPermitAndCreateRailForDeal(
         IERC20 token,
@@ -169,25 +170,32 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         uint256 maxLockupPeriod,
         uint256 commissionRateBps,
         address serviceFeeRecipient,
-        uint256 dealId,
-        PoRepMarket poRepMarket
-    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        uint256 dealId
+    ) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
 
-        FilecoinPayV1 filecoinPay = FilecoinPayV1($.filecoinPay);
-
-        filecoinPay.depositWithPermitAndApproveOperator(
-            token, payer, amount, deadline, v, r, s, address(this), rateAllowance, lockupAllowance, maxLockupPeriod
+        _depositWithPermitAndApproveOperator(
+            FilecoinPayV1($.filecoinPay),
+            token,
+            payer,
+            amount,
+            deadline,
+            v,
+            r,
+            s,
+            rateAllowance,
+            lockupAllowance,
+            maxLockupPeriod
         );
 
         uint256 railId =
-            filecoinPay.createRail(token, payer, payee, address(this), commissionRateBps, serviceFeeRecipient);
+            _createRail(FilecoinPayV1($.filecoinPay), token, payer, payee, commissionRateBps, serviceFeeRecipient);
 
-        poRepMarket.updateValidatorAndRailId(dealId, railId);
+        PoRepMarket($.poRepMarket).updateValidatorAndRailId(dealId, railId);
     }
 
     /**
-     * @notice Updates the lockup period of a payment rail.
+     * @notice Updates the lockup period of a payment rail
      * @param railId The ID of the rail to modify
      * @param newLockupPeriod New lockup period to set
      * @param lockupFixed New fixed lockup amount
@@ -199,11 +207,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotClientSC();
         }
 
-        FilecoinPayV1($.filecoinPay).modifyRailLockup(railId, newLockupPeriod, lockupFixed);
+        _updateLockupPeriod(FilecoinPayV1($.filecoinPay), railId, newLockupPeriod, lockupFixed);
     }
 
     /**
-     * @notice Invoked when a payment rail is terminated.
+     * @notice Invoked when a payment rail is terminated
      * @param railId The ID of the terminated rail
      * @param terminator Address that initiated the termination
      * @param endEpoch Filecoin epoch at which the rail was terminated
@@ -219,7 +227,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     //  solhint-disable
     /**
-     * @notice Retrieves the ValidatorStorage struct from the designated storage location.
+     * @notice Retrieves the ValidatorStorage struct from the designated storage location
      * @return $ Reference to the ValidatorStorage struct
      */
     function _getValidatorStorage() private pure returns (ValidatorStorage storage $) {
