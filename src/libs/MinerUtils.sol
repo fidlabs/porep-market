@@ -29,6 +29,9 @@ library MinerUtils {
             revert ExitCodeError();
         }
         return controllingAddress;
+    }
+
+    /**
      * @notice Retrieves the owner information for a given miner actor ID.
      * @dev Wraps the numeric minerID into a FilActorId and calls MinerAPI.getOwner.
      *      Reverts with ExitCodeError if the FVM call returns a non-zero exit code.
