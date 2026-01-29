@@ -1,18 +1,23 @@
+// solhint-disable use-natspec
 // SPDX-License-Identifier: MIT
-// solhint-disable
 
-pragma solidity ^0.8.24;
+pragma solidity 0.8.25;
 
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
 
 contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepMarket.DealProposal deal) public deals;
 
+    function setDealProposal(uint256 dealId, PoRepMarket.DealProposal memory dealProposal) external {
+        deals[dealId] = dealProposal;
+    }
+
     function getDealProposal(uint256 dealId) external view returns (PoRepMarket.DealProposal memory) {
         return deals[dealId];
     }
 
-    function setDealProposal(uint256 dealId, PoRepMarket.DealProposal calldata deal) external {
-        deals[dealId] = deal;
+    function completeDeal(uint256) external {
+        //noop
     }
 }
+

@@ -22,7 +22,7 @@ contract SPRegistryMock is ISPRegistry {
         owners[client][provider] = _isOwner;
     }
 
-    function isStorageProviderOwner(address client, CommonTypes.FilActorId provider) external view returns (bool) {
+    function isStorageProviderOwner(address client, CommonTypes.FilActorId provider) public view returns (bool) {
         return owners[client][provider];
     }
 }
