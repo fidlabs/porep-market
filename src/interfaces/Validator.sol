@@ -11,8 +11,9 @@ interface IValidator {
     /**
      * @notice updateLockupPeriod function
      * @dev updateLockupPeriod function is a function that updates the lockup period for a validator
-     * @param dealId The id of the deal
+     * @param railId The id of the rail
+     * @param newLockupPeriod The new lockup period
      */
-    function updateLockupPeriod(uint256 dealId) external;
+    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external;
 }
 

@@ -13,6 +13,4 @@ contract ValidatorFactoryMock {
     function setValidator(address _validator, bool _isCorrect) external {
         validators[_validator] = _isCorrect;
     }
-
-    function updateLockupPeriod(uint256 dealId) external {}
 }

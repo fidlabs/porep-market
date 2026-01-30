@@ -8,7 +8,7 @@ import {PoRepMarket} from "../../src/PoRepMarket.sol";
 contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepMarket.DealProposal deal) public deals;
 
-    function setDealProposal(uint256 dealId, PoRepMarket.DealProposal memory dealProposal) external {
+    function setDealProposal(uint256 dealId, PoRepMarket.DealProposal calldata dealProposal) external {
         deals[dealId] = dealProposal;
     }
 
@@ -16,6 +16,7 @@ contract PoRepMarketMock {
         return deals[dealId];
     }
 
+    // solhint-disable-next-line no-empty-blocks
     function completeDeal(uint256) external {
         //noop
     }

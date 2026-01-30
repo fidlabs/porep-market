@@ -1,0 +1,17 @@
+[
+  {
+    "type": "error",
+    "name": "InvalidFirstElement",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSecondElement",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTopLevelArray",
+    "inputs": []
+  }
+]

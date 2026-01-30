@@ -7,7 +7,6 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {DataCapAPI} from "filecoin-solidity/v0.8/DataCapAPI.sol";
-import {BigInts} from "filecoin-solidity/v0.8/utils/BigInts.sol";
 import {DataCapTypes} from "filecoin-solidity/v0.8/types/DataCapTypes.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {CBORDecoder} from "filecoin-solidity/v0.8/utils/CborDecode.sol";
@@ -17,24 +16,19 @@ import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
 import {IValidator} from "./interfaces/Validator.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
 /**
  * @title Client
  * @notice Upgradeable contract for managing client allowances with role-based access control
  */
-contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuard {
     using EnumerableMap for EnumerableMap.AddressToUintMap;
     using AllocationResponseCbor for DataCapTypes.TransferReturn;
 
     // @custom:storage-location erc7201:porepmarket.storage.ClientStorage
     struct ClientStorage {
-        mapping(address client => mapping(CommonTypes.FilActorId provider => uint256 amount)) _allowances;
         mapping(uint256 dealId => Deal deal) _deals;
-        mapping(
-            CommonTypes.FilActorId provider => mapping(address client => CommonTypes.FilActorId[] allocationIds)
-        ) _clientAllocationIdsPerProvider;
-        mapping(uint64 claim => bool isTerminated) _terminatedClaims;
-        mapping(CommonTypes.FilActorId provider => EnumerableMap.AddressToUintMap client) _spClients;
         PoRepMarket _poRepMarketContract;
     }
 
@@ -52,6 +46,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
 
     /**
      * @dev Returns the storage struct for the Client contract.
+     * @notice function to allow acess to storage for inheriting contracts
+     * @return ClientStorage storage struct
      */
     function s() internal pure returns (ClientStorage storage) {
         return _getClientStorage();
@@ -73,25 +69,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
      * @notice The role to set terminated claims.
      */
     bytes32 public constant TERMINATION_ORACLE = keccak256("TERMINATION_ORACLE");
-    /**
-     * @notice Mapping of allowances for clients and providers using FilActorId
-     */
-
-    /**
-     * @notice  Precision factor for DataCap tokens (1e18)
-     */
-    uint256 public constant TOKEN_PRECISION = 1e18;
-
-    /**
-     * @notice Event emitted when an allowance is changed
-     * @param client Client address
-     * @param provider Provider fil actor id
-     * @param allowanceBefore Allowance before the change
-     * @param allowanceAfter Allowance after the change
-     */
-    event AllowanceChanged(
-        address indexed client, CommonTypes.FilActorId indexed provider, uint256 allowanceBefore, uint256 allowanceAfter
-    );
 
     // solhint-disable gas-indexed-events
     /**
@@ -104,8 +81,17 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
 
     /**
      * @notice Emited when lockupPeriod is called
+     * @param dealId Deal id
+     * @param validator Validator address
      */
-    event ValidatorLockupPeriodUpdated(uint256 dealId, address validator);
+    event ValidatorLockupPeriodUpdated(uint256 indexed dealId, address indexed validator);
+
+    /**
+     * @notice Emitted when a verified client is added
+     * @param client Client address
+     * @param allowance Allowance amount
+     */
+    event VerifiedClientAdded(address indexed client, uint256 indexed allowance);
 
     /**
      * @notice Thrown if sender is not proposed client
@@ -116,26 +102,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
      * @notice Thrown if alloc provider is not proposed provider
      */
     error InvalidProvider();
-
-    /**
-     * @notice Error emitted when the amount is zero
-     */
-    error AmountEqualsZero();
-
-    /**
-     * @notice Error emitted when the allowance is zero
-     */
-    error AlreadyZero();
-
-    /**
-     * @notice Error thrown when amount is invalid
-     */
-    error InvalidAmount();
-
-    /**
-     * @notice Error thrown when senders balance is less than his allowance
-     */
-    error InsufficientAllowance();
 
     /**
      * @notice Datacap transfer failed
@@ -153,7 +119,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     error InvalidAllocationRequest();
 
     /**
-     * @notice GetClaims call to VerifReg faile
+     * @notice GetClaims call to VerifReg failed
      */
     error GetClaimsCallFailed();
 
@@ -178,28 +144,24 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     error InvalidCaller(address caller, address expectedCaller);
 
     /**
-     * @notice Thrown if beneficiary contract address doesn't match the one registered in BeneficiaryFactory
+     * @notice Error thrown when VerifReg addVerifiedClient call fails
      */
-    error InvalidBeneficiary(address beneficiary, address expectedBeneficiary);
+    error VerifRegAddVerifiedClientFailed(int256 exitCode);
 
     /**
-     * @notice Thrown if beneficiary contract address doesn't match the one registered in BeneficiaryFactory
+     * @notice Error thrown when deal state is invalid for transfer
      */
-    error AllocationNotFound(CommonTypes.FilActorId provider, address client, uint64 allocationId);
-
-    /**
-     * @notice Thrown if beneficiary allocation expiration is insufficient
-     */
-    error InsufficientBeneficiaryAllocationExpiration(
-        CommonTypes.FilActorId provider, int64 beneficiaryExpiration, int64 requiredExpiration
-    );
+    error InvalidDealStateForTransfer();
 
     struct Deal {
         address client;
+        address validator;
         CommonTypes.FilActorId provider;
-        uint256 dealID;
+        uint256 dealId;
+        uint256 railId;
         uint256 sizeOfAllocations;
         CommonTypes.ChainEpoch longestDealTerm;
+        CommonTypes.FilActorId[] allocationIds;
     }
 
     struct ProviderAllocation {
@@ -235,58 +197,14 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
         public
         initializer
     {
-        ClientStorage storage $ = s();
-
         __AccessControl_init();
-        // __UUPSUpgradeable_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
         _grantRole(ALLOCATOR_ROLE, allocator);
         _grantRole(TERMINATION_ORACLE, terminationOracle);
+
+        ClientStorage storage $ = s();
         $._poRepMarketContract = PoRepMarket(_poRepMarketContract);
-    }
-
-    /**
-     * @notice Increases the allowance for a given client and provider
-     * @param client Address of the client
-     * @param provider Address of the provider
-     * @param amount Amount to increase the allowance by
-     * Emits an AllowanceChanged event
-     */
-    function increaseAllowance(address client, CommonTypes.FilActorId provider, uint256 amount)
-        external
-        onlyRole(ALLOCATOR_ROLE)
-    {
-        if (amount == 0) revert AmountEqualsZero();
-
-        ClientStorage storage $ = s();
-        uint256 allowanceBefore = $._allowances[client][provider];
-        $._allowances[client][provider] += amount;
-        emit AllowanceChanged(client, provider, allowanceBefore, $._allowances[client][provider]);
-    }
-
-    /**
-     * @notice Decreases the allowance for a given client and provider
-     * @param client Address of the client
-     * @param provider Address of the provider
-     * @param amount Amount to decrease the allowance by
-     * @dev If the amount is greater than the allowance, the allowance is set to 0
-     * Emits an AllowanceChanged event
-     */
-    function decreaseAllowance(address client, CommonTypes.FilActorId provider, uint256 amount)
-        external
-        onlyRole(ALLOCATOR_ROLE)
-    {
-        if (amount == 0) revert AmountEqualsZero();
-
-        ClientStorage storage $ = s();
-        uint256 allowanceBefore = $._allowances[client][provider];
-        if (allowanceBefore == 0) revert AlreadyZero();
-        if (allowanceBefore < amount) {
-            amount = allowanceBefore;
-        }
-        $._allowances[client][provider] -= amount;
-        emit AllowanceChanged(client, provider, allowanceBefore, $._allowances[client][provider]);
     }
 
     /**
@@ -296,29 +214,34 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
      * @param dealId The id of the deal
      * @param dealCompleted Whether the deal is completed
      */
-    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId, bool dealCompleted) external {
-        (uint256 tokenAmount, bool failed) = BigInts.toUint256(params.amount);
-        if (failed) revert InvalidAmount();
-        uint256 datacapAmount = tokenAmount / TOKEN_PRECISION;
-
+    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId, bool dealCompleted)
+        external
+        nonReentrant
+    {
         (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 longestDealTerm) =
             _deserializeVerifregOperatorData(params.operator_data);
 
-        ClientStorage storage $ = s();
-        PoRepMarket.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
-
-        _verifyAndRegisterDeal(proposal, longestDealTerm);
-        _verifyAndRegisterAllocations(proposal, allocations);
+        _verifyAndRegisterDeal(dealId, dealCompleted);
+        _updateValidatorLockupPeriodAndLongestTermForDeal(dealId, longestDealTerm);
+        _verifyAndRegisterAllocations(dealId, allocations);
         _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
 
+        ClientStorage storage $ = s();
+
         VerifRegTypes.AddVerifiedClientParams memory verifregParams = VerifRegTypes.AddVerifiedClientParams({
-            addr: FilAddresses.fromEthAddress($._deals[dealId].client),
-            allowance: CommonTypes.BigInt(abi.encodePacked(datacapAmount), false)
+            addr: FilAddresses.fromEthAddress(address(this)),
+            allowance: CommonTypes.BigInt(abi.encodePacked($._deals[dealId].sizeOfAllocations), false)
         });
 
-        VerifRegAPI.addVerifiedClient(verifregParams);
+        {
+            emit VerifiedClientAdded(msg.sender, $._deals[dealId].sizeOfAllocations);
+            int256 verifgerApiExitCode = VerifRegAPI.addVerifiedClient(verifregParams);
+            if (verifgerApiExitCode != 0) {
+                revert VerifRegAddVerifiedClientFailed(verifgerApiExitCode);
+            }
+        }
 
-        emit DatacapSpent(msg.sender, datacapAmount);
+        emit DatacapSpent(msg.sender, $._deals[dealId].sizeOfAllocations);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
         (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
         if (exitCode != 0) {
@@ -329,13 +252,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
             for (uint256 i = 0; i < allocationIds.length; i++) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
-                CommonTypes.FilActorId provider = allocations[i].provider;
-                $._clientAllocationIdsPerProvider[provider][msg.sender].push(allocId);
+                $._deals[dealId].allocationIds.push(allocId);
             }
-        }
-
-        if (dealCompleted) {
-            $._poRepMarketContract.completeDeal(dealId);
         }
     }
 
@@ -456,49 +374,68 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
 
     /**
      * @notice Verifies and registers a deal.
-     * @param proposal The deal proposal.
-     * @param longestDealTerm The longest allocation.
+     * @param dealId The deal id.
+     * @param dealCompleted flag to check if deal is completed
      */
-    function _verifyAndRegisterDeal(PoRepMarket.DealProposal memory proposal, int64 longestDealTerm) internal {
+    function _verifyAndRegisterDeal(uint256 dealId, bool dealCompleted) internal {
         ClientStorage storage $ = s();
 
-        if (longestDealTerm > CommonTypes.ChainEpoch.unwrap($._deals[proposal.dealId].longestDealTerm)) {
-            IValidator validator = IValidator(proposal.validator);
-            validator.updateLockupPeriod(proposal.dealId);
+        PoRepMarket.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
-            emit ValidatorLockupPeriodUpdated(proposal.dealId, proposal.validator);
+        if (proposal.client != msg.sender) {
+            revert InvalidClient();
         }
 
-        $._deals[proposal.dealId].client = proposal.client;
-        $._deals[proposal.dealId].provider = proposal.provider;
-        $._deals[proposal.dealId].dealID = proposal.dealId;
-        $._deals[proposal.dealId].longestDealTerm = CommonTypes.ChainEpoch.wrap(longestDealTerm);
+        if (proposal.state != PoRepMarket.DealState.Accepted) {
+            revert InvalidDealStateForTransfer();
+        }
+
+        if (dealCompleted) {
+            $._poRepMarketContract.completeDeal(dealId);
+        }
+
+        Deal storage deal = $._deals[dealId];
+        if (deal.dealId != 0) return;
+
+        deal.client = proposal.client;
+        deal.provider = proposal.provider;
+        deal.dealId = proposal.dealId;
+        deal.validator = proposal.validator;
+        deal.railId = proposal.railId;
+    }
+
+    /**
+     * @notice Updates validator lockup period if needed
+     * @param dealId The deal id.
+     * @param longestDealTerm The longest allocation.
+     */
+    function _updateValidatorLockupPeriodAndLongestTermForDeal(uint256 dealId, int64 longestDealTerm) internal {
+        Deal storage deal = _getStorageDeal(dealId);
+
+        if (longestDealTerm > CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm)) {
+            IValidator validator = IValidator(deal.validator);
+            validator.updateLockupPeriod(deal.railId, uint256(uint64(longestDealTerm)));
+
+            emit ValidatorLockupPeriodUpdated(dealId, deal.validator);
+            deal.longestDealTerm = CommonTypes.ChainEpoch.wrap(longestDealTerm);
+        }
     }
 
     /**
      * @notice Verifies and registers allocations.
-     * @param proposal The deal proposal.
+     * @param dealId The deal id.
      * @param allocations The array of provider allocations.
      */
-    function _verifyAndRegisterAllocations(
-        PoRepMarket.DealProposal memory proposal,
-        ProviderAllocation[] memory allocations
-    ) internal {
-        if (proposal.client != msg.sender) revert InvalidClient();
-        ClientStorage storage $ = s();
+    function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations) internal {
+        Deal storage deal = _getStorageDeal(dealId);
 
         for (uint256 i = 0; i < allocations.length; i++) {
             ProviderAllocation memory alloc = allocations[i];
-            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(proposal.provider)) {
+            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
                 revert InvalidProvider();
             }
 
-            uint256 size = alloc.size;
-            if ($._allowances[msg.sender][alloc.provider] < size) {
-                revert InsufficientAllowance();
-            }
-            $._allowances[msg.sender][alloc.provider] -= size;
-            $._deals[proposal.dealId].sizeOfAllocations += size;
+            deal.sizeOfAllocations += alloc.size;
         }
     }
 
@@ -509,199 +446,52 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
      * @param claimExtensions The array of provider claims.
      */
     function _verifyAndRegisterClaimExtensions(uint256 dealId, ProviderClaim[] memory claimExtensions) internal {
-        int256 exitCode;
-        uint256 claimProvidersCount = 0;
-        CommonTypes.FilActorId[] memory claimProviders = new CommonTypes.FilActorId[](claimExtensions.length);
+        Deal storage deal = _getStorageDeal(dealId);
+        CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](claimExtensions.length);
+        CommonTypes.FilActorId dealProvider = deal.provider;
 
-        // get providers list with no duplicates
         for (uint256 i = 0; i < claimExtensions.length; i++) {
             ProviderClaim memory claim = claimExtensions[i];
-            bool alreadyExists = false;
-            for (uint256 j = 0; j < claimProvidersCount; j++) {
-                if (CommonTypes.FilActorId.unwrap(claimProviders[j]) == CommonTypes.FilActorId.unwrap(claim.provider)) {
-                    alreadyExists = true;
-                    break;
-                }
+
+            if (CommonTypes.FilActorId.unwrap(claim.provider) != CommonTypes.FilActorId.unwrap(dealProvider)) {
+                revert InvalidProvider();
             }
-            if (!alreadyExists) {
-                claimProviders[claimProvidersCount++] = claim.provider;
-            }
+
+            claimIds[i] = claim.claim;
         }
-
-        CommonTypes.FilActorId[] memory claims = new CommonTypes.FilActorId[](claimExtensions.length);
-        for (uint256 providerIdx = 0; providerIdx < claimProvidersCount; providerIdx++) {
-            // for each provider, find all claims for this provider
-            uint256 claimCount = 0;
-            CommonTypes.FilActorId provider = claimProviders[providerIdx];
-            for (uint256 i = 0; i < claimExtensions.length; i++) {
-                ProviderClaim memory claim = claimExtensions[i];
-                if (CommonTypes.FilActorId.unwrap(claim.provider) == CommonTypes.FilActorId.unwrap(provider)) {
-                    claims[claimCount++] = claim.claim;
-                }
-            }
-            // solhint-disable-next-line no-inline-assembly
-            assembly {
-                mstore(claims, claimCount)
-            }
-
-            // get details of claims of this provider
-            VerifRegTypes.GetClaimsParams memory getClaimsParams =
-                VerifRegTypes.GetClaimsParams({provider: provider, claim_ids: claims});
+        {
+            int256 exitCode;
             VerifRegTypes.GetClaimsReturn memory claimsDetails;
+            VerifRegTypes.GetClaimsParams memory getClaimsParams =
+                VerifRegTypes.GetClaimsParams({provider: dealProvider, claim_ids: claimIds});
             (exitCode, claimsDetails) = VerifRegAPI.getClaims(getClaimsParams);
-            if (exitCode != 0 || claimsDetails.batch_info.success_count != claims.length) {
+            if (exitCode != 0 || claimsDetails.batch_info.success_count != claimIds.length) {
                 revert GetClaimsCallFailed();
             }
 
-            // calculate total size of claims (a.k.a. how much datacap is going to this single SP)
-            ClientStorage storage $ = s();
-            uint256 size = 0;
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
-                size += claim.size;
+                deal.sizeOfAllocations += claim.size;
             }
-            if ($._allowances[msg.sender][provider] < size) {
-                revert InsufficientAllowance();
-            }
-            $._allowances[msg.sender][provider] -= size;
-            $._deals[dealId].sizeOfAllocations += size;
-        }
-    }
-
-    function getSPClientsDataUsage(CommonTypes.FilActorId provider)
-        external
-        view
-        returns (ClientDataUsage[] memory clientsDataUsage)
-    {
-        ClientStorage storage $ = s();
-        uint256 clientCount = $._spClients[provider].length();
-        clientsDataUsage = new ClientDataUsage[](clientCount);
-        for (uint256 i = 0; i < clientCount; ++i) {
-            (address client, uint256 usage) = $._spClients[provider].at(i);
-            clientsDataUsage[i] = ClientDataUsage({client: client, usage: usage});
-        }
-    }
-
-    /**
-     * @notice Returns the data usage of all clients for a given storage provider
-     * @param provider The FilActorId of the storage provider
-     * @return clients An array of provider clients
-     */
-    function getSPClients(CommonTypes.FilActorId provider) external view returns (address[] memory clients) {
-        clients = s()._spClients[provider].keys();
-    }
-
-    /**
-     * @notice Deletes an allocation ID from the client's allocation list for a given provider
-     * @dev Removes the allocation ID by swapping it with the last element and popping from the array. Reverts with AllocationNotFound if the allocation ID is not found
-     * @param provider The Filecoin actor ID of the provider
-     * @param client The Ethereum address of the client
-     * @param allocationId The allocation ID to delete
-     */
-    function _deleteAllocationIdByValue(CommonTypes.FilActorId provider, address client, uint64 allocationId) internal {
-        CommonTypes.FilActorId[] storage ids = s()._clientAllocationIdsPerProvider[provider][client];
-
-        uint256 maxIdx = ids.length - 1;
-        for (uint256 i = 0; i < maxIdx; i++) {
-            if (CommonTypes.FilActorId.unwrap(ids[i]) == allocationId) {
-                ids[i] = ids[maxIdx];
-                ids.pop();
-                return;
-            }
-        }
-        if (CommonTypes.FilActorId.unwrap(ids[maxIdx]) == allocationId) {
-            ids.pop();
-        } else {
-            revert AllocationNotFound(provider, client, allocationId);
-        }
-    }
-
-    /**
-     * @notice Marks the given claims as terminated early.
-     * @dev Only callable by TERMINATION_ORACLE role.
-     * @param claims An array of claim IDs to mark as terminated.
-     */
-    function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
-        ClientStorage storage $ = s();
-
-        for (uint256 i = 0; i < claims.length; i++) {
-            $._terminatedClaims[claims[i]] = true;
         }
     }
 
     /**
      * @notice custom getter to retrieve allication ids per client and provider
-     * @param provider the FilActorId of provider
-     * @param client the client address
+     * @param dealId the id of the deal
      * @return allocationIds the allocation ids for the client and provider
      */
-    function getClientAllocationIdsPerProvider(CommonTypes.FilActorId provider, address client)
-        external
-        view
-        returns (CommonTypes.FilActorId[] memory)
-    {
-        return s()._clientAllocationIdsPerProvider[provider][client];
+    function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory) {
+        return s()._deals[dealId].allocationIds;
     }
 
     /**
-     * @notice custom getter to allowances per client and provider
-     * @param client the client address
-     * @param provider the FilActorId of provider
-     * @return amount allocation per client and provider
+     * @notice Internal function used to retrieve a storage deal
+     * @param dealId The id of the deal
+     * @return deal The storage deal
      */
-    function getAllowance(address client, CommonTypes.FilActorId provider) external view returns (uint256 amount) {
-        return s()._allowances[client][provider];
-    }
-
-    function getTerminatedClaim(uint64 claim) external view returns (bool isTerminated) {
-        return s()._terminatedClaims[claim];
-    }
-
-        /**
-     * @notice Calculates the total active data size for a client with a specific provider
-     * @dev Iterates through the client's allocation IDs, retrieves their claims, and sums up the sizes of active claims
-     *      Removes allocation IDs associated with expired or terminated claims
-     * @param client The Ethereum address of the client
-     * @param provider The Filecoin actor ID of the provider
-     * @return totalSizePerSp The total active data size for the client with the specified provider
-     */
-    function getClientSpActiveDataSize(address client, CommonTypes.FilActorId provider) external returns (uint256) {
-        ClientStorage storage $ = s();
-
-        CommonTypes.FilActorId[] memory clientAllocationIds = $._clientAllocationIdsPerProvider[provider][client];
-        VerifRegTypes.GetClaimsParams memory getClaimsParams =
-            VerifRegTypes.GetClaimsParams({provider: provider, claim_ids: clientAllocationIds});
-        (int256 getClaimsExitCode, VerifRegTypes.GetClaimsReturn memory getClaimsResult) =
-            VerifRegAPI.getClaims(getClaimsParams);
-        if (getClaimsExitCode != 0) {
-            revert GetClaimsCallFailed();
-        }
-        uint256 totalSizePerSp = 0;
-        uint256 failCodesIterator = 0;
-        int64 currentEpoch = int64(uint64(block.number));
-        for (uint256 i = 0; i < clientAllocationIds.length; i++) {
-            if (
-                getClaimsResult.batch_info.fail_codes.length > 0
-                    && getClaimsResult.batch_info.fail_codes.length > failCodesIterator
-                    && i == getClaimsResult.batch_info.fail_codes[failCodesIterator].idx
-            ) {
-                failCodesIterator += 1;
-                continue;
-            }
-            if (
-                CommonTypes.ChainEpoch.unwrap(getClaimsResult.claims[i - failCodesIterator].term_start)
-                            + CommonTypes.ChainEpoch.unwrap(getClaimsResult.claims[i - failCodesIterator].term_max)
-                        < currentEpoch
-                    || $._terminatedClaims[
-                        CommonTypes.FilActorId.unwrap(getClaimsResult.claims[i - failCodesIterator].sector)
-                    ]
-            ) {
-                _deleteAllocationIdByValue(provider, client, CommonTypes.FilActorId.unwrap(clientAllocationIds[i]));
-                continue;
-            }
-            totalSizePerSp += getClaimsResult.claims[i - failCodesIterator].size;
-        }
-        return totalSizePerSp;
+    function _getStorageDeal(uint256 dealId) internal view returns (Deal storage) {
+        return s()._deals[dealId];
     }
 
     // solhint-disable no-empty-blocks

@@ -15,8 +15,6 @@ contract ActorIdMock {
 
     error MethodNotFound(string mockName, uint256 methodNum, uint64 target);
 
-    event ActorMockIdCall(uint256 methodNum, uint64 target);
-
     receive() external payable {}
 
     function setGetClaimsResult(bytes memory d) public {
@@ -26,8 +24,6 @@ contract ActorIdMock {
     // solhint-disable-next-line no-complex-fallback
     fallback(bytes calldata data) external payable returns (bytes memory) {
         (uint256 methodNum,,,,, uint64 target) = abi.decode(data, (uint64, uint256, uint64, uint64, bytes, uint64));
-        emit ActorMockIdCall(methodNum, target);
-
         if (target == VERIFREG_ACTOR_ID) {
             if (methodNum == ADD_VERIFIED_CLIENT) return _handleAddVerifiedClient();
             if (methodNum == VERIFREG_GET_CLAIMS) return _handleVerifrefGetClaims();
