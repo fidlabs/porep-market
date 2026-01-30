@@ -3,12 +3,10 @@
 
 pragma solidity ^0.8.24;
 
-import {IValidatorRegistry} from "../../src/interfaces/ValidatorRegistry.sol";
-
-contract ValidatorRegistryMock is IValidatorRegistry {
+contract ValidatorFactoryMock {
     mapping(address => bool) public validators;
 
-    function isCorrectValidator(address _validator) external view returns (bool) {
+    function isValidatorContract(address _validator) external view returns (bool) {
         return validators[_validator];
     }
 

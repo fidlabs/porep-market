@@ -5,14 +5,14 @@ pragma solidity ^0.8.24;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
-import {ValidatorRegistryMock} from "./contracts/ValidatorRegistryMock.sol";
+import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract PoRepMarketTest is Test {
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
-    ValidatorRegistryMock public validatorRegistry;
+    ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
     address public clientSmartContractAddress;
     address public clientAddress;
@@ -28,7 +28,7 @@ contract PoRepMarketTest is Test {
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
         spRegistry = new SPRegistryMock();
-        validatorRegistry = new ValidatorRegistryMock();
+        validatorFactory = new ValidatorFactoryMock();
         validatorAddress = vm.addr(0x001);
         clientSmartContractAddress = vm.addr(0x002);
         clientAddress = vm.addr(0x003);
@@ -44,7 +44,7 @@ contract PoRepMarketTest is Test {
         // solhint-disable gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
             "initialize(address,address,address)",
-            address(validatorRegistry),
+            address(validatorFactory),
             address(spRegistry),
             clientSmartContractAddress
         );
@@ -53,7 +53,7 @@ contract PoRepMarketTest is Test {
 
         spRegistry.setProvider(slcAddress, providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
-        validatorRegistry.setValidator(validatorAddress, true);
+        validatorFactory.setValidator(validatorAddress, true);
     }
 
     function testProposeDealEmitsEvent() public {
