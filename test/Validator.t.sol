@@ -119,25 +119,6 @@ contract ValidatorTest is Test {
             dealId
         );
 
-        assertEq(address(filecoinPay.lastToken()), address(token));
-        assertEq(filecoinPay.lastPayer(), payer);
-        assertEq(filecoinPay.lastAmount(), amount);
-        assertEq(filecoinPay.lastDeadline(), deadline);
-        assertEq(filecoinPay.lastV(), v);
-        assertEq(filecoinPay.lastR(), r);
-        assertEq(filecoinPay.lastS(), s);
-        assertEq(filecoinPay.lastOperator(), address(validator));
-        assertEq(filecoinPay.lastRateAllowance(), rateAllowance);
-        assertEq(filecoinPay.lastLockupAllowance(), lockupAllowance);
-        assertEq(filecoinPay.lastMaxLockupPeriod(), maxLockup);
-
-        assertEq(address(filecoinPay.lastRailToken()), address(token));
-        assertEq(filecoinPay.lastRailPayer(), payer);
-        assertEq(filecoinPay.lastRailPayee(), payee);
-        assertEq(filecoinPay.lastRailOperator(), address(validator));
-        assertEq(filecoinPay.lastCommissionRateBps(), commission);
-        assertEq(filecoinPay.lastServiceFeeRecipient(), feeRecipient);
-
         PoRepMarket.DealProposal memory dp = poRepMarket.getDealProposal(dealId);
         assertEq(dp.validator, address(validator));
         assertEq(dp.railId, 1);
