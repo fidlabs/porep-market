@@ -8,6 +8,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IValidator, FilecoinPayV1} from "filecoin-pay/FilecoinPayV1.sol";
+import {MinerUtils} from "./libs/MinerUtils.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
 import {SLCMock} from "../test/contracts/SLCMock.sol";
@@ -41,7 +42,31 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         address SLC;
         address clientSC;
         address poRepMarket;
-        CommonTypes.FilActorId provider;
+        CommonTypes.FilAddress providerOwner;
+    }
+
+    /**
+     * @notice Parameters for deposit with rail creation
+     * @param token The ERC20 token to deposit
+     * @param payer The address paying the tokens
+     * @param payee The address receiving the tokens
+     * @param amount The amount of tokens to deposit
+     * @param deadline The deadline for the permit
+     * @param v The v component of the permit signature
+     * @param r The r component of the permit signature
+     * @param s The s component of the permit signature
+     * @param dealId The ID of the deal associated with the payment rail
+     */
+    struct DepositWithRailParams {
+        IERC20 token;
+        address payer;
+        address payee;
+        uint8 v;
+        uint256 amount;
+        uint256 deadline;
+        bytes32 r;
+        bytes32 s;
+        uint256 dealId;
     }
 
     /**
@@ -65,27 +90,48 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param admin Address to be granted the default admin role
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLC Address of the SLC contract
-     * @param _provider FilActorId of the storage provider
      * @param _clientSC Address of the client smart contract
      * @param _poRepMarket Address of the PoRepMarket contract
+     * @param params Parameters for deposit and rail creation
      */
     function initialize(
         address admin,
         address _filecoinPay,
         address _SLC,
-        CommonTypes.FilActorId _provider,
         address _clientSC,
-        address _poRepMarket
+        address _poRepMarket,
+        DepositWithRailParams calldata params
     ) external initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
 
         ValidatorStorage storage $ = _getValidatorStorage();
+
+        PoRepMarket.DealProposal memory dp = PoRepMarket(_poRepMarket).getDealProposal(params.dealId);
+        address payer = dp.client;
+
+        CommonTypes.FilAddress memory providerOwner = MinerUtils.getOwner(dp.provider).owner;
+        $.providerOwner = providerOwner;
+
         $.filecoinPay = _filecoinPay;
         $.SLC = _SLC;
-        $.provider = _provider;
+        $.providerOwner = providerOwner;
         $.clientSC = _clientSC;
         $.poRepMarket = _poRepMarket;
+
+        DepositWithRailParams memory initParams = DepositWithRailParams({
+            token: params.token,
+            payer: payer,
+            payee: params.payee,
+            amount: params.amount,
+            deadline: params.deadline,
+            v: params.v,
+            r: params.r,
+            s: params.s,
+            dealId: params.dealId
+        });
+
+        depositWithPermitAndCreateRailForDeal(initParams);
     }
 
     // solhint-enable func-param-name-mixedcase
@@ -141,57 +187,29 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /**
      * @notice Deposits tokens with permit and creates a payment rail for a deal
-     * @param token The ERC20 token to deposit
-     * @param payer The address paying the tokens
-     * @param payee The address receiving the tokens
-     * @param amount The amount of tokens to deposit
-     * @param deadline The deadline for the permit
-     * @param v The v component of the permit signature
-     * @param r The r component of the permit signature
-     * @param s The s component of the permit signature
-     * @param rateAllowance The rate allowance for the operator
-     * @param lockupAllowance The lockup allowance for the operator
-     * @param maxLockupPeriod The maximum lockup period for the payment rail
-     * @param commissionRateBps The commission rate in basis points for the payment rail
-     * @param serviceFeeRecipient The recipient of service fees for the payment rail
-     * @param dealId The ID of the deal associated with the payment rail
+     * @param params Parameters for deposit with rail creation
      */
-    function depositWithPermitAndCreateRailForDeal(
-        IERC20 token,
-        address payer,
-        address payee,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s,
-        uint256 rateAllowance,
-        uint256 lockupAllowance,
-        uint256 maxLockupPeriod,
-        uint256 commissionRateBps,
-        address serviceFeeRecipient,
-        uint256 dealId
-    ) external override {
+    function depositWithPermitAndCreateRailForDeal(DepositWithRailParams calldata params) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
 
         _depositWithPermitAndApproveOperator(
             FilecoinPayV1($.filecoinPay),
-            token,
-            payer,
-            amount,
-            deadline,
-            v,
-            r,
-            s,
-            rateAllowance,
-            lockupAllowance,
-            maxLockupPeriod
+            params.token,
+            params.payer,
+            params.amount,
+            params.deadline,
+            params.v,
+            params.r,
+            params.s,
+            0,
+            0,
+            0
         );
 
         uint256 railId =
-            _createRail(FilecoinPayV1($.filecoinPay), token, payer, payee, commissionRateBps, serviceFeeRecipient);
+            _createRail(FilecoinPayV1($.filecoinPay), params.token, params.payer, params.payee, 0, address(0));
 
-        PoRepMarket($.poRepMarket).updateValidatorAndRailId(dealId, railId);
+        PoRepMarket($.poRepMarket).updateValidatorAndRailId(params.dealId, railId);
     }
 
     /**
