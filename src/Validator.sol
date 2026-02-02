@@ -5,9 +5,10 @@ pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IValidator, FilecoinPayV1} from "filecoin-pay/FilecoinPayV1.sol";
+import {PrecompilesAPI} from "filecoin-solidity/v0.8/PrecompilesAPI.sol";
+import {FilAddressIdConverter} from "filecoin-solidity/v0.8/utils/FilAddressIdConverter.sol";
 import {MinerUtils} from "./libs/MinerUtils.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
@@ -42,31 +43,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         address SLC;
         address clientSC;
         address poRepMarket;
-        CommonTypes.FilAddress providerOwner;
-    }
-
-    /**
-     * @notice Parameters for deposit with rail creation
-     * @param token The ERC20 token to deposit
-     * @param payer The address paying the tokens
-     * @param payee The address receiving the tokens
-     * @param amount The amount of tokens to deposit
-     * @param deadline The deadline for the permit
-     * @param v The v component of the permit signature
-     * @param r The r component of the permit signature
-     * @param s The s component of the permit signature
-     * @param dealId The ID of the deal associated with the payment rail
-     */
-    struct DepositWithRailParams {
-        IERC20 token;
-        address payer;
-        address payee;
-        uint8 v;
-        uint256 amount;
-        uint256 deadline;
-        bytes32 r;
-        bytes32 s;
-        uint256 dealId;
+        CommonTypes.FilActorId providerId;
     }
 
     /**
@@ -111,18 +88,19 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         address payer = dp.client;
 
         CommonTypes.FilAddress memory providerOwner = MinerUtils.getOwner(dp.provider).owner;
-        $.providerOwner = providerOwner;
+        uint64 providerOwnerId = PrecompilesAPI.resolveAddress(providerOwner);
+        address payee = FilAddressIdConverter.toAddress(providerOwnerId);
 
+        $.providerId = dp.provider;
         $.filecoinPay = _filecoinPay;
         $.SLC = _SLC;
-        $.providerOwner = providerOwner;
         $.clientSC = _clientSC;
         $.poRepMarket = _poRepMarket;
 
         DepositWithRailParams memory initParams = DepositWithRailParams({
             token: params.token,
             payer: payer,
-            payee: params.payee,
+            payee: payee,
             amount: params.amount,
             deadline: params.deadline,
             v: params.v,
@@ -131,7 +109,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             dealId: params.dealId
         });
 
-        depositWithPermitAndCreateRailForDeal(initParams);
+        _depositWithPermitAndCreateRailForDeal(initParams);
     }
 
     // solhint-enable func-param-name-mixedcase
@@ -164,8 +142,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         }
 
         // Mock's usage (temporary)
-        uint256 score = SLCMock($.SLC).getScore($.provider);
-        bool isDataSizeMatching = ClientSCMock($.clientSC).verifyAllocatedDataCapEqualsSealed($.provider);
+        uint256 score = SLCMock($.SLC).getScore($.providerId);
+        bool isDataSizeMatching = ClientSCMock($.clientSC).verifyAllocatedDataCapEqualsSealed($.providerId);
 
         if (!isDataSizeMatching) {
             result.modifiedAmount = 0;
@@ -190,6 +168,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param params Parameters for deposit with rail creation
      */
     function depositWithPermitAndCreateRailForDeal(DepositWithRailParams calldata params) external override {
+        DepositWithRailParams memory p = params;
+        _depositWithPermitAndCreateRailForDeal(p);
+    }
+
+    /**
+     * @notice Deposits tokens with permit and creates a payment rail for a deal
+     * @param params Parameters for deposit with rail creation
+     */
+    function _depositWithPermitAndCreateRailForDeal(DepositWithRailParams memory params) internal {
         ValidatorStorage storage $ = _getValidatorStorage();
 
         _depositWithPermitAndApproveOperator(

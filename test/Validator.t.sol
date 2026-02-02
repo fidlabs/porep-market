@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
+import {Operator} from "../src/abstracts/Operator.sol";
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {ValidatorRegistryMock} from "./contracts/ValidatorRegistryMock.sol";
@@ -51,15 +52,21 @@ contract ValidatorTest is Test {
         ERC1967Proxy poRepProxy = new ERC1967Proxy(address(poRepImpl), poRepInit);
         poRepMarket = PoRepMarket(address(poRepProxy));
 
+        Operator.DepositWithRailParams memory initParams = Operator.DepositWithRailParams({
+            token: token,
+            payer: address(0),
+            payee: address(0),
+            v: 27,
+            amount: 100,
+            deadline: block.timestamp + 1 days,
+            r: bytes32(uint256(1)),
+            s: bytes32(uint256(2)),
+            dealId: dealId
+        });
+
         Validator impl = new Validator();
         bytes memory initData = abi.encodeWithSelector(
-            Validator.initialize.selector,
-            admin,
-            address(filecoinPay),
-            slc,
-            providerFilActorId,
-            clientSC,
-            address(poRepMarket)
+            Validator.initialize.selector, admin, address(filecoinPay), slc, clientSC, address(poRepMarket), initParams
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         validator = Validator(address(proxy));
@@ -82,42 +89,44 @@ contract ValidatorTest is Test {
 
         vm.expectRevert(Initializable.InvalidInitialization.selector);
 
-        impl.initialize(
-            vm.addr(0x1), vm.addr(0x2), vm.addr(0x3), CommonTypes.FilActorId.wrap(1), vm.addr(0x4), vm.addr(0x5)
-        );
+        Operator.DepositWithRailParams memory dummyParams = Operator.DepositWithRailParams({
+            token: IERC20(address(0)),
+            payer: address(0),
+            payee: address(0),
+            v: 0,
+            amount: 0,
+            deadline: 0,
+            r: bytes32(0),
+            s: bytes32(0),
+            dealId: 0
+        });
+
+        impl.initialize(vm.addr(0x1), vm.addr(0x2), vm.addr(0x3), vm.addr(0x4), vm.addr(0x5), dummyParams);
     }
 
     function testDepositWithPermitAndCreateRailForDeal() public {
         address payer = vm.addr(0xA);
         address payee = vm.addr(0xB);
-        address feeRecipient = vm.addr(0xC);
 
         uint256 amount = 100;
         uint256 deadline = block.timestamp + 1 days;
         uint8 v = 27;
         bytes32 r = bytes32(uint256(1));
         bytes32 s = bytes32(uint256(2));
-        uint256 rateAllowance = 1_000;
-        uint256 lockupAllowance = 2_000;
-        uint256 maxLockup = 30 days;
-        uint256 commission = 500;
 
-        validator.depositWithPermitAndCreateRailForDeal(
-            token,
-            payer,
-            payee,
-            amount,
-            deadline,
-            v,
-            r,
-            s,
-            rateAllowance,
-            lockupAllowance,
-            maxLockup,
-            commission,
-            feeRecipient,
-            dealId
-        );
+        Operator.DepositWithRailParams memory params = Operator.DepositWithRailParams({
+            token: token,
+            payer: payer,
+            payee: payee,
+            v: v,
+            amount: amount,
+            deadline: deadline,
+            r: r,
+            s: s,
+            dealId: dealId
+        });
+
+        validator.depositWithPermitAndCreateRailForDeal(params);
 
         PoRepMarket.DealProposal memory dp = poRepMarket.getDealProposal(dealId);
         assertEq(dp.validator, address(validator));

@@ -10,7 +10,7 @@ import {FilecoinPayV1} from "filecoin-pay/FilecoinPayV1.sol";
  */
 abstract contract Operator {
     /**
-     * @notice Deposits tokens with permit and creates a payment rail for a deal
+     * @notice Parameters for deposit with rail creation
      * @param token The ERC20 token to deposit
      * @param payer The address paying the tokens
      * @param payee The address receiving the tokens
@@ -19,29 +19,25 @@ abstract contract Operator {
      * @param v The v component of the permit signature
      * @param r The r component of the permit signature
      * @param s The s component of the permit signature
-     * @param rateAllowance The rate allowance for the operator
-     * @param lockupAllowance The lockup allowance for the operator
-     * @param maxLockupPeriod The maximum lockup period for the payment rail
-     * @param commissionRateBps The commission rate in basis points for the payment rail
-     * @param serviceFeeRecipient The recipient of service fees for the payment rail
      * @param dealId The ID of the deal associated with the payment rail
      */
-    function depositWithPermitAndCreateRailForDeal(
-        IERC20 token,
-        address payer,
-        address payee,
-        uint256 amount,
-        uint256 deadline,
-        uint8 v,
-        bytes32 r,
-        bytes32 s,
-        uint256 rateAllowance,
-        uint256 lockupAllowance,
-        uint256 maxLockupPeriod,
-        uint256 commissionRateBps,
-        address serviceFeeRecipient,
-        uint256 dealId
-    ) external virtual;
+    struct DepositWithRailParams {
+        IERC20 token;
+        address payer;
+        address payee;
+        uint8 v;
+        uint256 amount;
+        uint256 deadline;
+        bytes32 r;
+        bytes32 s;
+        uint256 dealId;
+    }
+
+    /**
+     * @notice Deposits tokens with permit and creates a payment rail for a deal
+     * @param params Parameters for deposit and rail creation
+     */
+    function depositWithPermitAndCreateRailForDeal(DepositWithRailParams calldata params) external virtual;
 
     /**
      * @notice Updates the lockup period of a payment rail
