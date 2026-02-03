@@ -140,16 +140,6 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     /**
-     * @notice Gets the nonce for a given admin and provider
-     * @param admin The address of the admin
-     * @param provider The ID of the provider
-     * @return The nonce for the given admin and provider
-     */
-    function getNonce(address admin, CommonTypes.FilActorId provider) external view returns (uint256) {
-        return s()._nonce[admin][provider];
-    }
-
-    /**
      * @notice Gets the instance for a given deal
      * @param dealId The ID of the deal
      * @return The instance for the given deal

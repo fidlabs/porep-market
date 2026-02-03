@@ -62,7 +62,7 @@ contract ValidatorFactoryTest is Test {
     function testDeployEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
 
-        address expectedProxy = computeProxyAddress(admin, provider, factory.getNonce(admin, provider) + 1);
+        address expectedProxy = computeProxyAddress(admin, provider, 1);
         emit ValidatorFactory.ProxyCreated(expectedProxy, provider);
 
         factory.create(admin, slcAddress, provider, params);
@@ -70,15 +70,10 @@ contract ValidatorFactoryTest is Test {
     }
 
     function testDeployMarksProxyAsDeployed() public {
-        address expectedProxy = computeProxyAddress(admin, provider, factory.getNonce(admin, provider) + 1);
+        address expectedProxy = computeProxyAddress(admin, provider, 1);
         factory.create(admin, slcAddress, provider, params);
 
         assertTrue(factory.getInstance(params.dealId) == expectedProxy);
-    }
-
-    function testDeployIncrementsNonce() public {
-        factory.create(admin, slcAddress, provider, params);
-        assertEq(factory.getNonce(admin, provider), 1);
     }
 
     function testDeployRevertsIfInstanceExists() public {
