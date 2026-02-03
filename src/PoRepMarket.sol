@@ -7,14 +7,20 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/SPRegistry.sol";
-import {ValidatorFactory} from "./ValidatorFactory.sol";
+import {IValidatorRegistry} from "./interfaces/ValidatorRegistry.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
  * @title PoRepMarket contract
  * @dev PoRepMarket contract is a contract that allows users to create and manage deal proposals for PoRep deals
  * @notice PoRepMarket contract
  */
-contract PoRepMarket is Initializable, AccessControlUpgradeable {
+contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+    /**
+     * @notice role to manage contract upgrades
+     */
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
     // @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => DealProposal) _dealProposals;
@@ -23,7 +29,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
         address _clientSmartContract;
         uint256 _dealIdCounter;
     }
-
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DealProposalsStorage")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant DEAL_PROPOSALS_STORAGE_LOCATION =
         0xea093611145db18b250f1cd58e07fc50de512902beb662a10f8e6d1dd55f6700;
@@ -128,15 +133,18 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     /**
      * @notice Initializes the contract
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
-     * @param _validatorFactory The address of the validator factory
+     * @param _admin The address of the admin
+     * @param _validatorRegistry The address of the validator registry
      * @param _spRegistry The address of the SP registry
      * @param _clientSmartContract The address of the client smart contract
      */
-    function initialize(address _validatorFactory, address _spRegistry, address _clientSmartContract)
+    function initialize(address _admin, address _validatorRegistry, address _spRegistry, address _clientSmartContract)
         public
         initializer
     {
         __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        _grantRole(UPGRADER_ROLE, _admin);
 
         DealProposalsStorage storage $ = _getDealProposalsStorage();
         $._validatorFactoryContract = ValidatorFactory(_validatorFactory);
@@ -288,4 +296,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     function _ensureDealCorrectState(DealProposal memory dp, DealState expectedState) internal pure {
         if (dp.state != expectedState) revert DealNotInExpectedState(dp.dealId, dp.state, expectedState);
     }
+
+    // solhint-disable no-empty-blocks
+    /**
+     * @notice Authorizes an upgrade
+     * @dev Authorizes an upgrade by checking if the caller has the upgrader role
+     * @param newImplementation The address of the new implementation
+     */
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
 }
