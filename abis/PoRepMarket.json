@@ -337,6 +337,45 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "event",
+    "name": "Byt",
+    "inputs": [
+      {
+        "name": "b",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Byt",
+    "inputs": [
+      {
+        "name": "b",
+        "type": "bytes",
+        "indexed": false,
+        "internalType": "bytes"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Cos",
+    "inputs": [
+      {
+        "name": "c",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "function",
     "name": "upgradeToAndCall",
     "inputs": [
@@ -544,6 +583,19 @@
   },
   {
     "type": "event",
+    "name": "Step",
+    "inputs": [
+      {
+        "name": "v",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -603,6 +655,11 @@
   },
   {
     "type": "error",
+    "name": "ActorNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AddressEmptyCode",
     "inputs": [
       {
@@ -640,6 +697,38 @@
   },
   {
     "type": "error",
+    "name": "ExitCodeError",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidActorID",
+    "inputs": [
+      {
+        "name": "actorId",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidCodec",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -666,6 +755,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidResponseLength",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NoProviderFoundForDeal",
     "inputs": [
       {
@@ -682,6 +776,22 @@
         "name": "SLC",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotEnoughBalance",
+    "inputs": [
+      {
+        "name": "balance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
@@ -719,6 +829,27 @@
         "name": "clientSmartContract",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotTheControllingAddress",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "msgSender",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
       }
     ]
   },

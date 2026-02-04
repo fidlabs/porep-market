@@ -9,6 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/SPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {MinerUtils} from "./libs/MinerUtils.sol";
 
 /**
  * @title PoRepMarket contract
@@ -115,7 +116,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     error NotTheRegisteredValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
-    error NotTheStorageProviderOwner(uint256 dealId, address owner, CommonTypes.FilActorId provider);
+    error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
     error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
@@ -232,8 +233,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, DealState.Proposed);
 
-        if (!$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
-            revert NotTheStorageProviderOwner(dealId, msg.sender, dp.provider);
+        if (!MinerUtils.isControllingAddress(dp.provider, msg.sender)) {
+            revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
         }
 
         dp.state = DealState.Accepted;
