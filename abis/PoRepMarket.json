@@ -191,7 +191,7 @@
     "name": "initialize",
     "inputs": [
       {
-        "name": "admin",
+        "name": "_admin",
         "type": "address",
         "internalType": "address"
       },
