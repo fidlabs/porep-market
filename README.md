@@ -63,8 +63,9 @@ We expect following actors and contracts in the system:
 
 **PoRep Market** is a smart contract responsible for managing deal proposals and updates. It allows clients to propose new deals, automatically selects a Storage Provider (SP) via an external registry, and stores deal proposals on-chain. 
 
-There will be following role in this contract:
+There will be following roles in this contract:
 * `ADMIN`, who can upgrade the contract
+* `UPGRADER_ROLE`, who can upgrade the contract
 
 Expected interface:
 ```
@@ -84,10 +85,12 @@ struct DealProposal {
     uint256 dealId;
     address client;
     CommonTypes.FilActorId provider;
-    address SLC;
+    address SLC; // This will need to be updated after we rethink the SLC Params approach
     address validator;
     DealState state;
     uint256 railId;
+    uint256 price;
+    uint256 totalDealSize;
 }
 
 enum DealState {
@@ -159,7 +162,7 @@ interface FIDLOracle {
         uint16 bandwidth;
         uint16 stability;
     }
-    function setSLI(address provider, SLIAttestation calldata slis) external onlyRole(ORACLE_ROLE);
+    function setSLI(CommonTypes.FilActorId provider, SLIAttestation calldata slis) external onlyRole(ORACLE_ROLE);
 }
 ```
 
@@ -198,6 +201,8 @@ address OracleSLI;
 **SPRegistry** is a smart contract responsible for storing available Storage Providers (SPs) together with their service parameters. The contract participates in the selection of a Storage Provider based on required deal parameters provided by **PoRep Market**.
 
 The selection logic verifies whether a given SP supports the **ServiceLevelClass (SLC)** chosen by the client and whether its declared capacity is sufficient to handle the deal.
+
+> **Note:** Function definitions may change after the contract is created.
 
 Expected interface:
 ```
