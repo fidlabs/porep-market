@@ -129,6 +129,71 @@
         "internalType": "address"
       },
       {
+        "name": "",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct Validator.DepositWithRailParams",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "payer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
         "name": "_clientSC",
         "type": "address",
         "internalType": "address"
@@ -137,6 +202,60 @@
         "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct Operator.DepositWithRailParams",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "payer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+>>>>>>> 75b6a35 (tests & coverage)
+>>>>>>> 35351e3 (tests & coverage)
       }
     ],
     "outputs": [],
@@ -481,16 +600,26 @@
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "AdminCannotBeZeroAddress",
     "inputs": []
   },
   {
     "type": "error",
     "name": "CallerIsNotClient",
+=======
+<<<<<<< HEAD
+<<<<<<< HEAD
+=======
+=======
+    "name": "ActorNotFound",
+>>>>>>> 35351e3 (tests & coverage)
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
+=======
     "name": "CallerIsNotClientSC",
     "inputs": []
   },
@@ -501,30 +630,88 @@
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "ClientSCCannotBeZeroAddress",
+=======
+<<<<<<< HEAD
+>>>>>>> 9e3d97e (feat: validator contract with operator functionalities)
+=======
+    "name": "ExitCodeError",
+>>>>>>> 35351e3 (tests & coverage)
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "FilecoinPayCannotBeZeroAddress",
+=======
+    "name": "FailToCallActor",
+>>>>>>> 35351e3 (tests & coverage)
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
+=======
+    "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidActorID",
+    "inputs": [
+      {
+        "name": "actorId",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidCodec",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+>>>>>>> 75b6a35 (tests & coverage)
+>>>>>>> 35351e3 (tests & coverage)
     "name": "InvalidInitialization",
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "InvalidRailId",
     "inputs": [
       {
         "name": "expected",
+=======
+    "name": "InvalidResponseLength",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEnoughBalance",
+    "inputs": [
+      {
+        "name": "balance",
+>>>>>>> 35351e3 (tests & coverage)
         "type": "uint256",
         "internalType": "uint256"
       },
       {
+<<<<<<< HEAD
         "name": "actual",
+=======
+        "name": "value",
+>>>>>>> 35351e3 (tests & coverage)
         "type": "uint256",
         "internalType": "uint256"
       }
