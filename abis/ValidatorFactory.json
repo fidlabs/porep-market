@@ -550,7 +550,22 @@
   },
   {
     "type": "error",
+    "name": "InvalidAdminAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidClientAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSlcAddress",
     "inputs": []
   },
   {

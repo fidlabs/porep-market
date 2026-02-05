@@ -53,15 +53,18 @@ contract ValidatorFactoryTest is Test {
             s: bytes32(0),
             dealId: 100
         });
-        poRepMarketMock.setDealProposal(params.dealId, PoRepMarket.DealProposal({
-            dealId: params.dealId,
-            client: client,
-            provider: provider,
-            SLC: slcAddress,
-            validator: vm.addr(10),
-            state: PoRepMarket.DealState.Accepted,
-            railId: 200
-        }));
+        poRepMarketMock.setDealProposal(
+            params.dealId,
+            PoRepMarket.DealProposal({
+                dealId: params.dealId,
+                client: client,
+                provider: provider,
+                SLC: slcAddress,
+                validator: vm.addr(10),
+                state: PoRepMarket.DealState.Accepted,
+                railId: 200
+            })
+        );
 
         initData = abi.encodeCall(
             ValidatorFactory.initialize, (admin, validatorAddress, poRepMarket, clientSmartContract, filecoinPay)
