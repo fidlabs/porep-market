@@ -5,10 +5,13 @@ pragma solidity ^0.8.24;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {IValidator, FilecoinPayV1} from "filecoin-pay/FilecoinPayV1.sol";
 import {PrecompilesAPI} from "filecoin-solidity/v0.8/PrecompilesAPI.sol";
 import {FilAddressIdConverter} from "filecoin-solidity/v0.8/utils/FilAddressIdConverter.sol";
+
+import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
+import {IValidator} from "./interfaces/IValidator.sol";
 import {MinerUtils} from "./libs/MinerUtils.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
@@ -127,7 +130,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256 rate)
         external
         view
-        returns (ValidationResult memory result)
+        returns (IValidator.ValidationResult memory result)
     {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
@@ -164,55 +167,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     /**
-     * @notice Deposits tokens with permit and creates a payment rail for a deal
-     * @param params Parameters for deposit with rail creation
-     */
-    function depositWithPermitAndCreateRailForDeal(DepositWithRailParams calldata params) external override {
-        DepositWithRailParams memory p = params;
-        _depositWithPermitAndCreateRailForDeal(p);
-    }
-
-    /**
-     * @notice Deposits tokens with permit and creates a payment rail for a deal
-     * @param params Parameters for deposit with rail creation
-     */
-    function _depositWithPermitAndCreateRailForDeal(DepositWithRailParams memory params) internal {
-        ValidatorStorage storage $ = _getValidatorStorage();
-
-        _depositWithPermitAndApproveOperator(
-            FilecoinPayV1($.filecoinPay),
-            params.token,
-            params.payer,
-            params.amount,
-            params.deadline,
-            params.v,
-            params.r,
-            params.s,
-            0,
-            0,
-            0
-        );
-
-        uint256 railId =
-            _createRail(FilecoinPayV1($.filecoinPay), params.token, params.payer, params.payee, 0, address(0));
-
-        PoRepMarket($.poRepMarket).updateValidatorAndRailId(params.dealId, railId);
-    }
-
-    /**
      * @notice Updates the lockup period of a payment rail
      * @param railId The ID of the rail to modify
      * @param newLockupPeriod New lockup period to set
-     * @param lockupFixed New fixed lockup amount
      */
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod, uint256 lockupFixed) external override {
+    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
 
         if (msg.sender != $.clientSC) {
             revert CallerIsNotClientSC();
         }
 
-        _updateLockupPeriod(FilecoinPayV1($.filecoinPay), railId, newLockupPeriod, lockupFixed);
+        _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, newLockupPeriod, 0);
     }
 
     /**
@@ -229,6 +195,33 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     // solhint-enable no-unused-vars
+
+    /**
+     * @notice Deposits tokens with permit and creates a payment rail for a deal
+     * @param params Parameters for deposit with rail creation
+     */
+    function _depositWithPermitAndCreateRailForDeal(DepositWithRailParams memory params) internal override {
+        ValidatorStorage storage $ = _getValidatorStorage();
+
+        _depositWithPermitAndApproveOperator(
+            IFilecoinPayV1($.filecoinPay),
+            params.token,
+            params.payer,
+            params.amount,
+            params.deadline,
+            params.v,
+            params.r,
+            params.s,
+            0,
+            0,
+            0
+        );
+
+        uint256 railId =
+            _createRail(IFilecoinPayV1($.filecoinPay), params.token, params.payer, params.payee, 0, address(0));
+
+        PoRepMarket($.poRepMarket).updateValidatorAndRailId(params.dealId, railId);
+    }
 
     //  solhint-disable
     /**

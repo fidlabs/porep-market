@@ -19,84 +19,6 @@
   },
   {
     "type": "function",
-    "name": "depositWithPermitAndCreateRailForDeal",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "contract IERC20"
-      },
-      {
-        "name": "payer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "payee",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "deadline",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "v",
-        "type": "uint8",
-        "internalType": "uint8"
-      },
-      {
-        "name": "r",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "s",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "rateAllowance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "lockupAllowance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "maxLockupPeriod",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "commissionRateBps",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "serviceFeeRecipient",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -176,11 +98,6 @@
         "internalType": "address"
       },
       {
-        "name": "_provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
         "name": "_clientSC",
         "type": "address",
         "internalType": "address"
@@ -189,6 +106,58 @@
         "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct Operator.DepositWithRailParams",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "payer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "outputs": [],
@@ -283,11 +252,6 @@
       },
       {
         "name": "newLockupPeriod",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "lockupFixed",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -462,6 +426,11 @@
   },
   {
     "type": "error",
+    "name": "ActorNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "CallerIsNotClientSC",
     "inputs": []
   },
@@ -472,8 +441,66 @@
   },
   {
     "type": "error",
+    "name": "ExitCodeError",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidActorID",
+    "inputs": [
+      {
+        "name": "actorId",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidCodec",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidResponseLength",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEnoughBalance",
+    "inputs": [
+      {
+        "name": "balance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
