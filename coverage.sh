@@ -4,6 +4,6 @@ set -euo pipefail
 
 forge clean
 forge build
-forge coverage --report summary --report lcov
+forge coverage --report summary --report lcov --ir-minimum
 genhtml lcov.info -o report --branch-coverage --ignore-errors inconsistent,corrupt lcov.info
 xdg-open report/index.html || open report/index.html

@@ -1,4 +1,10 @@
 {
+  "lib/filecoin-pay": {
+    "tag": {
+      "name": "v1.0.0",
+      "rev": "f0a40fe287ecb08c2c20b828bdbadd2437988bba"
+    }
+  },
   "lib/filecoin-solidity": {
     "tag": {
       "name": "v1.1.2",
