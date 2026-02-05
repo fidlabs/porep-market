@@ -13,6 +13,8 @@ import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
+import {PoRepMarket} from "../src/PoRepMarket.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
@@ -22,17 +24,21 @@ contract ValidatorFactoryTest is Test {
     address public slcAddress;
     address public poRepMarket;
     address public clientSmartContract;
+    address public client;
     CommonTypes.FilActorId public provider;
     ValidatorFactory public factoryImpl;
     bytes public initData;
     Validator.DepositWithRailParams public params;
+    PoRepMarketMock public poRepMarketMock;
 
     function setUp() public {
         admin = vm.addr(1);
         filecoinPay = vm.addr(2);
         slcAddress = vm.addr(3);
-        poRepMarket = vm.addr(4);
+        poRepMarketMock = new PoRepMarketMock();
+        poRepMarket = address(poRepMarketMock);
         clientSmartContract = vm.addr(5);
+        client = vm.addr(6);
         provider = CommonTypes.FilActorId.wrap(1);
         validatorAddress = address(new Validator());
         factoryImpl = new ValidatorFactory();
@@ -47,6 +53,16 @@ contract ValidatorFactoryTest is Test {
             s: bytes32(0),
             dealId: 100
         });
+        poRepMarketMock.setDealProposal(params.dealId, PoRepMarket.DealProposal({
+            dealId: params.dealId,
+            client: client,
+            provider: provider,
+            SLC: slcAddress,
+            validator: vm.addr(10),
+            state: PoRepMarket.DealState.Accepted,
+            railId: 200
+        }));
+
         initData = abi.encodeCall(
             ValidatorFactory.initialize, (admin, validatorAddress, poRepMarket, clientSmartContract, filecoinPay)
         );
@@ -65,18 +81,21 @@ contract ValidatorFactoryTest is Test {
         address expectedProxy = computeProxyAddress(admin, provider, 1);
         emit ValidatorFactory.ProxyCreated(expectedProxy, provider);
 
+        vm.prank(client);
         factory.create(admin, slcAddress, provider, params);
         assertTrue(factory.isValidatorContract(expectedProxy));
     }
 
     function testDeployMarksProxyAsDeployed() public {
         address expectedProxy = computeProxyAddress(admin, provider, 1);
+        vm.prank(client);
         factory.create(admin, slcAddress, provider, params);
 
         assertTrue(factory.getInstance(params.dealId) == expectedProxy);
     }
 
     function testDeployRevertsIfInstanceExists() public {
+        vm.prank(client);
         factory.create(admin, slcAddress, provider, params);
 
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InstanceAlreadyExists.selector));
@@ -116,5 +135,24 @@ contract ValidatorFactoryTest is Test {
 
     function testShouldReturnFalseIfValidatorDoesNotExist() public view {
         assertFalse(factory.isValidatorContract(address(0)));
+    }
+
+    function testShouldRevertWhenAdminAddressIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidAdminAddress.selector));
+        vm.prank(client);
+        factory.create(address(0), slcAddress, provider, params);
+    }
+
+    function testShouldRevertWhenSlcAddressIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidSlcAddress.selector));
+        vm.prank(client);
+        factory.create(admin, address(0), provider, params);
+    }
+
+    function testShouldRevertWhenIncorrectClientAddress() public {
+        address incorrectClient = vm.addr(999);
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientAddress.selector));
+        vm.prank(incorrectClient);
+        factory.create(admin, slcAddress, provider, params);
     }
 }

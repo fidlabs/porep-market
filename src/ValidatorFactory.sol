@@ -10,6 +10,7 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {Validator} from "./Validator.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
+import {PoRepMarket} from "./PoRepMarket.sol";
 
 /**
  * @title ValidatorFactory
@@ -54,6 +55,9 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     }
 
     error InstanceAlreadyExists();
+    error InvalidAdminAddress();
+    error InvalidClientAddress();
+    error InvalidSlcAddress();
 
     /**
      * @notice Emitted when a new proxy is successfully created
@@ -104,11 +108,14 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         CommonTypes.FilActorId provider,
         Validator.DepositWithRailParams calldata params
     ) external {
-        ValidatorFactoryStorage storage $ = s();
+        if (admin == address(0)) revert InvalidAdminAddress();
+        if (slcAddress == address(0)) revert InvalidSlcAddress();
 
-        if ($._instances[params.dealId] != address(0)) {
-            revert InstanceAlreadyExists();
-        }
+        ValidatorFactoryStorage storage $ = s();
+        if ($._instances[params.dealId] != address(0)) revert InstanceAlreadyExists();
+
+        PoRepMarket.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(params.dealId);
+        if (msg.sender != dp.client) revert InvalidClientAddress();
 
         $._nonce[admin][provider]++;
 
