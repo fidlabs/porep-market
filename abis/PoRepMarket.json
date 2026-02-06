@@ -729,6 +729,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidRetrievabilityPct",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NoProviderFoundForDeal",
     "inputs": []
   },
