@@ -48,7 +48,7 @@ contract PoRepMarketTest is Test {
         bytes memory initData = abi.encodeWithSignature(
             "initialize(address,address,address,address)",
             adminAddress,
-            address(validatorRegistry),
+            address(validatorFactory),
             address(spRegistry),
             clientSmartContractAddress
         );

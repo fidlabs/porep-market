@@ -196,7 +196,7 @@
         "internalType": "address"
       },
       {
-        "name": "_validatorRegistry",
+        "name": "_validatorFactory",
         "type": "address",
         "internalType": "address"
       },

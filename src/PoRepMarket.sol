@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/SPRegistry.sol";
-import {IValidatorRegistry} from "./interfaces/ValidatorRegistry.sol";
+import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 
 /**
@@ -134,11 +134,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Initializes the contract
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param _admin The address of the admin
-     * @param _validatorRegistry The address of the validator registry
+     * @param _validatorFactory The address of the validator registry
      * @param _spRegistry The address of the SP registry
      * @param _clientSmartContract The address of the client smart contract
      */
-    function initialize(address _admin, address _validatorRegistry, address _spRegistry, address _clientSmartContract)
+    function initialize(address _admin, address _validatorFactory, address _spRegistry, address _clientSmartContract)
         public
         initializer
     {
