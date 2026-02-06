@@ -2,6 +2,11 @@
 pragma solidity ^0.8.24;
 
 /**
+ * @title SLI Types
+ * @notice Shared types for SLI-based deal requirements, capabilities, and attestations
+ */
+
+/**
  * @notice Unified SLI thresholds for requirements, capabilities, and attestations
  * @dev STRUCT EXTENSION PROTOCOL:
  *      - This struct may be extended by appending new fields

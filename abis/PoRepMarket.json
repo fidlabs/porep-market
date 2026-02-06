@@ -268,7 +268,7 @@
             "internalType": "uint256"
           },
           {
-            "name": "priceAttoFil",
+            "name": "priceForDeal",
             "type": "uint256",
             "internalType": "uint256"
           },

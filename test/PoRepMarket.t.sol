@@ -25,9 +25,10 @@ contract PoRepMarketTest is Test {
 
     CommonTypes.FilActorId public providerFilActorId;
 
-    SLIThresholds defaultRequirements = SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200});
+    SLIThresholds internal defaultRequirements =
+        SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200});
 
-    DealTerms defaultTerms = DealTerms({dealSizeBytes: 1000, priceForDeal: 100, durationDays: 365});
+    DealTerms internal defaultTerms = DealTerms({dealSizeBytes: 1000, priceForDeal: 100, durationDays: 365});
 
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
