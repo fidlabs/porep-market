@@ -103,6 +103,7 @@ contract ValidatorFactoryTest is Test {
         factory.create(admin, slcAddress, provider, params);
 
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InstanceAlreadyExists.selector));
+        vm.prank(client);
         factory.create(admin, slcAddress, provider, params);
     }
 
