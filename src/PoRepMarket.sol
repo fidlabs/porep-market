@@ -7,7 +7,7 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/SPRegistry.sol";
-import {IValidatorRegistry} from "./interfaces/ValidatorRegistry.sol";
+import {ValidatorFactory} from "./ValidatorFactory.sol";
 
 /**
  * @title PoRepMarket contract
@@ -19,7 +19,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     struct DealProposalsStorage {
         mapping(uint256 dealId => DealProposal) _dealProposals;
         ISPRegistry _SPRegistryContract;
-        IValidatorRegistry _validatorRegistryContract;
+        ValidatorFactory _validatorFactoryContract;
         address _clientSmartContract;
         uint256 _dealIdCounter;
     }
@@ -128,18 +128,18 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
     /**
      * @notice Initializes the contract
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
-     * @param _validatorRegistry The address of the validator registry
+     * @param _validatorFactory The address of the validator factory
      * @param _spRegistry The address of the SP registry
      * @param _clientSmartContract The address of the client smart contract
      */
-    function initialize(address _validatorRegistry, address _spRegistry, address _clientSmartContract)
+    function initialize(address _validatorFactory, address _spRegistry, address _clientSmartContract)
         public
         initializer
     {
         __AccessControl_init();
 
         DealProposalsStorage storage $ = _getDealProposalsStorage();
-        $._validatorRegistryContract = IValidatorRegistry(_validatorRegistry);
+        $._validatorFactoryContract = ValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._clientSmartContract = _clientSmartContract;
     }
@@ -192,7 +192,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable {
             revert ValidatorAlreadySet(dealId);
         }
 
-        if (!$._validatorRegistryContract.isCorrectValidator(msg.sender)) {
+        if (!$._validatorFactoryContract.isValidatorContract(msg.sender)) {
             revert NotTheRegisteredValidator(dealId, msg.sender);
         }
 

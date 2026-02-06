@@ -1,10 +1,5 @@
 [
   {
-    "type": "constructor",
-    "inputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
     "type": "function",
     "name": "DEFAULT_ADMIN_ROLE",
     "inputs": [],
@@ -19,12 +14,100 @@
   },
   {
     "type": "function",
-    "name": "acceptDeal",
+    "name": "UPGRADER_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "UPGRADE_INTERFACE_VERSION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "create",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "admin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "slcAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct Validator.DepositWithRailParams",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "payer",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "outputs": [],
@@ -32,20 +115,20 @@
   },
   {
     "type": "function",
-    "name": "completeDeal",
-    "inputs": [
+    "name": "getBeacon",
+    "inputs": [],
+    "outputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
-    "name": "getDealProposal",
+    "name": "getInstance",
     "inputs": [
       {
         "name": "dealId",
@@ -56,45 +139,8 @@
     "outputs": [
       {
         "name": "",
-        "type": "tuple",
-        "internalType": "struct PoRepMarket.DealProposal",
-        "components": [
-          {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "client",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "provider",
-            "type": "uint64",
-            "internalType": "CommonTypes.FilActorId"
-          },
-          {
-            "name": "SLC",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "validator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "state",
-            "type": "uint8",
-            "internalType": "enum PoRepMarket.DealState"
-          },
-          {
-            "name": "railId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -165,12 +211,17 @@
     "name": "initialize",
     "inputs": [
       {
-        "name": "_validatorFactory",
+        "name": "admin",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "_spRegistry",
+        "name": "implementation",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
       },
@@ -178,27 +229,9 @@
         "name": "_clientSmartContract",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "proposeDeal",
-    "inputs": [
-      {
-        "name": "expectedDealSize",
-        "type": "uint256",
-        "internalType": "uint256"
       },
       {
-        "name": "priceForDeal",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "SLC",
+        "name": "_filecoinPay",
         "type": "address",
         "internalType": "address"
       }
@@ -208,16 +241,35 @@
   },
   {
     "type": "function",
-    "name": "rejectDeal",
+    "name": "isValidatorContract",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "contractAddress",
+        "type": "address",
+        "internalType": "address"
       }
     ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "proxiableUUID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -276,121 +328,21 @@
   },
   {
     "type": "function",
-    "name": "updateValidatorAndRailId",
+    "name": "upgradeToAndCall",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "newImplementation",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "DealAccepted",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "owner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "DealCompleted",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "client",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "DealProposalCreated",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "client",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "SLC",
-        "type": "address",
-        "indexed": false,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "DealRejected",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "rejector",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
+    "stateMutability": "payable"
   },
   {
     "type": "event",
@@ -401,6 +353,25 @@
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProxyCreated",
+    "inputs": [
+      {
+        "name": "proxy",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
       }
     ],
     "anonymous": false
@@ -482,25 +453,13 @@
   },
   {
     "type": "event",
-    "name": "ValidatorAndRailIdUpdated",
+    "name": "Upgraded",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "validator",
+        "name": "implementation",
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "railId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -528,29 +487,76 @@
   },
   {
     "type": "error",
-    "name": "DealDoesNotExist",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "Create2EmptyBytecode",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "DealNotInExpectedState",
+    "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
-        "name": "dealId",
+        "name": "implementation",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC1967NonPayable",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailedCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailedDeployment",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InstanceAlreadyExists",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientBalance",
+    "inputs": [
+      {
+        "name": "balance",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-        "name": "currentState",
-        "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
-      },
-      {
-        "name": "expectedState",
-        "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
+        "name": "needed",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidAdminAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidClientAddress",
+    "inputs": []
   },
   {
     "type": "error",
@@ -559,24 +565,8 @@
   },
   {
     "type": "error",
-    "name": "NoProviderFoundForDeal",
-    "inputs": [
-      {
-        "name": "expectedDealSize",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "priceForDeal",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "SLC",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+    "name": "InvalidSlcAddress",
+    "inputs": []
   },
   {
     "type": "error",
@@ -585,81 +575,17 @@
   },
   {
     "type": "error",
-    "name": "NotTheClientOrStorageProvider",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "rejector",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
+    "name": "UUPSUnauthorizedCallContext",
+    "inputs": []
   },
   {
     "type": "error",
-    "name": "NotTheClientSmartContract",
+    "name": "UUPSUnsupportedProxiableUUID",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "clientSmartContract",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotTheRegisteredValidator",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "validator",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotTheStorageProviderOwner",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "owner",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ValidatorAlreadySet",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "slot",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ]
   }
