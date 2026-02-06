@@ -332,4 +332,11 @@ contract PoRepMarketTest is Test {
         );
         poRepMarket.upgradeToAndCall(newImpl, "");
     }
+
+    function testProposeDealRevertsWhenRetrievabilityPctExceeds100() public {
+        SLIThresholds memory badRequirements = SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 500, latencyMs: 200});
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRetrievabilityPct.selector, uint8(101)));
+        poRepMarket.proposeDeal(badRequirements, defaultTerms);
+    }
 }

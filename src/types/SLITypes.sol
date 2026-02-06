@@ -24,7 +24,9 @@ pragma solidity ^0.8.24;
  *      V2: { retrievabilityPct, bandwidthMbps, latencyMs, uptimePct }
  */
 struct SLIThresholds {
+    /// @dev Valid range: 0-100. 0 means "don't care". Values above 100 are invalid.
     uint8 retrievabilityPct;
+    /// @dev Cappedd at ~64 Gbps
     uint16 bandwidthMbps;
     uint16 latencyMs;
 }

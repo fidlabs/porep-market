@@ -22,7 +22,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
+    /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => DealProposal) _dealProposals;
         ISPRegistry _SPRegistryContract;
@@ -125,6 +125,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
     error NoProviderFoundForDeal();
     error ValidatorAlreadySet(uint256 dealId);
+    error InvalidRetrievabilityPct(uint8 value);
 
     /**
      * @notice Constructor
@@ -163,6 +164,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param terms The commercial terms for the deal
      */
     function proposeDeal(SLIThresholds calldata requirements, DealTerms calldata terms) external {
+        if (requirements.retrievabilityPct > 100) {
+            revert InvalidRetrievabilityPct(requirements.retrievabilityPct);
+        }
+
         DealProposalsStorage storage $ = _getDealProposalsStorage();
 
         CommonTypes.FilActorId provider = $._SPRegistryContract.getProviderForDeal(requirements, terms);
