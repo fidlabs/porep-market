@@ -8,6 +8,7 @@ import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 contract PoRepMarketTest is Test {
     PoRepMarket public poRepMarket;
@@ -18,6 +19,7 @@ contract PoRepMarketTest is Test {
     address public clientAddress;
     address public providerOwnerAddress;
     address public slcAddress;
+    address public adminAddress;
     uint256 public railId;
     uint256 public dealId;
     uint256 public expectedDealSize;
@@ -34,6 +36,7 @@ contract PoRepMarketTest is Test {
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
         slcAddress = vm.addr(0x005);
+        adminAddress = vm.addr(0x006);
         dealId = 1;
         railId = 1;
         expectedDealSize = 100;
@@ -43,7 +46,8 @@ contract PoRepMarketTest is Test {
 
         // solhint-disable gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address)",
+            "initialize(address,address,address,address)",
+            adminAddress,
             address(validatorFactory),
             address(spRegistry),
             clientSmartContractAddress
@@ -315,5 +319,16 @@ contract PoRepMarketTest is Test {
         );
         vm.prank(notTheClientOrStorageProviderOwner);
         poRepMarket.rejectDeal(dealId);
+    }
+
+    function testAuthorizeUpgradeRevert() public {
+        address unauthorized = vm.addr(0x999);
+        address newImpl = address(new PoRepMarket());
+        bytes32 upgraderRole = poRepMarket.UPGRADER_ROLE();
+        vm.prank(unauthorized);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, upgraderRole)
+        );
+        poRepMarket.upgradeToAndCall(newImpl, "");
     }
 }
