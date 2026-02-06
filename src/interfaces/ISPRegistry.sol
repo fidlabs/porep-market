@@ -37,6 +37,16 @@ interface ISPRegistry {
      */
     function isStorageProviderOwner(address ownerAddress, CommonTypes.FilActorId provider) external view returns (bool);
 
+    /**
+     * @notice Commit actual capacity after DDO allocation
+     * @dev Reduces provider's available capacity.
+     *      Unlike getProviderForDeal which uses the client's estimate, this uses the
+     *      real size determined after datacap transfer.
+     * @param provider The provider whose capacity to commit
+     * @param actualSizeBytes Actual deal size from DDO allocation
+     */
+    function commitCapacity(CommonTypes.FilActorId provider, uint256 actualSizeBytes) external;
+
     // ============ Admin Functions ============
 
     /**

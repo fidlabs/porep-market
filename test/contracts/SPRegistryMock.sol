@@ -38,6 +38,7 @@ contract SPRegistryMock is ISPRegistry {
     // ============ Stub Functions ============
 
     function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
+    function commitCapacity(CommonTypes.FilActorId, uint256) external {}
     function addOwner(address) external {}
     function removeOwner(address) external {}
     function registerProvider(CommonTypes.FilActorId) external {}
