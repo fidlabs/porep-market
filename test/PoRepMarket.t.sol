@@ -14,14 +14,12 @@ import {ActorIdMock} from "./contracts/ActorIdMock.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
 import {MinerUtils} from "../src/libs/MinerUtils.sol";
-
-// solhint-disable-next-line max-states-count
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
+// solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
-    ValidatorRegistryMock public validatorRegistry;
     ResolveAddressPrecompileMock public resolveAddressPrecompileMock;
     ResolveAddressPrecompileMock public resolveAddress =
         ResolveAddressPrecompileMock(payable(0xFE00000000000000000000000000000000000001));
@@ -46,7 +44,6 @@ contract PoRepMarketTest is Test {
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
         spRegistry = new SPRegistryMock();
-        validatorRegistry = new ValidatorRegistryMock();
         actorIdMock = new ActorIdMock();
         actorIdFailingMock = new ActorIdFailingMock();
         actorIdExitCodeErrorFailingMock = new ActorIdExitCodeErrorFailingMock();
