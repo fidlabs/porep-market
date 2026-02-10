@@ -15,6 +15,8 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
+import {SLIThresholds} from "../src/types/SLITypes.sol";
+import {Operator} from "../src/abstracts/Operator.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;

@@ -13,7 +13,7 @@ import {IValidator} from "../src/interfaces/IValidator.sol";
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {ActorIdMock} from "./contracts/ActorIdMock.sol";
-import {ValidatorRegistryMock} from "./contracts/ValidatorRegistryMock.sol";
+import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ResolveAddressPrecompileMock} from "./contracts/ResolveAddressPrecompileMock.sol";
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
 import {ClientSCMock} from "./contracts/ClientSCMock.sol";
@@ -31,7 +31,7 @@ contract ValidatorTest is Test {
     FilecoinPayV1Mock public filecoinPayMock;
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
-    ValidatorRegistryMock public validatorRegistry;
+    ValidatorFactoryMock public validatorFactory;
     SLCMock public slcMock;
     ClientSCMock public clientSCMock;
 
@@ -53,7 +53,7 @@ contract ValidatorTest is Test {
         filecoinPay = IFilecoinPayV1(address(new FilecoinPayV1Mock()));
         filecoinPayMock = FilecoinPayV1Mock(address(filecoinPay));
         spRegistry = new SPRegistryMock();
-        validatorRegistry = new ValidatorRegistryMock();
+        validatorFactory = new ValidatorFactoryMock();
         slcMock = new SLCMock();
         clientSCMock = new ClientSCMock();
 
@@ -79,7 +79,7 @@ contract ValidatorTest is Test {
 
         PoRepMarket poRepImpl = new PoRepMarket();
         bytes memory poRepInit = abi.encodeWithSignature(
-            "initialize(address,address,address)", address(validatorRegistry), address(spRegistry), clientSC
+            "initialize(address,address,address)", address(validatorFactory), address(spRegistry), clientSC
         );
         ERC1967Proxy poRepProxy = new ERC1967Proxy(address(poRepImpl), poRepInit);
         poRepMarket = PoRepMarket(address(poRepProxy));
@@ -93,7 +93,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(impl), "");
         validator = Validator(address(validatorProxy));
 
-        validatorRegistry.setValidator(address(validator), true);
+        validatorFactory.setValidator(address(validator), true);
 
         Operator.DepositWithRailParams memory initParams = Operator.DepositWithRailParams({
             token: token,
