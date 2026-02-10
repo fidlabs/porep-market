@@ -15,7 +15,7 @@ import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
 import {MinerUtils} from "../src/libs/MinerUtils.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {PoRepMarketWrapperMock} from "./contracts/PoRepMarketWrapperMock.sol";
+import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -384,7 +384,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testGetCompletedDeals() public {
-        PoRepMarketWrapperMock porepMarekMock = new PoRepMarketWrapperMock();
+        PoRepMarketContractMock porepMarekMock = new PoRepMarketContractMock();
         porepMarekMock.setDealProposal(createDealProposal(1, PoRepMarket.DealState.Completed));
         porepMarekMock.setDealProposal(createDealProposal(2, PoRepMarket.DealState.Completed));
         porepMarekMock.setDealProposal(createDealProposal(3, PoRepMarket.DealState.Proposed));
