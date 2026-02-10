@@ -17,9 +17,9 @@ contract ResolveAddressPrecompileMock {
         filAddressToId[filAddressData] = id;
     }
 
-    // function setIdFromFilAddress(bytes calldata filAddressData, uint64 id) external {
-    //     filAddressToId[filAddressData] = id;
-    // }
+    function setAddress(bytes calldata filAddressData, uint64 id) external {
+        filAddressToId[filAddressData] = id;
+    }
 
     // solhint-disable-next-line no-complex-fallback
     fallback(bytes calldata data) external returns (bytes memory) {
