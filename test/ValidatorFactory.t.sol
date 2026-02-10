@@ -60,7 +60,9 @@ contract ValidatorFactoryTest is Test {
                 dealId: params.dealId,
                 client: client,
                 provider: provider,
-                requirements: SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200}),
+                requirements: SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: vm.addr(10),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 200

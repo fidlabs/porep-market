@@ -26,7 +26,7 @@ contract PoRepMarketTest is Test {
     CommonTypes.FilActorId public providerFilActorId;
 
     SLIThresholds internal defaultRequirements =
-        SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200});
+        SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     DealTerms internal defaultTerms = DealTerms({dealSizeBytes: 1000, priceForDeal: 100, durationDays: 365});
 
@@ -79,6 +79,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.requirements.retrievabilityPct, defaultRequirements.retrievabilityPct);
         assertEq(p.requirements.bandwidthMbps, defaultRequirements.bandwidthMbps);
         assertEq(p.requirements.latencyMs, defaultRequirements.latencyMs);
+        assertEq(p.requirements.indexingPct, defaultRequirements.indexingPct);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
         assertTrue(p.state == PoRepMarket.DealState.Proposed);
@@ -90,6 +91,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.requirements.retrievabilityPct, 0);
         assertEq(p.requirements.bandwidthMbps, 0);
         assertEq(p.requirements.latencyMs, 0);
+        assertEq(p.requirements.indexingPct, 0);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
         assertEq(uint8(p.state), 0);
@@ -335,9 +337,17 @@ contract PoRepMarketTest is Test {
 
     function testProposeDealRevertsWhenRetrievabilityPctExceeds100() public {
         SLIThresholds memory badRequirements =
-            SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 500, latencyMs: 200});
+            SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRetrievabilityPct.selector, uint8(101)));
+        poRepMarket.proposeDeal(badRequirements, defaultTerms);
+    }
+
+    function testProposeDealRevertsWhenIndexingPctExceeds100() public {
+        SLIThresholds memory badRequirements =
+            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms);
     }
 }

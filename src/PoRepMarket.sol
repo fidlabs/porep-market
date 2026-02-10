@@ -126,6 +126,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error NoProviderFoundForDeal();
     error ValidatorAlreadySet(uint256 dealId);
     error InvalidRetrievabilityPct(uint8 value);
+    error InvalidIndexingPct(uint8 value);
 
     /**
      * @notice Constructor
@@ -166,6 +167,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     function proposeDeal(SLIThresholds calldata requirements, DealTerms calldata terms) external {
         if (requirements.retrievabilityPct > 100) {
             revert InvalidRetrievabilityPct(requirements.retrievabilityPct);
+        }
+        if (requirements.indexingPct > 100) {
+            revert InvalidIndexingPct(requirements.indexingPct);
         }
 
         DealProposalsStorage storage $ = _getDealProposalsStorage();
