@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.24;
 
-import {EnumerableMap} from "@openzeppelin/contracts/utils/structs/EnumerableMap.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
@@ -23,7 +22,6 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
  * @notice Upgradeable contract for managing client allowances with role-based access control
  */
 contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuard {
-    using EnumerableMap for EnumerableMap.AddressToUintMap;
     using AllocationResponseCbor for DataCapTypes.TransferReturn;
 
     // @custom:storage-location erc7201:porepmarket.storage.ClientStorage
