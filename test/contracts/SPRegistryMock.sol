@@ -10,6 +10,10 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 contract SPRegistryMock is ISPRegistry {
     CommonTypes.FilActorId public nextProvider;
     mapping(address => mapping(CommonTypes.FilActorId => bool)) public owners;
+    CommonTypes.FilActorId[] private _providers;
+    CommonTypes.FilActorId[] private _committedProviders;
+    mapping(uint64 => ProviderInfo) private _providerInfos;
+    mapping(uint64 => bool) private _registered;
 
     // ============ Implemented Functions ============
 
@@ -25,6 +29,22 @@ contract SPRegistryMock is ISPRegistry {
         return owners[owner][provider];
     }
 
+    function getProviders() external view returns (CommonTypes.FilActorId[] memory) {
+        return _providers;
+    }
+
+    function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory) {
+        return _committedProviders;
+    }
+
+    function getProviderInfo(CommonTypes.FilActorId provider) external view returns (ProviderInfo memory) {
+        return _providerInfos[CommonTypes.FilActorId.unwrap(provider)];
+    }
+
+    function isProviderRegistered(CommonTypes.FilActorId provider) external view returns (bool) {
+        return _registered[CommonTypes.FilActorId.unwrap(provider)];
+    }
+
     // ============ Test Helpers ============
 
     function setNextProvider(CommonTypes.FilActorId provider) external {
@@ -33,6 +53,19 @@ contract SPRegistryMock is ISPRegistry {
 
     function setIsOwner(address owner, CommonTypes.FilActorId provider, bool isOwner) external {
         owners[owner][provider] = isOwner;
+    }
+
+    function addProviderToList(CommonTypes.FilActorId provider) external {
+        _providers.push(provider);
+        _registered[CommonTypes.FilActorId.unwrap(provider)] = true;
+    }
+
+    function addCommittedProvider(CommonTypes.FilActorId provider) external {
+        _committedProviders.push(provider);
+    }
+
+    function setProviderInfo(CommonTypes.FilActorId provider, ProviderInfo calldata info) external {
+        _providerInfos[CommonTypes.FilActorId.unwrap(provider)] = info;
     }
 
     // ============ Stub Functions ============
