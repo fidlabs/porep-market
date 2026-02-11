@@ -15,6 +15,7 @@ import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
 import {MinerUtils} from "../src/libs/MinerUtils.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -81,6 +82,22 @@ contract PoRepMarketTest is Test {
         spRegistry.setProvider(slcAddress, providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
         validatorFactory.setValidator(validatorAddress, true);
+    }
+
+    function createDealProposal(uint256 proposalDealId, PoRepMarket.DealState state)
+        public
+        view
+        returns (PoRepMarket.DealProposal memory)
+    {
+        return PoRepMarket.DealProposal({
+            dealId: proposalDealId,
+            client: clientAddress,
+            provider: providerFilActorId,
+            SLC: slcAddress,
+            validator: validatorAddress,
+            railId: railId,
+            state: state
+        });
     }
 
     function testProposeDealEmitsEvent() public {
@@ -364,5 +381,34 @@ contract PoRepMarketTest is Test {
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, upgraderRole)
         );
         poRepMarket.upgradeToAndCall(newImpl, "");
+    }
+
+    function testGetCompletedDealsAndRemoveIdsFromSetWithIncorrectDealState() public {
+        PoRepMarketContractMock porepMarekMock = new PoRepMarketContractMock();
+        uint256[] memory ids = new uint256[](5);
+        ids[0] = 1;
+        ids[1] = 2;
+        ids[2] = 3;
+        ids[3] = 4;
+        ids[4] = 5;
+        porepMarekMock.setDealProposal(createDealProposal(ids[0], PoRepMarket.DealState.Completed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[1], PoRepMarket.DealState.Accepted));
+        porepMarekMock.setDealProposal(createDealProposal(ids[2], PoRepMarket.DealState.Proposed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[3], PoRepMarket.DealState.Completed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[4], PoRepMarket.DealState.Rejected));
+        porepMarekMock.setDealIdsReadyForPayment(ids);
+        assertEq(porepMarekMock.getDealIdsReadyForPayment().length, 5);
+
+        PoRepMarket.DealProposal[] memory dealProposal = porepMarekMock.getCompletedDeals();
+        assertEq(dealProposal.length, 2);
+        assertEq(dealProposal[0].dealId, ids[0]);
+        assertTrue(dealProposal[0].state == PoRepMarket.DealState.Completed);
+        assertEq(dealProposal[1].dealId, ids[3]);
+        assertTrue(dealProposal[1].state == PoRepMarket.DealState.Completed);
+
+        uint256[] memory readyForPaymentDeals = porepMarekMock.getDealIdsReadyForPayment();
+        assertEq(readyForPaymentDeals.length, 2);
+        assertEq(readyForPaymentDeals[0], ids[0]);
+        assertEq(readyForPaymentDeals[1], ids[3]);
     }
 }

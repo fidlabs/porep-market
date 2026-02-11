@@ -10,6 +10,7 @@ import {ISPRegistry} from "./interfaces/SPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MinerUtils} from "./libs/MinerUtils.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
  * @title PoRepMarket contract
@@ -17,6 +18,7 @@ import {MinerUtils} from "./libs/MinerUtils.sol";
  * @notice PoRepMarket contract
  */
 contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+    using EnumerableSet for EnumerableSet.UintSet;
     /**
      * @notice role to manage contract upgrades
      */
@@ -25,6 +27,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => DealProposal) _dealProposals;
+        EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         ValidatorFactory _validatorFactoryContract;
         address _clientSmartContract;
@@ -40,6 +43,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         assembly {
             $.slot := DEAL_PROPOSALS_STORAGE_LOCATION
         }
+    }
+
+    /**
+     * @dev Returns the storage struct for the PoRepMarket contract.
+     * @notice function to allow acess to storage for inheriting contracts
+     * @return DealProposalsStorage storage struct
+     */
+    function s() internal pure returns (DealProposalsStorage storage) {
+        return _getDealProposalsStorage();
     }
 
     /**
@@ -147,7 +159,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
 
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
         $._validatorFactoryContract = ValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._clientSmartContract = _clientSmartContract;
@@ -161,7 +173,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param SLC The SLC address
      */
     function proposeDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC) external {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
 
         CommonTypes.FilActorId provider = $._SPRegistryContract.getProviderForDeal(SLC, expectedDealSize, priceForDeal);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
@@ -191,7 +203,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param railId The id of the rail
      */
     function updateValidatorAndRailId(uint256 dealId, uint256 railId) external {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
         DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
@@ -217,7 +229,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @return DealProposal The deal proposal
      */
     function getDealProposal(uint256 dealId) external view returns (DealProposal memory) {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
         return $._dealProposals[dealId];
     }
 
@@ -227,7 +239,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal proposal
      */
     function acceptDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
         DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
@@ -247,7 +259,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal proposal
      */
     function completeDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
         DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
@@ -256,6 +268,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         dp.state = DealState.Completed;
+        $._dealIdsReadyForPayment.add(dealId);
         emit DealCompleted(dealId, msg.sender, dp.provider);
     }
 
@@ -265,7 +278,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposalsStorage storage $ = s();
         DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
@@ -277,6 +290,33 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         dp.state = DealState.Rejected;
         emit DealRejected(dealId, msg.sender);
+    }
+
+    /**
+     * @notice Gets all completed deals
+     * @dev Iterates through all deals and returns only those with Completed state
+     * @return completedDeals Array of completed deal proposals
+     */
+    function getCompletedDeals() external returns (DealProposal[] memory completedDeals) {
+        DealProposalsStorage storage $ = s();
+        uint256[] memory completedDealsIds = $._dealIdsReadyForPayment.values();
+        completedDeals = new DealProposal[](completedDealsIds.length);
+        uint256 dealCounter = 0;
+
+        for (uint256 i = 0; i < completedDealsIds.length; i++) {
+            DealProposal memory dp = $._dealProposals[completedDealsIds[i]];
+            if (dp.state == DealState.Completed) {
+                completedDeals[dealCounter] = dp;
+                dealCounter++;
+            } else {
+                $._dealIdsReadyForPayment.remove(completedDealsIds[i]);
+            }
+        }
+
+        // solhint-disable-next-line no-inline-assembly
+        assembly ("memory-safe") {
+            mstore(completedDeals, dealCounter)
+        }
     }
 
     /**
