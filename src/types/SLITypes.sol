@@ -23,6 +23,7 @@ pragma solidity ^0.8.24;
  *      V1: { retrievabilityPct, bandwidthMbps, latencyMs }
  *      V2: { retrievabilityPct, bandwidthMbps, latencyMs, indexingPct }
  */
+// forge-lint: disable-next-line(pascal-case-struct)
 struct SLIThresholds {
     /// @dev Valid range: 0-100. 0 means "don't care". Values above 100 are invalid.
     uint8 retrievabilityPct;
