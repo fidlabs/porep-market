@@ -29,6 +29,8 @@ interface ISPRegistry {
      */
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
 
+    // TODO: Implementation should use MinerUtils.isControllingAddress (MinerAPI precompile)
+    // to verify on-chain SP ownership. See src/libs/MinerUtils.sol for reference.
     /**
      * @notice Check if address owns/controls a provider
      * @param ownerAddress Address to check

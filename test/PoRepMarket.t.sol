@@ -8,12 +8,6 @@ import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {ResolveAddressPrecompileMock} from "../test/contracts/ResolveAddressPrecompileMock.sol";
-import {MockProxy} from "./contracts/MockProxy.sol";
-import {ActorIdMock} from "./contracts/ActorIdMock.sol";
-import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
-import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
-import {MinerUtils} from "../src/libs/MinerUtils.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SLIThresholds, DealTerms} from "../src/types/SLITypes.sol";
 
@@ -21,13 +15,6 @@ import {SLIThresholds, DealTerms} from "../src/types/SLITypes.sol";
 contract PoRepMarketTest is Test {
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
-    ResolveAddressPrecompileMock public resolveAddressPrecompileMock;
-    ResolveAddressPrecompileMock public resolveAddress =
-        ResolveAddressPrecompileMock(payable(0xFE00000000000000000000000000000000000001));
-    ActorIdMock public actorIdMock;
-    ActorIdFailingMock public actorIdFailingMock;
-    ActorIdExitCodeErrorFailingMock public actorIdExitCodeErrorFailingMock;
-    address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
     ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
     address public clientSmartContractAddress;
@@ -47,15 +34,6 @@ contract PoRepMarketTest is Test {
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
         spRegistry = new SPRegistryMock();
-        actorIdMock = new ActorIdMock();
-        actorIdFailingMock = new ActorIdFailingMock();
-        actorIdExitCodeErrorFailingMock = new ActorIdExitCodeErrorFailingMock();
-        address actorIdProxy = address(new MockProxy(address(5555)));
-
-        resolveAddressPrecompileMock = new ResolveAddressPrecompileMock();
-        vm.etch(address(resolveAddress), address(resolveAddressPrecompileMock).code);
-        vm.etch(CALL_ACTOR_ID, address(actorIdMock).code);
-        vm.etch(address(5555), address(actorIdProxy).code);
         validatorFactory = new ValidatorFactoryMock();
         validatorAddress = vm.addr(0x001);
         clientSmartContractAddress = vm.addr(0x002);
@@ -208,19 +186,8 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
     }
 
-    function testAcceptDealRevertsExitCodeError() public {
-        vm.etch(CALL_ACTOR_ID, address(actorIdExitCodeErrorFailingMock).code);
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(expectedDealSize, priceForDeal, slcAddress);
-
-        vm.expectRevert(abi.encodeWithSelector(MinerUtils.ExitCodeError.selector));
-        poRepMarket.acceptDeal(dealId);
-    }
-
     function testAcceptDealRevertsWhenNotTheControllingAddress() public {
-        vm.etch(CALL_ACTOR_ID, address(actorIdFailingMock).code);
         address notOwnerAddress = vm.addr(3);
-        resolveAddress.setId(notOwnerAddress, uint64(20000));
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
 
