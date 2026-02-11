@@ -119,7 +119,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     error NotTheRegisteredValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
-    error NotTheStorageProviderOwner(uint256 dealId, address owner, CommonTypes.FilActorId provider);
+    error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
     error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
@@ -245,7 +245,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealCorrectState(dp, DealState.Proposed);
 
         if (!$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
-            revert NotTheStorageProviderOwner(dealId, msg.sender, dp.provider);
+            revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
         }
 
         dp.state = DealState.Accepted;
