@@ -305,7 +305,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         for (uint256 i = 0; i < completedDealsIds.length; i++) {
             DealProposal memory dp = $._dealProposals[completedDealsIds[i]];
-            if(dp.state == DealState.Completed) {
+            if (dp.state == DealState.Completed) {
                 completedDeals[dealCounter] = dp;
                 dealCounter++;
             } else {
