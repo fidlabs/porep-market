@@ -10,6 +10,7 @@ import {ISPRegistry} from "./interfaces/SPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MinerUtils} from "./libs/MinerUtils.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
  * @title PoRepMarket contract
@@ -17,6 +18,7 @@ import {MinerUtils} from "./libs/MinerUtils.sol";
  * @notice PoRepMarket contract
  */
 contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+    using EnumerableSet for EnumerableSet.UintSet;
     /**
      * @notice role to manage contract upgrades
      */
@@ -25,6 +27,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => DealProposal) _dealProposals;
+        EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         ValidatorFactory _validatorFactoryContract;
         address _clientSmartContract;
@@ -265,6 +268,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         dp.state = DealState.Completed;
+        $._dealIdsReadyForPayment.add(dealId);
         emit DealCompleted(dealId, msg.sender, dp.provider);
     }
 
@@ -293,15 +297,19 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev Iterates through all deals and returns only those with Completed state
      * @return completedDeals Array of completed deal proposals
      */
-    function getCompletedDeals() external view returns (DealProposal[] memory completedDeals) {
+    function getCompletedDeals() external returns (DealProposal[] memory completedDeals) {
         DealProposalsStorage storage $ = s();
-        completedDeals = new DealProposal[]($._dealIdCounter);
+        uint256[] memory completedDealsIds = $._dealIdsReadyForPayment.values();
+        completedDeals = new DealProposal[](completedDealsIds.length);
         uint256 dealCounter = 0;
 
-        for (uint256 i = 1; i < $._dealIdCounter + 1; i++) {
-            if ($._dealProposals[i].state == DealState.Completed) {
-                completedDeals[dealCounter] = $._dealProposals[i];
+        for (uint256 i = 0; i < completedDealsIds.length; i++) {
+            DealProposal memory dp = $._dealProposals[completedDealsIds[i]];
+            if(dp.state == DealState.Completed) {
+                completedDeals[dealCounter] = dp;
                 dealCounter++;
+            } else {
+                $._dealIdsReadyForPayment.remove(completedDealsIds[i]);
             }
         }
 

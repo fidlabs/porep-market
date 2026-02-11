@@ -383,19 +383,32 @@ contract PoRepMarketTest is Test {
         poRepMarket.upgradeToAndCall(newImpl, "");
     }
 
-    function testGetCompletedDeals() public {
+    function testGetCompletedDealsAndRemoveIdsFromSetWithIncorrectDealState() public {
         PoRepMarketContractMock porepMarekMock = new PoRepMarketContractMock();
-        porepMarekMock.setDealProposal(createDealProposal(1, PoRepMarket.DealState.Completed));
-        porepMarekMock.setDealProposal(createDealProposal(2, PoRepMarket.DealState.Completed));
-        porepMarekMock.setDealProposal(createDealProposal(3, PoRepMarket.DealState.Proposed));
-        porepMarekMock.setDealProposal(createDealProposal(4, PoRepMarket.DealState.Accepted));
-        porepMarekMock.setDealProposal(createDealProposal(5, PoRepMarket.DealState.Rejected));
+        uint256[] memory ids = new uint256[](5);
+        ids[0] = 1;
+        ids[1] = 2;
+        ids[2] = 3;
+        ids[3] = 4;
+        ids[4] = 5;
+        porepMarekMock.setDealProposal(createDealProposal(ids[0], PoRepMarket.DealState.Completed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[1], PoRepMarket.DealState.Accepted));
+        porepMarekMock.setDealProposal(createDealProposal(ids[2], PoRepMarket.DealState.Proposed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[3], PoRepMarket.DealState.Completed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[4], PoRepMarket.DealState.Rejected));
+        porepMarekMock.setDealIdsReadyForPayment(ids);
+        assertEq(porepMarekMock.getDealIdsReadyForPayment().length, 5);
 
-        PoRepMarket.DealProposal[] memory completedDeals = porepMarekMock.getCompletedDeals();
-        assertEq(completedDeals.length, 2);
-        assertEq(completedDeals[0].dealId, 1);
-        assertTrue(completedDeals[0].state == PoRepMarket.DealState.Completed);
-        assertEq(completedDeals[1].dealId, 2);
-        assertTrue(completedDeals[1].state == PoRepMarket.DealState.Completed);
+        PoRepMarket.DealProposal[] memory dealProposal = porepMarekMock.getCompletedDeals();
+        assertEq(dealProposal.length, 2);
+        assertEq(dealProposal[0].dealId, ids[0]);
+        assertTrue(dealProposal[0].state == PoRepMarket.DealState.Completed);
+        assertEq(dealProposal[1].dealId, ids[3]);
+        assertTrue(dealProposal[1].state == PoRepMarket.DealState.Completed);
+
+        uint256[] memory readyForPaymentDeals = porepMarekMock.getDealIdsReadyForPayment();
+        assertEq(readyForPaymentDeals.length, 2);
+        assertEq(readyForPaymentDeals[0], ids[0]);
+        assertEq(readyForPaymentDeals[1], ids[3]);
     }
 }
