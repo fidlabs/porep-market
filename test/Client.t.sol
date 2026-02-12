@@ -485,4 +485,38 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector));
         client.transfer(transferParams, dealId, false);
     }
+
+    function testShouldAddClaimExtensionIdsAfterTransfer() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+
+        poRepMarketMock.setDealProposal(
+            dealId,
+            PoRepMarket.DealProposal({
+                dealId: 150,
+                client: clientAddress,
+                provider: SP2,
+                requirements: SLIThresholds(80, 500, 200, 90),
+                validator: address(validatorMock),
+                state: PoRepMarket.DealState.Accepted,
+                railId: 0
+            })
+        );
+        vm.prank(clientAddress);
+        // solhint-disable-next-line reentrancy
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710021A005034AC";
+        vm.expectEmit(true, true, true, true);
+        emit Client.ValidatorLockupPeriodUpdated(dealId, address(validatorMock));
+        clientMock.transfer(transferParams, dealId, false);
+
+        Client.Deal memory deal = clientMock.getDeal(dealId);
+        assertEq(deal.claimIds.length, 2);
+        assertTrue(CommonTypes.FilActorId.unwrap(deal.claimIds[0]) == 1);
+        assertTrue(CommonTypes.FilActorId.unwrap(deal.claimIds[1]) == 2);
+    }
 }
