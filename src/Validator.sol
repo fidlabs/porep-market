@@ -5,6 +5,7 @@ pragma solidity =0.8.25;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {PrecompilesAPI} from "filecoin-solidity/v0.8/PrecompilesAPI.sol";
@@ -35,6 +36,57 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     error CallerIsNotClientSC();
 
     /**
+     * @notice Error indicating that the admin address provided during initialization is the zero address
+     */
+    error AdminCannotBeZeroAddress();
+
+    /**
+     * @notice Error indicating that the FilecoinPay address provided during initialization is the zero address
+     */
+    error FilecoinPayCannotBeZeroAddress();
+
+    /**
+     * @notice Error indicating that the SLC address provided during initialization is the zero address
+     */
+    error SLCCannotBeZeroAddress();
+
+    /**
+     * @notice Error indicating that the client smart contract address provided during initialization is the zero address
+     */
+    error ClientSCCannotBeZeroAddress();
+
+    /**
+     * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
+     */
+    error PoRepMarketCannotBeZeroAddress();
+
+    /**
+     * @notice Error indicating that an invalid rail ID was provided
+     * @dev We expect only one rail ID to be valid for per validator
+     * @param expected The expected rail ID
+     * @param actual The actual rail ID provided in the function call
+     */
+    error InvalidRailId(uint256 expected, uint256 actual);
+
+    // solhint-disable gas-indexed-events
+    /**
+     * @notice Event emitted when a payment rail is terminated
+     * @param railId The ID of the terminated rail
+     * @param terminator The address that initiated the termination
+     * @param endEpoch The Filecoin epoch at which the rail was terminated
+     */
+    event RailTerminated(uint256 indexed railId, address indexed terminator, uint256 endEpoch);
+
+    /**
+     * @notice Event emitted when the lockup period of a rail is updated
+     * @param railId The ID of the rail
+     * @param newLockupPeriod The new lockup period for the rail
+     */
+    event LockupPeriodUpdated(uint256 indexed railId, uint256 newLockupPeriod);
+
+    // solhint-enable gas-indexed-events
+
+    /**
      * @notice Number of epochs in one month
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86,400 epochs
      */
@@ -42,12 +94,31 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
     struct ValidatorStorage {
+        uint256 railId;
         address filecoinPay;
         address SLC;
         address clientSC;
         address poRepMarket;
         CommonTypes.FilActorId providerId;
     }
+
+    /**
+     * @notice Input parameters for deposit and rail creation
+     */
+    struct DepositWithRailInputParams {
+        IERC20 token;
+        uint8 v;
+        uint256 amount;
+        uint256 deadline;
+        bytes32 r;
+        bytes32 s;
+        uint256 dealId;
+    }
+
+    /**
+     * @notice Role for settlement service
+     */
+    bytes32 public constant SETTLEMENT_SERVICE_ROLE = keccak256("SETTLEMENT_SERVICE_ROLE");
 
     /**
      * @notice Storage location for ValidatorStorage struct
@@ -80,10 +151,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         address _SLC,
         address _clientSC,
         address _poRepMarket,
-        DepositWithRailParams calldata params
+        DepositWithRailInputParams calldata params
     ) external initializer {
+        _validateInitializeAddresses(admin, _filecoinPay, _SLC, _clientSC, _poRepMarket);
+
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(SETTLEMENT_SERVICE_ROLE, admin);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -137,6 +211,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotFilecoinPay();
         }
 
+        if (railId != $.railId) {
+            revert InvalidRailId({expected: $.railId, actual: railId});
+        }
+
         if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
             result.modifiedAmount = 0;
             result.settleUpto = fromEpoch;
@@ -144,7 +222,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             return result;
         }
 
-        // Mock's usage (temporary)
+        /// TODO: Replace with real SLC and ClientSC interactions when available; currently using mocks for testing purposes
         uint256 score = SLCMock($.SLC).getScore($.providerId);
         bool isDataSizeMatching = ClientSCMock($.clientSC).verifyAllocatedDataCapEqualsSealed($.providerId);
 
@@ -178,7 +256,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotClientSC();
         }
 
+        if (railId != $.railId) {
+            revert InvalidRailId({expected: $.railId, actual: railId});
+        }
+
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, newLockupPeriod, 0);
+        emit LockupPeriodUpdated(railId, newLockupPeriod);
     }
 
     /**
@@ -187,11 +270,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param terminator Address that initiated the termination
      * @param endEpoch Filecoin epoch at which the rail was terminated
      */
-    function railTerminated(uint256 railId, address terminator, uint256 endEpoch) external view override {
+    function railTerminated(uint256 railId, address terminator, uint256 endEpoch) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
             revert CallerIsNotFilecoinPay();
         }
+
+        emit RailTerminated(railId, terminator, endEpoch);
     }
 
     // solhint-enable no-unused-vars
@@ -203,7 +288,17 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     function _depositWithPermitAndCreateRailForDeal(DepositWithRailParams memory params) internal override {
         ValidatorStorage storage $ = _getValidatorStorage();
 
-        _depositWithPermitAndApproveOperator(
+        _setOperatorApproval(
+            IFilecoinPayV1($.filecoinPay),
+            params.token,
+            address(this),
+            true,
+            0,
+            0,
+            0
+        );
+
+        _depositWithPermit(
             IFilecoinPayV1($.filecoinPay),
             params.token,
             params.payer,
@@ -211,16 +306,47 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             params.deadline,
             params.v,
             params.r,
-            params.s,
-            0,
-            0,
-            0
+            params.s
         );
 
         uint256 railId =
             _createRail(IFilecoinPayV1($.filecoinPay), params.token, params.payer, params.payee, 0, address(0));
 
+        $.railId = railId;
+
         PoRepMarket($.poRepMarket).updateValidatorAndRailId(params.dealId, railId);
+    }
+
+    /**
+     * @notice Validates that the provided addresses for initialization are not zero addresses
+     * @param admin Address to be granted the default admin role
+     * @param _filecoinPay Address of the FilecoinPay contract
+     * @param _SLC Address of the SLC contract
+     * @param _clientSC Address of the client smart contract
+     * @param _poRepMarket Address of the PoRepMarket contract
+     */
+    function _validateInitializeAddresses(
+        address admin,
+        address _filecoinPay,
+        address _SLC,
+        address _clientSC,
+        address _poRepMarket
+    ) internal pure {
+        if (admin == address(0)) {
+            revert AdminCannotBeZeroAddress();
+        }
+        if (_filecoinPay == address(0)) {
+            revert FilecoinPayCannotBeZeroAddress();
+        }
+        if (_SLC == address(0)) {
+            revert SLCCannotBeZeroAddress();
+        }
+        if (_clientSC == address(0)) {
+            revert ClientSCCannotBeZeroAddress();
+        }
+        if (_poRepMarket == address(0)) {
+            revert PoRepMarketCannotBeZeroAddress();
+        }
     }
 
     //  solhint-disable
