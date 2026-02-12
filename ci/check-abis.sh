@@ -4,7 +4,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")"/..
 
-for i in $(find src -name '*.sol' ! -path "*/interfaces/*"); do
+for i in $(find src -name '*.sol' ! -path "*/interfaces/*" ! -path "*/types/*" ! -path "*/libs/*"); do
   i="$(basename "$i")"
   name="${i%.sol}"
   [ -f "abis/${name}.json" ] || exit 1

@@ -101,9 +101,31 @@
             "internalType": "CommonTypes.FilActorId"
           },
           {
-            "name": "SLC",
-            "type": "address",
-            "internalType": "address"
+            "name": "requirements",
+            "type": "tuple",
+            "internalType": "struct SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "bandwidthMbps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
           },
           {
             "name": "validator",
@@ -219,19 +241,53 @@
     "name": "proposeDeal",
     "inputs": [
       {
-        "name": "expectedDealSize",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "requirements",
+        "type": "tuple",
+        "internalType": "struct SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
       },
       {
-        "name": "priceForDeal",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "SLC",
-        "type": "address",
-        "internalType": "address"
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct DealTerms",
+        "components": [
+          {
+            "name": "dealSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "priceForDeal",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          }
+        ]
       }
     ],
     "outputs": [],
@@ -427,10 +483,32 @@
         "internalType": "CommonTypes.FilActorId"
       },
       {
-        "name": "SLC",
-        "type": "address",
+        "name": "requirements",
+        "type": "tuple",
         "indexed": false,
-        "internalType": "address"
+        "internalType": "struct SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
       }
     ],
     "anonymous": false
@@ -603,11 +681,6 @@
   },
   {
     "type": "error",
-    "name": "ActorNotFound",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "AddressEmptyCode",
     "inputs": [
       {
@@ -661,38 +734,17 @@
   },
   {
     "type": "error",
-    "name": "ExitCodeError",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "FailToCallActor",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidActorID",
+    "name": "InvalidIndexingPct",
     "inputs": [
       {
-        "name": "actorId",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidCodec",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ]
   },
@@ -703,45 +755,19 @@
   },
   {
     "type": "error",
-    "name": "InvalidResponseLength",
-    "inputs": []
+    "name": "InvalidRetrievabilityPct",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
   },
   {
     "type": "error",
     "name": "NoProviderFoundForDeal",
-    "inputs": [
-      {
-        "name": "expectedDealSize",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "priceForDeal",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "SLC",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotEnoughBalance",
-    "inputs": [
-      {
-        "name": "balance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
+    "inputs": []
   },
   {
     "type": "error",

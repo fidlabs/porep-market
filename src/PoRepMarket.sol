@@ -6,10 +6,10 @@ pragma solidity ^0.8.24;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {ISPRegistry} from "./interfaces/SPRegistry.sol";
+import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {MinerUtils} from "./libs/MinerUtils.sol";
+import {SLIThresholds, DealTerms} from "./types/SLITypes.sol";
 
 /**
  * @title PoRepMarket contract
@@ -22,7 +22,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
+    /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => DealProposal) _dealProposals;
         ISPRegistry _SPRegistryContract;
@@ -61,7 +61,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         uint256 dealId;
         address client;
         CommonTypes.FilActorId provider;
-        address SLC;
+        SLIThresholds requirements;
         address validator;
         DealState state;
         uint256 railId;
@@ -73,10 +73,13 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal proposal
      * @param client The address of the client
      * @param provider The address of the provider
-     * @param SLC The address of the SLC
+     * @param requirements The SLI thresholds for the deal
      */
     event DealProposalCreated(
-        uint256 indexed dealId, address indexed client, CommonTypes.FilActorId indexed provider, address SLC
+        uint256 indexed dealId,
+        address indexed client,
+        CommonTypes.FilActorId indexed provider,
+        SLIThresholds requirements
     );
 
     /**
@@ -120,8 +123,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
     error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
-    error NoProviderFoundForDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC);
+    error NoProviderFoundForDeal();
     error ValidatorAlreadySet(uint256 dealId);
+    error InvalidRetrievabilityPct(uint8 value);
+    error InvalidIndexingPct(uint8 value);
 
     /**
      * @notice Constructor
@@ -156,16 +161,22 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /**
      * @notice Proposes a deal
      * @dev Proposes a deal by creating a new deal proposal
-     * @param expectedDealSize The expected size of the deal
-     * @param priceForDeal The price for the deal
-     * @param SLC The SLC address
+     * @param requirements The SLI thresholds for the deal
+     * @param terms The commercial terms for the deal
      */
-    function proposeDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC) external {
+    function proposeDeal(SLIThresholds calldata requirements, DealTerms calldata terms) external {
+        if (requirements.retrievabilityPct > 100) {
+            revert InvalidRetrievabilityPct(requirements.retrievabilityPct);
+        }
+        if (requirements.indexingPct > 100) {
+            revert InvalidIndexingPct(requirements.indexingPct);
+        }
+
         DealProposalsStorage storage $ = _getDealProposalsStorage();
 
-        CommonTypes.FilActorId provider = $._SPRegistryContract.getProviderForDeal(SLC, expectedDealSize, priceForDeal);
+        CommonTypes.FilActorId provider = $._SPRegistryContract.getProviderForDeal(requirements, terms);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
-            revert NoProviderFoundForDeal(expectedDealSize, priceForDeal, SLC);
+            revert NoProviderFoundForDeal();
         }
 
         uint256 dealId = ++$._dealIdCounter;
@@ -174,13 +185,13 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             dealId: dealId,
             client: msg.sender,
             provider: provider,
-            SLC: SLC,
+            requirements: requirements,
             validator: address(0),
             state: DealState.Proposed,
             railId: 0
         });
 
-        emit DealProposalCreated(dealId, msg.sender, provider, SLC);
+        emit DealProposalCreated(dealId, msg.sender, provider, requirements);
     }
 
     /**
@@ -233,7 +244,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, DealState.Proposed);
 
-        if (!MinerUtils.isControllingAddress(dp.provider, msg.sender)) {
+        if (!$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
             revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
         }
 
@@ -256,6 +267,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         dp.state = DealState.Completed;
+        // TODO: Call $._SPRegistryContract.commitCapacity(dp.provider, actualSizeBytes)
+        // when completeDeal signature is updated with actualSizeBytes from Client contract.
+        // REF: Client.sol (PR #4)
         emit DealCompleted(dealId, msg.sender, dp.provider);
     }
 

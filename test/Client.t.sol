@@ -26,6 +26,7 @@ import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {ClientContractMock} from "./contracts/ClientContractMock.sol";
 import {ReentrantValidatorMock} from "./contracts/ReentrantValidatorMock.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {SLIThresholds} from "../src/types/SLITypes.sol";
 
 // solhint-disable max-states-count
 contract ClientTest is Test {
@@ -110,7 +111,7 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                SLC: vm.addr(0x001),
+                requirements: SLIThresholds(80, 500, 200, 90),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
@@ -249,7 +250,7 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                SLC: vm.addr(0x001),
+                requirements: SLIThresholds(80, 500, 200, 90),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Completed,
                 railId: 0
@@ -381,7 +382,7 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                SLC: vm.addr(0x999),
+                requirements: SLIThresholds(80, 500, 200, 90),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
@@ -473,7 +474,7 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                SLC: vm.addr(0x999),
+                requirements: SLIThresholds(80, 500, 200, 90),
                 validator: address(reentrantValidatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
