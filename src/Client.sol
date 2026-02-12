@@ -160,7 +160,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         uint256 sizeOfAllocations;
         CommonTypes.ChainEpoch longestDealTerm;
         CommonTypes.FilActorId[] allocationIds;
-        CommonTypes.FilActorId[] claimIds;
     }
 
     struct ProviderAllocation {
@@ -470,7 +469,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
-                deal.claimIds.push(claimIds[i]);
+                deal.allocationIds.push(claimIds[i]);
                 deal.sizeOfAllocations += claim.size;
             }
         }

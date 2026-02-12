@@ -5,6 +5,7 @@ pragma solidity 0.8.25;
 
 contract ActorIdMock {
     bytes internal _getClaimsResult;
+    bytes internal _dataCapTransferResult;
     uint256 internal constant VERIFREG_GET_CLAIMS = 2199871187;
     uint256 internal constant ADD_VERIFIED_CLIENT = 3916220144;
     uint256 internal constant IS_CONTROLLING_ADDRESS = 348244887;
@@ -19,6 +20,10 @@ contract ActorIdMock {
 
     function setGetClaimsResult(bytes memory d) public {
         _getClaimsResult = d;
+    }
+
+    function setDataCapTransferResult(bytes memory d) public {
+        _dataCapTransferResult = d;
     }
 
     // solhint-disable-next-line no-complex-fallback
@@ -49,8 +54,8 @@ contract ActorIdMock {
         return abi.encode(0, 0x51, _getClaimsResult);
     }
 
-    function _handleDatacapTransfer() internal pure returns (bytes memory) {
-        return abi.encode(0, 0x51, hex"834100410049838201808200808101");
+    function _handleDatacapTransfer() internal view returns (bytes memory) {
+        return abi.encode(0, 0x51, _dataCapTransferResult);
     }
 
     function _handleGetOwnerReturn(uint64 target) internal pure returns (bytes memory) {
