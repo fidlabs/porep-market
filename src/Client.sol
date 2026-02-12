@@ -469,6 +469,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
+                deal.allocationIds.push(claimIds[i]);
                 deal.sizeOfAllocations += claim.size;
             }
         }
