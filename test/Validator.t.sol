@@ -5,7 +5,6 @@ pragma solidity ^0.8.24;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
-import {Operator} from "../src/abstracts/Operator.sol";
 import {IFilecoinPayV1} from "../src/interfaces/IFilecoinPayV1.sol";
 import {MinerUtils} from "../src/libs/MinerUtils.sol";
 import {IValidator} from "../src/interfaces/IValidator.sol";
@@ -95,15 +94,13 @@ contract ValidatorTest is Test {
 
         validatorFactory.setValidator(address(validator), true);
 
-        Operator.DepositWithRailParams memory initParams = Operator.DepositWithRailParams({
+        Validator.DepositWithRailInputParams memory initParams = Validator.DepositWithRailInputParams({
             token: token,
-            payer: address(0),
-            payee: address(0),
-            v: 27,
+            v: 0,
             amount: 100,
             deadline: block.timestamp + 1 days,
-            r: bytes32(uint256(1)),
-            s: bytes32(uint256(2)),
+            r: bytes32(0),
+            s: bytes32(0),
             dealId: dealId
         });
 
@@ -133,15 +130,13 @@ contract ValidatorTest is Test {
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(impl), "");
         Validator badValidator = Validator(address(validatorProxy));
 
-        Operator.DepositWithRailParams memory params = Operator.DepositWithRailParams({
+        Validator.DepositWithRailInputParams memory params = Validator.DepositWithRailInputParams({
             token: token,
-            payer: address(0),
-            payee: address(0),
-            v: 27,
+            v: 0,
             amount: 100,
             deadline: block.timestamp + 1 days,
-            r: bytes32(uint256(1)),
-            s: bytes32(uint256(2)),
+            r: bytes32(0),
+            s: bytes32(0),
             dealId: dealId
         });
 
@@ -163,15 +158,13 @@ contract ValidatorTest is Test {
     function testImplementationContractCannotBeInitialized() public {
         Validator impl = new Validator();
 
-        Operator.DepositWithRailParams memory params = Operator.DepositWithRailParams({
+        Validator.DepositWithRailInputParams memory params = Validator.DepositWithRailInputParams({
             token: token,
-            payer: address(0),
-            payee: address(0),
-            v: 27,
+            v: 0,
             amount: 100,
             deadline: block.timestamp + 1 days,
-            r: bytes32(uint256(1)),
-            s: bytes32(uint256(2)),
+            r: bytes32(0),
+            s: bytes32(0),
             dealId: dealId
         });
 
@@ -180,15 +173,13 @@ contract ValidatorTest is Test {
     }
 
     function testValidatorCannotBeReinitialized() public {
-        Operator.DepositWithRailParams memory params = Operator.DepositWithRailParams({
+        Validator.DepositWithRailInputParams memory params = Validator.DepositWithRailInputParams({
             token: token,
-            payer: address(0),
-            payee: address(0),
-            v: 27,
+            v: 0,
             amount: 100,
             deadline: block.timestamp + 1 days,
-            r: bytes32(uint256(1)),
-            s: bytes32(uint256(2)),
+            r: bytes32(0),
+            s: bytes32(0),
             dealId: dealId
         });
 

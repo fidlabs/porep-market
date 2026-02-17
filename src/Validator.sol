@@ -86,12 +86,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     // solhint-enable gas-indexed-events
 
-    /**
-     * @notice Number of epochs in one month
-     * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86,400 epochs
-     */
-    uint256 private constant EPOCHS_IN_MONTH = 86_400;
-
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
     struct ValidatorStorage {
         uint256 railId;
@@ -119,6 +113,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @notice Role for settlement service
      */
     bytes32 public constant SETTLEMENT_SERVICE_ROLE = keccak256("SETTLEMENT_SERVICE_ROLE");
+
+    /**
+     * @notice Number of epochs in one month
+     * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86,400 epochs
+     */
+    uint256 private constant EPOCHS_IN_MONTH = 86_400;
+
+    /**
+     * @notice Maximum lockup period (5 years)
+     * @dev 5 years * 365 days/year * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 5_256_000 epochs
+     */
+    uint256 private constant MAX_LOCKUP_PERIOD = 5_256_000;
 
     /**
      * @notice Storage location for ValidatorStorage struct
@@ -276,6 +282,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotFilecoinPay();
         }
 
+        /// TODO: Implement any necessary cleanup or state updates upon rail termination; currently just emitting an event
+
         emit RailTerminated(railId, terminator, endEpoch);
     }
 
@@ -293,9 +301,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             params.token,
             address(this),
             true,
-            0,
-            0,
-            0
+            params.amount,
+            params.amount,
+            MAX_LOCKUP_PERIOD
         );
 
         _depositWithPermit(

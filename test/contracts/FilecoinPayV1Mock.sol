@@ -22,18 +22,23 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
 
     mapping(uint256 => Rail) public rails;
 
-    function depositWithPermitAndApproveOperator(
-        IERC20,
-        address,
-        uint256,
-        uint256,
-        uint8,
-        bytes32,
-        bytes32,
-        address,
-        uint256,
-        uint256,
-        uint256
+    function depositWithPermit(
+        IERC20 token,
+        address to,
+        uint256 amount,
+        uint256 deadline,
+        uint8 v,
+        bytes32 r,
+        bytes32 s
+    ) external override {}
+
+    function setOperatorApproval(
+        IERC20 token,
+        address operator,
+        bool approved,
+        uint256 rateAllowance,
+        uint256 lockupAllowance,
+        uint256 maxLockupPeriod
     ) external override {}
 
     function createRail(

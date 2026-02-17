@@ -60,7 +60,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         Proposed,
         Accepted,
         Completed,
-        Rejected
+        Rejected,
+        Terminated
     }
 
     /**
@@ -125,6 +126,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param provider The address of the provider
      */
     event DealCompleted(uint256 indexed dealId, address indexed client, CommonTypes.FilActorId indexed provider);
+
+    /**
+     * @notice DealTerminated event
+     * @dev DealTerminated event is emitted when a deal is terminated
+     * @param dealId The id of the deal proposal
+     * @param terminator The address that terminated the deal
+     * @param endEpoch The Filecoin epoch at which the deal was terminated
+     */
+    event DealTerminated(uint256 indexed dealId, address indexed terminator, uint256 indexed endEpoch);
 
     /**
      * @notice DealRejected event
@@ -357,6 +367,22 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, dp.terms.dealSizeBytes);
 
         emit DealCompleted(dealId, msg.sender, dp.provider);
+    }
+
+    /**
+     * @notice Terminate a deal
+     * @dev Terminates a deal by setting the deal state to terminated
+     * @param dealId The id of the deal proposal
+     */
+    function terminateDeal(uint256 dealId) external {
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        DealProposal storage dp = $._dealProposals[dealId];
+
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, DealState.Accepted);
+
+        dp.state = DealState.Terminated;
+        emit DealTerminated(dealId, msg.sender, block.timestamp);
     }
 
     /**
