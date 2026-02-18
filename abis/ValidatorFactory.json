@@ -48,9 +48,62 @@
         "internalType": "address"
       },
       {
+<<<<<<< HEAD
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
+=======
+        "name": "slcAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "params",
+        "type": "tuple",
+        "internalType": "struct Validator.DepositWithRailInputParams",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "contract IERC20"
+          },
+          {
+            "name": "v",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "amount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "deadline",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "r",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "s",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+>>>>>>> c6e2e2b (terminate deal)
       }
     ],
     "outputs": [],

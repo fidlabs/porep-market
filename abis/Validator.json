@@ -19,7 +19,11 @@
   },
   {
     "type": "function",
+<<<<<<< HEAD
     "name": "POREP_SERVICE_ROLE",
+=======
+    "name": "SETTLEMENT_SERVICE_ROLE",
+>>>>>>> c6e2e2b (terminate deal)
     "inputs": [],
     "outputs": [
       {
@@ -32,6 +36,7 @@
   },
   {
     "type": "function",
+<<<<<<< HEAD
     "name": "createRail",
     "inputs": [
       {
@@ -50,6 +55,8 @@
   },
   {
     "type": "function",
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -114,7 +121,11 @@
     "name": "initialize",
     "inputs": [
       {
+<<<<<<< HEAD
         "name": "_admin",
+=======
+        "name": "admin",
+>>>>>>> c6e2e2b (terminate deal)
         "type": "address",
         "internalType": "address"
       },
@@ -129,6 +140,7 @@
         "internalType": "address"
       },
       {
+<<<<<<< HEAD
         "name": "",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
@@ -194,6 +206,8 @@
             "internalType": "uint256"
           }
         ]
+=======
+>>>>>>> c6e2e2b (terminate deal)
         "name": "_clientSC",
         "type": "address",
         "internalType": "address"
@@ -206,22 +220,12 @@
       {
         "name": "params",
         "type": "tuple",
-        "internalType": "struct Operator.DepositWithRailParams",
+        "internalType": "struct Validator.DepositWithRailInputParams",
         "components": [
           {
             "name": "token",
             "type": "address",
             "internalType": "contract IERC20"
-          },
-          {
-            "name": "payer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "payee",
-            "type": "address",
-            "internalType": "address"
           },
           {
             "name": "v",
@@ -254,8 +258,11 @@
             "internalType": "uint256"
           }
         ]
+<<<<<<< HEAD
 >>>>>>> 75b6a35 (tests & coverage)
 >>>>>>> 35351e3 (tests & coverage)
+=======
+>>>>>>> c6e2e2b (terminate deal)
       }
     ],
     "outputs": [],
@@ -340,6 +347,7 @@
     "stateMutability": "view"
   },
   {
+<<<<<<< HEAD
     "type": "function",
     "name": "terminateRail",
     "inputs": [
@@ -353,6 +361,8 @@
     "stateMutability": "nonpayable"
   },
   {
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "type": "function",
     "name": "updateLockupPeriod",
     "inputs": [
@@ -460,6 +470,7 @@
   },
   {
     "type": "event",
+<<<<<<< HEAD
     "name": "RailPaymentModified",
     "inputs": [
       {
@@ -479,6 +490,8 @@
   },
   {
     "type": "event",
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "name": "RailTerminated",
     "inputs": [
       {
@@ -601,11 +614,16 @@
   {
     "type": "error",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "name": "AdminCannotBeZeroAddress",
+=======
+    "name": "ActorNotFound",
+>>>>>>> c6e2e2b (terminate deal)
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "CallerIsNotClient",
 =======
 <<<<<<< HEAD
@@ -614,12 +632,18 @@
 =======
     "name": "ActorNotFound",
 >>>>>>> 35351e3 (tests & coverage)
+=======
+    "name": "AdminCannotBeZeroAddress",
+>>>>>>> c6e2e2b (terminate deal)
     "inputs": []
   },
   {
     "type": "error",
 <<<<<<< HEAD
+<<<<<<< HEAD
 =======
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "name": "CallerIsNotClientSC",
     "inputs": []
   },
@@ -631,11 +655,19 @@
   {
     "type": "error",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "name": "ClientSCCannotBeZeroAddress",
 =======
 <<<<<<< HEAD
 >>>>>>> 9e3d97e (feat: validator contract with operator functionalities)
 =======
+=======
+    "name": "ClientSCCannotBeZeroAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+>>>>>>> c6e2e2b (terminate deal)
     "name": "ExitCodeError",
 >>>>>>> 35351e3 (tests & coverage)
     "inputs": []
@@ -654,6 +686,11 @@
 <<<<<<< HEAD
 =======
     "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FilecoinPayCannotBeZeroAddress",
     "inputs": []
   },
   {
@@ -680,19 +717,40 @@
   },
   {
     "type": "error",
+<<<<<<< HEAD
 >>>>>>> 75b6a35 (tests & coverage)
 >>>>>>> 35351e3 (tests & coverage)
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "name": "InvalidInitialization",
     "inputs": []
   },
   {
     "type": "error",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "name": "InvalidRailId",
     "inputs": [
       {
         "name": "expected",
+<<<<<<< HEAD
 =======
+=======
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+>>>>>>> c6e2e2b (terminate deal)
     "name": "InvalidResponseLength",
     "inputs": []
   },
@@ -729,11 +787,14 @@
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "RailAlreadyCreated",
     "inputs": []
   },
   {
     "type": "error",
+=======
+>>>>>>> c6e2e2b (terminate deal)
     "name": "SLCCannotBeZeroAddress",
     "inputs": []
   }

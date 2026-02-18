@@ -89,6 +89,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
     struct ValidatorStorage {
         uint256 railId;
+        uint256 dealId;
         address filecoinPay;
         address SLC;
         address clientSC;
@@ -179,6 +180,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         $.SLC = _SLC;
         $.clientSC = _clientSC;
         $.poRepMarket = _poRepMarket;
+        $.dealId = params.dealId;
 
         DepositWithRailParams memory initParams = DepositWithRailParams({
             token: params.token,
@@ -282,7 +284,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotFilecoinPay();
         }
 
-        /// TODO: Implement any necessary cleanup or state updates upon rail termination; currently just emitting an event
+        if (railId != $.railId) {
+            revert InvalidRailId({expected: $.railId, actual: railId});
+        }
+
+        PoRepMarket($.poRepMarket).terminateDeal($.dealId, terminator, endEpoch);
 
         emit RailTerminated(railId, terminator, endEpoch);
     }

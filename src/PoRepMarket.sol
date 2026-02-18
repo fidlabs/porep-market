@@ -374,7 +374,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal proposal
      */
-    function terminateDeal(uint256 dealId) external {
+    function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external {
         DealProposalsStorage storage $ = _getDealProposalsStorage();
         DealProposal storage dp = $._dealProposals[dealId];
 
@@ -382,7 +382,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealCorrectState(dp, DealState.Accepted);
 
         dp.state = DealState.Terminated;
-        emit DealTerminated(dealId, msg.sender, block.timestamp);
+        emit DealTerminated(dealId, terminator, endEpoch);
     }
 
     /**
