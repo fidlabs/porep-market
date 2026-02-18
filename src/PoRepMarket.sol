@@ -77,6 +77,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         DealState state;
         uint256 railId;
         string manifestLocation;
+        uint256 totalDealSize;
     }
 
     /**
@@ -86,6 +87,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param provider The address of the provider
      * @param requirements The SLI thresholds for the deal
      * @param manifestLocation The location of the manifest for the deal
+     * @param totalDealSize The total size of the deal in bytes
      */
     event DealProposalCreated(
         uint256 indexed dealId,
@@ -93,6 +95,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         CommonTypes.FilActorId indexed provider,
         SLITypes.SLIThresholds requirements,
         string manifestLocation
+        uint256 totalDealSize
     );
 
     /**
@@ -164,6 +167,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
+    error CallerIsNotValidator(uint256 dealId, address caller);
     error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
     error NoProviderFoundForDeal();
@@ -258,9 +262,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             state: initialState,
             railId: 0,
             manifestLocation: manifestLocation
+            totalDealSize: terms.dealSizeBytes
         });
 
-        emit DealProposalCreated(dealId, msg.sender, provider, requirements, manifestLocation);
+        emit DealProposalCreated(dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes);
         if (autoApprove) {
             emit DealAccepted(dealId, msg.sender, provider);
         }
@@ -373,6 +378,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal proposal
+     * @param terminator The address that terminated the deal
+     * @param endEpoch The Filecoin epoch at which the deal was terminated
      */
     function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external {
         DealProposalsStorage storage $ = _getDealProposalsStorage();
@@ -380,6 +387,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, DealState.Accepted);
+
+        if (msg.sender != dp.validator || dp.validator == address(0)) {
+            revert CallerIsNotValidator(dealId, msg.sender);
+        }
+
+        $._SPRegistryContract.releaseCapacity(dp.provider, dp.totalDealSize);
 
         dp.state = DealState.Terminated;
         emit DealTerminated(dealId, terminator, endEpoch);

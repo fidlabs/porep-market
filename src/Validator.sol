@@ -117,7 +117,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /**
      * @notice Number of epochs in one month
-     * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86,400 epochs
+     * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
 
