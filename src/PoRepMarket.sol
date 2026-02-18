@@ -9,7 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {SLIThresholds, DealTerms} from "./types/SLITypes.sol";
+import {SLITypes} from "./types/SLITypes.sol";
 
 /**
  * @title PoRepMarket contract
@@ -61,7 +61,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         uint256 dealId;
         address client;
         CommonTypes.FilActorId provider;
-        SLIThresholds requirements;
+        SLITypes.SLIThresholds requirements;
         address validator;
         DealState state;
         uint256 railId;
@@ -79,7 +79,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         uint256 indexed dealId,
         address indexed client,
         CommonTypes.FilActorId indexed provider,
-        SLIThresholds requirements
+        SLITypes.SLIThresholds requirements
     );
 
     /**
@@ -164,7 +164,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
      */
-    function proposeDeal(SLIThresholds calldata requirements, DealTerms calldata terms) external {
+    function proposeDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms) external {
         if (requirements.retrievabilityPct > 100) {
             revert InvalidRetrievabilityPct(requirements.retrievabilityPct);
         }

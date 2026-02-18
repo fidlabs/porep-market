@@ -26,7 +26,7 @@ import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {ClientContractMock} from "./contracts/ClientContractMock.sol";
 import {ReentrantValidatorMock} from "./contracts/ReentrantValidatorMock.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import {SLIThresholds} from "../src/types/SLITypes.sol";
+import {SLITypes} from "../src/types/SLITypes.sol";
 
 // solhint-disable max-states-count
 contract ClientTest is Test {
@@ -104,7 +104,6 @@ contract ClientTest is Test {
         });
         resolveAddress.setId(address(this), uint64(10000));
         resolveAddress.setAddress(hex"00C2A101", uint64(10000));
-
         dealId = 1;
         poRepMarketMock.setDealProposal(
             dealId,
@@ -112,7 +111,9 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
@@ -252,7 +253,9 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Completed,
                 railId: 0
@@ -384,7 +387,9 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
@@ -476,7 +481,9 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(reentrantValidatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0

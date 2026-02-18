@@ -4,7 +4,7 @@
 pragma solidity ^0.8.24;
 
 import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
-import {SLIThresholds, DealTerms} from "../../src/types/SLITypes.sol";
+import {SLITypes} from "../../src/types/SLITypes.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract SPRegistryMock is ISPRegistry {
@@ -17,7 +17,7 @@ contract SPRegistryMock is ISPRegistry {
 
     // ============ Implemented Functions ============
 
-    function getProviderForDeal(SLIThresholds calldata, DealTerms calldata)
+    function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
         external
         view
         returns (CommonTypes.FilActorId)
@@ -78,5 +78,5 @@ contract SPRegistryMock is ISPRegistry {
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
-    function setCapabilities(CommonTypes.FilActorId, SLIThresholds calldata) external {}
+    function setCapabilities(CommonTypes.FilActorId, SLITypes.SLIThresholds calldata) external {}
 }

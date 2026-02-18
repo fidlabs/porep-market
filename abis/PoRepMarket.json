@@ -103,7 +103,7 @@
           {
             "name": "requirements",
             "type": "tuple",
-            "internalType": "struct SLIThresholds",
+            "internalType": "struct SLITypes.SLIThresholds",
             "components": [
               {
                 "name": "retrievabilityPct",
@@ -243,7 +243,7 @@
       {
         "name": "requirements",
         "type": "tuple",
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
@@ -270,7 +270,7 @@
       {
         "name": "terms",
         "type": "tuple",
-        "internalType": "struct DealTerms",
+        "internalType": "struct SLITypes.DealTerms",
         "components": [
           {
             "name": "dealSizeBytes",
@@ -486,7 +486,7 @@
         "name": "requirements",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
