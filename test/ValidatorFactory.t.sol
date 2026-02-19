@@ -72,9 +72,10 @@ contract ValidatorFactoryTest is Test {
         );
 
         initData = abi.encodeCall(
-            ValidatorFactory.initialize, (admin, validatorAddress, poRepMarket, clientSmartContract, filecoinPay)
+            ValidatorFactory.initialize, (admin, validatorAddress)
         );
         factory = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        factory.initialize2(poRepMarket, clientSmartContract, filecoinPay);
     }
 
     function testEmitsUpgradedInConstructor() public {
