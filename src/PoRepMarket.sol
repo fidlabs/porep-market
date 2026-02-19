@@ -117,6 +117,13 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
+    /**
+     * @notice ClientSmartContractUpdated event
+     * @dev ClientSmartContractUpdated event is emitted when the client smart contract is updated
+     * @param clientSmartContract The address of the client smart contract
+     */
+    event ClientSmartContractUpdated(address indexed clientSmartContract);
+
     error NotTheRegisteredValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
@@ -142,12 +149,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param _admin The address of the admin
      * @param _validatorFactory The address of the validator registry
      * @param _spRegistry The address of the SP registry
-     * @param _clientSmartContract The address of the client smart contract
      */
-    function initialize(address _admin, address _validatorFactory, address _spRegistry, address _clientSmartContract)
-        public
-        initializer
-    {
+    function initialize(address _admin, address _validatorFactory, address _spRegistry) public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
@@ -155,7 +158,17 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         DealProposalsStorage storage $ = _getDealProposalsStorage();
         $._validatorFactoryContract = ValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
+    }
+
+    /**
+     * @notice Sets the client smart contract
+     * @dev Sets the client smart contract
+     * @param _clientSmartContract The address of the client smart contract
+     */
+    function setClientSmartContract(address _clientSmartContract) onlyRole(DEFAULT_ADMIN_ROLE) public {
+        DealProposalsStorage storage $ = _getDealProposalsStorage();
         $._clientSmartContract = _clientSmartContract;
+        emit ClientSmartContractUpdated(_clientSmartContract);
     }
 
     /**
