@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: MIT
+// solhint-disable use-natspec
 pragma solidity =0.8.25;
 
 import {Script, console} from "forge-std/Script.sol";
@@ -84,6 +85,11 @@ contract Deploy is Script {
         proxy = address(new ERC1967Proxy(address(impl), init));
     }
 
+    // solhint-disable no-console
+    /**
+     * @notice Prints the addresses of the deployed contracts
+     * @dev Prints the addresses of the deployed contracts
+     */
     function _print() internal view {
         console.log("Admin: %s", admin);
         console.log("PoRepMarket: %s", porepMarket);
@@ -91,4 +97,5 @@ contract Deploy is Script {
         console.log("ClientSmartContract: %s", clientSmartContract);
         console.log("FilecoinPay: %s", filecoinPay);
     }
+    // solhint-enable no-console
 }
