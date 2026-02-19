@@ -46,10 +46,8 @@ contract PoRepMarketTest is Test {
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 
-        bytes memory initData = abi.encodeCall(
-            PoRepMarket.initialize,
-            (adminAddress, address(validatorFactory), address(spRegistry))
-        );
+        bytes memory initData =
+            abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
         vm.prank(adminAddress);

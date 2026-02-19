@@ -165,7 +165,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev Sets the client smart contract
      * @param _clientSmartContract The address of the client smart contract
      */
-    function setClientSmartContract(address _clientSmartContract) onlyRole(DEFAULT_ADMIN_ROLE) public {
+    function setClientSmartContract(address _clientSmartContract) public onlyRole(DEFAULT_ADMIN_ROLE) {
         DealProposalsStorage storage $ = _getDealProposalsStorage();
         $._clientSmartContract = _clientSmartContract;
         emit ClientSmartContractUpdated(_clientSmartContract);
