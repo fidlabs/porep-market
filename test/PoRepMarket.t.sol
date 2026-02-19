@@ -46,16 +46,14 @@ contract PoRepMarketTest is Test {
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 
-        // solhint-disable gas-small-strings
-        bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)",
-            adminAddress,
-            address(validatorFactory),
-            address(spRegistry),
-            clientSmartContractAddress
+        bytes memory initData = abi.encodeCall(
+            PoRepMarket.initialize,
+            (adminAddress, address(validatorFactory), address(spRegistry))
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
+        vm.prank(adminAddress);
+        poRepMarket.setClientSmartContract(clientSmartContractAddress);
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
