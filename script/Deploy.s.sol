@@ -8,6 +8,8 @@ import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Client} from "../src/Client.sol";
+// import {SLIOracle} from "../src/SLIOracle.sol";
+// import {SLIScorer} from "../src/SLIScorer.sol";
 
 contract Deploy is Script {
     address public porepMarket;
@@ -18,6 +20,9 @@ contract Deploy is Script {
     address public admin;
     address public allocator;
     address public terminationOracle;
+    // address public oracleAddress;
+    // address public oracleSmartContract;
+    // address public sliScorer;
 
     error InvalidEnv();
 
@@ -29,12 +34,16 @@ contract Deploy is Script {
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         spRegistry = vm.envAddress("SP_REGISTRY");
+        // oracleAddress = vm.envAddress("ORACLE");
+        // oracleSmartContract = vm.envAddress("ORACLE_SMART_CONTRACT");
 
         vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
 
         validatorFactory = _deployValidatorFactory(admin);
         porepMarket = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         clientSmartContract = _deployClientSmartContract(admin, allocator, terminationOracle, porepMarket);
+        // oracleSmartContract = _deployOracleSmartContract(admin, oracleAddress);
+        // sliScorer = _deploySliScorer(admin, oracleSmartContract);
 
         // circular dependencies
         PoRepMarket(porepMarket).setClientSmartContract(clientSmartContract);
@@ -48,7 +57,7 @@ contract Deploy is Script {
     function _ensureEnvsExist() internal view {
         if (
             !vm.envExists("RPC_TEST") || !vm.envExists("ADMIN_PRIVATE_KEY") || !vm.envExists("FILECOIN_PAY")
-                || !vm.envExists("SP_REGISTRY") || !vm.envExists("ALLOCATOR") || !vm.envExists("TERMINATION_ORACLE")
+                || !vm.envExists("SP_REGISTRY") || !vm.envExists("ALLOCATOR") || !vm.envExists("TERMINATION_ORACLE") || !vm.envExists("ORACLE")
         ) {
             revert InvalidEnv();
         }
@@ -81,6 +90,18 @@ contract Deploy is Script {
         proxy = _createProxy(init, address(impl));
     }
 
+    // function _deployOracle(address _admin, address _oracleAddress) internal returns (address proxy) {
+    //     SLIOracle impl = new SLIOracle();
+    //     bytes memory init = abi.encodeCall(SLIOracle.initialize, (_admin, _oracleAddress));
+    //     proxy = _createProxy(init, address(impl));
+    // }
+
+    // function _deploySliScorer(address _admin, address _oracleSmartContract) internal returns (address proxy) {
+    //     SLIScorer impl = new SLIScorer();
+    //     bytes memory init = abi.encodeCall(SLIScorer.initialize, (_admin, _oracleSmartContract));
+    //     proxy = _createProxy(init, address(impl));
+    // }
+
     function _createProxy(bytes memory init, address impl) internal returns (address proxy) {
         proxy = address(new ERC1967Proxy(address(impl), init));
     }
@@ -96,6 +117,8 @@ contract Deploy is Script {
         console.log("ValidatorFactory: %s", validatorFactory);
         console.log("ClientSmartContract: %s", clientSmartContract);
         console.log("FilecoinPay: %s", filecoinPay);
+        // console.log("Oracle: %s", oracleSmartContract);
+        // console.log("SLIScorer: %s", sliScorer);
     }
     // solhint-enable no-console
 }
