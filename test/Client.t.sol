@@ -485,6 +485,9 @@ contract ClientTest is Test {
                     retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 validator: address(reentrantValidatorMock),
+                requirements: SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
             })
@@ -533,5 +536,139 @@ contract ClientTest is Test {
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[1]) == 1);
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[2]) == 4);
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
+    }
+    
+    function testIsDataSizeMatchingTrueWhenActiveSizeEqualsSizeOfAllocations() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        CommonTypes.FilActorId[] memory claimIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(claimIds.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 1);
+
+        bool ok = client.isDataSizeMatching(dealId);
+        assertTrue(ok);
+    }
+
+    function testIsDataSizeMatchingPrunesTerminatedClaim() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        uint64[] memory claims = new uint64[](1);
+        claims[0] = 1;
+
+        vm.prank(terminationOracle);
+        client.claimsTerminatedEarly(claims);
+
+        CommonTypes.FilActorId[] memory beforeIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(beforeIds.length, 1);
+
+        bool ok = client.isDataSizeMatching(dealId);
+        assertTrue(!ok);
+
+        CommonTypes.FilActorId[] memory afterIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(afterIds.length, 0);
+    }
+
+    function testIsDataSizeMatchingPrunesExpiredClaim() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        vm.roll(5256407);
+
+        bool ok = client.isDataSizeMatching(dealId);
+        assertTrue(!ok);
+
+        CommonTypes.FilActorId[] memory afterIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(afterIds.length, 0);
+    }
+
+    function testIsDataSizeMatchingSkipsFailCodesAndDoesNotPrune() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        actorIdMock.setGetClaimsResult(
+            hex"8282008182001081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        CommonTypes.FilActorId[] memory beforeIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(beforeIds.length, 1);
+
+        bool ok = client.isDataSizeMatching(dealId);
+        assertTrue(!ok);
+
+        CommonTypes.FilActorId[] memory afterIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(afterIds.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 1);
+    }
+
+    function testIsDataSizeMatchingReturnsFalseWhenNoClaimsTracked() public {
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013180";
+
+        vm.prank(clientAddress);
+        vm.expectRevert(Client.GetClaimsCallFailed.selector);
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testIsDataSizeMatchingRemovesTerminatedClaimId() public {
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        transferParams.operator_data = hex"82808283192710011A005034AC83192710021A005034AC";
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        CommonTypes.FilActorId[] memory beforeIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(beforeIds.length, 2);
+        assertEq(CommonTypes.FilActorId.unwrap(beforeIds[0]), 1);
+        assertEq(CommonTypes.FilActorId.unwrap(beforeIds[1]), 2);
+
+        uint64[] memory claims = new uint64[](1);
+        claims[0] = 1;
+
+        vm.prank(terminationOracle);
+        client.claimsTerminatedEarly(claims);
+
+        bool ok = client.isDataSizeMatching(dealId);
+
+        CommonTypes.FilActorId[] memory afterIds = client.getClientClaimIdsPerDeal(dealId);
+        assertEq(afterIds.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 2);
+    }
+
+    function testClaimsTerminatedEarlyRevertsWhenNotTerminationOracle() public {
+        uint64[] memory claims = new uint64[](1);
+        claims[0] = 1;
+
+        address notOracle = vm.addr(123);
+        bytes32 expectedRole = client.TERMINATION_ORACLE();
+
+        vm.prank(notOracle);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, notOracle, expectedRole)
+        );
+        client.claimsTerminatedEarly(claims);
+    }
+
+    function testClaimsTerminatedEarly() public {
+        assertTrue(!client.terminatedClaims(1));
+        assertTrue(!client.terminatedClaims(2));
+
+        uint64[] memory claims = new uint64[](2);
+        claims[0] = 1;
+        claims[1] = 2;
+
+        vm.prank(terminationOracle);
+        client.claimsTerminatedEarly(claims);
+
+        assertTrue(client.terminatedClaims(1));
+        assertTrue(client.terminatedClaims(2));
+        assertTrue(!client.terminatedClaims(3));
     }
 }
