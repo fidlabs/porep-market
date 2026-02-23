@@ -122,6 +122,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
+                totalDealSize: 1024
             })
         );
     }
@@ -267,6 +268,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Completed,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
+                totalDealSize: 1024
             })
         );
 
@@ -403,6 +405,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
+                totalDealSize: 1024
             })
         );
         vm.prank(clientAddress);
@@ -499,6 +502,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
+                totalDealSize: 1024
             })
         );
         reentrantValidatorMock.setAttackParams(address(client), transferParams, dealId);

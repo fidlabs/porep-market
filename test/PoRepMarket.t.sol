@@ -25,6 +25,7 @@ contract PoRepMarketTest is Test {
     address public adminAddress;
     uint256 public railId;
     uint256 public dealId;
+    uint256 public totalDealSize;
 
     CommonTypes.FilActorId public providerFilActorId;
 
@@ -47,6 +48,7 @@ contract PoRepMarketTest is Test {
         adminAddress = vm.addr(0x006);
         dealId = 1;
         railId = 1;
+        totalDealSize = 1024;
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 
@@ -84,7 +86,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealProposalCreated(
-            dealId, clientAddress, providerFilActorId, defaultRequirements, expectedManifestLocation
+            dealId, clientAddress, providerFilActorId, defaultRequirements, expectedManifestLocation, totalDealSize
         );
 
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);

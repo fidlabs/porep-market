@@ -73,7 +73,7 @@ contract ValidatorTest is Test {
         resolveAddress.setAddress(hex"00C2A101", uint64(20000));
         resolveAddress.setId(providerOwner, uint64(20000));
 
-        spRegistry.setProvider(slc, providerFilActorId);
+        spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwner, providerFilActorId, true);
 
         PoRepMarket poRepImpl = new PoRepMarket();
@@ -82,11 +82,6 @@ contract ValidatorTest is Test {
         );
         ERC1967Proxy poRepProxy = new ERC1967Proxy(address(poRepImpl), poRepInit);
         poRepMarket = PoRepMarket(address(poRepProxy));
-
-        vm.prank(clientSC);
-        poRepMarket.proposeDeal(100, 150, slc);
-        vm.prank(providerOwner);
-        poRepMarket.acceptDeal(dealId);
 
         Validator impl = new Validator();
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(impl), "");
