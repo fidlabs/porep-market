@@ -1,135 +1,1128 @@
-
-╭-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------╮
-| Type        | Signature                                                                                    | Selector                                                           |
-+=================================================================================================================================================================================+
-| event       | AvailableSpaceUpdated(CommonTypes.FilActorId,uint256)                                        | 0xfae192944a1ec25be9c90bbb4974cf4bc949d7bbe9b8a56e7ed3185eef25521f |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | CapabilitiesUpdated(CommonTypes.FilActorId,SLIThresholds)                                    | 0x16482201d3d93faacee25c21208beadb4b2b693d888a47a9f41f656c83c52834 |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | CapacityCommitted(CommonTypes.FilActorId,uint256)                                            | 0xee46d94fadee4d4d1e2961b9289db30e5de2d74d7246e132264e74b308f56063 |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | CapacityReleased(CommonTypes.FilActorId,uint256)                                             | 0x0859ac06952363ae2a3930fb55a7b0a4df9626af437fb64be73b137363bb81bf |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | DefaultPriceUpdated(CommonTypes.FilActorId,uint256,uint256)                                  | 0x4e3f7a2879a33c77ac57abcb2d13170833fab0f861b055ed3ff8e8e336c744c8 |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | Initialized(uint64)                                                                          | 0xc7f505b2f371ae2175ee4913f4499e1f2633a7b5936321eed1cdaeb6115181d2 |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | OwnerAdded(address)                                                                          | 0x994a936646fe87ffe4f1e469d3d6aa417d6b855598397f323de5b449f765f0c3 |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | ProviderRegistered(CommonTypes.FilActorId,address)                                           | 0x492e2283127f05c8282bd8c8645a7796281564373f74bd6a094ae98581cfd489 |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | RoleAdminChanged(bytes32,bytes32,bytes32)                                                    | 0xbd79b86ffe0ab8e8776151514217cd7cacd52c909f66475c3af44e129f0b00ff |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | RoleGranted(bytes32,address,address)                                                         | 0x2f8788117e7eff1d82e926ec794901d17c78024a50270940304540a733656f0d |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | RoleRevoked(bytes32,address,address)                                                         | 0xf6391f5c32d9c69d2a47ea670b442974b53935d1edc7fd64eb21e047a839171b |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| event       | Upgraded(address)                                                                            | 0xbc7cd75a20ee27fd9adebab32041f755214dbc6bffa90cc0225b39da2e5c2d3b |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | AccessControlBadConfirmation()                                                               | 0x6697b232                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | AccessControlUnauthorizedAccount(address,bytes32)                                            | 0xe2517d3f                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | AddressEmptyCode(address)                                                                    | 0x9996b315                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | CommitExceedsAvailable(CommonTypes.FilActorId,uint256,uint256)                               | 0x2578fa12                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC1967InvalidImplementation(address)                                                        | 0x4c9c8ce3                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ERC1967NonPayable()                                                                          | 0xb398979f                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | FailedCall()                                                                                 | 0xd6bda275                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidAdminAddress()                                                                        | 0x05bb467c                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidIndexingPct(uint8)                                                                    | 0xad23dabc                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidInitialization()                                                                      | 0xf92ee8a9                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidOwnerAddress()                                                                        | 0xd924e5f4                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidPoRepMarketAddress()                                                                  | 0xc9cc4a06                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidProviderActorId()                                                                     | 0x7599e239                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | InvalidRetrievabilityPct(uint8)                                                              | 0xdfa96d26                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | NotImplemented()                                                                             | 0xd6234725                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | NotInitializing()                                                                            | 0xd7e6bcf8                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | NotProviderOwnerOrAdmin(address,CommonTypes.FilActorId)                                      | 0xfad52b3a                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ProviderAlreadyRegistered(CommonTypes.FilActorId)                                            | 0xf91794e7                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ProviderNotRegistered(CommonTypes.FilActorId)                                                | 0x2b87b09e                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | ReleaseExceedsCommitted(CommonTypes.FilActorId,uint256,uint256)                              | 0x014d0038                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | UUPSUnauthorizedCallContext()                                                                | 0xe07c8dba                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| error       | UUPSUnsupportedProxiableUUID(bytes32)                                                        | 0xaa1d49a4                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | DEFAULT_ADMIN_ROLE() view returns (bytes32)                                                  | 0xa217fddf                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | MARKET_ROLE() view returns (bytes32)                                                         | 0x3e27ec9b                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | UPGRADER_ROLE() view returns (bytes32)                                                       | 0xf72c0d8b                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | UPGRADE_INTERFACE_VERSION() view returns (string)                                            | 0xad3cb1cc                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | addOwner(address) pure                                                                       | 0x7065cb48                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | commitCapacity(CommonTypes.FilActorId,uint256) nonpayable                                    | 0x52be0dc0                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | getCommittedProviders() view returns (CommonTypes.FilActorId[])                              | 0xa2a661e8                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | getProviderForDeal(SLIThresholds,DealTerms) nonpayable returns (CommonTypes.FilActorId,bool) | 0x3c3db76c                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | getProviderInfo(CommonTypes.FilActorId) view returns (ISPRegistry.ProviderInfo)              | 0x2ec20c76                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | getProviders() view returns (CommonTypes.FilActorId[])                                       | 0xedc922a9                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | getRoleAdmin(bytes32) view returns (bytes32)                                                 | 0x248a9ca3                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | grantRole(bytes32,address) nonpayable                                                        | 0x2f2ff15d                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | hasRole(bytes32,address) view returns (bool)                                                 | 0x91d14854                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | initialize(address,address) nonpayable                                                       | 0x485cc955                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | isProviderRegistered(CommonTypes.FilActorId) view returns (bool)                             | 0xee1d507d                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | isStorageProviderOwner(address,CommonTypes.FilActorId) view returns (bool)                   | 0xe637ae08                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | pauseProvider(CommonTypes.FilActorId) pure                                                   | 0x8cb45edf                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | proxiableUUID() view returns (bytes32)                                                       | 0x52d1902d                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | registerProvider(CommonTypes.FilActorId) pure                                                | 0x355b24de                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | registerProviderFor(CommonTypes.FilActorId,address,SLIThresholds,uint256,uint256) nonpayable | 0x5f72a0b5                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | releaseCapacity(CommonTypes.FilActorId,uint256) nonpayable                                   | 0xb76e8b34                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | removeOwner(address) pure                                                                    | 0x173825d9                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | renounceRole(bytes32,address) nonpayable                                                     | 0x36568abe                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | revokeRole(bytes32,address) nonpayable                                                       | 0xd547741f                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | setCapabilities(CommonTypes.FilActorId,SLIThresholds) nonpayable                             | 0x7a917a02                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | setDefaultPrice(CommonTypes.FilActorId,uint256) pure                                         | 0x417e227e                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | supportsInterface(bytes4) view returns (bool)                                                | 0x01ffc9a7                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | unpauseProvider(CommonTypes.FilActorId) pure                                                 | 0xfb0f0bfc                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | updateAvailableSpace(CommonTypes.FilActorId,uint256) nonpayable                              | 0x26069054                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| function    | upgradeToAndCall(address,bytes) payable                                                      | 0x4f1ef286                                                         |
-|-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------|
-| constructor | constructor() nonpayable                                                                     |                                                                    |
-╰-------------+----------------------------------------------------------------------------------------------+--------------------------------------------------------------------╯
-
+[
+  {
+    "type": "constructor",
+    "inputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "DEFAULT_ADMIN_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MARKET_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "UPGRADER_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "UPGRADE_INTERFACE_VERSION",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "addOwner",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "commitCapacity",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "actualSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getCommittedProviders",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64[]",
+        "internalType": "CommonTypes.FilActorId[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProviderForDeal",
+    "inputs": [
+      {
+        "name": "requirements",
+        "type": "tuple",
+        "internalType": "struct SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      },
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct DealTerms",
+        "components": [
+          {
+            "name": "dealSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "priceForDeal",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getProviderInfo",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "info",
+        "type": "tuple",
+        "internalType": "struct ISPRegistry.ProviderInfo",
+        "components": [
+          {
+            "name": "owner",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "capabilities",
+            "type": "tuple",
+            "internalType": "struct SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "bandwidthMbps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "availableBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "committedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "defaultPricePerDeal",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProviders",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64[]",
+        "internalType": "CommonTypes.FilActorId[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getRoleAdmin",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "grantRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "hasRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "initialize",
+    "inputs": [
+      {
+        "name": "_admin",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_poRepMarket",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isProviderRegistered",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isStorageProviderOwner",
+    "inputs": [
+      {
+        "name": "ownerAddress",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "pauseProvider",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "proxiableUUID",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "registerProvider",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "registerProviderFor",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "capabilities",
+        "type": "tuple",
+        "internalType": "struct SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      },
+      {
+        "name": "availableBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "defaultPricePerDeal",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "releaseCapacity",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "sizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "removeOwner",
+    "inputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "renounceRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "callerConfirmation",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "revokeRole",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setCapabilities",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "capabilities",
+        "type": "tuple",
+        "internalType": "struct SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setDefaultPrice",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "supportsInterface",
+    "inputs": [
+      {
+        "name": "interfaceId",
+        "type": "bytes4",
+        "internalType": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "unpauseProvider",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "updateAvailableSpace",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "availableBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "upgradeToAndCall",
+    "inputs": [
+      {
+        "name": "newImplementation",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "data",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "AvailableSpaceUpdated",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "availableBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CapabilitiesUpdated",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "capabilities",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CapacityCommitted",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "committedBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "CapacityReleased",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "releasedBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DefaultPriceUpdated",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "oldPrice",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newPrice",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Initialized",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OwnerAdded",
+    "inputs": [
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProviderRegistered",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "owner",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RoleAdminChanged",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "previousAdminRole",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newAdminRole",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RoleGranted",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RoleRevoked",
+    "inputs": [
+      {
+        "name": "role",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "sender",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "Upgraded",
+    "inputs": [
+      {
+        "name": "implementation",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "error",
+    "name": "AccessControlBadConfirmation",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AccessControlUnauthorizedAccount",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "neededRole",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "CommitExceedsAvailable",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "newCommitted",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "availableBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC1967InvalidImplementation",
+    "inputs": [
+      {
+        "name": "implementation",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ERC1967NonPayable",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailedCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAdminAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidIndexingPct",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidOwnerAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepMarketAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidProviderActorId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidRetrievabilityPct",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "NotImplemented",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotInitializing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotProviderOwnerOrAdmin",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProviderAlreadyRegistered",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProviderNotRegistered",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ReleaseExceedsCommitted",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "sizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "committedBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UUPSUnauthorizedCallContext",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UUPSUnsupportedProxiableUUID",
+    "inputs": [
+      {
+        "name": "slot",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ]
+  }
+]
