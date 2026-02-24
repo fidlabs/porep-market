@@ -9,20 +9,19 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract SPRegistryMock is ISPRegistry {
     CommonTypes.FilActorId public nextProvider;
+    bool public nextAutoApprove;
     mapping(address => mapping(CommonTypes.FilActorId => bool)) public owners;
     CommonTypes.FilActorId[] private _providers;
     CommonTypes.FilActorId[] private _committedProviders;
     mapping(uint64 => ProviderInfo) private _providerInfos;
     mapping(uint64 => bool) private _registered;
 
-    // ============ Implemented Functions ============
-
     function getProviderForDeal(SLIThresholds calldata, DealTerms calldata)
         external
         view
-        returns (CommonTypes.FilActorId)
+        returns (CommonTypes.FilActorId, bool)
     {
-        return nextProvider;
+        return (nextProvider, nextAutoApprove);
     }
 
     function isStorageProviderOwner(address owner, CommonTypes.FilActorId provider) external view returns (bool) {
@@ -45,10 +44,12 @@ contract SPRegistryMock is ISPRegistry {
         return _registered[CommonTypes.FilActorId.unwrap(provider)];
     }
 
-    // ============ Test Helpers ============
-
     function setNextProvider(CommonTypes.FilActorId provider) external {
         nextProvider = provider;
+    }
+
+    function setNextAutoApprove(bool _autoApprove) external {
+        nextAutoApprove = _autoApprove;
     }
 
     function setIsOwner(address owner, CommonTypes.FilActorId provider, bool isOwner) external {
@@ -68,8 +69,6 @@ contract SPRegistryMock is ISPRegistry {
         _providerInfos[CommonTypes.FilActorId.unwrap(provider)] = info;
     }
 
-    // ============ Stub Functions ============
-
     function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
     function commitCapacity(CommonTypes.FilActorId, uint256) external {}
     function addOwner(address) external {}
@@ -79,4 +78,5 @@ contract SPRegistryMock is ISPRegistry {
     function unpauseProvider(CommonTypes.FilActorId) external {}
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
     function setCapabilities(CommonTypes.FilActorId, SLIThresholds calldata) external {}
+    function setDefaultPrice(CommonTypes.FilActorId, uint256) external {}
 }

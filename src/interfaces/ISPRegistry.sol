@@ -15,9 +15,8 @@ interface ISPRegistry {
         SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
+        uint256 defaultPricePerDeal;
     }
-
-    // ============ View Methods ============
 
     /**
      * @notice Get all registered providers
@@ -45,21 +44,26 @@ interface ISPRegistry {
      */
     function isProviderRegistered(CommonTypes.FilActorId provider) external view returns (bool);
 
-    // ============ Provider Matching (called by PoRepMarket) ============
-
     /**
-     * @notice Find and reserve a provider matching requirements
-     * @dev Reserves capacity atomically. Selection uses closest-match + weighted round-robin.
+     * @notice Find a provider matching requirements
+     * @dev Selects the least-committed eligible provider. Capacity is NOT reserved atomically;
+     *      between matching and `commitCapacity`, other deals may consume the same capacity
+     *      (TOCTOU race). This is acceptable because `commitCapacity` enforces the upper bound.
+     *      Future improvement: consider `pendingBytes` reservation to hold capacity between
+     *      matching and commitment.
+     *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
      * @param terms Commercial terms (size, price, duration)
-     * @return provider The matched provider (reverts if none found)
+     * @return provider The matched provider, or FilActorId(0) if none found
+     * @return autoApprove True if the provider's default price is met by the deal terms
      */
     function getProviderForDeal(SLIThresholds calldata requirements, DealTerms calldata terms)
         external
-        returns (CommonTypes.FilActorId provider);
+        returns (CommonTypes.FilActorId provider, bool autoApprove);
 
     /**
-     * @notice Release reserved capacity (called on deal rejection)
+     * @notice Release committed capacity (called on deal rejection)
+     * @dev Decrements committedBytes for the provider. Reverts on underflow.
      * @param provider The provider whose capacity to release
      * @param sizeBytes Amount of capacity to release
      */
@@ -85,8 +89,6 @@ interface ISPRegistry {
      */
     function commitCapacity(CommonTypes.FilActorId provider, uint256 actualSizeBytes) external;
 
-    // ============ Admin Functions ============
-
     /**
      * @notice Add an approved owner (admin only)
      * @param owner Address to approve as owner
@@ -98,8 +100,6 @@ interface ISPRegistry {
      * @param owner Address to remove
      */
     function removeOwner(address owner) external;
-
-    // ============ Owner Self-Management ============
 
     /**
      * @notice Register a new provider under caller's ownership
@@ -129,7 +129,14 @@ interface ISPRegistry {
     /**
      * @notice Set SLI capabilities for a provider
      * @param provider The provider to update
-     * @param thresholds The SLI thresholds this provider guarantees
+     * @param capabilities The SLI capabilities this provider guarantees
      */
-    function setCapabilities(CommonTypes.FilActorId provider, SLIThresholds calldata thresholds) external;
+    function setCapabilities(CommonTypes.FilActorId provider, SLIThresholds calldata capabilities) external;
+
+    /**
+     * @notice Set the default auto-approve price for a provider
+     * @param provider The provider to update
+     * @param pricePerDeal The stablecoin price per deal (0 to disable auto-approve)
+     */
+    function setDefaultPrice(CommonTypes.FilActorId provider, uint256 pricePerDeal) external;
 }

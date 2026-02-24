@@ -174,7 +174,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         DealProposalsStorage storage $ = _getDealProposalsStorage();
 
-        CommonTypes.FilActorId provider = $._SPRegistryContract.getProviderForDeal(requirements, terms);
+        // TODO: Use autoApprove to skip explicit acceptDeal() step when SP's price floor is met
+        (
+            CommonTypes.FilActorId provider, /* autoApprove */
+        ) = $._SPRegistryContract.getProviderForDeal(requirements, terms);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
         }
