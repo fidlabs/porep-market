@@ -11,11 +11,11 @@ contract ClientContractMock is Client {
     }
 
     function addDealClaimId(uint256 dealId, uint64 claimId) external {
-        s()._deals[dealId].claimIds.push(CommonTypes.FilActorId.wrap(claimId));
+        s()._deals[dealId].allocationIds.push(CommonTypes.FilActorId.wrap(claimId));
     }
 
     function deleteDealClaimIdByValue(uint256 dealId, uint64 claimId) external {
         Deal storage deal = s()._deals[dealId];
-        _deleteDealClaimIdByValue(dealId, deal, claimId);
+        _deleteDealAllocationIdByValue(dealId, deal, claimId);
     }
 }
