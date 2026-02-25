@@ -412,6 +412,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         if (longestDealTerm > CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm)) {
             IValidator validator = IValidator(deal.validator);
+            // casting to uint64 is safe because longestDealTerm is a positive ChainEpoch
+            // forge-lint: disable-next-line(unsafe-typecast)
             validator.updateLockupPeriod(deal.railId, uint256(uint64(longestDealTerm)));
 
             emit ValidatorLockupPeriodUpdated(dealId, deal.validator);

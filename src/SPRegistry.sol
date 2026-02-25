@@ -40,6 +40,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @custom:storage-location erc7201:porepmarket.storage.SPRegistryStorage
+    // forge-lint: disable-next-line(pascal-case-struct)
     struct SPRegistryStorage {
         EnumerableSet.UintSet _providerIds;
         EnumerableSet.AddressSet _approvedOwners;

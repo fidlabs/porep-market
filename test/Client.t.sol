@@ -111,7 +111,9 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
@@ -250,7 +252,9 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Completed,
                 railId: 0
@@ -382,7 +386,9 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
@@ -474,7 +480,9 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(reentrantValidatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
