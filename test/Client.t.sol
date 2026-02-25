@@ -93,6 +93,7 @@ contract ClientTest is Test {
         actorIdMock.setGetClaimsResult(
             hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
         // --- Dummy transfer params ---
         transferParams = DataCapTypes.TransferParams({
             to: CommonTypes.FilAddress(transferTo),
@@ -159,13 +160,14 @@ contract ClientTest is Test {
         assertEq(clientAllocationIdsBefore.length, 0);
 
         transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710021A005034AC";
         vm.prank(clientAddress);
         client.transfer(transferParams, dealId, false);
 
         CommonTypes.FilActorId[] memory clientAllocationIdsAfter = client.getClientAllocationIdsPerDeal(dealId);
-        assertEq(clientAllocationIdsAfter.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(clientAllocationIdsAfter[0]), 1);
+        assertEq(clientAllocationIdsAfter.length, 2);
+        assertEq(CommonTypes.FilActorId.unwrap(clientAllocationIdsAfter[0]), 2);
+        assertEq(CommonTypes.FilActorId.unwrap(clientAllocationIdsAfter[1]), 1);
     }
 
     function testInvalidClaimExtensionRequest() public {
@@ -484,5 +486,43 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector));
         client.transfer(transferParams, dealId, false);
+    }
+
+    function testShouldAddClaimExtensionIdsAfterTransfer() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+
+        poRepMarketMock.setDealProposal(
+            dealId,
+            PoRepMarket.DealProposal({
+                dealId: 150,
+                client: clientAddress,
+                provider: SP1,
+                requirements: SLIThresholds(80, 500, 200, 90),
+                validator: address(validatorMock),
+                state: PoRepMarket.DealState.Accepted,
+                railId: 0
+            })
+        );
+        // solhint-disable-next-line reentrancy
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710041A005034AC";
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808102");
+        vm.expectEmit(true, true, true, true);
+        emit Client.ValidatorLockupPeriodUpdated(dealId, address(validatorMock));
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+
+        Client.Deal memory deal = clientMock.getDeal(dealId);
+        assertEq(deal.allocationIds.length, 4);
+        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[0]) == 3);
+        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[1]) == 1);
+        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[2]) == 4);
+        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
     }
 }
