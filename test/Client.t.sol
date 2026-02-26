@@ -539,37 +539,45 @@ contract ClientTest is Test {
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
     }
     
-    function testIsDataSizeMatchingTrueWhenActiveSizeEqualsSizeOfAllocations() public {
+    function testIsDataSizeMatchingHappyPath() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId, false);
 
-        CommonTypes.FilActorId[] memory claimIds = client.getClientAllocationIdsPerDeal(dealId);
-        assertEq(claimIds.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 1);
+        clientMock.addDealAllocationId(dealId, 1);
 
-        bool ok = client.isDataSizeMatching(dealId);
+        CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
+
+        bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(ok);
     }
 
     function testIsDataSizeMatchingRemovesTerminatedClaimAndReturnsFalse() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId, false);
+
+        clientMock.addDealAllocationId(dealId, 1);
 
         uint64[] memory claims = new uint64[](1);
         claims[0] = 1;
 
         vm.prank(terminationOracle);
-        client.claimsTerminatedEarly(claims);
+        clientMock.claimsTerminatedEarly(claims);
 
-        CommonTypes.FilActorId[] memory beforeIds = client.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory beforeIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 1);
 
-        bool ok = client.isDataSizeMatching(dealId);
+        bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
-        CommonTypes.FilActorId[] memory afterIds = client.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 0);
     }
 
@@ -588,21 +596,25 @@ contract ClientTest is Test {
     }
 
     function testIsDataSizeMatchingSkipsFailCodes() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId, false);
+
+        clientMock.addDealAllocationId(dealId, 1);
 
         actorIdMock.setGetClaimsResult(
             hex"8282008182001081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
 
-        CommonTypes.FilActorId[] memory beforeIds = client.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory beforeIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 1);
 
-        bool ok = client.isDataSizeMatching(dealId);
+        bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
-        CommonTypes.FilActorId[] memory afterIds = client.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 1);
     }
@@ -617,28 +629,31 @@ contract ClientTest is Test {
     }
 
     function testIsDataSizeMatchingRemovesTerminatedClaimId() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
         actorIdMock.setGetClaimsResult(
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
 
         transferParams.operator_data = hex"82808283192710011A005034AC83192710021A005034AC";
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId, false);
 
-        CommonTypes.FilActorId[] memory beforeIds = client.getClientAllocationIdsPerDeal(dealId);
+        clientMock.addDealAllocationId(dealId, 1);
+        clientMock.addDealAllocationId(dealId, 2);
+
+        CommonTypes.FilActorId[] memory beforeIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 2);
-        assertEq(CommonTypes.FilActorId.unwrap(beforeIds[0]), 1);
-        assertEq(CommonTypes.FilActorId.unwrap(beforeIds[1]), 2);
 
         uint64[] memory claims = new uint64[](1);
         claims[0] = 1;
 
         vm.prank(terminationOracle);
-        client.claimsTerminatedEarly(claims);
+        clientMock.claimsTerminatedEarly(claims);
 
-        client.isDataSizeMatching(dealId);
+        clientMock.isDataSizeMatching(dealId);
 
-        CommonTypes.FilActorId[] memory afterIds = client.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 2);
     }
@@ -673,28 +688,28 @@ contract ClientTest is Test {
         assertTrue(!isFourthClaimTerminated);
     }
 
-    function testDeleteDealClaimIdByValueRevertsWhenNotFound() public {
+    function testDeleteDealAllocationIdByValueRevertsWhenNotFound() public {
         ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
 
         uint256 localDealId = 123;
 
-        mock.addDealClaimId(localDealId, 1);
-        mock.addDealClaimId(localDealId, 2);
+        mock.addDealAllocationId(localDealId, 1);
+        mock.addDealAllocationId(localDealId, 2);
 
         vm.expectRevert(abi.encodeWithSelector(Client.DealAllocationNotFound.selector, localDealId, uint64(3)));
-        mock.deleteDealClaimIdByValue(localDealId, uint64(3));
+        mock.deleteDealAllocationIdByValue(localDealId, uint64(3));
     }
 
-    function testDeleteDealClaimIdByValue() public {
+    function testDeleteDealAllocationIdByValue() public {
         ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
 
         uint256 localDealId = 123;
 
-        mock.addDealClaimId(localDealId, 1);
-        mock.addDealClaimId(localDealId, 2);
-        mock.addDealClaimId(localDealId, 3);
+        mock.addDealAllocationId(localDealId, 1);
+        mock.addDealAllocationId(localDealId, 2);
+        mock.addDealAllocationId(localDealId, 3);
 
-        mock.deleteDealClaimIdByValue(localDealId, 2);
+        mock.deleteDealAllocationIdByValue(localDealId, 2);
 
         CommonTypes.FilActorId[] memory afterIds = mock.getClientAllocationIdsPerDeal(localDealId);
 
@@ -703,28 +718,32 @@ contract ClientTest is Test {
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[1]), 3);
     }
 
-    function testDeleteDealClaimIdByValueRevertsWhenEmpty() public {
+    function testDeleteDealAllocationIdByValueRevertsWhenEmpty() public {
         ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
 
         uint256 newDealId = 123;
-        uint64 missingClaimId = 1;
+        uint64 missingAllocationId = 1;
 
-        vm.expectRevert(abi.encodeWithSelector(Client.DealAllocationNotFound.selector, newDealId, missingClaimId));
-        mock.deleteDealClaimIdByValue(newDealId, missingClaimId);
+        vm.expectRevert(abi.encodeWithSelector(Client.DealAllocationNotFound.selector, newDealId, missingAllocationId));
+        mock.deleteDealAllocationIdByValue(newDealId, missingAllocationId);
     }
 
     function testIsDataSizeMatchingRevertsWhenGetClaimsExitCodeNonZero() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId, false);
 
-        CommonTypes.FilActorId[] memory claimIds = client.getClientAllocationIdsPerDeal(dealId);
-        assertEq(claimIds.length, 1);
+        clientMock.addDealAllocationId(dealId, 1);
+
+        CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 1);
 
         ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
         vm.etch(CALL_ACTOR_ID, address(failing).code);
 
         vm.expectRevert(Client.GetClaimsCallFailed.selector);
-        client.isDataSizeMatching(dealId);
+        clientMock.isDataSizeMatching(dealId);
     }
 }

@@ -554,9 +554,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
                     < currentEpoch;
 
             uint64 id = CommonTypes.FilActorId.unwrap(ids[i]);
-            bool terminated = $._terminatedClaims[id];
 
-            if (expired || terminated) {
+            if (expired || $._terminatedClaims[id]) {
                 _deleteDealAllocationIdByValue(dealId, deal, id);
                 continue;
             }
