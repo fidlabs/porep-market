@@ -152,11 +152,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      */
     error InvalidDealStateForTransfer();
 
-    /**
-     * @notice Error thrown when a deal allocation is not found
-     */
-    error DealAllocationNotFound(uint256 dealId, uint64 allocationId);
-
     struct Deal {
         address client;
         address validator;

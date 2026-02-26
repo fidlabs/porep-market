@@ -71,6 +71,19 @@
   },
   {
     "type": "function",
+    "name": "claimsTerminatedEarly",
+    "inputs": [
+      {
+        "name": "claims",
+        "type": "uint64[]",
+        "internalType": "uint64[]"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getClientAllocationIdsPerDeal",
     "inputs": [
       {
@@ -218,6 +231,25 @@
   },
   {
     "type": "function",
+    "name": "isDataSizeMatching",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "proxiableUUID",
     "inputs": [],
     "outputs": [
@@ -273,6 +305,25 @@
         "name": "interfaceId",
         "type": "bytes4",
         "internalType": "bytes4"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "terminatedClaims",
+    "inputs": [
+      {
+        "name": "claimId",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ],
     "outputs": [
@@ -553,6 +604,22 @@
         "name": "target",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DealAllocationNotFound",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "allocationId",
+        "type": "uint64",
+        "internalType": "uint64"
       }
     ]
   },
