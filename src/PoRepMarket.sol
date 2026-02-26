@@ -10,7 +10,6 @@ import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLIThresholds, DealTerms} from "./types/SLITypes.sol";
-import {MinerUtils} from "./libs/MinerUtils.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
@@ -48,7 +47,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @dev Returns the storage struct for the PoRepMarket contract.
-     * @notice function to allow acess to storage for inheriting contracts
+     * @notice function to allow acess to storage
      * @return DealProposalsStorage storage struct
      */
     function s() private pure returns (DealProposalsStorage storage) {
