@@ -51,7 +51,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice function to allow acess to storage for inheriting contracts
      * @return DealProposalsStorage storage struct
      */
-    function s() internal pure returns (DealProposalsStorage storage) {
+    function s() private pure returns (DealProposalsStorage storage) {
         return _getDealProposalsStorage();
     }
 
@@ -311,7 +311,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev Iterates through all deals and returns only those with Completed state
      * @return completedDeals Array of completed deal proposals
      */
-    function getCompletedDeals() external returns (DealProposal[] memory completedDeals) {
+    function getCompletedDeals() external view returns (DealProposal[] memory completedDeals) {
         DealProposalsStorage storage $ = s();
         uint256[] memory completedDealsIds = $._dealIdsReadyForPayment.values();
         completedDeals = new DealProposal[](completedDealsIds.length);
@@ -322,8 +322,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             if (dp.state == DealState.Completed) {
                 completedDeals[dealCounter] = dp;
                 dealCounter++;
-            } else {
-                $._dealIdsReadyForPayment.remove(completedDealsIds[i]);
             }
         }
 
