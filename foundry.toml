@@ -4,6 +4,10 @@ out = "out"
 libs = ["lib"]
 via_ir = true
 optimizer = true
+fs_permissions = [
+  { access = "read-write", path = "./deployments/" } 
+]
+
 [lint]
 # disable mixed case lint errors because of Filecoin naming specifications
 exclude_lints = ["mixed-case-function", "mixed-case-variable", "pascal-case-struct"]
