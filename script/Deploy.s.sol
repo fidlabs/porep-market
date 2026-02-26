@@ -2,8 +2,7 @@
 // solhint-disable use-natspec
 pragma solidity =0.8.25;
 
-import {Script, console} from "forge-std/Script.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Script} from "forge-std/Script.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
