@@ -9,8 +9,8 @@ contract ClientContractMock is Client {
         return s()._deals[dealId];
     }
 
-    function deleteDealAllocationIdByValue(uint256 dealId, uint64 allocationId) external {
+    function deleteDealAllocationIdByValue(uint256 dealId, uint64 index) external {
         Deal storage deal = s()._deals[dealId];
-        _deleteDealAllocationIdByValue(dealId, deal, allocationId);
+        _deleteDealAllocationIdByIndex(deal, index);
     }
 }

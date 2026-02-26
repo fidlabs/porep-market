@@ -254,7 +254,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         if (allocations.length != 0) {
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
-            for (uint256 i = 0; i < allocationIds.length; i++) {
+            for (uint256 i = 0; i < allocationIds.length; ++i) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
                 $._deals[dealId].allocationIds.push(allocId);
             }
@@ -322,7 +322,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             int64 expiration;
             (resultLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
             allocations = new ProviderAllocation[](resultLength);
-            for (uint256 i = 0; i < resultLength; i++) {
+            for (uint256 i = 0; i < resultLength; ++i) {
                 uint256 allocationRequestLength;
                 (allocationRequestLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
 
@@ -356,7 +356,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             uint64 claimId;
             (resultLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
             claimExtensions = new ProviderClaim[](resultLength);
-            for (uint256 i = 0; i < resultLength; i++) {
+            for (uint256 i = 0; i < resultLength; ++i) {
                 uint256 claimExtensionRequestLength;
                 (claimExtensionRequestLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
 
@@ -434,7 +434,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations) internal {
         Deal storage deal = _getStorageDeal(dealId);
 
-        for (uint256 i = 0; i < allocations.length; i++) {
+        for (uint256 i = 0; i < allocations.length; ++i) {
             ProviderAllocation memory alloc = allocations[i];
             if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
                 revert InvalidProvider();
@@ -455,7 +455,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](claimExtensions.length);
         CommonTypes.FilActorId dealProvider = deal.provider;
 
-        for (uint256 i = 0; i < claimExtensions.length; i++) {
+        for (uint256 i = 0; i < claimExtensions.length; ++i) {
             ProviderClaim memory claim = claimExtensions[i];
 
             if (CommonTypes.FilActorId.unwrap(claim.provider) != CommonTypes.FilActorId.unwrap(dealProvider)) {
@@ -474,7 +474,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
                 revert GetClaimsCallFailed();
             }
 
-            for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
+            for (uint256 i = 0; i < claimsDetails.claims.length; ++i) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
                 deal.allocationIds.push(claimIds[i]);
                 deal.sizeOfAllocations += claim.size;
@@ -518,13 +518,19 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
 
     /**
-     * @notice Checks if the total active data size for the client with the specified provider matches the expected size.
+     * @notice Checks if the total active data size for the client with the specified provider matches the expected size
+     * @dev This function can only be called by the validator of the deal
      * @param dealId The id of the deal
      * @return totalSizePerSp The total active data size for the client with the specified provider
      */
     function isDataSizeMatching(uint256 dealId) external returns (bool) {
         Deal storage deal = _getStorageDeal(dealId);
         ClientStorage storage $ = s();
+
+        if (msg.sender != deal.validator) {
+            revert InvalidCaller(msg.sender, deal.validator);
+        }
+
         CommonTypes.FilActorId[] memory ids = deal.allocationIds;
 
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
@@ -538,13 +544,15 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         uint256 activeSize = 0;
         uint256 failIterator = 0;
         int64 currentEpoch = int64(uint64(block.number));
-        for (uint256 i = 0; i < ids.length; i++) {
+        uint256[] memory toDelete = new uint256[](ids.length);
+        uint256 deleteCount = 0;
+        for (uint256 i = 0; i < ids.length; ++i) {
             if (
                 getClaimsResult.batch_info.fail_codes.length > 0
                     && getClaimsResult.batch_info.fail_codes.length > failIterator
                     && i == getClaimsResult.batch_info.fail_codes[failIterator].idx
             ) {
-                failIterator += 1;
+                ++failIterator;
                 continue;
             }
             VerifRegTypes.Claim memory claim = getClaimsResult.claims[i - failIterator];
@@ -556,41 +564,31 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             uint64 id = CommonTypes.FilActorId.unwrap(ids[i]);
 
             if (expired || $._terminatedClaims[id]) {
-                _deleteDealAllocationIdByValue(dealId, deal, id);
+                toDelete[deleteCount++] = i;
                 continue;
             }
 
             activeSize += claim.size;
         }
 
+        for (uint256 i = deleteCount; i > 0; --i) {
+            uint256 idx = toDelete[i - 1];
+            _deleteDealAllocationIdByIndex(deal, idx);
+        }
+
         return activeSize == deal.sizeOfAllocations;
     }
 
     /**
-     * @notice Internal function to delete a deal allocation ID by value
-     * @param dealId The ID of the deal
+     * @notice Internal function to delete an allocation ID from a deal by its index
      * @param deal The storage reference to the deal
-     * @param allocationId The ID of the allocation to delete
+     * @param index The index of the allocation ID to delete
      */
-    function _deleteDealAllocationIdByValue(uint256 dealId, Deal storage deal, uint64 allocationId) internal {
+    function _deleteDealAllocationIdByIndex(Deal storage deal, uint256 index) internal {
         CommonTypes.FilActorId[] storage ids = deal.allocationIds;
-
-        uint256 len = ids.length;
-        if (len == 0) revert DealAllocationNotFound(dealId, allocationId);
-
-        uint256 maxIdx = len - 1;
-        for (uint256 i = 0; i < maxIdx; i++) {
-            if (CommonTypes.FilActorId.unwrap(ids[i]) == allocationId) {
-                ids[i] = ids[maxIdx];
-                ids.pop();
-                return;
-            }
-        }
-        if (CommonTypes.FilActorId.unwrap(ids[maxIdx]) == allocationId) {
-            ids.pop();
-        } else {
-            revert DealAllocationNotFound(dealId, allocationId);
-        }
+        uint256 last = ids.length - 1;
+        if (index != last) ids[index] = ids[last];
+        ids.pop();
     }
 
     /**
@@ -600,7 +598,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      */
     function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
         ClientStorage storage $ = s();
-        for (uint256 i = 0; i < claims.length; i++) {
+        for (uint256 i = 0; i < claims.length; ++i) {
             $._terminatedClaims[claims[i]] = true;
         }
     }

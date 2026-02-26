@@ -552,6 +552,7 @@ contract ClientTest is Test {
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
 
+        vm.prank(address(validatorMock));
         bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(ok);
     }
@@ -572,6 +573,7 @@ contract ClientTest is Test {
         CommonTypes.FilActorId[] memory beforeIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 1);
 
+        vm.prank(address(validatorMock));
         bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
@@ -588,6 +590,7 @@ contract ClientTest is Test {
 
         vm.roll(5256407);
 
+        vm.prank(address(validatorMock));
         bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
@@ -609,6 +612,7 @@ contract ClientTest is Test {
         CommonTypes.FilActorId[] memory beforeIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 1);
 
+        vm.prank(address(validatorMock));
         bool ok = clientMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
@@ -646,6 +650,7 @@ contract ClientTest is Test {
         vm.prank(terminationOracle);
         clientMock.claimsTerminatedEarly(claims);
 
+        vm.prank(address(validatorMock));
         clientMock.isDataSizeMatching(dealId);
 
         CommonTypes.FilActorId[] memory afterIds = clientMock.getClientAllocationIdsPerDeal(dealId);
@@ -683,19 +688,6 @@ contract ClientTest is Test {
         assertTrue(!isFourthClaimTerminated);
     }
 
-    function testDeleteDealAllocationIdByValueRevertsWhenNotFound() public {
-        ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-
-        transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
-
-        vm.prank(clientAddress);
-        mock.transfer(transferParams, dealId, false);
-
-        vm.expectRevert(abi.encodeWithSelector(Client.DealAllocationNotFound.selector, dealId, 999));
-        mock.deleteDealAllocationIdByValue(dealId, 999);
-    }
-
     function testDeleteDealAllocationIdByValue() public {
         ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
 
@@ -710,21 +702,11 @@ contract ClientTest is Test {
         assertEq(CommonTypes.FilActorId.unwrap(beforeIds[0]), 3);
         assertEq(CommonTypes.FilActorId.unwrap(beforeIds[1]), 1);
 
-        mock.deleteDealAllocationIdByValue(dealId, 3);
+        mock.deleteDealAllocationIdByValue(dealId, 0);
 
         CommonTypes.FilActorId[] memory afterIds = mock.getClientAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 1);
-    }
-
-    function testDeleteDealAllocationIdByValueRevertsWhenEmpty() public {
-        ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-
-        uint256 newDealId = 123;
-        uint64 missingAllocationId = 1;
-
-        vm.expectRevert(abi.encodeWithSelector(Client.DealAllocationNotFound.selector, newDealId, missingAllocationId));
-        mock.deleteDealAllocationIdByValue(newDealId, missingAllocationId);
     }
 
     function testIsDataSizeMatchingRevertsWhenGetClaimsExitCodeNonZero() public {
@@ -741,6 +723,7 @@ contract ClientTest is Test {
         vm.etch(CALL_ACTOR_ID, address(failing).code);
 
         vm.expectRevert(Client.GetClaimsCallFailed.selector);
+        vm.prank(address(validatorMock));
         clientMock.isDataSizeMatching(dealId);
     }
 
@@ -782,5 +765,17 @@ contract ClientTest is Test {
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[1]) == 1);
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[2]) == 4);
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
+    }
+
+    function testIsDataSizeMatchingCallerNotValidator() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+
+        vm.prank(address(0x123));
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidCaller.selector, address(0x123), address(validatorMock)));
+        clientMock.isDataSizeMatching(dealId);
     }
 }
