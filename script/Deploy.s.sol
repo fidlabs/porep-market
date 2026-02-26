@@ -8,10 +8,14 @@ import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Client} from "../src/Client.sol";
+import {stdJson} from "forge-std/StdJson.sol";
+import {DeployUtils} from "./utils/DeployUtils.sol";
 // import {SLIOracle} from "../src/SLIOracle.sol";
 // import {SLIScorer} from "../src/SLIScorer.sol";
 
-contract Deploy is Script {
+contract Deploy is Script, DeployUtils {
+    using stdJson for string;
+
     address public porepMarket;
     address public validatorFactory;
     address public clientSmartContract;
@@ -29,7 +33,7 @@ contract Deploy is Script {
     function run() external {
         _ensureEnvsExist();
 
-        admin = vm.addr(vm.envUint("ADMIN_PRIVATE_KEY"));
+        admin = vm.addr(vm.envUint("PRIVATE_KEY_TEST"));
         allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
@@ -37,7 +41,7 @@ contract Deploy is Script {
         // oracleAddress = vm.envAddress("ORACLE");
         // oracleSmartContract = vm.envAddress("ORACLE_SMART_CONTRACT");
 
-        vm.startBroadcast(vm.envUint("ADMIN_PRIVATE_KEY"));
+        vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
         validatorFactory = _deployValidatorFactory(admin);
         porepMarket = _deployPoRepMarket(admin, validatorFactory, spRegistry);
@@ -51,13 +55,14 @@ contract Deploy is Script {
 
         vm.stopBroadcast();
 
-        _print();
+        _serializeAndSaveArtifact();
     }
 
     function _ensureEnvsExist() internal view {
         if (
-            !vm.envExists("RPC_TEST") || !vm.envExists("ADMIN_PRIVATE_KEY") || !vm.envExists("FILECOIN_PAY")
-                || !vm.envExists("SP_REGISTRY") || !vm.envExists("ALLOCATOR") || !vm.envExists("TERMINATION_ORACLE") || !vm.envExists("ORACLE")
+            !vm.envExists("RPC_TEST") || !vm.envExists("PRIVATE_KEY_TEST") || !vm.envExists("FILECOIN_PAY")
+                || !vm.envExists("SP_REGISTRY") || !vm.envExists("ALLOCATOR") || !vm.envExists("TERMINATION_ORACLE")
+                || !vm.envExists("ORACLE")
         ) {
             revert InvalidEnv();
         }
@@ -67,7 +72,7 @@ contract Deploy is Script {
         Validator validatorImpl = new Validator();
         ValidatorFactory impl = new ValidatorFactory();
         bytes memory init = abi.encodeCall(ValidatorFactory.initialize, (_admin, address(validatorImpl)));
-        proxy = _createProxy(init, address(impl));
+        proxy = createProxy(init, address(impl));
     }
 
     function _deployPoRepMarket(address _admin, address _validatorFactory, address _spRegistry)
@@ -76,7 +81,7 @@ contract Deploy is Script {
     {
         PoRepMarket impl = new PoRepMarket();
         bytes memory init = abi.encodeCall(PoRepMarket.initialize, (_admin, _validatorFactory, _spRegistry));
-        proxy = _createProxy(init, address(impl));
+        proxy = createProxy(init, address(impl));
     }
 
     function _deployClientSmartContract(
@@ -87,7 +92,7 @@ contract Deploy is Script {
     ) internal returns (address proxy) {
         Client impl = new Client();
         bytes memory init = abi.encodeCall(Client.initialize, (_admin, _allocator, _terminationOracle, _porepMarket));
-        proxy = _createProxy(init, address(impl));
+        proxy = createProxy(init, address(impl));
     }
 
     // function _deployOracle(address _admin, address _oracleAddress) internal returns (address proxy) {
@@ -102,23 +107,23 @@ contract Deploy is Script {
     //     proxy = _createProxy(init, address(impl));
     // }
 
-    function _createProxy(bytes memory init, address impl) internal returns (address proxy) {
-        proxy = address(new ERC1967Proxy(address(impl), init));
-    }
+    function _serializeAndSaveArtifact() internal {
+        string memory json = "deployment";
+        json.serialize("chainId", block.chainid);
+        json.serialize("block", block.number);
+        json.serialize("timestamp", block.timestamp);
+        json.serialize("deployer", admin);
+        json.serialize("PoRepMarket", porepMarket);
+        json.serialize("ValidatorFactory", validatorFactory);
+        json.serialize("ClientSmartContract", clientSmartContract);
+        json.serialize("FilecoinPay", filecoinPay);
+        json.serialize("SPRegistry", spRegistry);
+        json.serialize("Allocator", allocator);
+        // OracleSmartContract and SLIScorer intentionally omitted (commented out)
+        // json.serialize("OracleSmartContract", oracleSmartContract);
+        // json.serialize("SLIScorer", sliScorer);
+        string memory output = json.serialize("TerminationOracle", terminationOracle);
 
-    // solhint-disable no-console
-    /**
-     * @notice Prints the addresses of the deployed contracts
-     * @dev Prints the addresses of the deployed contracts
-     */
-    function _print() internal view {
-        console.log("Admin: %s", admin);
-        console.log("PoRepMarket: %s", porepMarket);
-        console.log("ValidatorFactory: %s", validatorFactory);
-        console.log("ClientSmartContract: %s", clientSmartContract);
-        console.log("FilecoinPay: %s", filecoinPay);
-        // console.log("Oracle: %s", oracleSmartContract);
-        // console.log("SLIScorer: %s", sliScorer);
+        save(output);
     }
-    // solhint-enable no-console
 }
