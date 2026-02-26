@@ -471,8 +471,8 @@ contract ClientTest is Test {
         assertEq(deal.client, clientAddress);
         assertTrue(CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm) == expectedLongestDealTermAfter);
     }
-    // solhint-enable reentrancy
 
+    // solhint-enable reentrancy
     function testShouldNotTransferIfReentrantCall() public {
         ReentrantValidatorMock reentrantValidatorMock = new ReentrantValidatorMock();
         poRepMarketMock.setDealProposal(
@@ -494,6 +494,7 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector));
         client.transfer(transferParams, dealId, false);
     }
+    // solhint-disable reentrancy
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
