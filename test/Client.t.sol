@@ -494,7 +494,7 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector));
         client.transfer(transferParams, dealId, false);
     }
-    // solhint-disable reentrancy
+    
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
@@ -510,7 +510,9 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLIThresholds(80, 500, 200, 90),
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
