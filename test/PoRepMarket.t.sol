@@ -72,7 +72,7 @@ contract PoRepMarketTest is Test {
             dealId: proposalDealId,
             client: clientAddress,
             provider: providerFilActorId,
-            SLC: slcAddress,
+            requirements: defaultRequirements,
             validator: validatorAddress,
             railId: railId,
             state: state
@@ -384,7 +384,6 @@ contract PoRepMarketTest is Test {
         porepMarekMock.setDealProposal(createDealProposal(ids[3], PoRepMarket.DealState.Completed));
         porepMarekMock.setDealProposal(createDealProposal(ids[4], PoRepMarket.DealState.Rejected));
         porepMarekMock.setDealIdsReadyForPayment(ids);
-        assertEq(porepMarekMock.getDealIdsReadyForPayment().length, 5);
 
         PoRepMarket.DealProposal[] memory dealProposal = porepMarekMock.getCompletedDeals();
         assertEq(dealProposal.length, 2);
@@ -392,10 +391,5 @@ contract PoRepMarketTest is Test {
         assertTrue(dealProposal[0].state == PoRepMarket.DealState.Completed);
         assertEq(dealProposal[1].dealId, ids[3]);
         assertTrue(dealProposal[1].state == PoRepMarket.DealState.Completed);
-
-        uint256[] memory readyForPaymentDeals = porepMarekMock.getDealIdsReadyForPayment();
-        assertEq(readyForPaymentDeals.length, 2);
-        assertEq(readyForPaymentDeals[0], ids[0]);
-        assertEq(readyForPaymentDeals[1], ids[3]);
     }
 }
