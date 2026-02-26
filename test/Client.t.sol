@@ -494,7 +494,6 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector));
         client.transfer(transferParams, dealId, false);
     }
-    
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
