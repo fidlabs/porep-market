@@ -249,6 +249,30 @@ contract PoRepMarketTest is Test {
         poRepMarket.completeDeal(dealId);
     }
 
+    function testShouldAddDealIdToCompletedDealsIdsSet() public {
+        PoRepMarketContractMock impl = new PoRepMarketContractMock();
+        bytes memory initData = abi.encodeWithSignature(
+            "initialize(address,address,address,address)",
+            adminAddress,
+            address(validatorFactory),
+            address(spRegistry),
+            clientSmartContractAddress
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
+        vm.prank(clientAddress);
+        porepMarekMock.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        porepMarekMock.acceptDeal(dealId);
+
+        vm.prank(clientSmartContractAddress);
+        porepMarekMock.completeDeal(dealId);
+
+        uint256[] memory completedDealsIds = porepMarekMock.getCompletedDealsIds();
+        assertEq(completedDealsIds.length, 1);
+        assertEq(completedDealsIds[0], dealId);
+    }
+
     function testCompleteDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.completeDeal(dealId);

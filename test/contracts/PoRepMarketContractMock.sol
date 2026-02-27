@@ -25,5 +25,9 @@ contract PoRepMarketContractMock is PoRepMarket {
             _getStorage()._dealIdsReadyForPayment.add(dealIds[i]);
         }
     }
+
+    function getCompletedDealsIds() public view returns (uint256[] memory) {
+        return _getStorage()._dealIdsReadyForPayment.values();
+    }
 }
 

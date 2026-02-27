@@ -279,9 +279,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
         dp.state = DealState.Completed;
+        $._dealIdsReadyForPayment.add(dealId);
         // TODO: Call $._SPRegistryContract.commitCapacity(dp.provider, actualSizeBytes)
         // when completeDeal signature is updated with actualSizeBytes from Client contract.
         // REF: Client.sol (PR #4)
+
         emit DealCompleted(dealId, msg.sender, dp.provider);
     }
 
