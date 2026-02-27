@@ -94,6 +94,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     function initialize2(address _poRepMarket, address _clientSmartContract, address _filecoinPay)
         external
         reinitializer(2)
+        onlyRole(DEFAULT_ADMIN_ROLE)
     {
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
