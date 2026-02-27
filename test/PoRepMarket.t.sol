@@ -348,4 +348,10 @@ contract PoRepMarketTest is Test {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms);
     }
+
+    function testSetClientSmartContractRevertsWhenAddressIsZero() public {
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidClientSmartContractAddress.selector));
+        poRepMarket.setClientSmartContract(address(0));
+    }
 }

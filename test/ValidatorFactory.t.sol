@@ -161,4 +161,22 @@ contract ValidatorFactoryTest is Test {
         vm.prank(incorrectClient);
         factory.create(admin, slcAddress, provider, params);
     }
+
+    function testInitialize2RevertsWhenPoRepMarketIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepMarketAddress.selector));
+        f.initialize2(address(0), clientSmartContract, filecoinPay);
+    }
+
+    function testInitialize2RevertsWhenClientSmartContractIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientSmartContractAddress.selector));
+        f.initialize2(poRepMarket, address(0), filecoinPay);
+    }
+
+    function testInitialize2RevertsWhenFilecoinPayIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidFilecoinPayAddress.selector));
+        f.initialize2(poRepMarket, clientSmartContract, address(0));
+    }
 }

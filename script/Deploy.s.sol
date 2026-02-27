@@ -30,8 +30,6 @@ contract Deploy is Script, DeployUtils {
     error InvalidEnv();
 
     function run() external {
-        _ensureEnvsExist();
-
         admin = vm.addr(vm.envUint("PRIVATE_KEY_TEST"));
         allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
@@ -55,16 +53,6 @@ contract Deploy is Script, DeployUtils {
         vm.stopBroadcast();
 
         _serializeAndSaveArtifact();
-    }
-
-    function _ensureEnvsExist() internal view {
-        if (
-            !vm.envExists("RPC_TEST") || !vm.envExists("PRIVATE_KEY_TEST") || !vm.envExists("FILECOIN_PAY")
-                || !vm.envExists("SP_REGISTRY") || !vm.envExists("ALLOCATOR") || !vm.envExists("TERMINATION_ORACLE")
-                || !vm.envExists("ORACLE")
-        ) {
-            revert InvalidEnv();
-        }
     }
 
     function _deployValidatorFactory(address _admin) internal returns (address proxy) {

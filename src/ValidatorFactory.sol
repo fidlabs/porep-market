@@ -58,6 +58,9 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InvalidAdminAddress();
     error InvalidClientAddress();
     error InvalidSlcAddress();
+    error InvalidPoRepMarketAddress();
+    error InvalidClientSmartContractAddress();
+    error InvalidFilecoinPayAddress();
 
     /**
      * @notice Emitted when a new proxy is successfully created
@@ -92,6 +95,10 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         external
         reinitializer(2)
     {
+        if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
+        if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
+        if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
+
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
         $._clientSmartContract = _clientSmartContract;
