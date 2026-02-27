@@ -9,8 +9,8 @@ import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Client} from "../src/Client.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
-// import {SLIOracle} from "../src/SLIOracle.sol";
-// import {SLIScorer} from "../src/SLIScorer.sol";
+import {SLIOracle} from "../src/SLIOracle.sol";
+import {SLIScorer} from "../src/SLIScorer.sol";
 
 contract Deploy is Script, DeployUtils {
     using stdJson for string;
@@ -23,9 +23,9 @@ contract Deploy is Script, DeployUtils {
     address public admin;
     address public allocator;
     address public terminationOracle;
-    // address public oracleAddress;
-    // address public oracleSmartContract;
-    // address public sliScorer;
+    address public oracleAddress;
+    address public sliOracle;
+    address public sliScorer;
 
     error InvalidEnv();
 
@@ -35,16 +35,15 @@ contract Deploy is Script, DeployUtils {
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         spRegistry = vm.envAddress("SP_REGISTRY");
-        // oracleAddress = vm.envAddress("ORACLE");
-        // oracleSmartContract = vm.envAddress("ORACLE_SMART_CONTRACT");
+        oracleAddress = vm.envAddress("ORACLE");
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
         validatorFactory = _deployValidatorFactory(admin);
         porepMarket = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         clientSmartContract = _deployClientSmartContract(admin, allocator, terminationOracle, porepMarket);
-        // oracleSmartContract = _deployOracleSmartContract(admin, oracleAddress);
-        // sliScorer = _deploySliScorer(admin, oracleSmartContract);
+        sliOracle = _deploySLIOracle(admin, oracleAddress);
+        sliScorer = _deploySliScorer(admin, sliOracle);
 
         // circular dependencies
         PoRepMarket(porepMarket).setClientSmartContract(clientSmartContract);
@@ -82,17 +81,17 @@ contract Deploy is Script, DeployUtils {
         proxy = createProxy(init, address(impl));
     }
 
-    // function _deployOracle(address _admin, address _oracleAddress) internal returns (address proxy) {
-    //     SLIOracle impl = new SLIOracle();
-    //     bytes memory init = abi.encodeCall(SLIOracle.initialize, (_admin, _oracleAddress));
-    //     proxy = _createProxy(init, address(impl));
-    // }
+    function _deploySLIOracle(address _admin, address _oracleAddress) internal returns (address proxy) {
+        SLIOracle impl = new SLIOracle();
+        bytes memory init = abi.encodeCall(SLIOracle.initialize, (_admin, _oracleAddress));
+        proxy = createProxy(init, address(impl));
+    }
 
-    // function _deploySliScorer(address _admin, address _oracleSmartContract) internal returns (address proxy) {
-    //     SLIScorer impl = new SLIScorer();
-    //     bytes memory init = abi.encodeCall(SLIScorer.initialize, (_admin, _oracleSmartContract));
-    //     proxy = _createProxy(init, address(impl));
-    // }
+    function _deploySliScorer(address _admin, address _sliOracle) internal returns (address proxy) {
+        SLIScorer impl = new SLIScorer();
+        bytes memory init = abi.encodeCall(SLIScorer.initialize, (_admin, SLIOracle(_sliOracle)));
+        proxy = createProxy(init, address(impl));
+    }
 
     function _serializeAndSaveArtifact() internal {
         string memory json = "deployment";
@@ -106,9 +105,8 @@ contract Deploy is Script, DeployUtils {
         json.serialize("FilecoinPay", filecoinPay);
         json.serialize("SPRegistry", spRegistry);
         json.serialize("Allocator", allocator);
-        // OracleSmartContract and SLIScorer intentionally omitted (commented out)
-        // json.serialize("OracleSmartContract", oracleSmartContract);
-        // json.serialize("SLIScorer", sliScorer);
+        json.serialize("SLIOracle", sliOracle);
+        json.serialize("SLIScorer", sliScorer);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
         save(output);
