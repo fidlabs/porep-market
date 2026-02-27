@@ -249,7 +249,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         if (allocations.length != 0) {
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
-            for (uint256 i = 0; i < allocationIds.length; ++i) {
+            for (uint256 i = 0; i < allocationIds.length; i++) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
                 $._deals[dealId].allocationIds.push(allocId);
             }
@@ -317,7 +317,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             int64 expiration;
             (resultLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
             allocations = new ProviderAllocation[](resultLength);
-            for (uint256 i = 0; i < resultLength; ++i) {
+            for (uint256 i = 0; i < resultLength; i++) {
                 uint256 allocationRequestLength;
                 (allocationRequestLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
 
@@ -351,7 +351,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             uint64 claimId;
             (resultLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
             claimExtensions = new ProviderClaim[](resultLength);
-            for (uint256 i = 0; i < resultLength; ++i) {
+            for (uint256 i = 0; i < resultLength; i++) {
                 uint256 claimExtensionRequestLength;
                 (claimExtensionRequestLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
 
@@ -429,7 +429,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations) internal {
         Deal storage deal = _getStorageDeal(dealId);
 
-        for (uint256 i = 0; i < allocations.length; ++i) {
+        for (uint256 i = 0; i < allocations.length; i++) {
             ProviderAllocation memory alloc = allocations[i];
             if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
                 revert InvalidProvider();
@@ -450,7 +450,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](claimExtensions.length);
         CommonTypes.FilActorId dealProvider = deal.provider;
 
-        for (uint256 i = 0; i < claimExtensions.length; ++i) {
+        for (uint256 i = 0; i < claimExtensions.length; i++) {
             ProviderClaim memory claim = claimExtensions[i];
 
             if (CommonTypes.FilActorId.unwrap(claim.provider) != CommonTypes.FilActorId.unwrap(dealProvider)) {
@@ -469,7 +469,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
                 revert GetClaimsCallFailed();
             }
 
-            for (uint256 i = 0; i < claimsDetails.claims.length; ++i) {
+            for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
                 deal.allocationIds.push(claimIds[i]);
                 deal.sizeOfAllocations += claim.size;
