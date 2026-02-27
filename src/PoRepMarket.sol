@@ -165,6 +165,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error UnauthorisedCaller(uint256 dealId, address caller, address expectedCaller);
     error EmptyManifestLocation();
     error TooLongManifestLocation();
+    error InvalidClientSmartContractAddress();
 
     /**
      * @notice Constructor
@@ -195,6 +196,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param _clientSmartContract The address of the client smart contract
      */
     function setClientSmartContract(address _clientSmartContract) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
         DealProposalsStorage storage $ = _getDealProposalsStorage();
         $._clientSmartContract = _clientSmartContract;
         emit ClientSmartContractUpdated(_clientSmartContract);
