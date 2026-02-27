@@ -9,7 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {SLIThresholds, DealTerms} from "./types/SLITypes.sol";
+import {SLITypes} from "./types/SLITypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**

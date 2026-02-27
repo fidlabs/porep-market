@@ -9,7 +9,7 @@ import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {SLIThresholds, DealTerms} from "../src/types/SLITypes.sol";
+import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 
 // solhint-disable-next-line max-states-count
