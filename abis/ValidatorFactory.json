@@ -568,7 +568,22 @@
   },
   {
     "type": "error",
+    "name": "InvalidClientSmartContractAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFilecoinPayAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepMarketAddress",
     "inputs": []
   },
   {

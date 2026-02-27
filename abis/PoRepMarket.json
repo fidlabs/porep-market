@@ -990,6 +990,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidClientSmartContractAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidIndexingPct",
     "inputs": [
       {
