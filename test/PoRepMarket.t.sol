@@ -9,7 +9,7 @@ import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {SLIThresholds, DealTerms} from "../src/types/SLITypes.sol";
+import {SLITypes} from "../src/types/SLITypes.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -26,10 +26,11 @@ contract PoRepMarketTest is Test {
 
     CommonTypes.FilActorId public providerFilActorId;
 
-    SLIThresholds internal defaultRequirements =
-        SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+    SLITypes.SLIThresholds internal defaultRequirements =
+        SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
-    DealTerms internal defaultTerms = DealTerms({dealSizeBytes: 1000, priceForDeal: 100, durationDays: 365});
+    SLITypes.DealTerms internal defaultTerms =
+        SLITypes.DealTerms({dealSizeBytes: 1000, priceForDeal: 100, durationDays: 365});
 
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
@@ -337,16 +338,16 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenRetrievabilityPctExceeds100() public {
-        SLIThresholds memory badRequirements =
-            SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        SLITypes.SLIThresholds memory badRequirements =
+            SLITypes.SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRetrievabilityPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms);
     }
 
     function testProposeDealRevertsWhenIndexingPctExceeds100() public {
-        SLIThresholds memory badRequirements =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
+        SLITypes.SLIThresholds memory badRequirements =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms);
