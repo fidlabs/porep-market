@@ -97,7 +97,7 @@
           {
             "name": "requirements",
             "type": "tuple",
-            "internalType": "struct SLIThresholds",
+            "internalType": "struct SLITypes.SLIThresholds",
             "components": [
               {
                 "name": "retrievabilityPct",
