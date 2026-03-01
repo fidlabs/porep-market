@@ -152,6 +152,11 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      */
     error InvalidDealStateForTransfer();
 
+    /**
+     * @notice Error thrown when validator is not set for the deal
+     */
+    error ValidatorNotSet(uint256 dealId);
+
     struct Deal {
         address client;
         address validator;
@@ -518,9 +523,13 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @param dealId The id of the deal
      * @return totalSizePerSp The total active data size for the client with the specified provider
      */
-    function isDataSizeMatching(uint256 dealId) external returns (bool) {
+    function isDataSizeMatching(uint256 dealId) external nonReentrant returns (bool) {
         Deal storage deal = _getStorageDeal(dealId);
         ClientStorage storage $ = s();
+
+        if (deal.validator == address(0)) {
+            revert ValidatorNotSet(dealId);
+        }
 
         if (msg.sender != deal.validator) {
             revert InvalidCaller(msg.sender, deal.validator);

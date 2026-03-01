@@ -609,22 +609,6 @@
   },
   {
     "type": "error",
-    "name": "DealAllocationNotFound",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "allocationId",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -820,6 +804,17 @@
     "type": "error",
     "name": "UnsupportedType",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ValidatorNotSet",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

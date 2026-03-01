@@ -487,9 +487,6 @@ contract ClientTest is Test {
                     retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 validator: address(reentrantValidatorMock),
-                requirements: SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
-                }),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0
             })
@@ -539,7 +536,7 @@ contract ClientTest is Test {
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[2]) == 4);
         assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
     }
-    
+
     function testIsDataSizeMatchingHappyPath() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
 
@@ -727,46 +724,6 @@ contract ClientTest is Test {
         clientMock.isDataSizeMatching(dealId);
     }
 
-    function testShouldAddClaimExtensionIdsAfterTransfer() public {
-        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-        transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
-
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        poRepMarketMock.setDealProposal(
-            dealId,
-            PoRepMarket.DealProposal({
-                dealId: 150,
-                client: clientAddress,
-                provider: SP1,
-                requirements: SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
-                }),
-                validator: address(validatorMock),
-                state: PoRepMarket.DealState.Accepted,
-                railId: 0
-            })
-        );
-        // solhint-disable-next-line reentrancy
-        transferParams.operator_data =
-            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710041A005034AC";
-        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808102");
-        vm.expectEmit(true, true, true, true);
-        emit Client.ValidatorLockupPeriodUpdated(dealId, address(validatorMock));
-
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        Client.Deal memory deal = clientMock.getDeal(dealId);
-        assertEq(deal.allocationIds.length, 4);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[0]) == 3);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[1]) == 1);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[2]) == 4);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
-    }
-
     function testIsDataSizeMatchingCallerNotValidator() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
         transferParams.operator_data = hex"82808183192710011A005034AC";
@@ -776,6 +733,30 @@ contract ClientTest is Test {
 
         vm.prank(address(0x123));
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidCaller.selector, address(0x123), address(validatorMock)));
+        clientMock.isDataSizeMatching(dealId);
+    }
+
+    function testIsDataSizeMatchingDealWithNoValidator() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+
+        poRepMarketMock.setDealProposal(
+            dealId,
+            PoRepMarket.DealProposal({
+                dealId: dealId,
+                client: clientAddress,
+                provider: SP1,
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
+                validator: address(0),
+                state: PoRepMarket.DealState.Accepted,
+                railId: 0
+            })
+        );
+
+        vm.prank(address(0x123));
+        vm.expectRevert(abi.encodeWithSelector(Client.ValidatorNotSet.selector, dealId));
         clientMock.isDataSizeMatching(dealId);
     }
 }
