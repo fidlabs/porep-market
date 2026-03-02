@@ -10,6 +10,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
+import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -60,6 +61,22 @@ contract PoRepMarketTest is Test {
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
         validatorFactory.setValidator(validatorAddress, true);
+    }
+
+    function createDealProposal(uint256 proposalDealId, PoRepMarket.DealState state)
+        public
+        view
+        returns (PoRepMarket.DealProposal memory)
+    {
+        return PoRepMarket.DealProposal({
+            dealId: proposalDealId,
+            client: clientAddress,
+            provider: providerFilActorId,
+            requirements: defaultRequirements,
+            validator: validatorAddress,
+            railId: railId,
+            state: state
+        });
     }
 
     function testProposeDealEmitsEvent() public {
@@ -232,6 +249,30 @@ contract PoRepMarketTest is Test {
         poRepMarket.completeDeal(dealId);
     }
 
+    function testShouldAddDealIdToCompletedDealsIdsSet() public {
+        PoRepMarketContractMock impl = new PoRepMarketContractMock();
+        bytes memory initData = abi.encodeWithSignature(
+            "initialize(address,address,address,address)",
+            adminAddress,
+            address(validatorFactory),
+            address(spRegistry),
+            clientSmartContractAddress
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
+        vm.prank(clientAddress);
+        porepMarekMock.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        porepMarekMock.acceptDeal(dealId);
+
+        vm.prank(clientSmartContractAddress);
+        porepMarekMock.completeDeal(dealId);
+
+        uint256[] memory completedDealsIds = porepMarekMock.getCompletedDealsIds();
+        assertEq(completedDealsIds.length, 1);
+        assertEq(completedDealsIds[0], dealId);
+    }
+
     function testCompleteDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.completeDeal(dealId);
@@ -351,5 +392,28 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms);
+    }
+
+    function testGetCompletedDeals() public {
+        PoRepMarketContractMock porepMarekMock = new PoRepMarketContractMock();
+        uint256[] memory ids = new uint256[](5);
+        ids[0] = 1;
+        ids[1] = 2;
+        ids[2] = 3;
+        ids[3] = 4;
+        ids[4] = 5;
+        porepMarekMock.setDealProposal(createDealProposal(ids[0], PoRepMarket.DealState.Completed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[1], PoRepMarket.DealState.Accepted));
+        porepMarekMock.setDealProposal(createDealProposal(ids[2], PoRepMarket.DealState.Proposed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[3], PoRepMarket.DealState.Completed));
+        porepMarekMock.setDealProposal(createDealProposal(ids[4], PoRepMarket.DealState.Rejected));
+        porepMarekMock.setDealIdsReadyForPayment(ids);
+
+        PoRepMarket.DealProposal[] memory dealProposal = porepMarekMock.getCompletedDeals();
+        assertEq(dealProposal.length, 2);
+        assertEq(dealProposal[0].dealId, ids[0]);
+        assertTrue(dealProposal[0].state == PoRepMarket.DealState.Completed);
+        assertEq(dealProposal[1].dealId, ids[3]);
+        assertTrue(dealProposal[1].state == PoRepMarket.DealState.Completed);
     }
 }
