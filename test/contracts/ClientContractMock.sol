@@ -8,4 +8,9 @@ contract ClientContractMock is Client {
     function getDeal(uint256 dealId) public view returns (Client.Deal memory) {
         return s()._deals[dealId];
     }
+
+    function deleteDealAllocationIdByValue(uint256 dealId, uint64 index) external {
+        Deal storage deal = s()._deals[dealId];
+        _deleteDealAllocationIdByIndex(deal, index);
+    }
 }
