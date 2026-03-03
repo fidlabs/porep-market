@@ -10,6 +10,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SLITypes} from "./types/SLITypes.sol";
+import {MinerUtils} from "./libs/MinerUtils.sol";
 
 /**
  * @title SPRegistry
@@ -18,7 +19,6 @@ import {SLITypes} from "./types/SLITypes.sol";
  */
 contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ISPRegistry {
     using EnumerableSet for EnumerableSet.UintSet;
-    using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
      * @notice Role to manage contract upgrades
@@ -31,21 +31,22 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     bytes32 public constant MARKET_ROLE = keccak256("MARKET_ROLE");
 
     struct ProviderData {
-        address owner;
+        address organization;
         bool paused;
         SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
-        uint256 defaultPricePerDeal;
+        uint256 pendingBytes;
+        uint256 pricePerSector;
     }
 
     /// @custom:storage-location erc7201:porepmarket.storage.SPRegistryStorage
     // forge-lint: disable-next-line(pascal-case-struct)
     struct SPRegistryStorage {
         EnumerableSet.UintSet _providerIds;
-        EnumerableSet.AddressSet _approvedOwners;
-        mapping(address => EnumerableSet.UintSet) _ownerProviders;
+        mapping(address => EnumerableSet.UintSet) _orgProviders;
         mapping(uint64 => ProviderData) _providers;
+        uint256 sectorPaddingToleranceBps;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SPRegistryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -61,23 +62,20 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @notice OwnerAdded event
-     * @dev OwnerAdded event is emitted when an owner is approved
-     * @param owner The address of the approved owner
+     * @notice OrganizationAdded event
+     * @param organization The address of the organization
      */
-    event OwnerAdded(address indexed owner);
+    event OrganizationAdded(address indexed organization);
 
     /**
      * @notice ProviderRegistered event
-     * @dev ProviderRegistered event is emitted when a provider is registered
      * @param provider The provider actor ID
-     * @param owner The address of the owner
+     * @param organization The address of the organization
      */
-    event ProviderRegistered(CommonTypes.FilActorId indexed provider, address indexed owner);
+    event ProviderRegistered(CommonTypes.FilActorId indexed provider, address indexed organization);
 
     /**
      * @notice CapabilitiesUpdated event
-     * @dev CapabilitiesUpdated event is emitted when a provider's capabilities are updated
      * @param provider The provider actor ID
      * @param capabilities The updated SLI capabilities
      */
@@ -85,7 +83,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice AvailableSpaceUpdated event
-     * @dev AvailableSpaceUpdated event is emitted when a provider's available space is updated
      * @param provider The provider actor ID
      * @param availableBytes The new available space in bytes
      */
@@ -93,7 +90,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice CapacityCommitted event
-     * @dev CapacityCommitted event is emitted when capacity is committed for a provider
      * @param provider The provider actor ID
      * @param committedBytes The amount of bytes committed
      */
@@ -101,37 +97,60 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice CapacityReleased event
-     * @dev CapacityReleased event is emitted when capacity is released for a provider
      * @param provider The provider actor ID
      * @param releasedBytes The amount of bytes released
      */
     event CapacityReleased(CommonTypes.FilActorId indexed provider, uint256 releasedBytes);
 
     /**
-     * @notice DefaultPriceUpdated event
-     * @dev DefaultPriceUpdated event is emitted when a provider's default price is updated
+     * @notice PriceUpdated event
      * @param provider The provider actor ID
-     * @param oldPrice The previous default price per deal
-     * @param newPrice The new default price per deal
+     * @param oldPrice The previous price per sector
+     * @param newPrice The new price per sector
      */
-    event DefaultPriceUpdated(CommonTypes.FilActorId indexed provider, uint256 oldPrice, uint256 newPrice);
+    event PriceUpdated(CommonTypes.FilActorId indexed provider, uint256 oldPrice, uint256 newPrice);
+
+    /**
+     * @notice PendingCapacityReserved event
+     * @param provider The provider actor ID
+     * @param sizeBytes The amount of bytes reserved
+     */
+    event PendingCapacityReserved(CommonTypes.FilActorId indexed provider, uint256 sizeBytes);
+
+    /**
+     * @notice PendingCapacityReleased event
+     * @param provider The provider actor ID
+     * @param sizeBytes The amount of bytes released
+     */
+    event PendingCapacityReleased(CommonTypes.FilActorId indexed provider, uint256 sizeBytes);
+
+    /**
+     * @notice ToleranceBpsUpdated event
+     * @param oldBps The previous tolerance in basis points
+     * @param newBps The new tolerance in basis points
+     */
+    event ToleranceBpsUpdated(uint256 indexed oldBps, uint256 indexed newBps);
 
     error ProviderAlreadyRegistered(CommonTypes.FilActorId provider);
     error ProviderNotRegistered(CommonTypes.FilActorId provider);
-    error NotProviderOwnerOrAdmin(address caller, CommonTypes.FilActorId provider);
+    error NotProviderControllerOrAdmin(address caller, CommonTypes.FilActorId provider);
     error InvalidRetrievabilityPct(uint8 value);
     error InvalidIndexingPct(uint8 value);
     error InvalidAdminAddress();
     error InvalidPoRepMarketAddress();
     error InvalidProviderActorId();
-    error InvalidOwnerAddress();
+    error InvalidOrganizationAddress();
     error NotImplemented();
     error ReleaseExceedsCommitted(CommonTypes.FilActorId provider, uint256 sizeBytes, uint256 committedBytes);
     error CommitExceedsAvailable(CommonTypes.FilActorId provider, uint256 newCommitted, uint256 availableBytes);
+    error ActualSizeExceedsTolerance(CommonTypes.FilActorId provider, uint256 actualSize, uint256 maxAllowed);
+    error ReleasePendingExceedsPending(CommonTypes.FilActorId provider, uint256 sizeBytes, uint256 pendingBytes);
+    error AvailableBelowCommittedPlusPending(
+        CommonTypes.FilActorId provider, uint256 availableBytes, uint256 committedBytes, uint256 pendingBytes
+    );
 
     /**
      * @notice Constructor
-     * @dev Constructor disables initializers
      */
     constructor() {
         _disableInitializers();
@@ -139,7 +158,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice Initializes the contract
-     * @dev Initializes the contract by setting admin roles and market role
      * @param _admin The address of the admin
      * @param _poRepMarket The address of the PoRepMarket contract
      */
@@ -153,43 +171,42 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function addOwner(address) external pure {
-        revert NotImplemented();
-    }
-
-    /// @inheritdoc ISPRegistry
-    function removeOwner(address) external pure {
-        revert NotImplemented();
-    }
-
-    /// @inheritdoc ISPRegistry
     function registerProvider(CommonTypes.FilActorId) external pure {
         revert NotImplemented();
     }
 
     /// @inheritdoc ISPRegistry
-    function pauseProvider(CommonTypes.FilActorId) external pure {
-        revert NotImplemented();
+    function pauseProvider(CommonTypes.FilActorId provider) external {
+        _ensureProviderRegistered(provider);
+        _onlyProviderControllerOrAdmin(provider);
+        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = true;
     }
 
     /// @inheritdoc ISPRegistry
-    function unpauseProvider(CommonTypes.FilActorId) external pure {
-        revert NotImplemented();
+    function unpauseProvider(CommonTypes.FilActorId provider) external {
+        _ensureProviderRegistered(provider);
+        _onlyProviderControllerOrAdmin(provider);
+        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = false;
     }
 
     /// @inheritdoc ISPRegistry
     function updateAvailableSpace(CommonTypes.FilActorId provider, uint256 availableBytes) external {
         _ensureProviderRegistered(provider);
-        _onlyProviderOwnerOrAdmin(provider);
+        _onlyProviderControllerOrAdmin(provider);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
-        $._providers[CommonTypes.FilActorId.unwrap(provider)].availableBytes = availableBytes;
+        ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
+        uint256 minRequired = p.committedBytes + p.pendingBytes;
+        if (availableBytes < minRequired) {
+            revert AvailableBelowCommittedPlusPending(provider, availableBytes, p.committedBytes, p.pendingBytes);
+        }
+        p.availableBytes = availableBytes;
         emit AvailableSpaceUpdated(provider, availableBytes);
     }
 
     /// @inheritdoc ISPRegistry
     function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external {
         _ensureProviderRegistered(provider);
-        _onlyProviderOwnerOrAdmin(provider);
+        _onlyProviderControllerOrAdmin(provider);
         if (capabilities.retrievabilityPct > 100) revert InvalidRetrievabilityPct(capabilities.retrievabilityPct);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
@@ -198,8 +215,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function setDefaultPrice(CommonTypes.FilActorId, uint256) external pure {
-        revert NotImplemented();
+    function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSector) external {
+        _ensureProviderRegistered(provider);
+        _onlyProviderControllerOrAdmin(provider);
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        uint256 oldPrice = $._providers[id].pricePerSector;
+        $._providers[id].pricePerSector = pricePerSector;
+        emit PriceUpdated(provider, oldPrice, pricePerSector);
     }
 
     /// @inheritdoc ISPRegistry
@@ -214,13 +237,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 length = $._providerIds.length();
         uint256 count = 0;
 
-        // First pass: count committed providers
         for (uint256 i = 0; i < length; i++) {
             uint64 id = uint64($._providerIds.at(i));
             if ($._providers[id].committedBytes > 0) count++;
         }
 
-        // Second pass: populate array
         CommonTypes.FilActorId[] memory result = new CommonTypes.FilActorId[](count);
         uint256 idx = 0;
         for (uint256 i = 0; i < length; i++) {
@@ -237,12 +258,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
         info = ProviderInfo({
-            owner: p.owner,
+            organization: p.organization,
             paused: p.paused,
             capabilities: p.capabilities,
             availableBytes: p.availableBytes,
             committedBytes: p.committedBytes,
-            defaultPricePerDeal: p.defaultPricePerDeal
+            pendingBytes: p.pendingBytes,
+            pricePerSector: p.pricePerSector
         });
     }
 
@@ -253,27 +275,20 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function isStorageProviderOwner(address ownerAddress, CommonTypes.FilActorId provider)
-        external
-        view
-        returns (bool)
-    {
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        return $._providers[CommonTypes.FilActorId.unwrap(provider)].owner == ownerAddress;
+    function isStorageProviderOwner(address caller, CommonTypes.FilActorId provider) external view returns (bool) {
+        if (hasRole(DEFAULT_ADMIN_ROLE, caller)) return true;
+        return MinerUtils.isControllingAddress(provider, caller);
     }
 
     /**
-     * @notice Find a provider matching requirements for a deal
-     * @dev Capacity is NOT reserved atomically by this function. Between the time a provider
-     *      is selected here and when `commitCapacity` is called, other deals may consume the
-     *      same capacity (TOCTOU race). This is acceptable for now because `commitCapacity`
-     *      enforces the upper bound and will revert if capacity is exceeded.
-     *      Future improvement: consider implementing `pendingBytes` reservation to hold
-     *      capacity between matching and commitment, preventing optimistic over-selection.
+     * @notice Find a provider matching requirements and reserve pending capacity
+     * @dev Selects the least-committed eligible provider. Reserves `pendingBytes` atomically
+     *      so capacity is held between matching and commitment.
+     *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
      * @param terms Commercial terms (size, price, duration)
      * @return provider The matched provider, or FilActorId(0) if none found
-     * @return autoApprove True if the provider's default price is met by the deal terms
+     * @return autoApprove True if the provider's price per sector is met by the deal terms
      */
     function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
@@ -291,22 +306,33 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             uint64 id = uint64($._providerIds.at(i));
             ProviderData storage p = $._providers[id];
 
-            uint256 remaining = p.availableBytes > p.committedBytes ? p.availableBytes - p.committedBytes : 0;
-            if (remaining < terms.dealSizeBytes) continue;
+            if (p.paused) continue;
+
+            {
+                uint256 used = p.committedBytes + p.pendingBytes;
+                uint256 remaining = p.availableBytes > used ? p.availableBytes - used : 0;
+                if (remaining < terms.dealSizeBytes) continue;
+            }
 
             if (!_meetsRequirements(p.capabilities, requirements)) continue;
 
             if (p.committedBytes < lowestCommitted) {
                 lowestCommitted = p.committedBytes;
                 bestProvider = CommonTypes.FilActorId.wrap(id);
-                bestProviderPrice = p.defaultPricePerDeal;
+                bestProviderPrice = p.pricePerSector;
                 if (lowestCommitted == 0) break;
             }
         }
 
+        if (CommonTypes.FilActorId.unwrap(bestProvider) != 0) {
+            uint64 bestId = CommonTypes.FilActorId.unwrap(bestProvider);
+            $._providers[bestId].pendingBytes += terms.dealSizeBytes;
+            emit PendingCapacityReserved(bestProvider, terms.dealSizeBytes);
+        }
+
         // solhint-disable gas-strict-inequalities
         bool autoApprove = bestProviderPrice > 0 && CommonTypes.FilActorId.unwrap(bestProvider) != 0
-            && terms.priceForDeal >= bestProviderPrice;
+            && terms.pricePerSector >= bestProviderPrice;
         // solhint-enable gas-strict-inequalities
 
         return (bestProvider, autoApprove);
@@ -323,86 +349,126 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function commitCapacity(CommonTypes.FilActorId provider, uint256 actualSizeBytes) external onlyRole(MARKET_ROLE) {
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
+        _ensureProviderRegistered(provider);
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        uint256 pending = $._providers[id].pendingBytes;
+        if (sizeBytes > pending) revert ReleasePendingExceedsPending(provider, sizeBytes, pending);
+        $._providers[id].pendingBytes = pending - sizeBytes;
+        emit PendingCapacityReleased(provider, sizeBytes);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
+        external
+        onlyRole(MARKET_ROLE)
+    {
         _ensureProviderRegistered(provider);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
+
+        if ($.sectorPaddingToleranceBps > 0) {
+            uint256 maxAllowed = (estimatedSizeBytes * (10_000 + $.sectorPaddingToleranceBps)) / 10_000;
+            if (actualSizeBytes > maxAllowed) {
+                revert ActualSizeExceedsTolerance(provider, actualSizeBytes, maxAllowed);
+            }
+        }
+
+        uint256 pendingReleased;
+        // solhint-disable-next-line gas-strict-inequalities
+        if (estimatedSizeBytes <= p.pendingBytes) {
+            pendingReleased = estimatedSizeBytes;
+            p.pendingBytes -= estimatedSizeBytes;
+        } else {
+            pendingReleased = p.pendingBytes;
+            p.pendingBytes = 0;
+        }
+
         uint256 newCommitted = p.committedBytes + actualSizeBytes;
         if (newCommitted > p.availableBytes) revert CommitExceedsAvailable(provider, newCommitted, p.availableBytes);
         p.committedBytes = newCommitted;
+        emit PendingCapacityReleased(provider, pendingReleased);
         emit CapacityCommitted(provider, actualSizeBytes);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function setToleranceBps(uint256 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint256 oldBps = $.sectorPaddingToleranceBps;
+        $.sectorPaddingToleranceBps = bps;
+        emit ToleranceBpsUpdated(oldBps, bps);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function getToleranceBps() external view returns (uint256) {
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        return $.sectorPaddingToleranceBps;
     }
 
     /**
      * @notice Register a provider with full configuration in one call
      * @dev Admin convenience function for testnet onboarding. NOT in ISPRegistry interface.
      * @param provider The provider actor ID to register
-     * @param owner The address of the provider's owner
+     * @param organization The address of the provider's organization
      * @param capabilities The SLI thresholds this provider guarantees
      * @param availableBytes The provider's available storage capacity
-     * @param defaultPricePerDeal The provider's default auto-approve price (0 to skip)
+     * @param pricePerSector The provider's auto-approve price per sector (0 to skip)
      */
     function registerProviderFor(
         CommonTypes.FilActorId provider,
-        address owner,
+        address organization,
         SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
-        uint256 defaultPricePerDeal
+        uint256 pricePerSector
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (owner == address(0)) revert InvalidOwnerAddress();
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        if (!$._approvedOwners.contains(owner)) {
-            $._approvedOwners.add(owner);
-            emit OwnerAdded(owner);
-        }
-        _registerProvider(provider, owner);
+        if (organization == address(0)) revert InvalidOrganizationAddress();
+        _registerProvider(provider, organization);
 
         if (capabilities.retrievabilityPct > 100) revert InvalidRetrievabilityPct(capabilities.retrievabilityPct);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
 
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         $._providers[id].capabilities = capabilities;
         $._providers[id].availableBytes = availableBytes;
-        $._providers[id].defaultPricePerDeal = defaultPricePerDeal;
+        $._providers[id].pricePerSector = pricePerSector;
         emit CapabilitiesUpdated(provider, capabilities);
         emit AvailableSpaceUpdated(provider, availableBytes);
-        emit DefaultPriceUpdated(provider, 0, defaultPricePerDeal);
+        emit PriceUpdated(provider, 0, pricePerSector);
     }
 
     /**
-     * @notice Registers a provider under the given owner
-     * @dev Registers a provider by adding it to the provider set and storing ownership
+     * @notice Registers a provider under the given organization
      * @param provider The provider actor ID to register
-     * @param owner The address of the provider's owner
+     * @param organization The address of the provider's organization
      */
-    function _registerProvider(CommonTypes.FilActorId provider, address owner) internal {
+    function _registerProvider(CommonTypes.FilActorId provider, address organization) internal {
         if (CommonTypes.FilActorId.unwrap(provider) == 0) revert InvalidProviderActorId();
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 id256 = uint256(CommonTypes.FilActorId.unwrap(provider));
         if (!$._providerIds.add(id256)) revert ProviderAlreadyRegistered(provider);
 
-        $._providers[CommonTypes.FilActorId.unwrap(provider)].owner = owner;
-        $._ownerProviders[owner].add(id256);
+        $._providers[CommonTypes.FilActorId.unwrap(provider)].organization = organization;
+        $._orgProviders[organization].add(id256);
 
-        emit ProviderRegistered(provider, owner);
+        emit ProviderRegistered(provider, organization);
     }
 
     /**
-     * @notice Ensures the caller is the provider owner or admin
-     * @dev Ensures the caller is the provider owner or admin by checking ownership and role
+     * @notice Ensures the caller is a miner controlling address or admin
+     * @dev Uses MinerUtils.isControllingAddress to verify on-chain miner ownership
      * @param provider The provider actor ID to check against
      */
-    function _onlyProviderOwnerOrAdmin(CommonTypes.FilActorId provider) internal view {
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        uint64 id = CommonTypes.FilActorId.unwrap(provider);
-        if (msg.sender != $._providers[id].owner && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
-            revert NotProviderOwnerOrAdmin(msg.sender, provider);
+    function _onlyProviderControllerOrAdmin(CommonTypes.FilActorId provider) internal view {
+        if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) return;
+        if (!MinerUtils.isControllingAddress(provider, msg.sender)) {
+            revert NotProviderControllerOrAdmin(msg.sender, provider);
         }
     }
 
     /**
      * @notice Ensures a provider is registered
-     * @dev Ensures a provider is registered by checking the provider set
      * @param provider The provider actor ID to check
      */
     function _ensureProviderRegistered(CommonTypes.FilActorId provider) internal view {
@@ -414,30 +480,24 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice Checks if capabilities meet the given requirements
-     * @dev Checks if capabilities meet the given requirements by comparing each non-zero dimension
-     * @param capabilities The provider's SLI capabilities
-     * @param requirements The required SLI thresholds
+     * @param caps The provider's SLI capabilities
+     * @param reqs The required SLI thresholds
      * @return True if all non-zero requirement dimensions are met
      */
-    function _meetsRequirements(SLITypes.SLIThresholds storage capabilities, SLITypes.SLIThresholds calldata requirements)
+    function _meetsRequirements(SLITypes.SLIThresholds memory caps, SLITypes.SLIThresholds calldata reqs)
         internal
-        view
+        pure
         returns (bool)
     {
-        if (requirements.retrievabilityPct != 0 && capabilities.retrievabilityPct < requirements.retrievabilityPct) {
-            return false;
-        }
-        if (requirements.bandwidthMbps != 0 && capabilities.bandwidthMbps < requirements.bandwidthMbps) {
-            return false;
-        }
-        if (requirements.latencyMs != 0 && capabilities.latencyMs > requirements.latencyMs) return false;
-        if (requirements.indexingPct != 0 && capabilities.indexingPct < requirements.indexingPct) return false;
+        if (reqs.retrievabilityPct != 0 && caps.retrievabilityPct < reqs.retrievabilityPct) return false;
+        if (reqs.bandwidthMbps != 0 && caps.bandwidthMbps < reqs.bandwidthMbps) return false;
+        if (reqs.latencyMs != 0 && caps.latencyMs > reqs.latencyMs) return false; // lower is better
+        if (reqs.indexingPct != 0 && caps.indexingPct < reqs.indexingPct) return false;
         return true;
     }
 
     /**
      * @notice Converts a UintSet to a FilActorId array
-     * @dev Converts a UintSet to a FilActorId array by iterating and wrapping each element
      * @param set The UintSet to convert
      * @return Array of FilActorId values
      */
@@ -457,7 +517,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     // solhint-disable no-empty-blocks
     /**
      * @notice Authorizes an upgrade
-     * @dev Authorizes an upgrade by checking if the caller has the upgrader role
      * @param newImplementation The address of the new implementation
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}

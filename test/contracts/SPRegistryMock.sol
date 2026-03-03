@@ -20,7 +20,6 @@ contract SPRegistryMock is ISPRegistry {
 
     function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
         external
-        view
         returns (CommonTypes.FilActorId, bool)
     {
         return (nextProvider, nextAutoApprove);
@@ -72,13 +71,17 @@ contract SPRegistryMock is ISPRegistry {
     }
 
     function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
-    function commitCapacity(CommonTypes.FilActorId, uint256) external {}
-    function addOwner(address) external {}
-    function removeOwner(address) external {}
+    function releasePendingCapacity(CommonTypes.FilActorId, uint256) external {}
+    function commitCapacity(CommonTypes.FilActorId, uint256, uint256) external {}
     function registerProvider(CommonTypes.FilActorId) external {}
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
     function setCapabilities(CommonTypes.FilActorId, SLITypes.SLIThresholds calldata) external {}
-    function setDefaultPrice(CommonTypes.FilActorId, uint256) external {}
+    function setPrice(CommonTypes.FilActorId, uint256) external {}
+    function setToleranceBps(uint256) external {}
+
+    function getToleranceBps() external pure returns (uint256) {
+        return 0;
+    }
 }

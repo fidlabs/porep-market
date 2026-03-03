@@ -31,7 +31,7 @@ contract PoRepMarketTest is Test {
         SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1000, priceForDeal: 100, durationDays: 365});
+        SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365});
 
     function setUp() public {
         PoRepMarket impl = new PoRepMarket();
@@ -73,9 +73,10 @@ contract PoRepMarketTest is Test {
             client: clientAddress,
             provider: providerFilActorId,
             requirements: defaultRequirements,
+            terms: defaultTerms,
             validator: validatorAddress,
-            railId: railId,
-            state: state
+            state: state,
+            railId: railId
         });
     }
 
@@ -99,6 +100,9 @@ contract PoRepMarketTest is Test {
         assertEq(p.requirements.bandwidthMbps, defaultRequirements.bandwidthMbps);
         assertEq(p.requirements.latencyMs, defaultRequirements.latencyMs);
         assertEq(p.requirements.indexingPct, defaultRequirements.indexingPct);
+        assertEq(p.terms.dealSizeBytes, defaultTerms.dealSizeBytes);
+        assertEq(p.terms.pricePerSector, defaultTerms.pricePerSector);
+        assertEq(p.terms.durationDays, defaultTerms.durationDays);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
         assertTrue(p.state == PoRepMarket.DealState.Proposed);
@@ -111,6 +115,9 @@ contract PoRepMarketTest is Test {
         assertEq(p.requirements.bandwidthMbps, 0);
         assertEq(p.requirements.latencyMs, 0);
         assertEq(p.requirements.indexingPct, 0);
+        assertEq(p.terms.dealSizeBytes, 0);
+        assertEq(p.terms.pricePerSector, 0);
+        assertEq(p.terms.durationDays, 0);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
         assertEq(uint8(p.state), 0);
@@ -392,6 +399,37 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms);
+    }
+
+    function testProposeDealAutoApproveSetsDealToAccepted() public {
+        spRegistry.setNextAutoApprove(true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        PoRepMarket.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepMarket.DealState.Accepted);
+    }
+
+    function testProposeDealAutoApproveEmitsBothEvents() public {
+        spRegistry.setNextAutoApprove(true);
+
+        vm.prank(clientAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealProposalCreated(dealId, clientAddress, providerFilActorId, defaultRequirements);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealAccepted(dealId, clientAddress, providerFilActorId);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+    }
+
+    function testProposeDealNoAutoApproveKeepsProposed() public {
+        spRegistry.setNextAutoApprove(false);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        PoRepMarket.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepMarket.DealState.Proposed);
     }
 
     function testGetCompletedDeals() public {

@@ -46,7 +46,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @dev Returns the storage struct for the PoRepMarket contract.
      * @notice function to allow acess to storage
      * @return DealProposalsStorage storage struct
      */
@@ -56,7 +55,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice DealState enum
-     * @dev DealState enum is an enum that contains the states of a deal
      */
     enum DealState {
         Proposed,
@@ -67,13 +65,13 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice DealProposal struct
-     * @dev DealProposal struct is a struct that contains the details of a deal proposal
      */
     struct DealProposal {
         uint256 dealId;
         address client;
         CommonTypes.FilActorId provider;
         SLITypes.SLIThresholds requirements;
+        SLITypes.DealTerms terms;
         address validator;
         DealState state;
         uint256 railId;
@@ -81,7 +79,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice DealProposalCreated event
-     * @dev DealProposalCreated event is emitted when a deal proposal is created
      * @param dealId The id of the deal proposal
      * @param client The address of the client
      * @param provider The address of the provider
@@ -96,7 +93,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice DealAccepted event
-     * @dev DealAccepted event is emitted when a deal is accepted
      * @param dealId The id of the deal proposal
      * @param owner The address of the owner
      * @param provider The address of the provider
@@ -105,7 +101,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice ValidatorAndRailIdUpdated event
-     * @dev ValidatorAndRailIdUpdated event is emitted when a validator and rail id are updated
      * @param dealId The id of the deal proposal
      * @param validator The address of the validator
      * @param railId The id of the rail
@@ -114,7 +109,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice DealCompleted event
-     * @dev DealCompleted event is emitted when a deal is completed
      * @param dealId The id of the deal proposal
      * @param client The address of the client
      * @param provider The address of the provider
@@ -123,7 +117,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice DealRejected event
-     * @dev DealRejected event is emitted when a deal is rejected
      * @param dealId The id of the deal proposal
      * @param rejector The address of the rejector
      */
@@ -142,7 +135,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Constructor
-     * @dev Constructor disables initializers
      */
     constructor() {
         _disableInitializers();
@@ -150,7 +142,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Initializes the contract
-     * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param _admin The address of the admin
      * @param _validatorFactory The address of the validator registry
      * @param _spRegistry The address of the SP registry
@@ -172,7 +163,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Proposes a deal
-     * @dev Proposes a deal by creating a new deal proposal
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
      */
@@ -186,33 +176,34 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         DealProposalsStorage storage $ = s();
 
-        // TODO: Use autoApprove to skip explicit acceptDeal() step when SP's price floor is met
-        (
-            CommonTypes.FilActorId provider, /* autoApprove */
-        ) = $._SPRegistryContract.getProviderForDeal(requirements, terms);
+        (CommonTypes.FilActorId provider, bool autoApprove) =
+            $._SPRegistryContract.getProviderForDeal(requirements, terms);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
         }
 
         uint256 dealId = ++$._dealIdCounter;
+        DealState initialState = autoApprove ? DealState.Accepted : DealState.Proposed;
 
         $._dealProposals[dealId] = DealProposal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
             requirements: requirements,
+            terms: terms,
             validator: address(0),
-            state: DealState.Proposed,
+            state: initialState,
             railId: 0
         });
 
         emit DealProposalCreated(dealId, msg.sender, provider, requirements);
+        if (autoApprove) {
+            emit DealAccepted(dealId, msg.sender, provider);
+        }
     }
 
     /**
-     *
      * @notice Updates the validator and rail id for a deal proposal
-     * @dev Updates the validator and rail id for a deal proposal
      * @param dealId The id of the deal proposal
      * @param railId The id of the rail
      */
@@ -238,7 +229,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Gets a deal proposal
-     * @dev Gets a deal proposal by deal id
      * @param dealId The id of the deal proposal
      * @return DealProposal The deal proposal
      */
@@ -249,7 +239,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Accepts a deal
-     * @dev Accepts a deal by setting the deal state to accepted
      * @param dealId The id of the deal proposal
      */
     function acceptDeal(uint256 dealId) external {
@@ -269,7 +258,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Completes a deal
-     * @dev Completes a deal by setting the deal state to completed
      * @param dealId The id of the deal proposal
      */
     function completeDeal(uint256 dealId) external {
@@ -283,16 +271,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         dp.state = DealState.Completed;
         $._dealIdsReadyForPayment.add(dealId);
-        // TODO: Call $._SPRegistryContract.commitCapacity(dp.provider, actualSizeBytes)
-        // when completeDeal signature is updated with actualSizeBytes from Client contract.
-        // REF: Client.sol (PR #4)
+        // TODO: actualSizeBytes should come from Client contract's allocation tracking
+        // For now, use estimated size (no tolerance delta)
+        $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, dp.terms.dealSizeBytes);
 
         emit DealCompleted(dealId, msg.sender, dp.provider);
     }
 
     /**
      * @notice Rejects a deal
-     * @dev Rejects a deal by setting the deal state to rejected
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external {
@@ -307,12 +294,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         dp.state = DealState.Rejected;
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
         emit DealRejected(dealId, msg.sender);
     }
 
     /**
      * @notice Gets all completed deals
-     * @dev Iterates through all deals and returns only those with Completed state
      * @return completedDeals Array of completed deal proposals
      */
     function getCompletedDeals() external view returns (DealProposal[] memory completedDeals) {
@@ -337,7 +324,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Ensures a deal exists
-     * @dev Ensures a deal exists by checking if the deal id exists
      * @param dealProposal The id of the deal proposal
      */
     function _ensureDealExists(DealProposal memory dealProposal) internal pure {
@@ -346,7 +332,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Ensures a deal is in the correct state
-     * @dev Ensures a deal is in the correct state by checking if the deal state is the expected state
      * @param dp The deal proposal
      * @param expectedState The expected state
      */
@@ -357,7 +342,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // solhint-disable no-empty-blocks
     /**
      * @notice Authorizes an upgrade
-     * @dev Authorizes an upgrade by checking if the caller has the upgrader role
      * @param newImplementation The address of the new implementation
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}

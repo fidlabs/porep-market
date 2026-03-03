@@ -58,25 +58,17 @@
   },
   {
     "type": "function",
-    "name": "addOwner",
-    "inputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "pure"
-  },
-  {
-    "type": "function",
     "name": "commitCapacity",
     "inputs": [
       {
         "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "estimatedSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "actualSizeBytes",
@@ -107,7 +99,7 @@
       {
         "name": "requirements",
         "type": "tuple",
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
@@ -134,7 +126,7 @@
       {
         "name": "terms",
         "type": "tuple",
-        "internalType": "struct DealTerms",
+        "internalType": "struct SLITypes.DealTerms",
         "components": [
           {
             "name": "dealSizeBytes",
@@ -142,7 +134,7 @@
             "internalType": "uint256"
           },
           {
-            "name": "priceForDeal",
+            "name": "pricePerSector",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -185,7 +177,7 @@
         "internalType": "struct ISPRegistry.ProviderInfo",
         "components": [
           {
-            "name": "owner",
+            "name": "organization",
             "type": "address",
             "internalType": "address"
           },
@@ -197,7 +189,7 @@
           {
             "name": "capabilities",
             "type": "tuple",
-            "internalType": "struct SLIThresholds",
+            "internalType": "struct SLITypes.SLIThresholds",
             "components": [
               {
                 "name": "retrievabilityPct",
@@ -232,7 +224,12 @@
             "internalType": "uint256"
           },
           {
-            "name": "defaultPricePerDeal",
+            "name": "pendingBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "pricePerSector",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -269,6 +266,19 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getToleranceBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -357,7 +367,7 @@
     "name": "isStorageProviderOwner",
     "inputs": [
       {
-        "name": "ownerAddress",
+        "name": "caller",
         "type": "address",
         "internalType": "address"
       },
@@ -381,13 +391,13 @@
     "name": "pauseProvider",
     "inputs": [
       {
-        "name": "",
+        "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
       }
     ],
     "outputs": [],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -425,14 +435,14 @@
         "internalType": "CommonTypes.FilActorId"
       },
       {
-        "name": "owner",
+        "name": "organization",
         "type": "address",
         "internalType": "address"
       },
       {
         "name": "capabilities",
         "type": "tuple",
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
@@ -462,7 +472,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "defaultPricePerDeal",
+        "name": "pricePerSector",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -490,16 +500,21 @@
   },
   {
     "type": "function",
-    "name": "removeOwner",
+    "name": "releasePendingCapacity",
     "inputs": [
       {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "sizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -549,7 +564,7 @@
       {
         "name": "capabilities",
         "type": "tuple",
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
@@ -579,21 +594,34 @@
   },
   {
     "type": "function",
-    "name": "setDefaultPrice",
+    "name": "setPrice",
     "inputs": [
       {
-        "name": "",
+        "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
       },
       {
-        "name": "",
+        "name": "pricePerSector",
         "type": "uint256",
         "internalType": "uint256"
       }
     ],
     "outputs": [],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setToleranceBps",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -619,13 +647,13 @@
     "name": "unpauseProvider",
     "inputs": [
       {
-        "name": "",
+        "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
       }
     ],
     "outputs": [],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -696,7 +724,7 @@
         "name": "capabilities",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
@@ -763,7 +791,71 @@
   },
   {
     "type": "event",
-    "name": "DefaultPriceUpdated",
+    "name": "Initialized",
+    "inputs": [
+      {
+        "name": "version",
+        "type": "uint64",
+        "indexed": false,
+        "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OrganizationAdded",
+    "inputs": [
+      {
+        "name": "organization",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PendingCapacityReleased",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "sizeBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PendingCapacityReserved",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "sizeBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PriceUpdated",
     "inputs": [
       {
         "name": "provider",
@@ -788,32 +880,6 @@
   },
   {
     "type": "event",
-    "name": "Initialized",
-    "inputs": [
-      {
-        "name": "version",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OwnerAdded",
-    "inputs": [
-      {
-        "name": "owner",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "ProviderRegistered",
     "inputs": [
       {
@@ -823,7 +889,7 @@
         "internalType": "CommonTypes.FilActorId"
       },
       {
-        "name": "owner",
+        "name": "organization",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -908,6 +974,25 @@
   },
   {
     "type": "event",
+    "name": "ToleranceBpsUpdated",
+    "inputs": [
+      {
+        "name": "oldBps",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newBps",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -942,12 +1027,64 @@
   },
   {
     "type": "error",
+    "name": "ActorNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ActualSizeExceedsTolerance",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "actualSize",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxAllowed",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "AddressEmptyCode",
     "inputs": [
       {
         "name": "target",
         "type": "address",
         "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "AvailableBelowCommittedPlusPending",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "availableBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "committedBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "pendingBytes",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
@@ -990,13 +1127,45 @@
   },
   {
     "type": "error",
+    "name": "ExitCodeError",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
   {
     "type": "error",
+    "name": "InvalidActorID",
+    "inputs": [
+      {
+        "name": "actorId",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidAdminAddress",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCodec",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1016,7 +1185,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidOwnerAddress",
+    "name": "InvalidOrganizationAddress",
     "inputs": []
   },
   {
@@ -1027,6 +1196,11 @@
   {
     "type": "error",
     "name": "InvalidProviderActorId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidResponseLength",
     "inputs": []
   },
   {
@@ -1042,6 +1216,22 @@
   },
   {
     "type": "error",
+    "name": "NotEnoughBalance",
+    "inputs": [
+      {
+        "name": "balance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NotImplemented",
     "inputs": []
   },
@@ -1052,7 +1242,7 @@
   },
   {
     "type": "error",
-    "name": "NotProviderOwnerOrAdmin",
+    "name": "NotProviderControllerOrAdmin",
     "inputs": [
       {
         "name": "caller",
@@ -1104,6 +1294,27 @@
       },
       {
         "name": "committedBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ReleasePendingExceedsPending",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "sizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "pendingBytes",
         "type": "uint256",
         "internalType": "uint256"
       }
