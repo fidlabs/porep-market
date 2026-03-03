@@ -122,6 +122,28 @@
             ]
           },
           {
+            "name": "terms",
+            "type": "tuple",
+            "internalType": "struct SLITypes.DealTerms",
+            "components": [
+              {
+                "name": "dealSizeBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "pricePerSector",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "durationDays",
+                "type": "uint32",
+                "internalType": "uint32"
+              }
+            ]
+          },
+          {
             "name": "validator",
             "type": "address",
             "internalType": "address"
@@ -196,6 +218,28 @@
                 "name": "indexingPct",
                 "type": "uint8",
                 "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "terms",
+            "type": "tuple",
+            "internalType": "struct SLITypes.DealTerms",
+            "components": [
+              {
+                "name": "dealSizeBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "pricePerSector",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "durationDays",
+                "type": "uint32",
+                "internalType": "uint32"
               }
             ]
           },
@@ -345,7 +389,7 @@
             "internalType": "uint256"
           },
           {
-            "name": "priceForDeal",
+            "name": "pricePerSector",
             "type": "uint256",
             "internalType": "uint256"
           },

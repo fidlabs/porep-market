@@ -10,12 +10,13 @@ import {SLITypes} from "../types/SLITypes.sol";
  */
 interface ISPRegistry {
     struct ProviderInfo {
-        address owner;
+        address organization;
         bool paused;
         SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
-        uint256 defaultPricePerDeal;
+        uint256 pendingBytes;
+        uint256 pricePerSector;
     }
 
     /**
@@ -45,17 +46,14 @@ interface ISPRegistry {
     function isProviderRegistered(CommonTypes.FilActorId provider) external view returns (bool);
 
     /**
-     * @notice Find a provider matching requirements
-     * @dev Selects the least-committed eligible provider. Capacity is NOT reserved atomically;
-     *      between matching and `commitCapacity`, other deals may consume the same capacity
-     *      (TOCTOU race). This is acceptable because `commitCapacity` enforces the upper bound.
-     *      Future improvement: consider `pendingBytes` reservation to hold capacity between
-     *      matching and commitment.
+     * @notice Find a provider matching requirements and reserve pending capacity
+     * @dev Selects the least-committed eligible provider. Reserves `pendingBytes` atomically
+     *      so capacity is held between matching and commitment.
      *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
      * @param terms Commercial terms (size, price, duration)
      * @return provider The matched provider, or FilActorId(0) if none found
-     * @return autoApprove True if the provider's default price is met by the deal terms
+     * @return autoApprove True if the provider's price per sector is met by the deal terms
      */
     function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
@@ -69,10 +67,17 @@ interface ISPRegistry {
      */
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
 
-    // TODO: Implementation should use MinerUtils.isControllingAddress (MinerAPI precompile)
-    // to verify on-chain SP ownership. See src/libs/MinerUtils.sol for reference.
+    /**
+     * @notice Release pending capacity (called on deal rejection before commitment)
+     * @dev Decrements pendingBytes for the provider. Reverts if sizeBytes > pendingBytes.
+     * @param provider The provider whose pending capacity to release
+     * @param sizeBytes Amount of pending capacity to release
+     */
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
+
     /**
      * @notice Check if address owns/controls a provider
+     * @dev Admin always returns true. Otherwise checks MinerUtils.isControllingAddress.
      * @param ownerAddress Address to check
      * @param provider Provider to check against
      * @return True if ownerAddress owns/controls provider
@@ -81,25 +86,14 @@ interface ISPRegistry {
 
     /**
      * @notice Commit actual capacity after DDO allocation
-     * @dev Reduces provider's available capacity.
-     *      Unlike getProviderForDeal which uses the client's estimate, this uses the
-     *      real size determined after datacap transfer.
+     * @dev Releases estimated pending bytes, then commits actual bytes.
+     *      Enforces sector padding tolerance if configured.
      * @param provider The provider whose capacity to commit
+     * @param estimatedSizeBytes Estimated size from the original deal proposal
      * @param actualSizeBytes Actual deal size from DDO allocation
      */
-    function commitCapacity(CommonTypes.FilActorId provider, uint256 actualSizeBytes) external;
-
-    /**
-     * @notice Add an approved owner (admin only)
-     * @param owner Address to approve as owner
-     */
-    function addOwner(address owner) external;
-
-    /**
-     * @notice Remove an owner (admin only)
-     * @param owner Address to remove
-     */
-    function removeOwner(address owner) external;
+    function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
+        external;
 
     /**
      * @notice Register a new provider under caller's ownership
@@ -134,9 +128,21 @@ interface ISPRegistry {
     function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external;
 
     /**
-     * @notice Set the default auto-approve price for a provider
+     * @notice Set the price per sector for a provider
      * @param provider The provider to update
-     * @param pricePerDeal The stablecoin price per deal (0 to disable auto-approve)
+     * @param pricePerSector The stablecoin price per 32 GiB sector (0 to disable auto-approve)
      */
-    function setDefaultPrice(CommonTypes.FilActorId provider, uint256 pricePerDeal) external;
+    function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSector) external;
+
+    /**
+     * @notice Set the sector padding tolerance in basis points (admin only)
+     * @param bps Tolerance in basis points (e.g., 1000 = 10%)
+     */
+    function setToleranceBps(uint256 bps) external;
+
+    /**
+     * @notice Get the current sector padding tolerance
+     * @return Tolerance in basis points
+     */
+    function getToleranceBps() external view returns (uint256);
 }

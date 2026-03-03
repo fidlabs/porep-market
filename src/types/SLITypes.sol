@@ -39,7 +39,7 @@ library SLITypes {
      */
     struct DealTerms {
         uint256 dealSizeBytes;
-        uint256 priceForDeal;
+        uint256 pricePerSector;
         uint32 durationDays;
     }
 
