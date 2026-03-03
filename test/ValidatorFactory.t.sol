@@ -15,7 +15,6 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
-import {SLIThresholds} from "../src/types/SLITypes.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
@@ -33,6 +32,7 @@ contract ValidatorFactoryTest is Test {
     ValidatorFactory public factoryImpl;
     bytes public initData;
     PoRepMarketMock public poRepMarketMock;
+    uint256 public dealId;
 
     function setUp() public {
         admin = vm.addr(1);

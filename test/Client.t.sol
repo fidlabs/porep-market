@@ -38,6 +38,7 @@ contract ClientTest is Test {
     address public terminationOracle;
     bytes public transferTo = abi.encodePacked(vm.addr(2));
     uint256 public dealId;
+    uint256 public totalDealSize;
 
     CommonTypes.FilActorId public providerFilActorId;
     // solhint-disable var-name-mixedcase
@@ -77,6 +78,7 @@ contract ClientTest is Test {
         poRepMarketMock = new PoRepMarketMock();
         validatorMock = new ValidatorMock();
         terminationOracle = vm.addr(3);
+        totalDealSize = 1024;
         client = Client(setupProxy(address(impl)));
         actorIdMock = new ActorIdMock();
         failingMockInvalidTopLevelArray = new FailingMockInvalidTopLevelArray();
@@ -122,7 +124,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
-                totalDealSize: 1024
+                totalDealSize: totalDealSize
             })
         );
     }
@@ -533,6 +535,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
+                totalDealSize: 1024
             })
         );
         // solhint-disable-next-line reentrancy
@@ -770,6 +773,7 @@ contract ClientTest is Test {
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
+                totalDealSize: 1024
             })
         );
 

@@ -33,7 +33,7 @@ contract PoRepMarketTest is Test {
         SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365});
+        SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365});
 
     string public expectedManifestLocation = "https://example.com/manifest";
 
@@ -76,9 +76,10 @@ contract PoRepMarketTest is Test {
             requirements: defaultRequirements,
             terms: defaultTerms,
             validator: validatorAddress,
-            state: state,
             railId: railId,
+            state: state,
             manifestLocation: expectedManifestLocation
+            totalDealSize: totalDealSize
         });
     }
 
