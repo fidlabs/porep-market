@@ -71,6 +71,78 @@
   },
   {
     "type": "function",
+    "name": "getCompletedDeals",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "completedDeals",
+        "type": "tuple[]",
+        "internalType": "struct PoRepMarket.DealProposal[]",
+        "components": [
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "requirements",
+            "type": "tuple",
+            "internalType": "struct SLITypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "bandwidthMbps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "validator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "state",
+            "type": "uint8",
+            "internalType": "enum PoRepMarket.DealState"
+          },
+          {
+            "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getDealProposal",
     "inputs": [
       {
@@ -103,7 +175,7 @@
           {
             "name": "requirements",
             "type": "tuple",
-            "internalType": "struct SLIThresholds",
+            "internalType": "struct SLITypes.SLIThresholds",
             "components": [
               {
                 "name": "retrievabilityPct",
@@ -243,7 +315,7 @@
       {
         "name": "requirements",
         "type": "tuple",
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",
@@ -270,7 +342,7 @@
       {
         "name": "terms",
         "type": "tuple",
-        "internalType": "struct DealTerms",
+        "internalType": "struct SLITypes.DealTerms",
         "components": [
           {
             "name": "dealSizeBytes",
@@ -486,7 +558,7 @@
         "name": "requirements",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct SLIThresholds",
+        "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityPct",

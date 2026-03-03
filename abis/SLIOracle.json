@@ -6,19 +6,6 @@
   },
   {
     "type": "function",
-    "name": "ALLOCATOR_ROLE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "DEFAULT_ADMIN_ROLE",
     "inputs": [],
     "outputs": [
@@ -32,7 +19,7 @@
   },
   {
     "type": "function",
-    "name": "TERMINATION_ORACLE",
+    "name": "ORACLE_ROLE",
     "inputs": [],
     "outputs": [
       {
@@ -71,32 +58,53 @@
   },
   {
     "type": "function",
-    "name": "claimsTerminatedEarly",
+    "name": "getAttestation",
     "inputs": [
       {
-        "name": "claims",
-        "type": "uint64[]",
-        "internalType": "uint64[]"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "getClientAllocationIdsPerDeal",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
       }
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "uint64[]",
-        "internalType": "CommonTypes.FilActorId[]"
+        "name": "attestation",
+        "type": "tuple",
+        "internalType": "struct SLITypes.Attestation",
+        "components": [
+          {
+            "name": "lastUpdate",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "slis",
+            "type": "tuple",
+            "internalType": "struct SLITypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "bandwidthMbps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -140,45 +148,6 @@
   },
   {
     "type": "function",
-    "name": "handle_filecoin_method",
-    "inputs": [
-      {
-        "name": "method",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "inputCodec",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "params",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "exitCode",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "codec",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "data",
-        "type": "bytes",
-        "internalType": "bytes"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "hasRole",
     "inputs": [
       {
@@ -211,17 +180,7 @@
         "internalType": "address"
       },
       {
-        "name": "allocator",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "terminationOracle",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_poRepMarketContract",
+        "name": "oracle",
         "type": "address",
         "internalType": "address"
       }
@@ -231,19 +190,19 @@
   },
   {
     "type": "function",
-    "name": "isDataSizeMatching",
+    "name": "multicall",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "data",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
       }
     ],
     "outputs": [
       {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
+        "name": "results",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
       }
     ],
     "stateMutability": "nonpayable"
@@ -299,6 +258,46 @@
   },
   {
     "type": "function",
+    "name": "setSLI",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "slis",
+        "type": "tuple",
+        "internalType": "struct SLITypes.SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -318,84 +317,6 @@
   },
   {
     "type": "function",
-    "name": "terminatedClaims",
-    "inputs": [
-      {
-        "name": "claimId",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "transfer",
-    "inputs": [
-      {
-        "name": "params",
-        "type": "tuple",
-        "internalType": "struct DataCapTypes.TransferParams",
-        "components": [
-          {
-            "name": "to",
-            "type": "tuple",
-            "internalType": "struct CommonTypes.FilAddress",
-            "components": [
-              {
-                "name": "data",
-                "type": "bytes",
-                "internalType": "bytes"
-              }
-            ]
-          },
-          {
-            "name": "amount",
-            "type": "tuple",
-            "internalType": "struct CommonTypes.BigInt",
-            "components": [
-              {
-                "name": "val",
-                "type": "bytes",
-                "internalType": "bytes"
-              },
-              {
-                "name": "neg",
-                "type": "bool",
-                "internalType": "bool"
-              }
-            ]
-          },
-          {
-            "name": "operator_data",
-            "type": "bytes",
-            "internalType": "bytes"
-          }
-        ]
-      },
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "dealCompleted",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "upgradeToAndCall",
     "inputs": [
       {
@@ -411,25 +332,6 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
-  },
-  {
-    "type": "event",
-    "name": "DatacapSpent",
-    "inputs": [
-      {
-        "name": "client",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "amount",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "event",
@@ -521,6 +423,53 @@
   },
   {
     "type": "event",
+    "name": "SLIAttestationUpdate",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "lastUpdate",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "slis",
+        "type": "tuple",
+        "indexed": false,
+        "internalType": "struct SLITypes.SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
+            "name": "bandwidthMbps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Upgraded",
     "inputs": [
       {
@@ -528,44 +477,6 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "ValidatorLockupPeriodUpdated",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "validator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "VerifiedClientAdded",
-    "inputs": [
-      {
-        "name": "client",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "allowance",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -590,11 +501,6 @@
         "internalType": "bytes32"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "ActorNotFound",
-    "inputs": []
   },
   {
     "type": "error",
@@ -625,80 +531,12 @@
   },
   {
     "type": "error",
-    "name": "FailToCallActor",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "GetClaimsCallFailed",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidAllocationRequest",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidCaller",
-    "inputs": [
-      {
-        "name": "caller",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "expectedCaller",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidClaimExtensionRequest",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidClient",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidCodec",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidCodec",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidDealStateForTransfer",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidFirstElement",
+    "name": "InvalidAdmin",
     "inputs": []
   },
   {
@@ -708,81 +546,13 @@
   },
   {
     "type": "error",
-    "name": "InvalidOperatorData",
+    "name": "InvalidOracle",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidProvider",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidResponseLength",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSecondElement",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidTokenReceived",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidTopLevelArray",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "MethodNotHandled",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotEnoughBalance",
-    "inputs": [
-      {
-        "name": "balance",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "value",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   },
   {
     "type": "error",
     "name": "NotInitializing",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ReentrancyGuardReentrantCall",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "TransferFailed",
-    "inputs": [
-      {
-        "name": "exitCode",
-        "type": "int256",
-        "internalType": "int256"
-      }
-    ]
   },
   {
     "type": "error",
@@ -797,33 +567,6 @@
         "name": "slot",
         "type": "bytes32",
         "internalType": "bytes32"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "UnsupportedType",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ValidatorNotSet",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "VerifRegAddVerifiedClientFailed",
-    "inputs": [
-      {
-        "name": "exitCode",
-        "type": "int256",
-        "internalType": "int256"
       }
     ]
   }

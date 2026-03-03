@@ -8,7 +8,7 @@ import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {SLIThresholds, DealTerms} from "../src/types/SLITypes.sol";
+import {SLITypes} from "../src/types/SLITypes.sol";
 
 // solhint-disable-next-line max-states-count
 contract SPRegistryTest is Test {
@@ -23,10 +23,10 @@ contract SPRegistryTest is Test {
     CommonTypes.FilActorId public provider2;
     CommonTypes.FilActorId public provider3;
 
-    SLIThresholds internal defaultCapabilities =
-        SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 1000, latencyMs: 100, indexingPct: 90});
+    SLITypes.SLIThresholds internal defaultCapabilities =
+        SLITypes.SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 1000, latencyMs: 100, indexingPct: 90});
 
-    DealTerms internal defaultTerms = DealTerms({dealSizeBytes: 1_000_000, priceForDeal: 100, durationDays: 365});
+    SLITypes.DealTerms internal defaultTerms = SLITypes.DealTerms({dealSizeBytes: 1_000_000, priceForDeal: 100, durationDays: 365});
 
     uint256 internal defaultAvailableBytes = 10_000_000;
 
@@ -239,8 +239,8 @@ contract SPRegistryTest is Test {
     function testSetCapabilitiesRevertsInvalidRetrievabilityPct() public {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
-        SLIThresholds memory bad =
-            SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
+        SLITypes.SLIThresholds memory bad =
+            SLITypes.SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
         vm.prank(owner1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidRetrievabilityPct.selector, uint8(101)));
         spRegistry.setCapabilities(provider1, bad);
@@ -249,8 +249,8 @@ contract SPRegistryTest is Test {
     function testSetCapabilitiesRevertsInvalidIndexingPct() public {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
-        SLIThresholds memory bad =
-            SLIThresholds({retrievabilityPct: 50, bandwidthMbps: 100, latencyMs: 100, indexingPct: 101});
+        SLITypes.SLIThresholds memory bad =
+            SLITypes.SLIThresholds({retrievabilityPct: 50, bandwidthMbps: 100, latencyMs: 100, indexingPct: 101});
         vm.prank(owner1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidIndexingPct.selector, uint8(101)));
         spRegistry.setCapabilities(provider1, bad);
@@ -259,8 +259,8 @@ contract SPRegistryTest is Test {
     function testSetCapabilitiesAdminCanSet() public {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
-        SLIThresholds memory newCaps =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory newCaps =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(adminAddress);
         spRegistry.setCapabilities(provider1, newCaps);
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
@@ -323,8 +323,8 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (, bool autoApprove) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertTrue(autoApprove);
@@ -334,8 +334,8 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 50);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (, bool autoApprove) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertTrue(autoApprove);
@@ -345,8 +345,8 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 200);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (, bool autoApprove) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertFalse(autoApprove);
@@ -356,16 +356,16 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (, bool autoApprove) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertFalse(autoApprove);
     }
 
     function testGetProviderForDealAutoApproveFalseWhenNoProviderMatches() public {
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result, bool autoApprove) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
@@ -432,8 +432,8 @@ contract SPRegistryTest is Test {
     }
 
     function testGetProviderForDealReturnsZeroWhenNoProviders() public {
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
@@ -443,8 +443,8 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider1));
@@ -454,21 +454,21 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, 500, 0); // less than defaultTerms.dealSizeBytes
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
     }
 
     function testGetProviderForDealSkipsUnmetRequirements() public {
-        SLIThresholds memory lowCapabilities =
-            SLIThresholds({retrievabilityPct: 50, bandwidthMbps: 100, latencyMs: 500, indexingPct: 30});
+        SLITypes.SLIThresholds memory lowCapabilities =
+            SLITypes.SLIThresholds({retrievabilityPct: 50, bandwidthMbps: 100, latencyMs: 500, indexingPct: 30});
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
@@ -484,34 +484,34 @@ contract SPRegistryTest is Test {
         vm.prank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, 5000);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider2));
     }
 
     function testGetProviderForDealZeroRequirementSkipsDimension() public {
-        SLIThresholds memory lowCapabilities =
-            SLIThresholds({retrievabilityPct: 10, bandwidthMbps: 50, latencyMs: 999, indexingPct: 5});
+        SLITypes.SLIThresholds memory lowCapabilities =
+            SLITypes.SLIThresholds({retrievabilityPct: 10, bandwidthMbps: 50, latencyMs: 999, indexingPct: 5});
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0);
 
         // All zeros = don't care about any SLI dimension
-        SLIThresholds memory req = SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0});
+        SLITypes.SLIThresholds memory req = SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider1));
     }
 
     function testGetProviderForDealSkipsUnmetBandwidth() public {
-        SLIThresholds memory lowBandwidth =
-            SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 100, latencyMs: 100, indexingPct: 90});
+        SLITypes.SLIThresholds memory lowBandwidth =
+            SLITypes.SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 100, latencyMs: 100, indexingPct: 90});
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, lowBandwidth, defaultAvailableBytes, 0);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 500, latencyMs: 0, indexingPct: 0});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 500, latencyMs: 0, indexingPct: 0});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
@@ -519,34 +519,34 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealLatencyLowerIsBetter() public {
         // Provider with high latency should NOT match low latency requirement
-        SLIThresholds memory highLatency =
-            SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 1000, latencyMs: 500, indexingPct: 90});
+        SLITypes.SLIThresholds memory highLatency =
+            SLITypes.SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 1000, latencyMs: 500, indexingPct: 90});
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, highLatency, defaultAvailableBytes, 0);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 100, indexingPct: 0});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 100, indexingPct: 0});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
     }
 
     function testGetProviderForDealSkipsUnmetIndexing() public {
-        SLIThresholds memory lowIndexing =
-            SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 1000, latencyMs: 100, indexingPct: 30});
+        SLITypes.SLIThresholds memory lowIndexing =
+            SLITypes.SLIThresholds({retrievabilityPct: 95, bandwidthMbps: 1000, latencyMs: 100, indexingPct: 30});
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, lowIndexing, defaultAvailableBytes, 0);
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 80});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 80});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
     }
 
     function testGetProviderForDealRevertsForNonMarketRole() public {
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         bytes32 marketRole = spRegistry.MARKET_ROLE();
         vm.prank(unauthorizedAddress);
         vm.expectRevert(
@@ -655,8 +655,8 @@ contract SPRegistryTest is Test {
         spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0);
         vm.stopPrank();
 
-        SLIThresholds memory req =
-            SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+        SLITypes.SLIThresholds memory req =
+            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
 
@@ -724,16 +724,16 @@ contract SPRegistryTest is Test {
     }
 
     function testRegisterProviderForRevertsInvalidRetrievabilityPct() public {
-        SLIThresholds memory bad =
-            SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
+        SLITypes.SLIThresholds memory bad =
+            SLITypes.SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidRetrievabilityPct.selector, uint8(101)));
         spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0);
     }
 
     function testRegisterProviderForRevertsInvalidIndexingPct() public {
-        SLIThresholds memory bad =
-            SLIThresholds({retrievabilityPct: 50, bandwidthMbps: 100, latencyMs: 100, indexingPct: 101});
+        SLITypes.SLIThresholds memory bad =
+            SLITypes.SLIThresholds({retrievabilityPct: 50, bandwidthMbps: 100, latencyMs: 100, indexingPct: 101});
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidIndexingPct.selector, uint8(101)));
         spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0);

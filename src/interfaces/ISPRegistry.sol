@@ -2,7 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {SLIThresholds, DealTerms} from "../types/SLITypes.sol";
+import {SLITypes} from "../types/SLITypes.sol";
 
 /**
  * @title ISPRegistry
@@ -12,7 +12,7 @@ interface ISPRegistry {
     struct ProviderInfo {
         address owner;
         bool paused;
-        SLIThresholds capabilities;
+        SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 defaultPricePerDeal;
@@ -57,7 +57,7 @@ interface ISPRegistry {
      * @return provider The matched provider, or FilActorId(0) if none found
      * @return autoApprove True if the provider's default price is met by the deal terms
      */
-    function getProviderForDeal(SLIThresholds calldata requirements, DealTerms calldata terms)
+    function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
         returns (CommonTypes.FilActorId provider, bool autoApprove);
 
@@ -131,7 +131,7 @@ interface ISPRegistry {
      * @param provider The provider to update
      * @param capabilities The SLI capabilities this provider guarantees
      */
-    function setCapabilities(CommonTypes.FilActorId provider, SLIThresholds calldata capabilities) external;
+    function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external;
 
     /**
      * @notice Set the default auto-approve price for a provider

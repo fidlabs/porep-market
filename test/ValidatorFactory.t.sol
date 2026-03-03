@@ -15,7 +15,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
-import {SLIThresholds} from "../src/types/SLITypes.sol";
+import {SLITypes} from "../src/types/SLITypes.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
@@ -60,7 +60,7 @@ contract ValidatorFactoryTest is Test {
                 dealId: params.dealId,
                 client: client,
                 provider: provider,
-                requirements: SLIThresholds({
+                requirements: SLITypes.SLIThresholds({
                     retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 validator: vm.addr(10),

@@ -6,5 +6,5 @@ via_ir = true
 optimizer = true
 [lint]
 # disable mixed case lint errors because of Filecoin naming specifications
-exclude_lints = ["mixed-case-function", "mixed-case-variable"]
+exclude_lints = ["mixed-case-function", "mixed-case-variable", "pascal-case-struct"]
 # See more config options https://github.com/foundry-rs/foundry/blob/master/crates/config/README.md#all-options

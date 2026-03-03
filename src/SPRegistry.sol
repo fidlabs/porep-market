@@ -9,7 +9,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
-import {SLIThresholds, DealTerms} from "./types/SLITypes.sol";
+import {SLITypes} from "./types/SLITypes.sol";
 
 /**
  * @title SPRegistry
@@ -33,7 +33,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     struct ProviderData {
         address owner;
         bool paused;
-        SLIThresholds capabilities;
+        SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 defaultPricePerDeal;
@@ -81,7 +81,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param provider The provider actor ID
      * @param capabilities The updated SLI capabilities
      */
-    event CapabilitiesUpdated(CommonTypes.FilActorId indexed provider, SLIThresholds capabilities);
+    event CapabilitiesUpdated(CommonTypes.FilActorId indexed provider, SLITypes.SLIThresholds capabilities);
 
     /**
      * @notice AvailableSpaceUpdated event
@@ -187,7 +187,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function setCapabilities(CommonTypes.FilActorId provider, SLIThresholds calldata capabilities) external {
+    function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external {
         _ensureProviderRegistered(provider);
         _onlyProviderOwnerOrAdmin(provider);
         if (capabilities.retrievabilityPct > 100) revert InvalidRetrievabilityPct(capabilities.retrievabilityPct);
@@ -275,7 +275,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @return provider The matched provider, or FilActorId(0) if none found
      * @return autoApprove True if the provider's default price is met by the deal terms
      */
-    function getProviderForDeal(SLIThresholds calldata requirements, DealTerms calldata terms)
+    function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
         onlyRole(MARKET_ROLE)
         returns (CommonTypes.FilActorId, bool)
@@ -345,7 +345,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function registerProviderFor(
         CommonTypes.FilActorId provider,
         address owner,
-        SLIThresholds calldata capabilities,
+        SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
         uint256 defaultPricePerDeal
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -419,7 +419,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param requirements The required SLI thresholds
      * @return True if all non-zero requirement dimensions are met
      */
-    function _meetsRequirements(SLIThresholds storage capabilities, SLIThresholds calldata requirements)
+    function _meetsRequirements(SLITypes.SLIThresholds storage capabilities, SLITypes.SLIThresholds calldata requirements)
         internal
         view
         returns (bool)

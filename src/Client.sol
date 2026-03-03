@@ -27,6 +27,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     // @custom:storage-location erc7201:porepmarket.storage.ClientStorage
     struct ClientStorage {
         mapping(uint256 dealId => Deal deal) _deals;
+        mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         PoRepMarket _poRepMarketContract;
     }
 
@@ -150,6 +151,11 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @notice Error thrown when deal state is invalid for transfer
      */
     error InvalidDealStateForTransfer();
+
+    /**
+     * @notice Error thrown when validator is not set for the deal
+     */
+    error ValidatorNotSet(uint256 dealId);
 
     struct Deal {
         address client;
@@ -412,7 +418,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         if (longestDealTerm > CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm)) {
             IValidator validator = IValidator(deal.validator);
-            // casting to uint64 is safe because longestDealTerm is a positive ChainEpoch
             // forge-lint: disable-next-line(unsafe-typecast)
             validator.updateLockupPeriod(deal.railId, uint256(uint64(longestDealTerm)));
 
@@ -471,18 +476,28 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
+                deal.allocationIds.push(claimIds[i]);
                 deal.sizeOfAllocations += claim.size;
             }
         }
     }
 
     /**
-     * @notice custom getter to retrieve allication ids per client and provider
+     * @notice custom getter to retrieve allocation ids per client and provider
      * @param dealId the id of the deal
      * @return allocationIds the allocation ids for the client and provider
      */
     function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory) {
         return s()._deals[dealId].allocationIds;
+    }
+
+    /**
+     * @notice custom getter to check if claim is terminated
+     * @param claimId the id of the claim
+     * @return isTerminated whether the claim is terminated
+     */
+    function terminatedClaims(uint64 claimId) external view returns (bool) {
+        return s()._terminatedClaims[claimId];
     }
 
     /**
@@ -501,4 +516,94 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @param newImplementation Address of new implementation
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+
+    /**
+     * @notice Checks if the total active data size for the client with the specified provider matches the expected size
+     * @dev This function can only be called by the validator of the deal
+     * @param dealId The id of the deal
+     * @return totalSizePerSp The total active data size for the client with the specified provider
+     */
+    function isDataSizeMatching(uint256 dealId) external nonReentrant returns (bool) {
+        Deal storage deal = _getStorageDeal(dealId);
+        ClientStorage storage $ = s();
+
+        if (deal.validator == address(0)) {
+            revert ValidatorNotSet(dealId);
+        }
+
+        if (msg.sender != deal.validator) {
+            revert InvalidCaller(msg.sender, deal.validator);
+        }
+
+        CommonTypes.FilActorId[] memory ids = deal.allocationIds;
+
+        VerifRegTypes.GetClaimsParams memory getClaimsParams =
+            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: ids});
+
+        (int256 getClaimsExitCode, VerifRegTypes.GetClaimsReturn memory getClaimsResult) =
+            VerifRegAPI.getClaims(getClaimsParams);
+
+        if (getClaimsExitCode != 0) revert GetClaimsCallFailed();
+
+        uint256 activeSize = 0;
+        uint256 failIterator = 0;
+        int64 currentEpoch = int64(uint64(block.number));
+        uint256[] memory toDelete = new uint256[](ids.length);
+        uint256 deleteCount = 0;
+        for (uint256 i = 0; i < ids.length; ++i) {
+            if (
+                getClaimsResult.batch_info.fail_codes.length > 0
+                    && getClaimsResult.batch_info.fail_codes.length > failIterator
+                    && i == getClaimsResult.batch_info.fail_codes[failIterator].idx
+            ) {
+                ++failIterator;
+                continue;
+            }
+            VerifRegTypes.Claim memory claim = getClaimsResult.claims[i - failIterator];
+
+            bool expired =
+                (CommonTypes.ChainEpoch.unwrap(claim.term_start) + CommonTypes.ChainEpoch.unwrap(claim.term_max))
+                    < currentEpoch;
+
+            uint64 id = CommonTypes.FilActorId.unwrap(ids[i]);
+
+            if (expired || $._terminatedClaims[id]) {
+                toDelete[deleteCount++] = i;
+                continue;
+            }
+
+            activeSize += claim.size;
+        }
+
+        for (uint256 i = deleteCount; i > 0; --i) {
+            uint256 idx = toDelete[i - 1];
+            _deleteDealAllocationIdByIndex(deal, idx);
+        }
+
+        return activeSize == deal.sizeOfAllocations;
+    }
+
+    /**
+     * @notice Internal function to delete an allocation ID from a deal by its index
+     * @param deal The storage reference to the deal
+     * @param index The index of the allocation ID to delete
+     */
+    function _deleteDealAllocationIdByIndex(Deal storage deal, uint256 index) internal {
+        CommonTypes.FilActorId[] storage ids = deal.allocationIds;
+        uint256 last = ids.length - 1;
+        if (index != last) ids[index] = ids[last];
+        ids.pop();
+    }
+
+    /**
+     * @notice Marks the given claims as terminated early.
+     * @dev Only callable by TERMINATION_ORACLE role.
+     * @param claims An array of claim IDs to mark as terminated.
+     */
+    function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
+        ClientStorage storage $ = s();
+        for (uint256 i = 0; i < claims.length; ++i) {
+            $._terminatedClaims[claims[i]] = true;
+        }
+    }
 }
