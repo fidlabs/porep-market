@@ -21,6 +21,20 @@ contract DeployUtils is Script {
         proxy = address(new ERC1967Proxy(address(impl), init));
     }
 
+    function serializeContract(
+        string memory json,
+        string memory contractName,
+        address proxy,
+        address impl
+    ) internal {
+        string memory obj = contractName;
+        obj.serialize("proxy", proxy);
+        obj.serialize("impl", impl);
+        obj.serialize("codeHash", vm.toString(impl.codehash));
+        string memory serialized = obj.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(contractName)));
+        json.serialize(contractName, serialized);
+    }
+
     function network() internal view returns (string memory) {
         if (block.chainid == 31415926) return "devnet";
         else if (block.chainid == 314159) return "calibnet";
