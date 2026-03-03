@@ -69,10 +69,10 @@ contract ValidatorFactoryTest is Test {
             })
         );
 
-        initData = abi.encodeCall(
-            ValidatorFactory.initialize, (admin, validatorAddress, poRepMarket, clientSmartContract, filecoinPay)
-        );
+        initData = abi.encodeCall(ValidatorFactory.initialize, (admin, validatorAddress));
         factory = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.prank(admin);
+        factory.initialize2(poRepMarket, clientSmartContract, filecoinPay);
     }
 
     function testEmitsUpgradedInConstructor() public {
@@ -161,5 +161,37 @@ contract ValidatorFactoryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientAddress.selector));
         vm.prank(incorrectClient);
         factory.create(admin, slcAddress, provider, params);
+    }
+
+    function testInitialize2RevertsWhenPoRepMarketIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepMarketAddress.selector));
+        vm.prank(admin);
+        f.initialize2(address(0), clientSmartContract, filecoinPay);
+    }
+
+    function testInitialize2RevertsWhenClientSmartContractIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientSmartContractAddress.selector));
+        vm.prank(admin);
+        f.initialize2(poRepMarket, address(0), filecoinPay);
+    }
+
+    function testInitialize2RevertsWhenFilecoinPayIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidFilecoinPayAddress.selector));
+        vm.prank(admin);
+        f.initialize2(poRepMarket, clientSmartContract, address(0));
+    }
+
+    function testInitialize2RevertsWhenNotAdmin() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, client, f.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(client);
+        f.initialize2(poRepMarket, clientSmartContract, filecoinPay);
     }
 }

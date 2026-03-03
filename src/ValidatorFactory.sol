@@ -58,6 +58,9 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InvalidAdminAddress();
     error InvalidClientAddress();
     error InvalidSlcAddress();
+    error InvalidPoRepMarketAddress();
+    error InvalidClientSmartContractAddress();
+    error InvalidFilecoinPayAddress();
 
     /**
      * @notice Emitted when a new proxy is successfully created
@@ -71,23 +74,33 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param admin The address of the admin responsible for the contract
      * @param implementation The address of the implementation contract
-     * @param _poRepMarket The address of the PoRepMarket contract
-     * @param _clientSmartContract The address of the ClientSmartContract contract
-     * @param _filecoinPay The address of the FilecoinPay contract
      */
-    function initialize(
-        address admin,
-        address implementation,
-        address _poRepMarket,
-        address _clientSmartContract,
-        address _filecoinPay
-    ) public initializer {
+    function initialize(address admin, address implementation) public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
 
         ValidatorFactoryStorage storage $ = s();
         $._beacon = address(new UpgradeableBeacon(implementation, admin));
+    }
+
+    /**
+     * @notice Initializes the contract with the PoRepMarket, ClientSmartContract, and FilecoinPay addresses
+     * @dev This function is called after the contract is initialized with the admin and implementation addresses
+     * @param _poRepMarket The address of the PoRepMarket contract
+     * @param _clientSmartContract The address of the ClientSmartContract contract
+     * @param _filecoinPay The address of the FilecoinPay contract
+     */
+    function initialize2(address _poRepMarket, address _clientSmartContract, address _filecoinPay)
+        external
+        reinitializer(2)
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
+        if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
+        if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
+
+        ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
         $._clientSmartContract = _clientSmartContract;
         $._filecoinPay = _filecoinPay;

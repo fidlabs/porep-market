@@ -47,16 +47,12 @@ contract PoRepMarketTest is Test {
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 
-        // solhint-disable gas-small-strings
-        bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)",
-            adminAddress,
-            address(validatorFactory),
-            address(spRegistry),
-            clientSmartContractAddress
-        );
+        bytes memory initData =
+            abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
+        vm.prank(adminAddress);
+        poRepMarket.setClientSmartContract(clientSmartContractAddress);
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
@@ -415,5 +411,11 @@ contract PoRepMarketTest is Test {
         assertTrue(dealProposal[0].state == PoRepMarket.DealState.Completed);
         assertEq(dealProposal[1].dealId, ids[3]);
         assertTrue(dealProposal[1].state == PoRepMarket.DealState.Completed);
+    }
+
+    function testSetClientSmartContractRevertsWhenAddressIsZero() public {
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidClientSmartContractAddress.selector));
+        poRepMarket.setClientSmartContract(address(0));
     }
 }

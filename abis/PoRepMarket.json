@@ -298,11 +298,6 @@
         "name": "_spRegistry",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_clientSmartContract",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -429,6 +424,19 @@
   },
   {
     "type": "function",
+    "name": "setClientSmartContract",
+    "inputs": [
+      {
+        "name": "_clientSmartContract",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -481,6 +489,19 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "ClientSmartContractUpdated",
+    "inputs": [
+      {
+        "name": "clientSmartContract",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -807,6 +828,11 @@
   {
     "type": "error",
     "name": "FailedCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidClientSmartContractAddress",
     "inputs": []
   },
   {
