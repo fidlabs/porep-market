@@ -340,15 +340,14 @@ contract PoRepMarketTest is Test {
 
     function testShouldAddDealIdToCompletedDealsIdsSet() public {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
+        // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)",
-            adminAddress,
-            address(validatorFactory),
-            address(spRegistry),
-            clientSmartContractAddress
+            "initialize(address,address,address)", adminAddress, address(validatorFactory), address(spRegistry)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
+        vm.prank(adminAddress);
+        porepMarekMock.setClientSmartContract(clientSmartContractAddress);
         vm.prank(clientAddress);
         porepMarekMock.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);

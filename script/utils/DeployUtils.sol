@@ -21,12 +21,7 @@ contract DeployUtils is Script {
         proxy = address(new ERC1967Proxy(address(impl), init));
     }
 
-    function serializeContract(
-        string memory json,
-        string memory contractName,
-        address proxy,
-        address impl
-    ) internal {
+    function serializeContract(string memory json, string memory contractName, address proxy, address impl) internal {
         string memory obj = contractName;
         obj.serialize("proxy", proxy);
         obj.serialize("impl", impl);

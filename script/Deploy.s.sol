@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec
+// solhint-disable use-natspec, max-states-count
 pragma solidity =0.8.25;
 
 import {Script} from "forge-std/Script.sol";
@@ -122,7 +122,7 @@ contract Deploy is Script, DeployUtils {
         json.serialize("block", block.number);
         json.serialize("timestamp", block.timestamp);
         json.serialize("deployer", admin);
-        
+
         serializeContract(json, "PoRepMarket", porepMarket, porepMarketImpl);
         serializeContract(json, "ValidatorFactory", validatorFactory, validatorFactoryImpl);
         serializeContract(json, "Client", clientSmartContract, clientSmartContractImpl);
