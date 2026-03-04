@@ -24,7 +24,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
 
     // @custom:storage-location erc7201:porepmarket.storage.ValidatorFactoryStorage
     struct ValidatorFactoryStorage {
-        mapping(address admin => mapping(CommonTypes.FilActorId provider => uint256 deployCounter)) _nonce;
+        mapping(address admin => mapping(uint256 dealId => uint256 deployCounter)) _nonce;
         mapping(uint256 dealId => address contractAddress) _instances;
         mapping(address => bool) _isValidatorContract;
         address _clientSmartContract;
@@ -130,7 +130,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         PoRepMarket.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(params.dealId);
         if (msg.sender != dp.client) revert InvalidClientAddress();
 
-        $._nonce[admin][provider]++;
+        $._nonce[admin][params.dealId]++;
 
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,
@@ -143,7 +143,8 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
 
-        address proxy = Create2.deploy(0, keccak256(abi.encode(admin, provider, $._nonce[admin][provider])), initCode);
+        address proxy =
+            Create2.deploy(0, keccak256(abi.encode(admin, params.dealId, $._nonce[admin][params.dealId])), initCode);
         $._instances[params.dealId] = proxy;
         $._isValidatorContract[proxy] = true;
 
