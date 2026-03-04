@@ -123,7 +123,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     // solhint-disable func-param-name-mixedcase
     /**
      * @notice Initializes the contract
-     * @param admin Address to be granted the default admin role
+     * @param _admin Address to be granted the default admin role
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLC Address of the SLC contract
      * @param _clientSC Address of the client smart contract
@@ -131,19 +131,19 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
     function initialize(
-        address admin,
+        address _admin,
         address _filecoinPay,
         address _SLC,
         address _clientSC,
         address _poRepMarket,
         uint256 _dealId
     ) external initializer {
-        _validateInitializeAddresses(admin, _filecoinPay, _SLC, _clientSC, _poRepMarket);
+        _validateInitializeAddresses(_admin, _filecoinPay, _SLC, _clientSC, _poRepMarket);
 
         __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         /// NOTE: should we have a separate parameter for initializing settlement service role ?
-        _grantRole(SETTLEMENT_SERVICE_ROLE, admin);
+        _grantRole(SETTLEMENT_SERVICE_ROLE, _admin);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -203,7 +203,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             return result;
         }
 
-        if (score == 0) {
+        if (score != 100) {
             result.modifiedAmount = 0;
             result.note = "full slash";
         } else {
@@ -215,7 +215,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     /**
-     * @notice Creates a payment rail with the specified parameters
+     * @notice Creates a payment rail with the specified parameters and set initial lockup period
      * @dev Only callable by the client smart contract
      * @param token The ERC20 token to use for the payment rail
      * @param payer The address paying the tokens
@@ -232,7 +232,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         $.railId = railId;
 
         IPoRepMarket($.poRepMarket).updateRailId($.dealId, railId);
+
+        _setInitialLockup(railId, EPOCHS_IN_MONTH);
     }
+
+    // solhint-disable no-empty-blocks
+    /**
+     * @notice Modifies the payment rate and optionally makes a one-time payment.
+     * @param railId The ID of the rail to modify.
+     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
+     */
+    function modifyRailPayment(uint256 railId, uint256 newRate) external override {}
+    // solhint-enable no-empty-blocks
 
     /**
      * @notice Updates the lockup period of a payment rail
@@ -278,6 +289,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     // solhint-enable no-unused-vars
+
+    /**
+     * @notice Sets the initial lockup period for a payment rail
+     * @param railId The ID of the rail for which to set the initial lockup period
+     * @param lockupPeriod The lockup period to set
+     */
+    function _setInitialLockup(uint256 railId, uint256 lockupPeriod) internal {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, lockupPeriod, 0);
+    }
 
     /**
      * @notice Validates that the provided addresses for initialization are not zero addresses

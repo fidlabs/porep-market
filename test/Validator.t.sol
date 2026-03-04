@@ -5,6 +5,7 @@ pragma solidity ^0.8.24;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
+import {Client} from "../src/Client.sol";
 import {IFilecoinPayV1} from "../src/interfaces/IFilecoinPayV1.sol";
 import {IValidator} from "../src/interfaces/IValidator.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
@@ -85,6 +86,9 @@ contract ValidatorTest is Test {
         validatorFactory.setValidator(address(validator), true);
 
         validator.initialize(admin, address(filecoinPayMock), slc, clientSC, address(poRepMarketMock), dealId);
+
+        vm.prank(clientSC);
+        validator.createRail(token, address(clientSCMock), address(this));
     }
 
     function testIsAdminSet() public view {
@@ -104,9 +108,6 @@ contract ValidatorTest is Test {
 
     function testUpdateLockupPeriodUpdatesFilecoinPayRail() public {
         uint256 newLockup = 123;
-
-        vm.prank(clientSC);
-        validator.createRail(token, address(clientSCMock), address(this));
 
         vm.prank(clientSC);
         validator.updateLockupPeriod(railId, newLockup);
@@ -139,7 +140,6 @@ contract ValidatorTest is Test {
     function testValidatePaymentDatacapMismatch() public {
         vm.prank(address(filecoinPayMock));
         IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
-
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 0);
         assertEq(result.note, "datacap mismatch");

@@ -28,10 +28,27 @@ interface IFilecoinPayV1 {
     ) external returns (uint256);
 
     /**
-     * @notice Modifies the lockup period of a payment rail
-     * @param railId ID of the payment rail
-     * @param newLockupPeriod New lockup period to set
-     * @param lockupFixed Fixed lockup amount
+     * @notice Modifies the fixed lockup and lockup period of a rail.
+     * @dev - If the rail has already been terminated, the lockup period may not be altered and the fixed lockup may only be reduced.
+     * @dev - If the rail is active, the lockup may only be modified if the payer's account is fully funded and will remain fully funded after the operation.
+     * @param railId The ID of the rail to modify.
+     * @param period The new lockup period (in epochs/blocks).
+     * @param lockupFixed The new fixed lockup amount.
+     * @custom:constraint Caller must be the rail operator.
+     * @custom:constraint Operator must have sufficient lockup allowance to cover any increases the lockup period or the fixed lockup.
      */
-    function modifyRailLockup(uint256 railId, uint256 newLockupPeriod, uint256 lockupFixed) external;
+    function modifyRailLockup(uint256 railId, uint256 period, uint256 lockupFixed) external;
+
+    /**
+     * @notice Modifies the payment rate and optionally makes a one-time payment.
+     * @dev - If the rail has already been terminated, one-time payments can be made and the rate may always be decreased (but never increased) regardless of the status of the payer's account.
+     * @dev - If the payer's account isn't fully funded and the rail is active (not terminated), the rail's payment rate may not be changed at all (increased or decreased).
+     * @dev - Regardless of the payer's account status, one-time payments will always go through provided that the rail has sufficient fixed lockup to cover the payment.
+     * @param railId The ID of the rail to modify.
+     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
+     * @param oneTimePayment Optional one-time payment amount to transfer immediately, taken out of the rail's fixed lockup.
+     * @custom:constraint Caller must be the rail operator.
+     * @custom:constraint Operator must have sufficient rate and lockup allowances for any increases.
+     */
+    function modifyRailPayment(uint256 railId, uint256 newRate, uint256 oneTimePayment) external;
 }

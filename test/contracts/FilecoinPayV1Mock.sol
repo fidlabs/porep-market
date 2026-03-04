@@ -49,6 +49,8 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
         r.lockupFixed = lockupFixed;
     }
 
+    function modifyRailPayment(uint256 railId, uint256 newRate, uint256 oneTimePayment) external override {}
+
     function getRailLockup(uint256 railId) external view returns (uint256 lockupPeriod, uint256 lockupFixed) {
         Rail storage r = rails[railId];
         return (r.lockupPeriod, r.lockupFixed);

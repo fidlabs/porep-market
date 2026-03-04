@@ -24,5 +24,9 @@ contract PoRepMarketMock {
     function updateValidatorAddress(uint256 dealId) external {
         deals[dealId].validator = msg.sender;
     }
+
+    function updateRailId(uint256 dealId, uint256 newRailId) external {
+        deals[dealId].railId = newRailId;
+    }
 }
 

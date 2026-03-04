@@ -25,6 +25,13 @@ abstract contract Operator {
     function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external virtual;
 
     /**
+     * @notice Modifies the payment rate and optionally makes a one-time payment.
+     * @param railId The ID of the rail to modify.
+     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
+     */
+    function modifyRailPayment(uint256 railId, uint256 newRate) external virtual;
+
+    /**
      * @notice Internal function to create a payment rail
      * @param filecoinPay The FilecoinPayV1 interface
      * @param token The ERC20 token to use for the payment rail
@@ -59,5 +66,18 @@ abstract contract Operator {
         uint256 lockupFixed
     ) internal {
         filecoinPay.modifyRailLockup(railId, newLockupPeriod, lockupFixed);
+    }
+
+    /**
+     * @notice Internal function to modify the payment rate and optionally make a one-time payment.
+     * @param filecoinPay The FilecoinPayV1 interface
+     * @param railId The ID of the rail to modify.
+     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
+     * @param oneTimePayment Optional one-time payment amount to transfer immediately, taken out of the rail's fixed lockup.
+     */
+    function _modifyRailPayment(IFilecoinPayV1 filecoinPay, uint256 railId, uint256 newRate, uint256 oneTimePayment)
+        internal
+    {
+        filecoinPay.modifyRailPayment(railId, newRate, oneTimePayment);
     }
 }

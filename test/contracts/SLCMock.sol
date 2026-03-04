@@ -4,6 +4,7 @@
 pragma solidity ^0.8.24;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+import {SLITypes} from "../../src/types/SLITypes.sol";
 
 contract SLCMock {
     error ScoreOutOfBounds();
@@ -17,7 +18,11 @@ contract SLCMock {
         scores[provider] = score;
     }
 
-    function getScore(CommonTypes.FilActorId provider) external view returns (uint256) {
+    function calculateScore(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata)
+        external
+        view
+        returns (uint256)
+    {
         return scores[provider];
     }
 }
