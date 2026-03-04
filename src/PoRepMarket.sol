@@ -100,12 +100,20 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     event DealAccepted(uint256 indexed dealId, address indexed owner, CommonTypes.FilActorId indexed provider);
 
     /**
-     * @notice ValidatorAndRailIdUpdated event
+     * @notice ValidatorUpdated event
+     * @dev ValidatorUpdated event is emitted when a validator is updated
      * @param dealId The id of the deal proposal
      * @param validator The address of the validator
+     */
+    event ValidatorUpdated(uint256 indexed dealId, address indexed validator);
+
+    /**
+     * @notice RailIdUpdated event
+     * @dev RailIdUpdated event is emitted when a rail id is updated
+     * @param dealId The id of the deal proposal
      * @param railId The id of the rail
      */
-    event ValidatorAndRailIdUpdated(uint256 indexed dealId, address indexed validator, uint256 indexed railId);
+    event RailIdUpdated(uint256 indexed dealId, uint256 indexed railId);
 
     /**
      * @notice DealCompleted event
@@ -205,9 +213,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /**
      * @notice Updates the validator and rail id for a deal proposal
      * @param dealId The id of the deal proposal
-     * @param railId The id of the rail
      */
-    function updateValidatorAndRailId(uint256 dealId, uint256 railId) external {
+    function updateValidator(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
         DealProposal storage dp = $._dealProposals[dealId];
 
@@ -223,8 +230,28 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         dp.validator = msg.sender;
+        emit ValidatorUpdated(dealId, msg.sender);
+    }
+
+    /**
+     * @notice Updates the rail id for a deal proposal
+     * @dev Updates the rail id for a deal proposal
+     * @param dealId The id of the deal proposal
+     * @param railId The id of the rail
+     */
+    function updateRailId(uint256 dealId, uint256 railId) external {
+        DealProposalsStorage storage $ = s();
+        DealProposal storage dp = $._dealProposals[dealId];
+
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, DealState.Accepted);
+
+        if (dp.validator != msg.sender) {
+            revert NotTheRegisteredValidator(dealId, msg.sender);
+        }
+
         dp.railId = railId;
-        emit ValidatorAndRailIdUpdated(dealId, msg.sender, railId);
+        emit RailIdUpdated(dealId, railId);
     }
 
     /**
