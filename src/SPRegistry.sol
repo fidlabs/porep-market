@@ -157,16 +157,24 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @notice Initializes the contract
+     * @notice Initializes the contract with admin roles only
+     * @dev Phase 1 of two-phase initialization. Call initialize2 after PoRepMarket is deployed.
      * @param _admin The address of the admin
-     * @param _poRepMarket The address of the PoRepMarket contract
      */
-    function initialize(address _admin, address _poRepMarket) public initializer {
+    function initialize(address _admin) public initializer {
         if (_admin == address(0)) revert InvalidAdminAddress();
-        if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
+    }
+
+    /**
+     * @notice Completes initialization by granting MARKET_ROLE to PoRepMarket
+     * @dev Phase 2 of two-phase initialization. Called after PoRepMarket is deployed.
+     * @param _poRepMarket The address of the PoRepMarket contract
+     */
+    function initialize2(address _poRepMarket) public reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         _grantRole(MARKET_ROLE, _poRepMarket);
     }
 
