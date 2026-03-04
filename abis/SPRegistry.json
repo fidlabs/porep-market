@@ -333,7 +333,15 @@
         "name": "_admin",
         "type": "address",
         "internalType": "address"
-      },
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "initialize2",
+    "inputs": [
       {
         "name": "_poRepMarket",
         "type": "address",

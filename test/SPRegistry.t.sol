@@ -6,6 +6,7 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
@@ -46,9 +47,12 @@ contract SPRegistryTest is Test {
         provider2 = CommonTypes.FilActorId.wrap(2000);
         provider3 = CommonTypes.FilActorId.wrap(3000);
 
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress, poRepMarketAddress));
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         spRegistry = SPRegistry(address(proxy));
+
+        vm.prank(adminAddress);
+        spRegistry.initialize2(poRepMarketAddress);
     }
 
     function testInitializeSetsAdminRole() public view {
@@ -59,22 +63,54 @@ contract SPRegistryTest is Test {
         assertTrue(spRegistry.hasRole(spRegistry.UPGRADER_ROLE(), adminAddress));
     }
 
-    function testInitializeSetsMarketRole() public view {
+    function testInitialize2GrantsMarketRole() public view {
         assertTrue(spRegistry.hasRole(spRegistry.MARKET_ROLE(), poRepMarketAddress));
     }
 
     function testInitializeRevertsForZeroAdmin() public {
         SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (address(0), poRepMarketAddress));
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (address(0)));
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidAdminAddress.selector));
         new ERC1967Proxy(address(impl), initData);
     }
 
-    function testInitializeRevertsForZeroPoRepMarket() public {
+    function testInitialize2RevertsForZeroAddress() public {
         SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress, address(0)));
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        SPRegistry registry = SPRegistry(address(proxy));
+
+        vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidPoRepMarketAddress.selector));
-        new ERC1967Proxy(address(impl), initData);
+        registry.initialize2(address(0));
+    }
+
+    function testInitialize2RevertsForNonAdmin() public {
+        SPRegistry impl = new SPRegistry();
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        SPRegistry registry = SPRegistry(address(proxy));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), registry.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        registry.initialize2(poRepMarketAddress);
+    }
+
+    function testInitialize2CannotBeCalledTwice() public {
+        SPRegistry impl = new SPRegistry();
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        SPRegistry registry = SPRegistry(address(proxy));
+
+        vm.prank(adminAddress);
+        registry.initialize2(poRepMarketAddress);
+
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
+        registry.initialize2(poRepMarketAddress);
     }
 
     function testEIP7201StorageSlotIsCorrect() public pure {
