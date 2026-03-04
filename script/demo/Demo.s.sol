@@ -27,16 +27,15 @@ contract DeployDemo is Script {
         ERC1967Proxy vfProxy =
             new ERC1967Proxy(address(vfImpl), abi.encodeCall(ValidatorFactory.initialize, (admin, address(validatorImpl))));
 
-        // admin as temporary poRepMarket to satisfy non-zero check
         SPRegistry spImpl = new SPRegistry();
-        ERC1967Proxy spProxy = new ERC1967Proxy(address(spImpl), abi.encodeCall(SPRegistry.initialize, (admin, admin)));
+        ERC1967Proxy spProxy = new ERC1967Proxy(address(spImpl), abi.encodeCall(SPRegistry.initialize, (admin)));
 
         PoRepMarket pmImpl = new PoRepMarket();
         ERC1967Proxy pmProxy = new ERC1967Proxy(
             address(pmImpl), abi.encodeCall(PoRepMarket.initialize, (admin, address(vfProxy), address(spProxy)))
         );
 
-        SPRegistry(address(spProxy)).grantRole(SPRegistry(address(spProxy)).MARKET_ROLE(), address(pmProxy));
+        SPRegistry(address(spProxy)).initialize2(address(pmProxy));
 
         // admin doubles as oracle for demo purposes
         SLIOracle oracleImpl = new SLIOracle();
