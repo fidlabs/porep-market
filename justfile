@@ -46,3 +46,15 @@ pre-push: fmt-check lint test
 
 fix: fmt lint test
     @echo "Fixed and validated."
+
+# Verify contracts on Blockscout (Calibnet)
+verify-calibnet:
+    @bash script/verify-blockscout.sh Calibnet
+
+# Deploy demo contracts (takes 15+ min on Calibration)
+demo-deploy:
+    @bash script/demo/demo-deploy.sh
+
+# Run the demo (requires demo-deploy first)
+demo:
+    @bash script/demo/demo.sh

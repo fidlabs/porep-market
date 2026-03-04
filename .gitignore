@@ -13,3 +13,6 @@ docs/
 
 lcov.info
 report/
+
+# Demo state
+script/demo/demo-state.json
