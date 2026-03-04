@@ -157,6 +157,11 @@
             "name": "railId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
           }
         ]
       }
@@ -257,8 +262,32 @@
             "name": "railId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getManifestLocation",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "manifestLocation",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "stateMutability": "view"
@@ -404,6 +433,11 @@
             "internalType": "uint32"
           }
         ]
+      },
+      {
+        "name": "manifestLocation",
+        "type": "string",
+        "internalType": "string"
       }
     ],
     "outputs": [],
@@ -492,7 +526,25 @@
   },
   {
     "type": "function",
-    "name": "updateRailId",
+    "name": "updateManifestLocation",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newManifestLocation",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateValidatorAndRailId",
     "inputs": [
       {
         "name": "dealId",
@@ -638,6 +690,12 @@
             "internalType": "uint8"
           }
         ]
+      },
+      {
+        "name": "manifestLocation",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
       }
     ],
     "anonymous": false
@@ -676,7 +734,7 @@
   },
   {
     "type": "event",
-    "name": "RailIdUpdated",
+    "name": "ManifestLocationUpdated",
     "inputs": [
       {
         "name": "dealId",
@@ -685,10 +743,16 @@
         "internalType": "uint256"
       },
       {
-        "name": "railId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
+        "name": "oldManifestLocation",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "newManifestLocation",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
       }
     ],
     "anonymous": false
@@ -876,6 +940,11 @@
   },
   {
     "type": "error",
+    "name": "EmptyManifestLocation",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
@@ -893,11 +962,6 @@
   {
     "type": "error",
     "name": "InvalidInitialization",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidRailId",
     "inputs": []
   },
   {
@@ -1008,7 +1072,7 @@
   },
   {
     "type": "error",
-    "name": "RailIdAlreadySet",
+    "name": "TooLongManifestLocation",
     "inputs": []
   },
   {
@@ -1024,6 +1088,27 @@
         "name": "slot",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnauthorisedCaller",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "expectedCaller",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },
