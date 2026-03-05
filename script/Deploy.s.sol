@@ -15,27 +15,27 @@ import {SLIScorer} from "../src/SLIScorer.sol";
 contract Deploy is Script, DeployUtils {
     using stdJson for string;
 
-    address porepMarket;
-    address validatorFactory;
-    address clientSmartContract;
-    address sliOracle;
-    address sliScorer;
+    address internal porepMarket;
+    address internal validatorFactory;
+    address internal clientSmartContract;
+    address internal sliOracle;
+    address internal sliScorer;
 
-    address porepMarketImpl;
-    address validatorFactoryImpl;
-    address validatorImpl;
-    address clientSmartContractImpl;
-    address sliOracleImpl;
-    address sliScorerImpl;
-    address validator;
-    address validatorBeacon;
+    address internal porepMarketImpl;
+    address internal validatorFactoryImpl;
+    address internal validatorImpl;
+    address internal clientSmartContractImpl;
+    address internal sliOracleImpl;
+    address internal sliScorerImpl;
+    address internal validator;
+    address internal validatorBeacon;
 
-    address spRegistry;
-    address filecoinPay;
-    address admin;
-    address allocator;
-    address terminationOracle;
-    address oracleAddress;
+    address internal spRegistry;
+    address internal filecoinPay;
+    address internal admin;
+    address internal allocator;
+    address internal terminationOracle;
+    address internal oracleAddress;
 
     error InvalidEnv();
 
