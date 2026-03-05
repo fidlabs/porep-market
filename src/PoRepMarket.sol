@@ -140,6 +140,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error ValidatorAlreadySet(uint256 dealId);
     error InvalidRetrievabilityPct(uint8 value);
     error InvalidIndexingPct(uint8 value);
+    error InvalidRailId();
+    error RailIdAlreadySet();
 
     /**
      * @notice Constructor
@@ -245,6 +247,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, DealState.Accepted);
+
+        if (dp.railId != 0) {
+            revert RailIdAlreadySet();
+        }
+
+        if (railId == 0) {
+            revert InvalidRailId();
+        }
 
         if (dp.validator != msg.sender) {
             revert NotTheRegisteredValidator(dealId, msg.sender);

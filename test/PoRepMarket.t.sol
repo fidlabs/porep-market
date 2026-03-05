@@ -246,6 +246,34 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateRailId(dealId, railId);
     }
 
+    function testUpdateRailIdRevertsWhenRailIdIsAlreadySet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.RailIdAlreadySet.selector));
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+    }
+
+    function testUpdateRailIdRevertsWhenRailIdIsInvalid() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRailId.selector));
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, 0);
+    }
+
     function testAcceptDealEmitsDealAcceptedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
