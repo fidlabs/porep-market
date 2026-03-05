@@ -15,27 +15,27 @@ import {SLIScorer} from "../src/SLIScorer.sol";
 contract Deploy is Script, DeployUtils {
     using stdJson for string;
 
-    address public porepMarket;
-    address public validatorFactory;
-    address public clientSmartContract;
-    address public sliOracle;
-    address public sliScorer;
+    address porepMarket;
+    address validatorFactory;
+    address clientSmartContract;
+    address sliOracle;
+    address sliScorer;
 
-    address public porepMarketImpl;
-    address public validatorFactoryImpl;
-    address public validatorImpl;
-    address public clientSmartContractImpl;
-    address public sliOracleImpl;
-    address public sliScorerImpl;
-    address public validator;
-    address public validatorBeacon;
+    address porepMarketImpl;
+    address validatorFactoryImpl;
+    address validatorImpl;
+    address clientSmartContractImpl;
+    address sliOracleImpl;
+    address sliScorerImpl;
+    address validator;
+    address validatorBeacon;
 
-    address public spRegistry;
-    address public filecoinPay;
-    address public admin;
-    address public allocator;
-    address public terminationOracle;
-    address public oracleAddress;
+    address spRegistry;
+    address filecoinPay;
+    address admin;
+    address allocator;
+    address terminationOracle;
+    address oracleAddress;
 
     error InvalidEnv();
 
@@ -129,6 +129,8 @@ contract Deploy is Script, DeployUtils {
         serializeContract(json, "SLIOracle", sliOracle, sliOracleImpl);
         serializeContract(json, "SLIScorer", sliScorer, sliScorerImpl);
 
+        json.serialize("ValidatorBeacon", validatorBeacon);
+        json.serialize("ValidatorImpl", validatorImpl);
         json.serialize("FilecoinPay", filecoinPay);
         json.serialize("SPRegistry", spRegistry);
         json.serialize("Allocator", allocator);
