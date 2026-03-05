@@ -897,6 +897,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidRailId",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidRetrievabilityPct",
     "inputs": [
       {
@@ -984,6 +989,11 @@
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "RailIdAlreadySet",
+    "inputs": []
   },
   {
     "type": "error",
