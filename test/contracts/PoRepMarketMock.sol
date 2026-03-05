@@ -28,5 +28,9 @@ contract PoRepMarketMock {
     function updateRailId(uint256 dealId, uint256 newRailId) external {
         deals[dealId].railId = newRailId;
     }
+
+    function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external {
+        deals[dealId].state = PoRepMarket.DealState.Terminated;
+    }
 }
 

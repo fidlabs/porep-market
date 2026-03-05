@@ -616,5 +616,76 @@ contract PoRepMarketTest is Test {
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidClientSmartContractAddress.selector));
         poRepMarket.setClientSmartContract(address(0));
+    function testTerminateDealEmitsEventAndSetsState() public {
+        address terminator = vm.addr(0x777);
+        uint256 endEpoch = 12345;
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidatorAndRailId(dealId, railId);
+
+        vm.expectEmit(true, true, true, true);
+
+        emit PoRepMarket.DealTerminated(dealId, terminator, endEpoch);
+        vm.prank(validatorAddress);
+        poRepMarket.terminateDeal(dealId, terminator, endEpoch);
+
+        PoRepMarket.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepMarket.DealState.Terminated);
+    }
+
+    function testTerminateDealRevertsWhenDealDoesNotExist() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
+        poRepMarket.terminateDeal(dealId, vm.addr(0x1), 1);
+    }
+
+    function testTerminateDealRevertsWhenDealNotAccepted() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.DealNotInExpectedState.selector,
+                dealId,
+                PoRepMarket.DealState.Proposed,
+                PoRepMarket.DealState.Accepted
+            )
+        );
+        vm.prank(validatorAddress);
+        poRepMarket.terminateDeal(dealId, vm.addr(0x2), 2);
+    }
+
+    function testTerminateDealRevertsWhenValidatorNotSet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        address caller = vm.addr(0x999);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
+        vm.prank(caller);
+        poRepMarket.terminateDeal(dealId, vm.addr(0x3), 3);
+    }
+
+    function testTerminateDealRevertsWhenCallerIsNotValidator() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidatorAndRailId(dealId, railId);
+
+        address caller = vm.addr(0x999);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
+        vm.prank(caller);
+        poRepMarket.terminateDeal(dealId, vm.addr(0x4), 4);
     }
 }

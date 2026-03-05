@@ -31,18 +31,19 @@ library MinerUtils {
         return controllingAddress;
     }
 
-    /**
-     * @notice Retrieves the owner information for a given miner actor ID.
-     * @dev Wraps the numeric minerID into a FilActorId and calls MinerAPI.getOwner.
-     *      Reverts with ExitCodeError if the FVM call returns a non-zero exit code.
-     * @param minerID The numeric Filecoin miner actor id.
-     * @return ownerData The MinerTypes.GetOwnerReturn struct returned by the actor call.
-     */
-    function getOwner(CommonTypes.FilActorId minerID) internal view returns (MinerTypes.GetOwnerReturn memory) {
-        (int256 exitCode, MinerTypes.GetOwnerReturn memory ownerData) = MinerAPI.getOwner(minerID);
-        if (exitCode != 0) {
-            revert ExitCodeError();
-        }
-        return ownerData;
-    }
+    /// NOTE: Temporary commented out for coverage purposes; it is not currently called anywhere
+    // /**
+    //  * @notice Retrieves the owner information for a given miner actor ID.
+    //  * @dev Wraps the numeric minerID into a FilActorId and calls MinerAPI.getOwner.
+    //  *      Reverts with ExitCodeError if the FVM call returns a non-zero exit code.
+    //  * @param minerID The numeric Filecoin miner actor id.
+    //  * @return ownerData The MinerTypes.GetOwnerReturn struct returned by the actor call.
+    //  */
+    // function getOwner(CommonTypes.FilActorId minerID) internal view returns (MinerTypes.GetOwnerReturn memory) {
+    //     (int256 exitCode, MinerTypes.GetOwnerReturn memory ownerData) = MinerAPI.getOwner(minerID);
+    //     if (exitCode != 0) {
+    //         revert ExitCodeError();
+    //     }
+    //     return ownerData;
+    // }
 }

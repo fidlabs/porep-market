@@ -5,16 +5,13 @@ pragma solidity ^0.8.24;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
-import {Client} from "../src/Client.sol";
-import {IFilecoinPayV1} from "../src/interfaces/IFilecoinPayV1.sol";
+import {SLIOracle} from "../src/SLIOracle.sol";
+import {SLIScorer} from "../src/SLIScorer.sol";
 import {IValidator} from "../src/interfaces/IValidator.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
-import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
-import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ClientSCMock} from "./contracts/ClientSCMock.sol";
-import {SLCMock} from "./contracts/SLCMock.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
@@ -27,15 +24,13 @@ contract ValidatorTest is Test {
     Validator public validator;
     FilecoinPayV1Mock public filecoinPayMock;
     PoRepMarketMock public poRepMarketMock;
-    SPRegistryMock public spRegistry;
-    ValidatorFactoryMock public validatorFactory;
-    SLCMock public slcMock;
     ClientSCMock public clientSCMock;
+    SLIOracle public sliOracle;
+    SLIScorer public sliScorer;
 
     address public admin;
-    address public slc;
+    address public oracleUpdater;
     address public clientSC;
-    address public providerOwner;
     IERC20 public token;
     CommonTypes.FilActorId public providerFilActorId;
     uint256 public dealId;
@@ -46,16 +41,12 @@ contract ValidatorTest is Test {
 
     function setUp() public {
         filecoinPayMock = new FilecoinPayV1Mock();
-        spRegistry = new SPRegistryMock();
-        validatorFactory = new ValidatorFactoryMock();
-        slcMock = new SLCMock();
         clientSCMock = new ClientSCMock();
         poRepMarketMock = new PoRepMarketMock();
 
         admin = address(this);
-        slc = address(slcMock);
+        oracleUpdater = vm.addr(0xA11CE);
         clientSC = address(clientSCMock);
-        providerOwner = vm.addr(0x4);
         token = IERC20(vm.addr(0x5));
         providerFilActorId = CommonTypes.FilActorId.wrap(20000);
         dealId = 1;
@@ -79,16 +70,29 @@ contract ValidatorTest is Test {
             })
         );
 
+        SLIOracle oracleImpl = new SLIOracle();
+        ERC1967Proxy oracleProxy = new ERC1967Proxy(address(oracleImpl), "");
+        sliOracle = SLIOracle(address(oracleProxy));
+        sliOracle.initialize(admin, oracleUpdater);
+
+        SLIScorer scorerImpl = new SLIScorer();
+        ERC1967Proxy scorerProxy = new ERC1967Proxy(address(scorerImpl), "");
+        sliScorer = SLIScorer(address(scorerProxy));
+        sliScorer.initialize(admin, sliOracle);
+
         Validator impl = new Validator();
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(impl), "");
         validator = Validator(address(validatorProxy));
 
-        validatorFactory.setValidator(address(validator), true);
-
-        validator.initialize(admin, address(filecoinPayMock), slc, clientSC, address(poRepMarketMock), dealId);
+        validator.initialize(
+            admin, address(filecoinPayMock), address(sliScorer), clientSC, address(poRepMarketMock), dealId
+        );
 
         vm.prank(clientSC);
         validator.createRail(token, address(clientSCMock), address(this));
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
     }
 
     function testIsAdminSet() public view {
@@ -120,12 +124,14 @@ contract ValidatorTest is Test {
     function testImplementationContractCannotBeInitialized() public {
         Validator impl = new Validator();
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        impl.initialize(admin, address(filecoinPayMock), slc, clientSC, address(poRepMarketMock), dealId);
+        impl.initialize(admin, address(filecoinPayMock), address(sliScorer), clientSC, address(poRepMarketMock), dealId);
     }
 
     function testValidatorCannotBeReinitialized() public {
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        validator.initialize(admin, address(filecoinPayMock), slc, clientSC, address(poRepMarketMock), dealId);
+        validator.initialize(
+            admin, address(filecoinPayMock), address(sliScorer), clientSC, address(poRepMarketMock), dealId
+        );
     }
 
     function testValidatePaymentTooEarlyForNextPayout() public {
@@ -146,7 +152,13 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentFullSlashWhenScoreZero() public {
-        clientSCMock.setValid(providerFilActorId, true);
+        clientSCMock.setDataSizeMatching(dealId, true);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(
+            providerFilActorId,
+            SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0})
+        );
 
         vm.prank(address(filecoinPayMock));
         IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
@@ -157,8 +169,10 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentOkWhenScorePositiveAndDatacapMatches() public {
-        slcMock.setScore(providerFilActorId, 100);
-        clientSCMock.setValid(providerFilActorId, true);
+        clientSCMock.setDataSizeMatching(dealId, true);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
         IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
@@ -171,5 +185,83 @@ contract ValidatorTest is Test {
     function testValidatePaymentCallerIsNotFilecoinPayRevert() public {
         vm.expectRevert(Validator.CallerIsNotFilecoinPay.selector);
         validator.validatePayment(1, 100, 0, 0, 1);
+    }
+
+    function testCreateRailCallerIsNotClientSCRevert() public {
+        vm.expectRevert(Validator.CallerIsNotClientSC.selector);
+        validator.createRail(token, address(clientSCMock), address(this));
+    }
+
+    function testValidatePaymentInvalidRailIdRevert() public {
+        uint256 wrongRailId = railId + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
+        vm.prank(address(filecoinPayMock));
+        validator.validatePayment(wrongRailId, 100, 0, type(uint256).max, 1);
+    }
+
+    function testUpdateLockupPeriodInvalidRailIdRevert() public {
+        uint256 wrongRailId = railId + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
+        vm.prank(clientSC);
+        validator.updateLockupPeriod(wrongRailId, 123);
+    }
+
+    function testRailTerminatedInvalidRailIdRevert() public {
+        uint256 wrongRailId = railId + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
+        vm.prank(address(filecoinPayMock));
+        validator.railTerminated(wrongRailId, address(this), 10);
+    }
+
+    function testInitializeRevertsWhenAdminIsZeroAddress() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator validator = Validator(address(proxy));
+
+        vm.expectRevert(Validator.AdminCannotBeZeroAddress.selector);
+        validator.initialize(
+            address(0), address(filecoinPayMock), address(sliScorer), clientSC, address(poRepMarketMock), dealId
+        );
+    }
+
+    function testInitializeRevertsWhenFilecoinPayIsZeroAddress() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator validator = Validator(address(proxy));
+
+        vm.expectRevert(Validator.FilecoinPayCannotBeZeroAddress.selector);
+        validator.initialize(admin, address(0), address(sliScorer), clientSC, address(poRepMarketMock), dealId);
+    }
+
+    function testInitializeRevertsWhenSLCIsZeroAddress() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator validator = Validator(address(proxy));
+
+        vm.expectRevert(Validator.SLCCannotBeZeroAddress.selector);
+        validator.initialize(admin, address(filecoinPayMock), address(0), clientSC, address(poRepMarketMock), dealId);
+    }
+
+    function testInitializeRevertsWhenClientSCIsZeroAddress() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator validator = Validator(address(proxy));
+
+        vm.expectRevert(Validator.ClientSCCannotBeZeroAddress.selector);
+        validator.initialize(
+            admin, address(filecoinPayMock), address(sliScorer), address(0), address(poRepMarketMock), dealId
+        );
+    }
+
+    function testInitializeRevertsWhenPoRepMarketIsZeroAddress() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator validator = Validator(address(proxy));
+
+        vm.expectRevert(Validator.PoRepMarketCannotBeZeroAddress.selector);
+        validator.initialize(admin, address(filecoinPayMock), address(sliScorer), clientSC, address(0), dealId);
     }
 }

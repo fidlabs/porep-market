@@ -243,6 +243,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
      */
     function modifyRailPayment(uint256 railId, uint256 newRate) external override {}
+
     // solhint-enable no-empty-blocks
 
     /**
