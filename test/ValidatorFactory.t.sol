@@ -86,7 +86,7 @@ contract ValidatorFactoryTest is Test {
     function testDeployEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
 
-        address expectedProxy = computeProxyAddress(admin, params.dealId, 1);
+        address expectedProxy = computeProxyAddress(admin, params.dealId);
         emit ValidatorFactory.ProxyCreated(expectedProxy, provider);
 
         vm.prank(client);
@@ -95,7 +95,7 @@ contract ValidatorFactoryTest is Test {
     }
 
     function testDeployMarksProxyAsDeployed() public {
-        address expectedProxy = computeProxyAddress(admin, params.dealId, 1);
+        address expectedProxy = computeProxyAddress(admin, params.dealId);
         vm.prank(client);
         factory.create(admin, slcAddress, provider, params);
 
@@ -111,7 +111,7 @@ contract ValidatorFactoryTest is Test {
         factory.create(admin, slcAddress, provider, params);
     }
 
-    function computeProxyAddress(address admin_, uint256 dealId, uint256 nonce) private view returns (address) {
+    function computeProxyAddress(address admin_, uint256 dealId) private view returns (address) {
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,
             abi.encode(
@@ -122,7 +122,7 @@ contract ValidatorFactoryTest is Test {
                 )
             )
         );
-        bytes32 salt = keccak256(abi.encode(admin, dealId, nonce));
+        bytes32 salt = keccak256(abi.encode(admin, dealId));
         bytes32 bytecodeHash = keccak256(initCode);
         return Create2.computeAddress(salt, bytecodeHash, address(factory));
     }
