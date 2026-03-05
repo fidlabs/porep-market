@@ -4,7 +4,6 @@ pragma solidity =0.8.25;
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {MinerAPI} from "filecoin-solidity/v0.8/MinerAPI.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
-import {MinerTypes} from "filecoin-solidity/v0.8/types/MinerTypes.sol";
 
 /**
  * @title MinerUtils

@@ -8,6 +8,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FilecoinPayV1Mock is IFilecoinPayV1 {
     uint256 public nextRailId = 1;
+    mapping(uint256 => bool) public terminated;
 
     struct Rail {
         IERC20 token;
@@ -50,6 +51,10 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
     }
 
     function modifyRailPayment(uint256 railId, uint256 newRate, uint256 oneTimePayment) external override {}
+
+    function terminateRail(uint256 railId) external override {
+        terminated[railId] = true;
+    }
 
     function getRailLockup(uint256 railId) external view returns (uint256 lockupPeriod, uint256 lockupFixed) {
         Rail storage r = rails[railId];

@@ -58,6 +58,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     error PoRepMarketCannotBeZeroAddress();
 
     /**
+     * @notice Error indicating that the caller is not the client
+     */
+    error CallerIsNotClient();
+
+    /**
+     * @notice Error indicating that a payment rail has already been created for this validator
+     */
+    error RailAlreadyCreated();
+
+    /**
      * @notice Error indicating that an invalid rail ID was provided
      * @dev We expect only one rail ID to be valid for per validator
      * @param expected The expected rail ID
@@ -81,6 +91,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     event LockupPeriodUpdated(uint256 indexed railId, uint256 newLockupPeriod);
 
+    /**
+     * @notice Event emitted when the payment rate of a rail is modified
+     * @param railId The ID of the rail
+     * @param newRate The new payment rate for the rail
+     */
+    event RailPaymentModified(uint256 indexed railId, uint256 newRate);
+
     // solhint-enable gas-indexed-events
 
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
@@ -95,9 +112,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     /**
-     * @notice Role for settlement service
+     * @notice Role for POREP Bot which is responsible for automating validator functions
      */
-    bytes32 public constant SETTLEMENT_SERVICE_ROLE = keccak256("SETTLEMENT_SERVICE_ROLE");
+    bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     /**
      * @notice Number of epochs in one month
@@ -111,6 +128,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     bytes32 private constant VALIDATOR_STORAGE_LOCATION =
         0xf51cddbeb47ca42a561371db80eaffa401732269b8af46b255e3f43a7c044000;
+
+    /**
+     * @notice Modifier to check that the provided rail ID is valid before executing the function
+     * @param railId The rail ID to validate
+     */
+    modifier isRailIdValid(uint256 railId) {
+        _checkRailIdValid(railId);
+        _;
+    }
 
     /**
      * @notice Constructor
@@ -142,8 +168,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        /// NOTE: should we have a separate parameter for initializing settlement service role ?
-        _grantRole(SETTLEMENT_SERVICE_ROLE, _admin);
+        _grantRole(POREP_SERVICE_ROLE, _admin);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -181,9 +206,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert CallerIsNotFilecoinPay();
         }
 
-        if (railId != $.railId) {
-            revert InvalidRailId({expected: $.railId, actual: railId});
-        }
+        _checkRailIdValid(railId);
 
         if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
             result.modifiedAmount = 0;
@@ -216,55 +239,70 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /**
      * @notice Creates a payment rail with the specified parameters and set initial lockup period
-     * @dev Only callable by the client smart contract
+     * @dev Only callable by the client
+     * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
      * @param token The ERC20 token to use for the payment rail
-     * @param payer The address paying the tokens
      * @param payee The address receiving the tokens
      */
-    function createRail(IERC20 token, address payer, address payee) external override {
+    function createRail(IERC20 token, address payee) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
+        IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
 
-        if (msg.sender != $.clientSC) {
-            revert CallerIsNotClientSC();
+        if (msg.sender != dealProposal.client) {
+            revert CallerIsNotClient();
         }
 
-        uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, payer, payee, 0, address(0));
+        if ($.railId != 0) {
+            revert RailAlreadyCreated();
+        }
+
+        uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, dealProposal.client, payee, 0, address(0));
         $.railId = railId;
 
         IPoRepMarket($.poRepMarket).updateRailId($.dealId, railId);
-
         _setInitialLockup(railId, EPOCHS_IN_MONTH);
     }
 
-    // solhint-disable no-empty-blocks
     /**
-     * @notice Modifies the payment rate and optionally makes a one-time payment.
+     * @notice Modifies the payment rate
      * @param railId The ID of the rail to modify.
      * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
      */
-    function modifyRailPayment(uint256 railId, uint256 newRate) external override {}
-
-    // solhint-enable no-empty-blocks
+    function modifyRailPayment(uint256 railId, uint256 newRate)
+        external
+        override
+        onlyRole(POREP_SERVICE_ROLE)
+        isRailIdValid(railId)
+    {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        IFilecoinPayV1($.filecoinPay).modifyRailPayment(railId, newRate, 0);
+        emit RailPaymentModified(railId, newRate);
+    }
 
     /**
      * @notice Updates the lockup period of a payment rail
-     * @dev Only callable by the client smart contract
+     * @dev Only callable by the admin
      * @param railId The ID of the rail to modify
      * @param newLockupPeriod New lockup period to set
      */
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external override {
+    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod)
+        external
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+        isRailIdValid(railId)
+    {
         ValidatorStorage storage $ = _getValidatorStorage();
-
-        if (msg.sender != $.clientSC) {
-            revert CallerIsNotClientSC();
-        }
-
-        if (railId != $.railId) {
-            revert InvalidRailId({expected: $.railId, actual: railId});
-        }
-
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, newLockupPeriod, 0);
         emit LockupPeriodUpdated(railId, newLockupPeriod);
+    }
+
+    /**
+     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
+     * @param railId The ID of the rail to terminate.
+     */
+    function terminateRail(uint256 railId) external override onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        IFilecoinPayV1($.filecoinPay).terminateRail(railId);
     }
 
     /**
@@ -274,22 +312,32 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @param terminator Address that initiated the termination
      * @param endEpoch Filecoin epoch at which the rail was terminated
      */
-    function railTerminated(uint256 railId, address terminator, uint256 endEpoch) external override {
+    function railTerminated(uint256 railId, address terminator, uint256 endEpoch)
+        external
+        override
+        isRailIdValid(railId)
+    {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
             revert CallerIsNotFilecoinPay();
         }
 
-        if (railId != $.railId) {
-            revert InvalidRailId({expected: $.railId, actual: railId});
-        }
-
         IPoRepMarket($.poRepMarket).terminateDeal($.dealId, terminator, endEpoch);
-
         emit RailTerminated(railId, terminator, endEpoch);
     }
 
     // solhint-enable no-unused-vars
+
+    /**
+     * @notice Checks that the provided rail ID matches the expected rail ID stored in contract state
+     * @param railId The rail ID to validate
+     */
+    function _checkRailIdValid(uint256 railId) internal view {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        if (railId != $.railId) {
+            revert InvalidRailId({expected: $.railId, actual: railId});
+        }
+    }
 
     /**
      * @notice Sets the initial lockup period for a payment rail

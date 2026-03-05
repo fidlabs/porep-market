@@ -17,6 +17,7 @@ interface IFilecoinPayV1 {
      * @param commissionRateBps The commission rate in basis points for the payment rail
      * @param serviceFeeRecipient The recipient of service fees for the payment rail
      * @return railId ID of the created payment rail
+     * @custom:constraint Caller must be approved as an operator by the client (from address).
      */
     function createRail(
         IERC20 token,
@@ -51,4 +52,14 @@ interface IFilecoinPayV1 {
      * @custom:constraint Operator must have sufficient rate and lockup allowances for any increases.
      */
     function modifyRailPayment(uint256 railId, uint256 newRate, uint256 oneTimePayment) external;
+
+    /**
+     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
+     * @param railId The ID of the rail to terminate.
+     * @custom:constraint Caller must be a rail client or operator.
+     * @custom:constraint Rail must be active and not already terminated.
+     * @custom:constraint If called by the client, the payer's account must be fully funded.
+     * @custom:constraint If called by the operator, the payer's funding status isn't checked.
+     */
+    function terminateRail(uint256 railId) external;
 }

@@ -12,10 +12,9 @@ abstract contract Operator {
     /**
      * @notice Creates a payment rail with the specified parameters
      * @param token The ERC20 token to use for the payment rail
-     * @param payer The address paying the tokens
      * @param payee The address receiving the tokens
      */
-    function createRail(IERC20 token, address payer, address payee) external virtual;
+    function createRail(IERC20 token, address payee) external virtual;
 
     /**
      * @notice Updates the lockup period of a payment rail
@@ -30,6 +29,12 @@ abstract contract Operator {
      * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
      */
     function modifyRailPayment(uint256 railId, uint256 newRate) external virtual;
+
+    /**
+     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
+     * @param railId The ID of the rail to terminate.
+     */
+    function terminateRail(uint256 railId) external virtual;
 
     /**
      * @notice Internal function to create a payment rail
@@ -79,5 +84,14 @@ abstract contract Operator {
         internal
     {
         filecoinPay.modifyRailPayment(railId, newRate, oneTimePayment);
+    }
+
+    /**
+     * @notice Internal function to terminate a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
+     * @param filecoinPay The FilecoinPayV1 interface
+     * @param railId The ID of the rail to terminate.
+     */
+    function _terminateRail(IFilecoinPayV1 filecoinPay, uint256 railId) internal {
+        filecoinPay.terminateRail(railId);
     }
 }
