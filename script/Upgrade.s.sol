@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT
+// solhint-disable use-natspec
 pragma solidity ^0.8.25;
 
-import {Script, console} from "forge-std/Script.sol";
+import {Script} from "forge-std/Script.sol";
 
 interface IUpgradeable {
     function upgradeToAndCall(address newImpl, bytes calldata data) external;
 }
 
 contract Upgrade is Script {
-    address proxy;
-    string memory name;
-    bytes memory cd;
+    address internal proxy;
+    string internal name;
+    bytes internal cd;
 
     function run() external {
         proxy = vm.envAddress("UPGRADE_PROXY_ADDRESS_TEST");
@@ -24,11 +25,5 @@ contract Upgrade is Script {
         IUpgradeable(proxy).upgradeToAndCall(impl, cd);
 
         vm.stopBroadcast();
-    }
-
-    function _print() internal {
-        console.log("Contract: %s", name);
-        console.log("New impl: %s", impl);
-        console.log("Proxy:    %s", proxy);
     }
 }
