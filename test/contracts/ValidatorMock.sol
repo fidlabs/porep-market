@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable
 
-pragma solidity ^0.8.24;
+pragma solidity =0.8.25;
 
 import {IValidator} from "../../src/interfaces/Validator.sol";
 
