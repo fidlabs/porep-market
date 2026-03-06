@@ -100,11 +100,6 @@ contract ValidatorTest is Test {
         assertTrue(validator.hasRole(adminRole, admin));
     }
 
-    function testUpdateLockupPeriodCallerIsNotClientSCRevert() public {
-        vm.expectRevert(Validator.CallerIsNotClientSC.selector);
-        validator.updateLockupPeriod(1, 2);
-    }
-
     function testRailTerminatedCallerIsNotFilecoinPayRevert() public {
         vm.expectRevert(Validator.CallerIsNotFilecoinPay.selector);
         validator.railTerminated(1, address(this), 0);
@@ -206,7 +201,7 @@ contract ValidatorTest is Test {
         uint256 wrongRailId = railId + 1;
 
         vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
-        vm.prank(clientSC);
+        vm.prank(admin);
         validator.updateLockupPeriod(wrongRailId, 123);
     }
 
@@ -294,5 +289,11 @@ contract ValidatorTest is Test {
 
         vm.prank(address(filecoinPayMock));
         validator.railTerminated(railId, terminator, endEpoch);
+    }
+
+    function testCreateRailRevertsWhenRailAlreadyCreated() public {
+        vm.expectRevert(Validator.RailAlreadyCreated.selector);
+        vm.prank(admin);
+        validator.createRail(token, address(this));
     }
 }

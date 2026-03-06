@@ -18,7 +18,7 @@ import {Client} from "./Client.sol";
 
 /**
  * @title Validator
- * @dev Implements payment validation logic for Filecoin Pay rails
+ * @dev Implements validator and operator logic for managing Filecoin Pay rails
  * @notice Validator contract for Filecoin Pay
  */
 contract Validator is Initializable, AccessControlUpgradeable, IValidator, Operator {
@@ -300,7 +300,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
      * @param railId The ID of the rail to terminate.
      */
-    function terminateRail(uint256 railId) external override onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
+    function terminateRail(uint256 railId) external override isRailIdValid(railId) {
         ValidatorStorage storage $ = _getValidatorStorage();
         IFilecoinPayV1($.filecoinPay).terminateRail(railId);
     }

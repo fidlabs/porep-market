@@ -6,7 +6,8 @@ import {IFilecoinPayV1} from "../interfaces/IFilecoinPayV1.sol";
 
 /**
  * @title Operator abstract contract
- * @notice Abstract contract defining operator functions for creating payment rails and updating lockup periods in Filecoin Pay rails
+ * @notice Abstract contract defining operator functions for creating and managing payment rails in the FilecoinPayV1 system.
+ * This contract provides internal helper functions for interacting with the FilecoinPayV1 interface, while leaving the implementation of the external functions to derived contracts.
  */
 abstract contract Operator {
     /**

@@ -781,4 +781,19 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Client.ValidatorNotSet.selector, dealId));
         clientMock.isDataSizeMatching(dealId);
     }
+
+    function testGetClientDealInfoReturnsStoredDeal() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+
+        Client.Deal memory deal = clientMock.getClientDealInfo(dealId);
+
+        assertEq(deal.client, clientAddress);
+        assertEq(deal.validator, address(validatorMock));
+        assertEq(CommonTypes.FilActorId.unwrap(deal.provider), CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(deal.dealId, dealId);
+        assertEq(deal.railId, 0);
+    }
 }
