@@ -30,9 +30,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     bytes32 public constant MARKET_ROLE = keccak256("MARKET_ROLE");
 
+    /**
+     * @notice Maximum sector padding tolerance in basis points (100% = 10000)
+     */
+    uint256 public constant MAX_TOLERANCE_BPS = 10_000;
+
     struct ProviderData {
         address organization;
         bool paused;
+        bool blocked;
         SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
@@ -131,8 +137,38 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event ToleranceBpsUpdated(uint256 indexed oldBps, uint256 indexed newBps);
 
+    /**
+     * @notice ProviderBlocked event
+     * @dev ProviderBlocked event is emitted when an admin blocks a provider
+     * @param provider The provider actor ID
+     */
+    event ProviderBlocked(CommonTypes.FilActorId indexed provider);
+
+    /**
+     * @notice ProviderUnblocked event
+     * @dev ProviderUnblocked event is emitted when an admin unblocks a provider
+     * @param provider The provider actor ID
+     */
+    event ProviderUnblocked(CommonTypes.FilActorId indexed provider);
+
+    /**
+     * @notice ProviderPaused event
+     * @dev ProviderPaused event is emitted when a provider is paused
+     * @param provider The provider actor ID
+     */
+    event ProviderPaused(CommonTypes.FilActorId indexed provider);
+
+    /**
+     * @notice ProviderUnpaused event
+     * @dev ProviderUnpaused event is emitted when a provider is unpaused
+     * @param provider The provider actor ID
+     */
+    event ProviderUnpaused(CommonTypes.FilActorId indexed provider);
+
     error ProviderAlreadyRegistered(CommonTypes.FilActorId provider);
     error ProviderNotRegistered(CommonTypes.FilActorId provider);
+    error ProviderIsBlocked(CommonTypes.FilActorId provider);
+    error ToleranceBpsTooHigh(uint256 bps, uint256 maxBps);
     error NotProviderControllerOrAdmin(address caller, CommonTypes.FilActorId provider);
     error InvalidRetrievabilityPct(uint8 value);
     error InvalidIndexingPct(uint8 value);
@@ -186,20 +222,39 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function pauseProvider(CommonTypes.FilActorId provider) external {
         _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
         _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = true;
+        emit ProviderPaused(provider);
     }
 
     /// @inheritdoc ISPRegistry
     function unpauseProvider(CommonTypes.FilActorId provider) external {
         _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
         _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = false;
+        emit ProviderUnpaused(provider);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function blockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _ensureProviderRegistered(provider);
+        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked = true;
+        emit ProviderBlocked(provider);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function unblockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _ensureProviderRegistered(provider);
+        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked = false;
+        emit ProviderUnblocked(provider);
     }
 
     /// @inheritdoc ISPRegistry
     function updateAvailableSpace(CommonTypes.FilActorId provider, uint256 availableBytes) external {
         _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
@@ -214,6 +269,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external {
         _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
         if (capabilities.retrievabilityPct > 100) revert InvalidRetrievabilityPct(capabilities.retrievabilityPct);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
@@ -225,6 +281,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSector) external {
         _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
@@ -268,6 +325,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         info = ProviderInfo({
             organization: p.organization,
             paused: p.paused,
+            blocked: p.blocked,
             capabilities: p.capabilities,
             availableBytes: p.availableBytes,
             committedBytes: p.committedBytes,
@@ -283,7 +341,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function isStorageProviderOwner(address caller, CommonTypes.FilActorId provider) external view returns (bool) {
+    function isAuthorizedForProvider(address caller, CommonTypes.FilActorId provider) external view returns (bool) {
         if (hasRole(DEFAULT_ADMIN_ROLE, caller)) return true;
         return MinerUtils.isControllingAddress(provider, caller);
     }
@@ -314,7 +372,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             uint64 id = uint64($._providerIds.at(i));
             ProviderData storage p = $._providers[id];
 
-            if (p.paused) continue;
+            if (p.paused || p.blocked) continue;
 
             {
                 uint256 used = p.committedBytes + p.pendingBytes;
@@ -402,6 +460,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function setToleranceBps(uint256 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (bps > MAX_TOLERANCE_BPS) revert ToleranceBpsTooHigh(bps, MAX_TOLERANCE_BPS);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 oldBps = $.sectorPaddingToleranceBps;
         $.sectorPaddingToleranceBps = bps;
@@ -483,6 +542,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         if (!$._providerIds.contains(uint256(CommonTypes.FilActorId.unwrap(provider)))) {
             revert ProviderNotRegistered(provider);
+        }
+    }
+
+    /**
+     * @notice Ensures a provider is not blocked
+     * @param provider The provider actor ID to check
+     */
+    function _ensureProviderNotBlocked(CommonTypes.FilActorId provider) internal view {
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        if ($._providers[CommonTypes.FilActorId.unwrap(provider)].blocked) {
+            revert ProviderIsBlocked(provider);
         }
     }
 

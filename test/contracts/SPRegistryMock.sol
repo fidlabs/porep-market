@@ -25,7 +25,7 @@ contract SPRegistryMock is ISPRegistry {
         return (nextProvider, nextAutoApprove);
     }
 
-    function isStorageProviderOwner(address owner, CommonTypes.FilActorId provider) external view returns (bool) {
+    function isAuthorizedForProvider(address owner, CommonTypes.FilActorId provider) external view returns (bool) {
         return owners[owner][provider];
     }
 
@@ -76,6 +76,8 @@ contract SPRegistryMock is ISPRegistry {
     function registerProvider(CommonTypes.FilActorId) external {}
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}
+    function blockProvider(CommonTypes.FilActorId) external {}
+    function unblockProvider(CommonTypes.FilActorId) external {}
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
     function setCapabilities(CommonTypes.FilActorId, SLITypes.SLIThresholds calldata) external {}
     function setPrice(CommonTypes.FilActorId, uint256) external {}

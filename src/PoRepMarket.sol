@@ -248,7 +248,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, DealState.Proposed);
 
-        if (!$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
+        if (!$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)) {
             revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
         }
 
@@ -289,7 +289,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, DealState.Proposed);
 
-        if (msg.sender != dp.client && !$._SPRegistryContract.isStorageProviderOwner(msg.sender, dp.provider)) {
+        if (msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)) {
             revert NotTheClientOrStorageProvider(dealId, msg.sender);
         }
 

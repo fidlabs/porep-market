@@ -12,6 +12,7 @@ interface ISPRegistry {
     struct ProviderInfo {
         address organization;
         bool paused;
+        bool blocked;
         SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
@@ -76,13 +77,25 @@ interface ISPRegistry {
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
 
     /**
-     * @notice Check if address owns/controls a provider
+     * @notice Check if address is authorized to act on behalf of a provider
      * @dev Admin always returns true. Otherwise checks MinerUtils.isControllingAddress.
-     * @param ownerAddress Address to check
+     * @param caller Address to check
      * @param provider Provider to check against
-     * @return True if ownerAddress owns/controls provider
+     * @return True if caller is authorized for provider
      */
-    function isStorageProviderOwner(address ownerAddress, CommonTypes.FilActorId provider) external view returns (bool);
+    function isAuthorizedForProvider(address caller, CommonTypes.FilActorId provider) external view returns (bool);
+
+    /**
+     * @notice Block a provider (admin only, excluded from matching)
+     * @param provider The provider to block
+     */
+    function blockProvider(CommonTypes.FilActorId provider) external;
+
+    /**
+     * @notice Unblock a provider (admin only)
+     * @param provider The provider to unblock
+     */
+    function unblockProvider(CommonTypes.FilActorId provider) external;
 
     /**
      * @notice Commit actual capacity after DDO allocation
