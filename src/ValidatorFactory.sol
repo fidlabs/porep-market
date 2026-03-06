@@ -140,12 +140,12 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
 
-        address proxy =
-            Create2.computeAddress(keccak256(abi.encode(admin, params.dealId)), keccak256(initCode), address(this));
+        bytes32 salt = keccak256(abi.encode(admin, params.dealId));
+        address proxy = Create2.computeAddress(salt, keccak256(initCode), address(this));
         $._instances[params.dealId] = proxy;
         $._isValidatorContract[proxy] = true;
 
-        Create2.deploy(0, keccak256(abi.encode(admin, params.dealId)), initCode);
+        Create2.deploy(0, salt, initCode);
         emit ProxyCreated(proxy, provider);
     }
 
