@@ -32,6 +32,19 @@
   },
   {
     "type": "function",
+    "name": "MAX_TOLERANCE_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "UPGRADER_ROLE",
     "inputs": [],
     "outputs": [
@@ -55,6 +68,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "blockProvider",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -183,6 +209,11 @@
           },
           {
             "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "blocked",
             "type": "bool",
             "internalType": "bool"
           },
@@ -353,8 +384,13 @@
   },
   {
     "type": "function",
-    "name": "isProviderRegistered",
+    "name": "isAuthorizedForProvider",
     "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "provider",
         "type": "uint64",
@@ -372,13 +408,8 @@
   },
   {
     "type": "function",
-    "name": "isStorageProviderOwner",
+    "name": "isProviderRegistered",
     "inputs": [
-      {
-        "name": "caller",
-        "type": "address",
-        "internalType": "address"
-      },
       {
         "name": "provider",
         "type": "uint64",
@@ -652,6 +683,19 @@
   },
   {
     "type": "function",
+    "name": "unblockProvider",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "unpauseProvider",
     "inputs": [
       {
@@ -888,6 +932,32 @@
   },
   {
     "type": "event",
+    "name": "ProviderBlocked",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProviderPaused",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "ProviderRegistered",
     "inputs": [
       {
@@ -901,6 +971,32 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProviderUnblocked",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ProviderUnpaused",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
       }
     ],
     "anonymous": false
@@ -1277,6 +1373,17 @@
   },
   {
     "type": "error",
+    "name": "ProviderIsBlocked",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ProviderNotRegistered",
     "inputs": [
       {
@@ -1323,6 +1430,22 @@
       },
       {
         "name": "pendingBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ToleranceBpsTooHigh",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxBps",
         "type": "uint256",
         "internalType": "uint256"
       }
