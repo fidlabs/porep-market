@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable var-name-mixedcase
 
-pragma solidity ^0.8.24;
+pragma solidity =0.8.25;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";

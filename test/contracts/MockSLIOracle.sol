@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable use-natspec
 
-pragma solidity ^0.8.24;
+pragma solidity =0.8.25;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SLITypes} from "../../src/types/SLITypes.sol";

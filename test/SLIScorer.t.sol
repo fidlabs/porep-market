@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable use-natspec
-pragma solidity ^0.8.24;
+pragma solidity =0.8.25;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";

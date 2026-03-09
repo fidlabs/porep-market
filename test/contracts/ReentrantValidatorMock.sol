@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable use-natspec
-pragma solidity ^0.8.24;
+pragma solidity =0.8.25;
 
 import {IValidator} from "../../src/interfaces/Validator.sol";
 import {Client} from "../../src/Client.sol";
