@@ -100,12 +100,20 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     event DealAccepted(uint256 indexed dealId, address indexed owner, CommonTypes.FilActorId indexed provider);
 
     /**
-     * @notice ValidatorAndRailIdUpdated event
+     * @notice ValidatorUpdated event
+     * @dev ValidatorUpdated event is emitted when a validator is updated
      * @param dealId The id of the deal proposal
      * @param validator The address of the validator
+     */
+    event ValidatorUpdated(uint256 indexed dealId, address indexed validator);
+
+    /**
+     * @notice RailIdUpdated event
+     * @dev RailIdUpdated event is emitted when a rail id is updated
+     * @param dealId The id of the deal proposal
      * @param railId The id of the rail
      */
-    event ValidatorAndRailIdUpdated(uint256 indexed dealId, address indexed validator, uint256 indexed railId);
+    event RailIdUpdated(uint256 indexed dealId, uint256 indexed railId);
 
     /**
      * @notice DealCompleted event
@@ -123,6 +131,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
     error NotTheRegisteredValidator(uint256 dealId, address validator);
+    error NotTheDealValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
@@ -132,6 +141,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error ValidatorAlreadySet(uint256 dealId);
     error InvalidRetrievabilityPct(uint8 value);
     error InvalidIndexingPct(uint8 value);
+    error InvalidRailId();
+    error RailIdAlreadySet();
 
     /**
      * @notice Constructor
@@ -205,9 +216,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /**
      * @notice Updates the validator and rail id for a deal proposal
      * @param dealId The id of the deal proposal
-     * @param railId The id of the rail
      */
-    function updateValidatorAndRailId(uint256 dealId, uint256 railId) external {
+    function updateValidator(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
         DealProposal storage dp = $._dealProposals[dealId];
 
@@ -223,8 +233,36 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         dp.validator = msg.sender;
+        emit ValidatorUpdated(dealId, msg.sender);
+    }
+
+    /**
+     * @notice Updates the rail id for a deal proposal
+     * @dev Updates the rail id for a deal proposal
+     * @param dealId The id of the deal proposal
+     * @param railId The id of the rail
+     */
+    function updateRailId(uint256 dealId, uint256 railId) external {
+        DealProposalsStorage storage $ = s();
+        DealProposal storage dp = $._dealProposals[dealId];
+
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, DealState.Accepted);
+
+        if (dp.railId != 0) {
+            revert RailIdAlreadySet();
+        }
+
+        if (railId == 0) {
+            revert InvalidRailId();
+        }
+
+        if (dp.validator != msg.sender) {
+            revert NotTheDealValidator(dealId, msg.sender);
+        }
+
         dp.railId = railId;
-        emit ValidatorAndRailIdUpdated(dealId, msg.sender, railId);
+        emit RailIdUpdated(dealId, railId);
     }
 
     /**

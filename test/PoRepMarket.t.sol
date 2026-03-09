@@ -157,33 +157,33 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
     }
 
-    function testUpdateValidatorAndRailIdEmitsValidatorAndRailIdUpdatedEvent() public {
+    function testUpdateValidatorEmitsValidatorUpdatedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
         vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.ValidatorAndRailIdUpdated(dealId, validatorAddress, railId);
+        emit PoRepMarket.ValidatorUpdated(dealId, validatorAddress);
 
         vm.prank(validatorAddress);
-        poRepMarket.updateValidatorAndRailId(dealId, railId);
+        poRepMarket.updateValidator(dealId);
     }
 
-    function testUpdateValidatorAndRailIdRevertsIfValidatorIsAlreadySet() public {
+    function testUpdateValidatorRevertsIfValidatorIsAlreadySet() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
-        poRepMarket.updateValidatorAndRailId(dealId, railId);
+        poRepMarket.updateValidator(dealId);
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ValidatorAlreadySet.selector, dealId));
-        poRepMarket.updateValidatorAndRailId(dealId, railId);
+        poRepMarket.updateValidator(dealId);
     }
 
-    function testUpdateValidatorAndRailIdRevertsIfNotTheRegisteredValidator() public {
+    function testUpdateValidatorRevertsIfNotTheRegisteredValidator() public {
         address notTheValidator = vm.addr(0x999);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
@@ -192,7 +192,86 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredValidator.selector, dealId, notTheValidator));
         vm.prank(notTheValidator);
-        poRepMarket.updateValidatorAndRailId(dealId, railId);
+        poRepMarket.updateValidator(dealId);
+    }
+
+    function testUpdateRailIdEmitsRailIdUpdatedEvent() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.RailIdUpdated(dealId, railId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+    }
+
+    function testUpdateRailIdRevertsIfSenderIsNotTheDealValidator() public {
+        address notTheValidator = vm.addr(0x999);
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheDealValidator.selector, dealId, notTheValidator));
+        vm.prank(notTheValidator);
+        poRepMarket.updateRailId(dealId, railId);
+    }
+
+    function testUpdateRailIdRevertsWhenDealIsInIncorrectState() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.DealNotInExpectedState.selector,
+                dealId,
+                PoRepMarket.DealState.Proposed,
+                PoRepMarket.DealState.Accepted
+            )
+        );
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+    }
+
+    function testUpdateRaildIdRevertsWhenDealDoesntExist() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+    }
+
+    function testUpdateRailIdRevertsWhenRailIdIsAlreadySet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.RailIdAlreadySet.selector));
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, railId);
+    }
+
+    function testUpdateRailIdRevertsWhenRailIdIsInvalid() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRailId.selector));
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, 0);
     }
 
     function testAcceptDealEmitsDealAcceptedEvent() public {
