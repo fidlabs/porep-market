@@ -50,16 +50,12 @@ contract PoRepMarketTest is Test {
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 
-        // solhint-disable gas-small-strings
-        bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)",
-            adminAddress,
-            address(validatorFactory),
-            address(spRegistry),
-            clientSmartContractAddress
-        );
+        bytes memory initData =
+            abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
+        vm.prank(adminAddress);
+        poRepMarket.setClientSmartContract(clientSmartContractAddress);
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
@@ -344,15 +340,14 @@ contract PoRepMarketTest is Test {
 
     function testShouldAddDealIdToCompletedDealsIdsSet() public {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
+        // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)",
-            adminAddress,
-            address(validatorFactory),
-            address(spRegistry),
-            clientSmartContractAddress
+            "initialize(address,address,address)", adminAddress, address(validatorFactory), address(spRegistry)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
+        vm.prank(adminAddress);
+        porepMarekMock.setClientSmartContract(clientSmartContractAddress);
         vm.prank(clientAddress);
         porepMarekMock.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
@@ -612,5 +607,11 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.TooLongManifestLocation.selector, tooLongManifestLocation));
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, tooLongManifestLocation);
+    }
+
+    function testSetClientSmartContractRevertsWhenAddressIsZero() public {
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidClientSmartContractAddress.selector));
+        poRepMarket.setClientSmartContract(address(0));
     }
 }
