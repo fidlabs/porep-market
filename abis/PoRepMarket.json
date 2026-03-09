@@ -544,7 +544,7 @@
   },
   {
     "type": "function",
-    "name": "updateValidatorAndRailId",
+    "name": "updateRailId",
     "inputs": [
       {
         "name": "dealId",
@@ -553,6 +553,19 @@
       },
       {
         "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateValidator",
+    "inputs": [
+      {
+        "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -746,6 +759,25 @@
   },
   {
     "type": "event",
+    "name": "RailIdUpdated",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "RoleAdminChanged",
     "inputs": [
       {
@@ -834,7 +866,7 @@
   },
   {
     "type": "event",
-    "name": "ValidatorAndRailIdUpdated",
+    "name": "ValidatorUpdated",
     "inputs": [
       {
         "name": "dealId",
@@ -847,12 +879,6 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
-      },
-      {
-        "name": "railId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -959,6 +985,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidRailId",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidRetrievabilityPct",
     "inputs": [
       {
@@ -1033,6 +1064,22 @@
   },
   {
     "type": "error",
+    "name": "NotTheDealValidator",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "validator",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NotTheRegisteredValidator",
     "inputs": [
       {
@@ -1046,6 +1093,11 @@
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "RailIdAlreadySet",
+    "inputs": []
   },
   {
     "type": "error",
