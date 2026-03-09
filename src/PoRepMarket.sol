@@ -131,6 +131,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
     error NotTheRegisteredValidator(uint256 dealId, address validator);
+    error NotTheDealValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
     error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
@@ -257,7 +258,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         if (dp.validator != msg.sender) {
-            revert NotTheRegisteredValidator(dealId, msg.sender);
+            revert NotTheDealValidator(dealId, msg.sender);
         }
 
         dp.railId = railId;

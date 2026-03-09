@@ -210,7 +210,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateRailId(dealId, railId);
     }
 
-    function testUpdateRailIdRevertsIfNotTheValidator() public {
+    function testUpdateRailIdRevertsIfSenderIsNotTheDealValidator() public {
         address notTheValidator = vm.addr(0x999);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
@@ -219,7 +219,7 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredValidator.selector, dealId, notTheValidator));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheDealValidator.selector, dealId, notTheValidator));
         vm.prank(notTheValidator);
         poRepMarket.updateRailId(dealId, railId);
     }
