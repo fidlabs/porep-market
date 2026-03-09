@@ -186,7 +186,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     // solhint-enable func-param-name-mixedcase
 
-    // solhint-disable no-unused-vars
+    // solhint-disable function-max-lines, gas-strict-inequalities
     /**
      * @notice Validates a proposed payment amount for a payment rail
      * @dev Only callable by the FilecoinPay contract
@@ -208,7 +208,29 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         _checkRailIdValid(railId);
 
-        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
+        Client.Deal memory deal = Client($.clientSC).getClientDealInfo($.dealId);
+        int64 longestDealTerm = CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm);
+        bool cappedByDealEnd = false;
+
+        if (longestDealTerm > 0) {
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint256 dealEndEpoch = uint256(uint64(longestDealTerm));
+
+            if (fromEpoch >= dealEndEpoch) {
+                result.modifiedAmount = 0;
+                result.settleUpto = fromEpoch;
+                result.note = "deal ended";
+                return result;
+            }
+
+            if (toEpoch > dealEndEpoch) {
+                toEpoch = dealEndEpoch;
+                cappedByDealEnd = true;
+                proposedAmount = rate * (toEpoch - fromEpoch);
+            }
+        }
+
+        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH && !cappedByDealEnd) {
             result.modifiedAmount = 0;
             result.settleUpto = fromEpoch;
             result.note = "too early for next payout";
@@ -236,6 +258,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         result.settleUpto = toEpoch;
     }
+
+    // solhint-enable function-max-lines, gas-strict-inequalities
 
     /**
      * @notice Creates a payment rail with the specified parameters and set initial lockup period
@@ -275,7 +299,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         isRailIdValid(railId)
     {
         ValidatorStorage storage $ = _getValidatorStorage();
-        IFilecoinPayV1($.filecoinPay).modifyRailPayment(railId, newRate, 0);
+        _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, newRate, 0);
         emit RailPaymentModified(railId, newRate);
     }
 
@@ -302,7 +326,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     function terminateRail(uint256 railId) external override isRailIdValid(railId) {
         ValidatorStorage storage $ = _getValidatorStorage();
-        IFilecoinPayV1($.filecoinPay).terminateRail(railId);
+        _terminateRail(IFilecoinPayV1($.filecoinPay), railId);
     }
 
     /**
@@ -325,8 +349,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         IPoRepMarket($.poRepMarket).terminateDeal($.dealId, terminator, endEpoch);
         emit RailTerminated(railId, terminator, endEpoch);
     }
-
-    // solhint-enable no-unused-vars
 
     /**
      * @notice Checks that the provided rail ID matches the expected rail ID stored in contract state

@@ -20,10 +20,14 @@
   {
     "type": "function",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "name": "POREP_SERVICE_ROLE",
 =======
     "name": "SETTLEMENT_SERVICE_ROLE",
 >>>>>>> c6e2e2b (terminate deal)
+=======
+    "name": "POREP_SERVICE_ROLE",
+>>>>>>> e58081f (lognestDealTerm validation)
     "inputs": [],
     "outputs": [
       {
@@ -37,6 +41,9 @@
   {
     "type": "function",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "createRail",
     "inputs": [
       {
@@ -55,8 +62,11 @@
   },
   {
     "type": "function",
+<<<<<<< HEAD
 =======
 >>>>>>> c6e2e2b (terminate deal)
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -122,10 +132,14 @@
     "inputs": [
       {
 <<<<<<< HEAD
+<<<<<<< HEAD
         "name": "_admin",
 =======
         "name": "admin",
 >>>>>>> c6e2e2b (terminate deal)
+=======
+        "name": "_admin",
+>>>>>>> e58081f (lognestDealTerm validation)
         "type": "address",
         "internalType": "address"
       },
@@ -218,6 +232,7 @@
         "internalType": "address"
       },
       {
+<<<<<<< HEAD
         "name": "params",
         "type": "tuple",
         "internalType": "struct Validator.DepositWithRailInputParams",
@@ -263,6 +278,29 @@
 >>>>>>> 35351e3 (tests & coverage)
 =======
 >>>>>>> c6e2e2b (terminate deal)
+=======
+        "name": "_dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "modifyRailPayment",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newRate",
+        "type": "uint256",
+        "internalType": "uint256"
+>>>>>>> e58081f (lognestDealTerm validation)
       }
     ],
     "outputs": [],
@@ -364,6 +402,19 @@
 =======
 >>>>>>> c6e2e2b (terminate deal)
     "type": "function",
+    "name": "terminateRail",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "updateLockupPeriod",
     "inputs": [
       {
@@ -434,7 +485,7 @@
         ]
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
@@ -471,6 +522,9 @@
   {
     "type": "event",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "RailPaymentModified",
     "inputs": [
       {
@@ -490,8 +544,11 @@
   },
   {
     "type": "event",
+<<<<<<< HEAD
 =======
 >>>>>>> c6e2e2b (terminate deal)
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "RailTerminated",
     "inputs": [
       {
@@ -615,10 +672,19 @@
     "type": "error",
 <<<<<<< HEAD
 <<<<<<< HEAD
+<<<<<<< HEAD
     "name": "AdminCannotBeZeroAddress",
 =======
     "name": "ActorNotFound",
 >>>>>>> c6e2e2b (terminate deal)
+=======
+    "name": "AdminCannotBeZeroAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CallerIsNotClient",
+>>>>>>> e58081f (lognestDealTerm validation)
     "inputs": []
   },
   {
@@ -667,6 +733,7 @@
   },
   {
     "type": "error",
+<<<<<<< HEAD
 >>>>>>> c6e2e2b (terminate deal)
     "name": "ExitCodeError",
 >>>>>>> 35351e3 (tests & coverage)
@@ -690,11 +757,14 @@
   },
   {
     "type": "error",
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "FilecoinPayCannotBeZeroAddress",
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
     "name": "InvalidActorID",
     "inputs": [
       {
@@ -722,6 +792,8 @@
 >>>>>>> 35351e3 (tests & coverage)
 =======
 >>>>>>> c6e2e2b (terminate deal)
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "InvalidInitialization",
     "inputs": []
   },
@@ -750,6 +822,7 @@
   },
   {
     "type": "error",
+<<<<<<< HEAD
 >>>>>>> c6e2e2b (terminate deal)
     "name": "InvalidResponseLength",
     "inputs": []
@@ -777,6 +850,8 @@
   },
   {
     "type": "error",
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "NotInitializing",
     "inputs": []
   },
@@ -788,13 +863,19 @@
   {
     "type": "error",
 <<<<<<< HEAD
+<<<<<<< HEAD
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "RailAlreadyCreated",
     "inputs": []
   },
   {
     "type": "error",
+<<<<<<< HEAD
 =======
 >>>>>>> c6e2e2b (terminate deal)
+=======
+>>>>>>> e58081f (lognestDealTerm validation)
     "name": "SLCCannotBeZeroAddress",
     "inputs": []
   }

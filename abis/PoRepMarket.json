@@ -963,6 +963,22 @@
   },
   {
     "type": "error",
+    "name": "CallerIsNotValidator",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DealDoesNotExist",
     "inputs": []
   },

@@ -296,4 +296,36 @@ contract ValidatorTest is Test {
         vm.prank(admin);
         validator.createRail(token, address(this));
     }
+
+    function testTerminateRailTerminatesFilecoinPayRail() public {
+        assertFalse(filecoinPayMock.terminated(railId));
+        validator.terminateRail(railId);
+        assertTrue(filecoinPayMock.terminated(railId));
+    }
+
+    function testValidatePaymentReturnsDealEndedWhenFromEpochPastLongestDealTerm() public {
+        clientSCMock.setLongestDealTerm(dealId, 10);
+
+        vm.prank(address(filecoinPayMock));
+        IValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 20, 1);
+
+        assertEq(result.modifiedAmount, 0);
+        assertEq(result.settleUpto, 10);
+        assertEq(result.note, "deal ended");
+    }
+
+    function testValidatePaymentCapsSettlementToLongestDealTerm() public {
+        clientSCMock.setDataSizeMatching(dealId, true);
+        clientSCMock.setLongestDealTerm(dealId, 1000);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+
+        vm.prank(address(filecoinPayMock));
+        IValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 2_000, 10);
+
+        assertEq(result.modifiedAmount, 10 * 1000);
+        assertEq(result.settleUpto, 1000);
+        assertEq(result.note, "ok");
+    }
 }

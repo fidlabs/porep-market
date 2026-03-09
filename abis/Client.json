@@ -103,6 +103,67 @@
   },
   {
     "type": "function",
+    "name": "getClientDealInfo",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "deal",
+        "type": "tuple",
+        "internalType": "struct Client.Deal",
+        "components": [
+          {
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "validator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "sizeOfAllocations",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "longestDealTerm",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "allocationIds",
+            "type": "uint64[]",
+            "internalType": "CommonTypes.FilActorId[]"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {

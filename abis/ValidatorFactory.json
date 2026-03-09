@@ -58,6 +58,7 @@
         "internalType": "address"
       },
       {
+<<<<<<< HEAD
         "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
@@ -104,6 +105,11 @@
           }
         ]
 >>>>>>> c6e2e2b (terminate deal)
+=======
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+>>>>>>> e58081f (lognestDealTerm validation)
       }
     ],
     "outputs": [],
