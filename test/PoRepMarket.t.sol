@@ -204,7 +204,7 @@ contract PoRepMarketTest is Test {
 
     function testUpdateRailIdEmitsRailIdUpdatedEvent() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
@@ -220,7 +220,7 @@ contract PoRepMarketTest is Test {
     function testUpdateRailIdRevertsIfSenderIsNotTheDealValidator() public {
         address notTheValidator = vm.addr(0x999);
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
@@ -233,7 +233,7 @@ contract PoRepMarketTest is Test {
 
     function testUpdateRailIdRevertsWhenDealIsInIncorrectState() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -255,7 +255,7 @@ contract PoRepMarketTest is Test {
 
     function testUpdateRailIdRevertsWhenRailIdIsAlreadySet() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
@@ -270,7 +270,7 @@ contract PoRepMarketTest is Test {
 
     function testUpdateRailIdRevertsWhenRailIdIsInvalid() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);

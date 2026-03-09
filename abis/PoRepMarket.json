@@ -562,19 +562,6 @@
   },
   {
     "type": "function",
-    "name": "updateValidator",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "upgradeToAndCall",
     "inputs": [
       {
@@ -847,7 +834,7 @@
   },
   {
     "type": "event",
-    "name": "ValidatorUpdated",
+    "name": "ValidatorAndRailIdUpdated",
     "inputs": [
       {
         "name": "dealId",
@@ -860,6 +847,12 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      },
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1035,22 +1028,6 @@
         "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotTheDealValidator",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "validator",
-        "type": "address",
-        "internalType": "address"
       }
     ]
   },
