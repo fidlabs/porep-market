@@ -36,6 +36,7 @@ contract ValidatorTest is Test {
     uint256 public dealId;
     uint256 public railId;
     uint256 public totalDealSize;
+    string public expectedManifestLocation;
 
     SLITypes.SLIThresholds public defaultRequirements;
 
@@ -52,6 +53,7 @@ contract ValidatorTest is Test {
         dealId = 1;
         railId = 1;
         totalDealSize = 1024;
+        expectedManifestLocation = "https://example.com/manifest";
 
         defaultRequirements =
             SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
@@ -62,10 +64,12 @@ contract ValidatorTest is Test {
                 dealId: dealId,
                 client: admin,
                 provider: providerFilActorId,
+                terms: SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSector: 100, durationDays: 365}),
                 requirements: defaultRequirements,
                 validator: address(0),
                 state: PoRepMarket.DealState.Proposed,
                 railId: railId,
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: totalDealSize
             })
         );

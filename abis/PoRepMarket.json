@@ -162,6 +162,11 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
+          },
+          {
+            "name": "totalDealSize",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -267,6 +272,11 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
+          },
+          {
+            "name": "totalDealSize",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -534,6 +544,29 @@
   },
   {
     "type": "function",
+    "name": "terminateDeal",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "terminator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "endEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "updateManifestLocation",
     "inputs": [
       {
@@ -717,6 +750,12 @@
         "type": "string",
         "indexed": false,
         "internalType": "string"
+      },
+      {
+        "name": "totalDealSize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false

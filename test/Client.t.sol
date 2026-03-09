@@ -123,7 +123,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: totalDealSize
             })
         );
@@ -269,7 +269,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Completed,
                 railId: 0,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: 1024
             })
         );
@@ -406,7 +406,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: 1024
             })
         );
@@ -503,7 +503,7 @@ contract ClientTest is Test {
                 validator: address(reentrantValidatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: 1024
             })
         );
@@ -534,7 +534,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: 1024
             })
         );
@@ -772,7 +772,7 @@ contract ClientTest is Test {
                 validator: address(0),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
                 totalDealSize: 1024
             })
         );

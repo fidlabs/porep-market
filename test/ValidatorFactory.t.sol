@@ -61,7 +61,7 @@ contract ValidatorFactoryTest is Test {
                 validator: vm.addr(10),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 200,
-                manifestLocation: "https://example.com/manifest"
+                manifestLocation: "https://example.com/manifest",
                 totalDealSize: 1024
             })
         );

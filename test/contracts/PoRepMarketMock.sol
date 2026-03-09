@@ -21,7 +21,7 @@ contract PoRepMarketMock {
         //noop
     }
 
-    function updateValidatorAddress(uint256 dealId) external {
+    function updateValidator(uint256 dealId) external {
         deals[dealId].validator = msg.sender;
     }
 

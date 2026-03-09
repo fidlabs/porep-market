@@ -20,7 +20,7 @@ contract SPRegistryMock is ISPRegistry {
     // ============ Implemented Functions ============
 
     function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
-        external
+        external view
         returns (CommonTypes.FilActorId, bool)
     {
         return (nextProvider, nextAutoApprove);

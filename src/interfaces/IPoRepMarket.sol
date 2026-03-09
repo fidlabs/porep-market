@@ -31,9 +31,11 @@ interface IPoRepMarket {
         address client;
         CommonTypes.FilActorId provider;
         SLITypes.SLIThresholds requirements;
+        SLITypes.DealTerms terms;
         address validator;
         DealState state;
         uint256 railId;
+        string manifestLocation;
         uint256 totalDealSize;
     }
 
@@ -41,7 +43,7 @@ interface IPoRepMarket {
      * @notice Updates the validator address for a given deal ID
      * @param dealId The ID of the deal for which the validator address is to be updated
      */
-    function updateValidatorAddress(uint256 dealId) external;
+    function updateValidator(uint256 dealId) external;
 
     /**
      * @notice Updates the rail ID for a given deal ID

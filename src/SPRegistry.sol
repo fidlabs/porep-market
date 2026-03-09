@@ -10,7 +10,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SLITypes} from "./types/SLITypes.sol";
-import {MinerUtils} from "./libs/MinerUtils.sol";
+import {MinerUtils} from "./lib/MinerUtils.sol";
 
 /**
  * @title SPRegistry

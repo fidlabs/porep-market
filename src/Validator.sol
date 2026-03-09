@@ -181,7 +181,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         $.poRepMarket = _poRepMarket;
         $.dealId = _dealId;
 
-        IPoRepMarket(_poRepMarket).updateValidatorAddress(_dealId);
+        IPoRepMarket(_poRepMarket).updateValidator(_dealId);
     }
 
     // solhint-enable func-param-name-mixedcase

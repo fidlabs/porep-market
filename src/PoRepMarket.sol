@@ -94,7 +94,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         address indexed client,
         CommonTypes.FilActorId indexed provider,
         SLITypes.SLIThresholds requirements,
-        string manifestLocation
+        string manifestLocation,
         uint256 totalDealSize
     );
 
@@ -261,7 +261,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             validator: address(0),
             state: initialState,
             railId: 0,
-            manifestLocation: manifestLocation
+            manifestLocation: manifestLocation,
             totalDealSize: terms.dealSizeBytes
         });
 
