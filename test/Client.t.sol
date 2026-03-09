@@ -66,6 +66,8 @@ contract ClientTest is Test {
 
     uint64[] public earlyTerminatedClaims = new uint64[](0);
 
+    string public expectedManifestLocation = "https://example.com/manifest";
+
     // solhint-disable-next-line function-max-lines
     function setUp() public {
         Client impl = new Client();
@@ -118,7 +120,8 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
-                railId: 0
+                railId: 0,
+                manifestLocation: expectedManifestLocation
             })
         );
     }
@@ -262,7 +265,8 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Completed,
-                railId: 0
+                railId: 0,
+                manifestLocation: expectedManifestLocation
             })
         );
 
@@ -397,7 +401,8 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
-                railId: 0
+                railId: 0,
+                manifestLocation: expectedManifestLocation
             })
         );
         vm.prank(clientAddress);
@@ -492,7 +497,8 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(reentrantValidatorMock),
                 state: PoRepMarket.DealState.Accepted,
-                railId: 0
+                railId: 0,
+                manifestLocation: expectedManifestLocation
             })
         );
         reentrantValidatorMock.setAttackParams(address(client), transferParams, dealId);
@@ -521,7 +527,8 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
-                railId: 0
+                railId: 0,
+                manifestLocation: expectedManifestLocation
             })
         );
         // solhint-disable-next-line reentrancy
@@ -757,7 +764,8 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(0),
                 state: PoRepMarket.DealState.Accepted,
-                railId: 0
+                railId: 0,
+                manifestLocation: expectedManifestLocation
             })
         );
 

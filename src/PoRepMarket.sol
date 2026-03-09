@@ -75,6 +75,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         address validator;
         DealState state;
         uint256 railId;
+        string manifestLocation;
     }
 
     /**
@@ -83,12 +84,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param client The address of the client
      * @param provider The address of the provider
      * @param requirements The SLI thresholds for the deal
+     * @param manifestLocation The location of the manifest for the deal
      */
     event DealProposalCreated(
         uint256 indexed dealId,
         address indexed client,
         CommonTypes.FilActorId indexed provider,
-        SLITypes.SLIThresholds requirements
+        SLITypes.SLIThresholds requirements,
+        string manifestLocation
     );
 
     /**
@@ -130,6 +133,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
+    /**
+     * @notice ManifestLocationUpdated event
+     * @dev ManifestLocationUpdated event is emitted when a manifest location is updated
+     * @param dealId The id of the deal proposal
+     * @param oldManifestLocation The old manifest location
+     * @param newManifestLocation The new manifest location
+     */
+    event ManifestLocationUpdated(uint256 indexed dealId, string oldManifestLocation, string newManifestLocation);
+
     error NotTheRegisteredValidator(uint256 dealId, address validator);
     error NotTheDealValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
@@ -143,6 +155,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error InvalidIndexingPct(uint8 value);
     error InvalidRailId();
     error RailIdAlreadySet();
+    error UnauthorisedCaller(uint256 dealId, address caller, address expectedCaller);
+    error EmptyManifestLocation();
+    error TooLongManifestLocation();
 
     /**
      * @notice Constructor
@@ -176,13 +191,25 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Proposes a deal
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
+     * @param manifestLocation The location of the manifest for the deal
      */
-    function proposeDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms) external {
+    function proposeDeal(
+        SLITypes.SLIThresholds calldata requirements,
+        SLITypes.DealTerms calldata terms,
+        string calldata manifestLocation
+    ) external {
         if (requirements.retrievabilityPct > 100) {
             revert InvalidRetrievabilityPct(requirements.retrievabilityPct);
         }
         if (requirements.indexingPct > 100) {
             revert InvalidIndexingPct(requirements.indexingPct);
+        }
+
+        if (bytes(manifestLocation).length == 0) {
+            revert EmptyManifestLocation();
+        }
+        if (bytes(manifestLocation).length > 2048) {
+            revert TooLongManifestLocation();
         }
 
         DealProposalsStorage storage $ = s();
@@ -204,10 +231,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             terms: terms,
             validator: address(0),
             state: initialState,
-            railId: 0
+            railId: 0,
+            manifestLocation: manifestLocation
         });
 
-        emit DealProposalCreated(dealId, msg.sender, provider, requirements);
+        emit DealProposalCreated(dealId, msg.sender, provider, requirements, manifestLocation);
         if (autoApprove) {
             emit DealAccepted(dealId, msg.sender, provider);
         }
@@ -358,6 +386,44 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         assembly ("memory-safe") {
             mstore(completedDeals, dealCounter)
         }
+    }
+
+    /**
+     * @notice Retrieves the manifest location URL for a specific deal proposal
+     * @param dealId The unique identifier of the deal proposal
+     * @return manifestLocation The manifest location URL for a specific deal proposal
+     */
+    function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation) {
+        DealProposalsStorage storage $ = s();
+        DealProposal storage dealProposal = $._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+        return dealProposal.manifestLocation;
+    }
+
+    /**
+     * @notice Updates the manifest location for a specific deal proposal
+     * @param dealId The unique identifier of the deal proposal
+     * @param newManifestLocation The new manifest location URL to be updated for the deal proposal
+     */
+    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external {
+        DealProposalsStorage storage $ = s();
+        DealProposal storage dealProposal = $._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+        if (msg.sender != dealProposal.client) {
+            revert UnauthorisedCaller(dealId, msg.sender, dealProposal.client);
+        }
+
+        if (bytes(newManifestLocation).length == 0) {
+            revert EmptyManifestLocation();
+        }
+
+        if (bytes(newManifestLocation).length > 2048) {
+            revert TooLongManifestLocation();
+        }
+
+        string memory oldManifestLocation = dealProposal.manifestLocation;
+        dealProposal.manifestLocation = newManifestLocation;
+        emit ManifestLocationUpdated(dealId, oldManifestLocation, newManifestLocation);
     }
 
     /**
