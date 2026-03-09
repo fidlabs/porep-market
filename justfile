@@ -16,6 +16,13 @@ test:
 build:
     forge build --build-info --sizes
 
+gen-abis:
+    forge build
+    for f in $(find src -name '*.sol' ! -path "*/interfaces/*" ! -path "*/types/*" ! -path "*/libs/*"); do \
+        name="$(basename "${f%.sol}")"; \
+        jq .abi "out/$(basename "$f")/$name.json" > "abis/$name.json"; \
+    done
+
 check-abis:
     ./ci/check-abis.sh
 

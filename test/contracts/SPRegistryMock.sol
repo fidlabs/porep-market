@@ -9,6 +9,7 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract SPRegistryMock is ISPRegistry {
     CommonTypes.FilActorId public nextProvider;
+    bool public nextAutoApprove;
     mapping(address => mapping(CommonTypes.FilActorId => bool)) public owners;
     CommonTypes.FilActorId[] private _providers;
     CommonTypes.FilActorId[] private _committedProviders;
@@ -19,13 +20,12 @@ contract SPRegistryMock is ISPRegistry {
 
     function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
         external
-        view
-        returns (CommonTypes.FilActorId)
+        returns (CommonTypes.FilActorId, bool)
     {
-        return nextProvider;
+        return (nextProvider, nextAutoApprove);
     }
 
-    function isStorageProviderOwner(address owner, CommonTypes.FilActorId provider) external view returns (bool) {
+    function isAuthorizedForProvider(address owner, CommonTypes.FilActorId provider) external view returns (bool) {
         return owners[owner][provider];
     }
 
@@ -45,10 +45,12 @@ contract SPRegistryMock is ISPRegistry {
         return _registered[CommonTypes.FilActorId.unwrap(provider)];
     }
 
-    // ============ Test Helpers ============
-
     function setNextProvider(CommonTypes.FilActorId provider) external {
         nextProvider = provider;
+    }
+
+    function setNextAutoApprove(bool _autoApprove) external {
+        nextAutoApprove = _autoApprove;
     }
 
     function setIsOwner(address owner, CommonTypes.FilActorId provider, bool isOwner) external {
@@ -68,15 +70,20 @@ contract SPRegistryMock is ISPRegistry {
         _providerInfos[CommonTypes.FilActorId.unwrap(provider)] = info;
     }
 
-    // ============ Stub Functions ============
-
     function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
-    function commitCapacity(CommonTypes.FilActorId, uint256) external {}
-    function addOwner(address) external {}
-    function removeOwner(address) external {}
+    function releasePendingCapacity(CommonTypes.FilActorId, uint256) external {}
+    function commitCapacity(CommonTypes.FilActorId, uint256, uint256) external {}
     function registerProvider(CommonTypes.FilActorId) external {}
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}
+    function blockProvider(CommonTypes.FilActorId) external {}
+    function unblockProvider(CommonTypes.FilActorId) external {}
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
     function setCapabilities(CommonTypes.FilActorId, SLITypes.SLIThresholds calldata) external {}
+    function setPrice(CommonTypes.FilActorId, uint256) external {}
+    function setToleranceBps(uint256) external {}
+
+    function getToleranceBps() external pure returns (uint256) {
+        return 0;
+    }
 }
