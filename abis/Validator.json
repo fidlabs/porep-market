@@ -99,11 +99,6 @@
       },
       {
         "name": "",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "",
         "type": "address",
         "internalType": "address"
       },
@@ -114,55 +109,13 @@
       },
       {
         "name": "",
-        "type": "tuple",
-        "internalType": "struct Validator.DepositWithRailParams",
-        "components": [
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "payer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "payee",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "v",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "r",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "s",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
