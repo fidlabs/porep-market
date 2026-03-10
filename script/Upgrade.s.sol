@@ -14,28 +14,51 @@ contract Upgrade is Script, DeployUtils {
     using stdJson for string;
 
     address internal proxy;
+    address internal prevImpl;
+    address internal impl;
     string internal name;
+    bytes32 internal deployedCodeHash;
     bytes internal cd;
+
+    error ContractAlreadyDeployed();
 
     function run() external {
         proxy = vm.envAddress("UPGRADE_PROXY_ADDRESS_TEST");
         name = vm.envString("UPGRADE_CONTRACT_NAME");
         cd = vm.envOr("UPGRADE_CALLDATA", bytes(""));
 
-        string memory json = readLatestDeploymentArtifact(name);
-        (,,, bytes memory deployedCodeHash) = deserializeContract(json, name);
         bytes32 hash = generateContractHash(name);
+        string memory json = readLatestDeploymentArtifact();
+        (proxy, prevImpl,, deployedCodeHash) = deserializeContract(json, name);
 
-        if (hash == abi.decode(deployedCodeHash, (bytes32))) {
-            revert("Code hash is unchanged, upgrade skipped");
+        if (hash == deployedCodeHash) {
+            revert ContractAlreadyDeployed();
         }
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
-        address impl = vm.deployCode(string.concat(name, ".sol:", name));
-
+        impl = vm.deployCode(string.concat(name, ".sol:", name));
         IUpgradeable(proxy).upgradeToAndCall(impl, cd);
 
         vm.stopBroadcast();
+        serializeAndSaveArtifact();
+    }
+
+    function serializeAndSaveArtifact() internal {
+        string memory json = name;
+
+        json.serialize("proxy", proxy);
+        json.serialize("prevImpl", prevImpl);
+        json.serialize("newImpl", impl);
+        json.serialize("prevCodeHash", vm.toString(prevImpl.codehash));
+        json.serialize("newCodeHash", vm.toString(impl.codehash));
+        json.serialize("upgradedAt", block.timestamp);
+        json.serialize("chainId", block.chainid);
+
+        string memory output =
+            json.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name))));
+
+        saveUpgrade(output, name);
+        updateLatestImpl(name, impl);
     }
 }

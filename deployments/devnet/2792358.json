@@ -1,0 +1,42 @@
+{
+  "Allocator": "0x2E6A0C4F8D1B3e7a9c5f2d4B6a8e0C1f3D5B7A90",
+  "Client": {
+    "codeHash": "0x1b7dcf32635e0ab901dfc511756d28f59d98912eabecd2c7429edc3225d58d97",
+    "deployedCodeHash": "0x9048d733b20c183768d445ac08c89687ab82d18e66152c90369e88a5ad7d68a9",
+    "impl": "0x9081E7483404A1e91CE48d14CCA978C318aeBAAe",
+    "proxy": "0xEf5Dde9035e57186545dE65a12c5E84BE1D2A2Df"
+  },
+  "FilecoinPay": "0x4A8F3C2e1D9B7f6A0E5c8b3D2a1F9e7C4B6d8a2E",
+  "PoRepMarket": {
+    "codeHash": "0x7b6725aaa60b60df01388743106dfec05e1d5ecfb22fa29229647c40a89f3eb5",
+    "deployedCodeHash": "0xb031c9ec0abfd7acc802ef8f664c0c44c990fac55de0f4c42785fec7babf536b",
+    "impl": "0x88aAFcb9f78618bFaD5A83bb6Cb6D7BbCc864224",
+    "proxy": "0x3d95578A66f76A8BF8dca37e6Eb938C9B74FBd83"
+  },
+  "SLIOracle": {
+    "codeHash": "0x4f9246c8527a06a651694145ba5ee45139f98b237387cee993f8a261b206ab05",
+    "deployedCodeHash": "0x84c90af6d48f5b7c953e9867829dbf0272b2a5312886dc8a572e6e4b0ce27df1",
+    "impl": "0x224cd8a80AD1d9f0068bC4bE46a864E9deF6e47C",
+    "proxy": "0x4334D484986CaeD58842967072b3A91Bd6Ee5560"
+  },
+  "SLIScorer": {
+    "codeHash": "0x43d48a9721320e2ee57453f55e68586c6ef6ded0b845eb8604cc761402d4d1e1",
+    "deployedCodeHash": "0x60e6845fddd07ad022ba2b208194ce68cc92851a4ccbd428fd3ced081582d003",
+    "impl": "0x9aA1A0B9F220b876d2aEB591dBE4F64b1af5fc5f",
+    "proxy": "0x7e4439ab89B25676a24d11f9a3227bAaE5Fd70a7"
+  },
+  "SPRegistry": "0x7C3D1A9f2e8b4c6a0d5E3f1B9C7A2d4E6f8b0c30",
+  "TerminationOracle": "0x9F1c5A3e7B2d4f6C8a0e3B1D5c7A9f2e4B6D8C00",
+  "ValidatorBeacon": "0xdcc5993a9964Aa4E84846d311Bf0ebC827ab7561",
+  "ValidatorFactory": {
+    "codeHash": "0x495982cc5256a7f941b7000de6d488b4a58eefada0152cb9ee064b3213c57d3b",
+    "deployedCodeHash": "0xb0f2743ea1faf0044cdeb564081139be8d6b563290f7d61b2d6eb3ae88283edc",
+    "impl": "0x9c2e8b4C32b2428FB7a066B73396635EBaF55fE0",
+    "proxy": "0xBE3B9b252Df0a0876884c44cbb7721cf3AAffcFd"
+  },
+  "ValidatorImpl": "0xAa81B569f9022ff2646Fa276efb094157781D2A1",
+  "block": 2792358,
+  "chainId": 31415926,
+  "deployer": "0x149661aB3B2d343114e4F518fF3cC3b47266d8C4",
+  "timestamp": 1771263185
+}
