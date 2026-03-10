@@ -30,6 +30,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address _filecoinPay;
         address _sliScorer;
         address _poRepMarket;
+        address _SPRegistry;
         address _beacon;
     }
 
@@ -63,6 +64,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InvalidFilecoinPayAddress();
     error InvalidPoRepServiceAddress();
     error InvalidSliScorerAddress();
+    error InvalidSPRegistryAddress();
 
     /**
      * @notice Emitted when a new proxy is successfully created
@@ -100,13 +102,15 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address _filecoinPay,
         address _sliScorer,
         address _clientSmartContract,
-        address _poRepMarket
+        address _poRepMarket,
+        address _SPRegistry
     ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
         if (_sliScorer == address(0)) revert InvalidSliScorerAddress();
+        if (_SPRegistry == address(0)) revert InvalidSPRegistryAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
@@ -114,6 +118,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
         $._sliScorer = _sliScorer;
+        $._SPRegistry = _SPRegistry;
     }
 
     /**
@@ -145,6 +150,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
                         $._sliScorer,
                         $._clientSmartContract,
                         $._poRepMarket,
+                        $._SPRegistry,
                         dealId
                     )
                 )

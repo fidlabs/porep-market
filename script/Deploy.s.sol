@@ -65,7 +65,7 @@ contract Deploy is Script, DeployUtils {
         // circular dependencies
         PoRepMarket(poRepMarket).setClientSmartContract(clientSmartContract);
         ValidatorFactory(validatorFactory)
-            .initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket);
+            .initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
         SPRegistry(spRegistry).initialize2(poRepMarket);
 
         vm.stopBroadcast();

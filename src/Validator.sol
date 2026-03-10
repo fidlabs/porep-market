@@ -15,6 +15,7 @@ contract Validator is AccessControlUpgradeable {
         address, // _SLIScorer
         address, // _clientSC
         address, // _poRepMarket
+        address, // _SPRegistry,
         uint256 //_dealId
     )
         external
