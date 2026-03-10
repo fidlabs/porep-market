@@ -4,7 +4,6 @@
 pragma solidity =0.8.25;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {Validator} from "./Validator.sol";
@@ -128,10 +127,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @param admin The address of the admin responsible for the contract.
      * @param dealId The dealId for which the proxy was created.
      */
-    function create(
-        address admin,
-        uint256 dealId
-    ) external {
+    function create(address admin, uint256 dealId) external {
         if (admin == address(0)) revert InvalidAdminAddress();
 
         ValidatorFactoryStorage storage $ = s();
@@ -146,7 +142,15 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
                 $._beacon,
                 abi.encodeCall(
                     Validator.initialize,
-                    (admin, $._poRepService, $._filecoinPay, $._sliScorer, $._clientSmartContract, $._poRepMarket, dealId)
+                    (
+                        admin,
+                        $._poRepService,
+                        $._filecoinPay,
+                        $._sliScorer,
+                        $._clientSmartContract,
+                        $._poRepMarket,
+                        dealId
+                    )
                 )
             )
         );
