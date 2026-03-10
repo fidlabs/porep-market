@@ -30,6 +30,24 @@ contract DeployUtils is Script {
         json.serialize(contractName, serialized);
     }
 
+    function readLatestDeploymentArtifact(string memory contractName) internal view returns (string memory json) {
+        json = vm.readFile(string.concat("./deployments/", network(), "/latest.json"));
+    }
+
+    function deserializeContract(string memory json, string memory contractName)
+        internal
+        returns (bytes memory proxy, bytes memory impl, bytes memory codeHash, bytes memory deployedCodeHash)
+    {
+        proxy = json.parseRaw(string.concat(".", contractName, ".proxy"));
+        impl = json.parseRaw(string.concat(".", contractName, ".impl"));
+        codeHash = json.parseRaw(string.concat(".", contractName, ".codeHash"));
+        deployedCodeHash = json.parseRaw(string.concat(".", contractName, ".deployedCodeHash"));
+    }
+
+    function generateContractHash(string memory contractName) internal view returns (bytes32 hash) {
+        hash = keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName)));
+    }
+
     function network() internal view returns (string memory) {
         if (block.chainid == 31415926) return "devnet";
         else if (block.chainid == 314159) return "calibnet";

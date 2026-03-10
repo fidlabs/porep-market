@@ -39,7 +39,7 @@ devnet_deploy:
 
 upgrade:
 	forge clean && forge build
-	forge script script/Upgrade.s.sol:Upgrade --rpc-url $RPC_URL --private-key $PRIVATE_KEY --broadcast
+    forge script script/Upgrade.s.sol:Upgrade --rpc-url $RPC_TEST --private-key $PRIVATE_KEY_TEST --broadcast
 
 # CI equivalent check
 check: fmt-check lint test check-coverage build check-abis
