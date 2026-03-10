@@ -101,11 +101,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address _sliScorer,
         address _clientSmartContract,
         address _poRepMarket
-    )
-        external
-        reinitializer(2)
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();

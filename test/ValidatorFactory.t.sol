@@ -167,7 +167,6 @@ contract ValidatorFactoryTest is Test {
         f.initialize2(poRepService, filecoinPay, address(0), clientSmartContract, poRepMarket);
     }
 
-
     function testInitialize2RevertsWhenClientSmartContractIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientSmartContractAddress.selector));
@@ -181,8 +180,6 @@ contract ValidatorFactoryTest is Test {
         vm.prank(admin);
         f.initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, address(0));
     }
-
-
 
     function testInitialize2RevertsWhenNotAdmin() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));

@@ -11,17 +11,18 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
+import {SPRegistry} from "../src/SPRegistry.sol";
 
 contract Deploy is Script, DeployUtils {
     using stdJson for string;
 
-    address internal porepMarket;
+    address internal poRepMarket;
     address internal validatorFactory;
     address internal clientSmartContract;
     address internal sliOracle;
     address internal sliScorer;
 
-    address internal porepMarketImpl;
+    address internal poRepMarketImpl;
     address internal validatorFactoryImpl;
     address internal validatorImpl;
     address internal clientSmartContractImpl;
@@ -29,6 +30,7 @@ contract Deploy is Script, DeployUtils {
     address internal sliScorerImpl;
     address internal validator;
     address internal validatorBeacon;
+    address internal spRegistryImpl;
 
     address internal spRegistry;
     address internal filecoinPay;
@@ -36,6 +38,7 @@ contract Deploy is Script, DeployUtils {
     address internal allocator;
     address internal terminationOracle;
     address internal oracleAddress;
+    address internal poRepService;
 
     error InvalidEnv();
 
@@ -44,23 +47,26 @@ contract Deploy is Script, DeployUtils {
         allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
-        spRegistry = vm.envAddress("SP_REGISTRY");
         oracleAddress = vm.envAddress("ORACLE");
+        poRepService = vm.envAddress("POREP_SERVICE");
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
-        (porepMarket, porepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
+        (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         (clientSmartContract, clientSmartContractImpl) =
-            _deployClientSmartContract(admin, allocator, terminationOracle, porepMarket);
+            _deployClientSmartContract(admin, allocator, terminationOracle, poRepMarket);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
+        (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
         // circular dependencies
-        PoRepMarket(porepMarket).setClientSmartContract(clientSmartContract);
-        ValidatorFactory(validatorFactory).initialize2(porepMarket, clientSmartContract, filecoinPay);
+        PoRepMarket(poRepMarket).setClientSmartContract(clientSmartContract);
+        ValidatorFactory(validatorFactory)
+            .initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket);
+        SPRegistry(spRegistry).initialize2(poRepMarket);
 
         vm.stopBroadcast();
 
@@ -115,6 +121,13 @@ contract Deploy is Script, DeployUtils {
         impl = address(_impl);
     }
 
+    function _deploySPRegistry(address _admin) internal returns (address proxy, address impl) {
+        SPRegistry _impl = new SPRegistry();
+        bytes memory init = abi.encodeCall(SPRegistry.initialize, (_admin));
+        proxy = createProxy(init, address(_impl));
+        impl = address(_impl);
+    }
+
     function _serializeAndSaveArtifact() internal {
         string memory json = "deployment";
 
@@ -123,17 +136,18 @@ contract Deploy is Script, DeployUtils {
         json.serialize("timestamp", block.timestamp);
         json.serialize("deployer", admin);
 
-        serializeContract(json, "PoRepMarket", porepMarket, porepMarketImpl);
+        serializeContract(json, "PoRepMarket", poRepMarket, poRepMarketImpl);
         serializeContract(json, "ValidatorFactory", validatorFactory, validatorFactoryImpl);
         serializeContract(json, "Client", clientSmartContract, clientSmartContractImpl);
         serializeContract(json, "SLIOracle", sliOracle, sliOracleImpl);
         serializeContract(json, "SLIScorer", sliScorer, sliScorerImpl);
+        serializeContract(json, "SPRegistry", spRegistry, spRegistryImpl);
 
         json.serialize("ValidatorBeacon", validatorBeacon);
         json.serialize("ValidatorImpl", validatorImpl);
         json.serialize("FilecoinPay", filecoinPay);
-        json.serialize("SPRegistry", spRegistry);
         json.serialize("Allocator", allocator);
+        json.serialize("PoRepService", poRepService);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
         save(output);

@@ -541,7 +541,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidPoRepServiceAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidSlcAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSliScorerAddress",
     "inputs": []
   },
   {
