@@ -96,6 +96,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @param _sliScorer The address of the SLIScorer contract
      * @param _clientSmartContract The address of the ClientSmartContract contract
      * @param _poRepMarket The address of the PoRepMarket contract
+     * @param _SPRegistry The address of the SPRegistry contract
      */
     function initialize2(
         address _poRepService,
