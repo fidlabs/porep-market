@@ -175,4 +175,11 @@ interface ISPRegistry {
      * @return Tolerance in basis points
      */
     function getToleranceBps() external view returns (uint256);
+
+    /**
+     * @notice Get the payment address for a provider
+     * @param provider The provider to get the payment address for
+     * @return Payment address associated with the provider
+     */
+    function getPayAddressForProvider(CommonTypes.FilActorId provider) external view returns (address);
 }

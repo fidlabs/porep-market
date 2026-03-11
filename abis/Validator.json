@@ -19,15 +19,7 @@
   },
   {
     "type": "function",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "name": "POREP_SERVICE_ROLE",
-=======
-    "name": "SETTLEMENT_SERVICE_ROLE",
->>>>>>> c6e2e2b (terminate deal)
-=======
-    "name": "POREP_SERVICE_ROLE",
->>>>>>> e58081f (lognestDealTerm validation)
     "inputs": [],
     "outputs": [
       {
@@ -40,21 +32,12 @@
   },
   {
     "type": "function",
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> e58081f (lognestDealTerm validation)
     "name": "createRail",
     "inputs": [
       {
         "name": "token",
         "type": "address",
         "internalType": "contract IERC20"
-      },
-      {
-        "name": "payee",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -62,11 +45,19 @@
   },
   {
     "type": "function",
-<<<<<<< HEAD
-=======
->>>>>>> c6e2e2b (terminate deal)
-=======
->>>>>>> e58081f (lognestDealTerm validation)
+    "name": "disableFutureRailPayments",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -131,15 +122,12 @@
     "name": "initialize",
     "inputs": [
       {
-<<<<<<< HEAD
-<<<<<<< HEAD
         "name": "_admin",
-=======
-        "name": "admin",
->>>>>>> c6e2e2b (terminate deal)
-=======
-        "name": "_admin",
->>>>>>> e58081f (lognestDealTerm validation)
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_porepService",
         "type": "address",
         "internalType": "address"
       },
@@ -149,79 +137,11 @@
         "internalType": "address"
       },
       {
-        "name": "_SLC",
+        "name": "_SLIScorer",
         "type": "address",
         "internalType": "address"
       },
       {
-<<<<<<< HEAD
-        "name": "",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct Validator.DepositWithRailParams",
-        "components": [
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "payer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "payee",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "v",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "r",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "s",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-=======
->>>>>>> c6e2e2b (terminate deal)
         "name": "_clientSC",
         "type": "address",
         "internalType": "address"
@@ -232,53 +152,11 @@
         "internalType": "address"
       },
       {
-<<<<<<< HEAD
-        "name": "params",
-        "type": "tuple",
-        "internalType": "struct Validator.DepositWithRailInputParams",
-        "components": [
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "v",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "r",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "s",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
-<<<<<<< HEAD
->>>>>>> 75b6a35 (tests & coverage)
->>>>>>> 35351e3 (tests & coverage)
-=======
->>>>>>> c6e2e2b (terminate deal)
-=======
+        "name": "_SPRegistry",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "_dealId",
         "type": "uint256",
         "internalType": "uint256"
@@ -300,7 +178,6 @@
         "name": "newRate",
         "type": "uint256",
         "internalType": "uint256"
->>>>>>> e58081f (lognestDealTerm validation)
       }
     ],
     "outputs": [],
@@ -367,6 +244,24 @@
   },
   {
     "type": "function",
+    "name": "setDealEndEpoch",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "endEpoch",
+        "type": "int64",
+        "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -385,22 +280,6 @@
     "stateMutability": "view"
   },
   {
-<<<<<<< HEAD
-    "type": "function",
-    "name": "terminateRail",
-    "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-=======
->>>>>>> c6e2e2b (terminate deal)
     "type": "function",
     "name": "terminateRail",
     "inputs": [
@@ -489,6 +368,25 @@
   },
   {
     "type": "event",
+    "name": "DealEndEpochUpdated",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "endEpoch",
+        "type": "int64",
+        "indexed": false,
+        "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Initialized",
     "inputs": [
       {
@@ -521,10 +419,19 @@
   },
   {
     "type": "event",
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> e58081f (lognestDealTerm validation)
+    "name": "RailDisabled",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "RailPaymentModified",
     "inputs": [
       {
@@ -544,11 +451,6 @@
   },
   {
     "type": "event",
-<<<<<<< HEAD
-=======
->>>>>>> c6e2e2b (terminate deal)
-=======
->>>>>>> e58081f (lognestDealTerm validation)
     "name": "RailTerminated",
     "inputs": [
       {
@@ -670,46 +572,11 @@
   },
   {
     "type": "error",
-<<<<<<< HEAD
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "name": "AdminCannotBeZeroAddress",
-=======
-    "name": "ActorNotFound",
->>>>>>> c6e2e2b (terminate deal)
-=======
-    "name": "AdminCannotBeZeroAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "CallerIsNotClient",
->>>>>>> e58081f (lognestDealTerm validation)
     "inputs": []
   },
   {
     "type": "error",
-<<<<<<< HEAD
-    "name": "CallerIsNotClient",
-=======
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
-    "name": "ActorNotFound",
->>>>>>> 35351e3 (tests & coverage)
-=======
-    "name": "AdminCannotBeZeroAddress",
->>>>>>> c6e2e2b (terminate deal)
-    "inputs": []
-  },
-  {
-    "type": "error",
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
-=======
->>>>>>> c6e2e2b (terminate deal)
     "name": "CallerIsNotClientSC",
     "inputs": []
   },
@@ -720,129 +587,55 @@
   },
   {
     "type": "error",
-<<<<<<< HEAD
-<<<<<<< HEAD
-    "name": "ClientSCCannotBeZeroAddress",
-=======
-<<<<<<< HEAD
->>>>>>> 9e3d97e (feat: validator contract with operator functionalities)
-=======
-=======
-    "name": "ClientSCCannotBeZeroAddress",
+    "name": "InvalidAdminAddress",
     "inputs": []
   },
   {
     "type": "error",
-<<<<<<< HEAD
->>>>>>> c6e2e2b (terminate deal)
-    "name": "ExitCodeError",
->>>>>>> 35351e3 (tests & coverage)
+    "name": "InvalidClientSCAddress",
     "inputs": []
   },
   {
     "type": "error",
-<<<<<<< HEAD
-    "name": "FilecoinPayCannotBeZeroAddress",
-=======
-    "name": "FailToCallActor",
->>>>>>> 35351e3 (tests & coverage)
+    "name": "InvalidDealId",
     "inputs": []
   },
   {
     "type": "error",
-<<<<<<< HEAD
-=======
-    "name": "FailToCallActor",
+    "name": "InvalidFilecoinPayAddress",
     "inputs": []
   },
   {
     "type": "error",
-=======
->>>>>>> e58081f (lognestDealTerm validation)
-    "name": "FilecoinPayCannotBeZeroAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-<<<<<<< HEAD
-    "name": "InvalidActorID",
-    "inputs": [
-      {
-        "name": "actorId",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidCodec",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
-<<<<<<< HEAD
->>>>>>> 75b6a35 (tests & coverage)
->>>>>>> 35351e3 (tests & coverage)
-=======
->>>>>>> c6e2e2b (terminate deal)
-=======
->>>>>>> e58081f (lognestDealTerm validation)
     "name": "InvalidInitialization",
     "inputs": []
   },
   {
     "type": "error",
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> c6e2e2b (terminate deal)
-    "name": "InvalidRailId",
-    "inputs": [
-      {
-        "name": "expected",
-<<<<<<< HEAD
-=======
-=======
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actual",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-<<<<<<< HEAD
->>>>>>> c6e2e2b (terminate deal)
-    "name": "InvalidResponseLength",
+    "name": "InvalidLockupAllowance",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "NotEnoughBalance",
+    "name": "InvalidPoRepMarketAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepServiceAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidRailId",
     "inputs": [
       {
-        "name": "balance",
->>>>>>> 35351e3 (tests & coverage)
+        "name": "expected",
         "type": "uint256",
         "internalType": "uint256"
       },
       {
-<<<<<<< HEAD
         "name": "actual",
-=======
-        "name": "value",
->>>>>>> 35351e3 (tests & coverage)
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -850,33 +643,37 @@
   },
   {
     "type": "error",
-=======
->>>>>>> e58081f (lognestDealTerm validation)
+    "name": "InvalidRateAllowance",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSLIScorerAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSPRegistryAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MaxLockupPeriodLessThanMinimum",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotInitializing",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "PoRepMarketCannotBeZeroAddress",
+    "name": "OperatorNotApproved",
     "inputs": []
   },
   {
     "type": "error",
-<<<<<<< HEAD
-<<<<<<< HEAD
-=======
->>>>>>> e58081f (lognestDealTerm validation)
     "name": "RailAlreadyCreated",
-    "inputs": []
-  },
-  {
-    "type": "error",
-<<<<<<< HEAD
-=======
->>>>>>> c6e2e2b (terminate deal)
-=======
->>>>>>> e58081f (lognestDealTerm validation)
-    "name": "SLCCannotBeZeroAddress",
     "inputs": []
   }
 ]

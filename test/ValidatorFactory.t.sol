@@ -32,7 +32,6 @@ contract ValidatorFactoryTest is Test {
     ValidatorFactory public factoryImpl;
     bytes public initData;
     PoRepMarketMock public poRepMarketMock;
-    uint256 public dealId;
 
     function setUp() public {
         admin = vm.addr(1);
@@ -61,8 +60,7 @@ contract ValidatorFactoryTest is Test {
                 validator: vm.addr(10),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 200,
-                manifestLocation: "https://example.com/manifest",
-                totalDealSize: 1024
+                manifestLocation: "https://example.com/manifest"
             })
         );
 

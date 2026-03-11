@@ -13,11 +13,9 @@ import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {Client} from "./Client.sol";
-
-/// NOTE: Temporary usage
-import {SPRegistryMock} from "../test/contracts/SPRegistryMock.sol";
 
 /**
  * @title Validator
@@ -96,7 +94,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     error MaxLockupPeriodLessThanMinimum();
 
     /**
-     * @notice Error indicating that the lockup allowance is not set poroperly
+     * @notice Error indicating that the lockup allowance is not set properly
      */
     error InvalidLockupAllowance();
 
@@ -341,7 +339,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         if (!isApproved) {
             revert OperatorNotApproved();
         }
-
+        /// NOTE: to be discussed - might be shorter period than a month
         if (maxLockupPeriod < EPOCHS_IN_MONTH) {
             revert MaxLockupPeriodLessThanMinimum();
         }
@@ -354,8 +352,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert InvalidRateAllowance();
         }
 
-        /// TODO: replace it with a real example of retrieving the payee address for the provider from SPRegistry once integrated with the real SPRegistry contract
-        address payee = SPRegistryMock($.SPRegistry).getPayAddressForProvider($.providerId);
+        address payee = ISPRegistry($.SPRegistry).getPayAddressForProvider($.providerId);
 
         uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, dealProposal.client, payee, 0, address(0));
         $.railId = railId;

@@ -7,11 +7,6 @@
         "name": "token",
         "type": "address",
         "internalType": "contract IERC20"
-      },
-      {
-        "name": "payee",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],

@@ -48,6 +48,7 @@ contract ValidatorTest is Test {
         filecoinPayMock = new FilecoinPayV1Mock();
         clientSCMock = new ClientSCMock();
         poRepMarketMock = new PoRepMarketMock();
+        spRegistryMock = new SPRegistryMock();
 
         admin = address(this);
         porepService = vm.addr(0x123);
@@ -98,7 +99,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
 
@@ -140,7 +141,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -154,7 +155,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -256,7 +257,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -274,7 +275,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -292,7 +293,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -310,7 +311,7 @@ contract ValidatorTest is Test {
             address(0),
             clientSC,
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -328,7 +329,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             address(0),
             address(poRepMarketMock),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -346,7 +347,7 @@ contract ValidatorTest is Test {
             address(sliScorer),
             clientSC,
             address(0),
-            address(spRegistry),
+            address(spRegistryMock),
             dealId
         );
     }
@@ -356,7 +357,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        vm.expectRevert(Validator.InvalidSpRegistryAddress.selector);
+        vm.expectRevert(Validator.InvalidSPRegistryAddress.selector);
         newValidator.initialize(
             admin,
             porepService,

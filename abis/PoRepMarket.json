@@ -162,11 +162,6 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
-          },
-          {
-            "name": "totalDealSize",
-            "type": "uint256",
-            "internalType": "uint256"
           }
         ]
       }
@@ -272,11 +267,6 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
-          },
-          {
-            "name": "totalDealSize",
-            "type": "uint256",
-            "internalType": "uint256"
           }
         ]
       }

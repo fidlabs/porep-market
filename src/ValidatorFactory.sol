@@ -157,7 +157,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
                 )
             )
         );
-
+        // forge-lint: disable-next-line(asm-keccak256)
         bytes32 salt = keccak256(abi.encode(admin, dealId));
         address proxy = Create2.computeAddress(salt, keccak256(initCode), address(this));
         $._instances[dealId] = proxy;
