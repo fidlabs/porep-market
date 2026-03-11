@@ -124,6 +124,13 @@ contract ValidatorTest is Test {
         assertTrue(validator.hasRole(adminRole, admin));
     }
 
+    function testEIP7201StorageSlotIsCorrect() public pure {
+        // solhint-disable-next-line gas-small-strings
+        bytes32 expected = keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorStorage")) - 1))
+            & ~bytes32(uint256(0xff));
+        assertEq(expected, 0xf51cddbeb47ca42a561371db80eaffa401732269b8af46b255e3f43a7c044000);
+    }
+
     function testRailTerminatedCallerIsNotFilecoinPayRevert() public {
         vm.expectRevert(Validator.CallerIsNotFilecoinPay.selector);
         validator.railTerminated(1, address(this), 0);
@@ -451,5 +458,209 @@ contract ValidatorTest is Test {
         assertEq(result.modifiedAmount, 10 * 1000);
         assertEq(result.settleUpto, 1000);
         assertEq(result.note, "payment limited to deal endepoch");
+    }
+
+    function testSetDealEndEpochCallerIsNotClientSCRevert() public {
+        vm.expectRevert(Validator.CallerIsNotClientSC.selector);
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
+    }
+
+    function testSetDealEndEpochInvalidDealIdRevert() public {
+        uint256 wrongDealId = dealId + 1;
+
+        vm.expectRevert(Validator.InvalidDealId.selector);
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(wrongDealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
+    }
+
+    function testCreateRailRevertsWhenOperatorNotApproved() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator newValidator = Validator(address(proxy));
+
+        newValidator.initialize(
+            admin,
+            porepService,
+            address(filecoinPayMock),
+            address(sliScorer),
+            clientSC,
+            address(poRepMarketMock),
+            address(spRegistryMock),
+            dealId
+        );
+
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(newValidator), false, 1_000_000, 1_000_000, 0, 0, 86_400
+        );
+
+        vm.expectRevert(Validator.OperatorNotApproved.selector);
+        newValidator.createRail(token);
+    }
+
+    function testCreateRailRevertsWhenMaxLockupPeriodLessThanMinimum() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator newValidator = Validator(address(proxy));
+
+        newValidator.initialize(
+            admin,
+            porepService,
+            address(filecoinPayMock),
+            address(sliScorer),
+            clientSC,
+            address(poRepMarketMock),
+            address(spRegistryMock),
+            dealId
+        );
+
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_399
+        );
+
+        vm.expectRevert(Validator.MaxLockupPeriodLessThanMinimum.selector);
+        newValidator.createRail(token);
+    }
+
+    function testCreateRailRevertsWhenLockupAllowanceIsZero() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator newValidator = Validator(address(proxy));
+
+        newValidator.initialize(
+            admin,
+            porepService,
+            address(filecoinPayMock),
+            address(sliScorer),
+            clientSC,
+            address(poRepMarketMock),
+            address(spRegistryMock),
+            dealId
+        );
+
+        filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, 86_400);
+
+        vm.expectRevert(Validator.InvalidLockupAllowance.selector);
+        newValidator.createRail(token);
+    }
+
+    function testCreateRailRevertsWhenRateAllowanceIsZero() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator newValidator = Validator(address(proxy));
+
+        newValidator.initialize(
+            admin,
+            porepService,
+            address(filecoinPayMock),
+            address(sliScorer),
+            clientSC,
+            address(poRepMarketMock),
+            address(spRegistryMock),
+            dealId
+        );
+
+        filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, 86_400);
+
+        vm.expectRevert(Validator.InvalidRateAllowance.selector);
+        newValidator.createRail(token);
+    }
+
+    function testModifyRailPaymentRevertsWhenSectorCountIsZero() public {
+        CommonTypes.FilActorId[] memory emptyIds = new CommonTypes.FilActorId[](0);
+        clientSCMock.setAllocationIds(dealId, emptyIds);
+
+        vm.expectRevert(Validator.InvalidSectorCount.selector);
+        vm.prank(porepService);
+        validator.modifyRailPayment(railId);
+    }
+
+    function testModifyRailPaymentRevertsWhenDealDurationIsZero() public {
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
+        ids[0] = CommonTypes.FilActorId.wrap(1);
+        clientSCMock.setAllocationIds(dealId, ids);
+
+        PoRepMarket.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
+        dealProposal.terms.durationDays = 0;
+        poRepMarketMock.setDealProposal(dealId, dealProposal);
+
+        vm.expectRevert(Validator.InvalidDealDuration.selector);
+        vm.prank(porepService);
+        validator.modifyRailPayment(railId);
+    }
+
+    function testValidatePaymentRevertsWhenDealNotCompleted() public {
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(0)));
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId));
+        vm.prank(address(filecoinPayMock));
+        validator.validatePayment(railId, 100, 0, 86_400, 1);
+    }
+
+    function testDisableFutureRailPaymentsInvalidRailIdRevert() public {
+        uint256 wrongRailId = railId + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
+        vm.prank(porepService);
+        validator.disableFutureRailPayments(wrongRailId);
+    }
+
+    function testModifyRailPaymentInvalidRailIdRevert() public {
+        uint256 wrongRailId = railId + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
+        vm.prank(porepService);
+        validator.modifyRailPayment(wrongRailId);
+    }
+
+    function testTerminateRailInvalidRailIdRevert() public {
+        uint256 wrongRailId = railId + 1;
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
+        validator.terminateRail(wrongRailId);
+    }
+
+    function testCreateRailEmitsInitialLockupPeriodUpdated() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator newValidator = Validator(address(proxy));
+
+        newValidator.initialize(
+            admin,
+            porepService,
+            address(filecoinPayMock),
+            address(sliScorer),
+            clientSC,
+            address(poRepMarketMock),
+            address(spRegistryMock),
+            dealId
+        );
+
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
+        );
+
+        vm.expectEmit(true, false, false, true, address(newValidator));
+        emit Validator.LockupPeriodUpdated(2, 86_400);
+
+        newValidator.createRail(token);
+    }
+
+    function testSetDealEndEpochEmitsDealEndEpochUpdated() public {
+        CommonTypes.ChainEpoch newEndEpoch = CommonTypes.ChainEpoch.wrap(int64(123_456));
+
+        vm.expectEmit(true, false, false, true, address(validator));
+        emit Validator.DealEndEpochUpdated(dealId, newEndEpoch);
+
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(dealId, newEndEpoch);
+    }
+
+    function testDisableFutureRailPaymentsEmitsRailDisabled() public {
+        vm.expectEmit(true, false, false, true, address(validator));
+        emit Validator.RailDisabled(railId);
+
+        vm.prank(porepService);
+        validator.disableFutureRailPayments(railId);
     }
 }
