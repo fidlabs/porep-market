@@ -41,6 +41,14 @@ devnet_upgrade:
 	forge clean && forge build
 	forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_TEST --private-key $PRIVATE_KEY_TEST
 
+calibnet_deploy:
+    forge clean && forge build
+    forge script script/Deploy.s.sol --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_CALIBNET --private-key $PRIVATE_KEY_CALIBNET
+
+calibnet_upgrade:
+	forge clean && forge build
+	forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_CALIBNET --private-key $PRIVATE_KEY_CALIBNET
+
 # CI equivalent check
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."
