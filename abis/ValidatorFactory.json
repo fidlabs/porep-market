@@ -48,66 +48,9 @@
         "internalType": "address"
       },
       {
-        "name": "slcAddress",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "params",
-        "type": "tuple",
-        "internalType": "struct Validator.DepositWithRailParams",
-        "components": [
-          {
-            "name": "token",
-            "type": "address",
-            "internalType": "contract IERC20"
-          },
-          {
-            "name": "payer",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "payee",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "amount",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "deadline",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "v",
-            "type": "uint8",
-            "internalType": "uint8"
-          },
-          {
-            "name": "r",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "s",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -229,7 +172,17 @@
     "name": "initialize2",
     "inputs": [
       {
-        "name": "_poRepMarket",
+        "name": "_poRepService",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_filecoinPay",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_sliScorer",
         "type": "address",
         "internalType": "address"
       },
@@ -239,7 +192,12 @@
         "internalType": "address"
       },
       {
-        "name": "_filecoinPay",
+        "name": "_poRepMarket",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_SPRegistry",
         "type": "address",
         "internalType": "address"
       }
@@ -376,10 +334,10 @@
         "internalType": "address"
       },
       {
-        "name": "provider",
-        "type": "uint64",
+        "name": "dealId",
+        "type": "uint256",
         "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -588,7 +546,22 @@
   },
   {
     "type": "error",
+    "name": "InvalidPoRepServiceAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSPRegistryAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidSlcAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSliScorerAddress",
     "inputs": []
   },
   {

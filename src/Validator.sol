@@ -9,30 +9,22 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Validator is AccessControlUpgradeable {
     function initialize(
-        address,
-        address,
-        address,
-        CommonTypes.FilActorId,
-        address,
-        address,
-        DepositWithRailParams calldata
-    ) external initializer {
+        address, // admin
+        address, // _porepService
+        address, // _filecoinPay
+        address, // _SLIScorer
+        address, // _clientSC
+        address, // _poRepMarket
+        address, // _SPRegistry,
+        uint256 //_dealId
+    )
+        external
+        initializer
+    {
         __AccessControl_init();
     }
 
     constructor() {
         _disableInitializers();
-    }
-
-    struct DepositWithRailParams {
-        IERC20 token;
-        address payer;
-        address payee;
-        uint256 amount;
-        uint256 deadline;
-        uint8 v;
-        bytes32 r;
-        bytes32 s;
-        uint256 dealId;
     }
 }

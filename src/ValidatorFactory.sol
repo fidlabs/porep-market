@@ -4,7 +4,6 @@
 pragma solidity =0.8.25;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {Validator} from "./Validator.sol";
@@ -24,12 +23,14 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
 
     // @custom:storage-location erc7201:porepmarket.storage.ValidatorFactoryStorage
     struct ValidatorFactoryStorage {
-        mapping(address admin => mapping(CommonTypes.FilActorId provider => uint256 deployCounter)) _nonce;
         mapping(uint256 dealId => address contractAddress) _instances;
         mapping(address => bool) _isValidatorContract;
         address _clientSmartContract;
+        address _poRepService;
         address _filecoinPay;
+        address _sliScorer;
         address _poRepMarket;
+        address _SPRegistry;
         address _beacon;
     }
 
@@ -61,13 +62,16 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InvalidPoRepMarketAddress();
     error InvalidClientSmartContractAddress();
     error InvalidFilecoinPayAddress();
+    error InvalidPoRepServiceAddress();
+    error InvalidSliScorerAddress();
+    error InvalidSPRegistryAddress();
 
     /**
      * @notice Emitted when a new proxy is successfully created
      * @param proxy The address of the newly deployed proxy
-     * @param provider The provider for which the proxy was created
+     * @param dealId The dealId for which the proxy was created
      */
-    event ProxyCreated(address indexed proxy, CommonTypes.FilActorId indexed provider);
+    event ProxyCreated(address indexed proxy, uint256 indexed dealId);
 
     /**
      * @notice Initializes the contract
@@ -87,50 +91,52 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     /**
      * @notice Initializes the contract with the PoRepMarket, ClientSmartContract, and FilecoinPay addresses
      * @dev This function is called after the contract is initialized with the admin and implementation addresses
-     * @param _poRepMarket The address of the PoRepMarket contract
-     * @param _clientSmartContract The address of the ClientSmartContract contract
+     * @param _poRepService The address of the PoRepService contract
      * @param _filecoinPay The address of the FilecoinPay contract
+     * @param _sliScorer The address of the SLIScorer contract
+     * @param _clientSmartContract The address of the ClientSmartContract contract
+     * @param _poRepMarket The address of the PoRepMarket contract
+     * @param _SPRegistry The address of the SPRegistry contract
      */
-    function initialize2(address _poRepMarket, address _clientSmartContract, address _filecoinPay)
-        external
-        reinitializer(2)
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function initialize2(
+        address _poRepService,
+        address _filecoinPay,
+        address _sliScorer,
+        address _clientSmartContract,
+        address _poRepMarket,
+        address _SPRegistry
+    ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
+        if (_sliScorer == address(0)) revert InvalidSliScorerAddress();
+        if (_SPRegistry == address(0)) revert InvalidSPRegistryAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
         $._clientSmartContract = _clientSmartContract;
+        $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
+        $._sliScorer = _sliScorer;
+        $._SPRegistry = _SPRegistry;
     }
 
     /**
      * @notice Creates a new instance of an upgradeable contract.
      * @dev Uses BeaconProxy to create a new proxy instance, pointing to the Beacon for the logic contract.
-     * @dev Reverts if an instance for the given provider already exists.
+     * @dev Reverts if an instance for the given dealId already exists.
      * @param admin The address of the admin responsible for the contract.
-     * @param slcAddress The address of the SLC contract.
-     * @param provider The ID of the provider responsible for the contract.
-     * @param params The parameters for the deposit with rail.
+     * @param dealId The dealId for which the proxy was created.
      */
-    function create(
-        address admin,
-        address slcAddress,
-        CommonTypes.FilActorId provider,
-        Validator.DepositWithRailParams calldata params
-    ) external {
+    function create(address admin, uint256 dealId) external {
         if (admin == address(0)) revert InvalidAdminAddress();
-        if (slcAddress == address(0)) revert InvalidSlcAddress();
 
         ValidatorFactoryStorage storage $ = s();
-        if ($._instances[params.dealId] != address(0)) revert InstanceAlreadyExists();
+        if ($._instances[dealId] != address(0)) revert InstanceAlreadyExists();
 
-        PoRepMarket.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(params.dealId);
+        PoRepMarket.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(dealId);
         if (msg.sender != dp.client) revert InvalidClientAddress();
-
-        $._nonce[admin][provider]++;
 
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,
@@ -138,16 +144,27 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
                 $._beacon,
                 abi.encodeCall(
                     Validator.initialize,
-                    (admin, $._filecoinPay, slcAddress, provider, $._clientSmartContract, $._poRepMarket, params)
+                    (
+                        admin,
+                        $._poRepService,
+                        $._filecoinPay,
+                        $._sliScorer,
+                        $._clientSmartContract,
+                        $._poRepMarket,
+                        $._SPRegistry,
+                        dealId
+                    )
                 )
             )
         );
 
-        address proxy = Create2.deploy(0, keccak256(abi.encode(admin, provider, $._nonce[admin][provider])), initCode);
-        $._instances[params.dealId] = proxy;
+        bytes32 salt = keccak256(abi.encode(admin, dealId));
+        address proxy = Create2.computeAddress(salt, keccak256(initCode), address(this));
+        $._instances[dealId] = proxy;
         $._isValidatorContract[proxy] = true;
 
-        emit ProxyCreated(proxy, provider);
+        Create2.deploy(0, salt, initCode);
+        emit ProxyCreated(proxy, dealId);
     }
 
     /**

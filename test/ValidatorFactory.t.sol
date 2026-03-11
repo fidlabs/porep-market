@@ -12,7 +12,6 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
@@ -21,43 +20,37 @@ contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
     address public validatorAddress;
     address public admin;
+    address public poRepService;
     address public filecoinPay;
-    address public slcAddress;
-    address public poRepMarket;
+    address public sliScorer;
     address public clientSmartContract;
+    address public poRepMarket;
+    address public spRegistry;
     address public client;
+    uint256 public dealId;
     CommonTypes.FilActorId public provider;
     ValidatorFactory public factoryImpl;
     bytes public initData;
-    Validator.DepositWithRailParams public params;
     PoRepMarketMock public poRepMarketMock;
 
     function setUp() public {
         admin = vm.addr(1);
-        filecoinPay = vm.addr(2);
-        slcAddress = vm.addr(3);
+        poRepService = vm.addr(2);
+        filecoinPay = vm.addr(3);
+        sliScorer = vm.addr(4);
+        clientSmartContract = vm.addr(5);
+        spRegistry = vm.addr(6);
         poRepMarketMock = new PoRepMarketMock();
         poRepMarket = address(poRepMarketMock);
-        clientSmartContract = vm.addr(5);
         client = vm.addr(6);
+        dealId = 1;
         provider = CommonTypes.FilActorId.wrap(1);
         validatorAddress = address(new Validator());
         factoryImpl = new ValidatorFactory();
-        params = Validator.DepositWithRailParams({
-            token: IERC20(vm.addr(7)),
-            payer: vm.addr(8),
-            payee: vm.addr(9),
-            amount: 100,
-            deadline: 1000,
-            v: 0,
-            r: bytes32(0),
-            s: bytes32(0),
-            dealId: 100
-        });
         poRepMarketMock.setDealProposal(
-            params.dealId,
+            dealId,
             PoRepMarket.DealProposal({
-                dealId: params.dealId,
+                dealId: dealId,
                 client: client,
                 provider: provider,
                 requirements: SLITypes.SLIThresholds({
@@ -74,7 +67,7 @@ contract ValidatorFactoryTest is Test {
         initData = abi.encodeCall(ValidatorFactory.initialize, (admin, validatorAddress));
         factory = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
         vm.prank(admin);
-        factory.initialize2(poRepMarket, clientSmartContract, filecoinPay);
+        factory.initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
     }
 
     function testEmitsUpgradedInConstructor() public {
@@ -86,47 +79,52 @@ contract ValidatorFactoryTest is Test {
     function testDeployEmitsEvent() public {
         vm.expectEmit(true, true, true, true);
 
-        address expectedProxy = computeProxyAddress(admin, provider, 1);
-        emit ValidatorFactory.ProxyCreated(expectedProxy, provider);
+        address expectedProxy = computeProxyAddress(admin, dealId);
+        emit ValidatorFactory.ProxyCreated(expectedProxy, dealId);
 
         vm.prank(client);
-        factory.create(admin, slcAddress, provider, params);
+        factory.create(admin, dealId);
         assertTrue(factory.isValidatorContract(expectedProxy));
     }
 
     function testDeployMarksProxyAsDeployed() public {
-        address expectedProxy = computeProxyAddress(admin, provider, 1);
+        address expectedProxy = computeProxyAddress(admin, dealId);
         vm.prank(client);
-        factory.create(admin, slcAddress, provider, params);
+        factory.create(admin, dealId);
 
-        assertTrue(factory.getInstance(params.dealId) == expectedProxy);
+        assertTrue(factory.getInstance(dealId) == expectedProxy);
     }
 
     function testDeployRevertsIfInstanceExists() public {
         vm.prank(client);
-        factory.create(admin, slcAddress, provider, params);
+        factory.create(admin, dealId);
 
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InstanceAlreadyExists.selector));
         vm.prank(client);
-        factory.create(admin, slcAddress, provider, params);
+        factory.create(admin, dealId);
     }
 
-    function computeProxyAddress(address admin_, CommonTypes.FilActorId provider_, uint256 nonce)
-        private
-        view
-        returns (address)
-    {
+    function computeProxyAddress(address admin_, uint256 dealId_) private view returns (address) {
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,
             abi.encode(
                 address(factory.getBeacon()),
                 abi.encodeCall(
                     Validator.initialize,
-                    (admin_, filecoinPay, slcAddress, provider_, clientSmartContract, poRepMarket, params)
+                    (
+                        admin_,
+                        poRepService,
+                        filecoinPay,
+                        sliScorer,
+                        clientSmartContract,
+                        poRepMarket,
+                        spRegistry,
+                        dealId_
+                    )
                 )
             )
         );
-        bytes32 salt = keccak256(abi.encode(admin, provider, nonce));
+        bytes32 salt = keccak256(abi.encode(admin_, dealId_));
         bytes32 bytecodeHash = keccak256(initCode);
         return Create2.computeAddress(salt, bytecodeHash, address(factory));
     }
@@ -149,41 +147,56 @@ contract ValidatorFactoryTest is Test {
     function testShouldRevertWhenAdminAddressIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidAdminAddress.selector));
         vm.prank(client);
-        factory.create(address(0), slcAddress, provider, params);
-    }
-
-    function testShouldRevertWhenSlcAddressIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidSlcAddress.selector));
-        vm.prank(client);
-        factory.create(admin, address(0), provider, params);
+        factory.create(address(0), dealId);
     }
 
     function testShouldRevertWhenIncorrectClientAddress() public {
         address incorrectClient = vm.addr(999);
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientAddress.selector));
         vm.prank(incorrectClient);
-        factory.create(admin, slcAddress, provider, params);
+        factory.create(admin, dealId);
     }
 
-    function testInitialize2RevertsWhenPoRepMarketIsZero() public {
+    function testInitialize2RevertsWhenPoRepServiceIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
-        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepMarketAddress.selector));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepServiceAddress.selector));
         vm.prank(admin);
-        f.initialize2(address(0), clientSmartContract, filecoinPay);
-    }
-
-    function testInitialize2RevertsWhenClientSmartContractIsZero() public {
-        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
-        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientSmartContractAddress.selector));
-        vm.prank(admin);
-        f.initialize2(poRepMarket, address(0), filecoinPay);
+        f.initialize2(address(0), filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
     }
 
     function testInitialize2RevertsWhenFilecoinPayIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidFilecoinPayAddress.selector));
         vm.prank(admin);
-        f.initialize2(poRepMarket, clientSmartContract, address(0));
+        f.initialize2(poRepService, address(0), sliScorer, clientSmartContract, poRepMarket, spRegistry);
+    }
+
+    function testInitialize2RevertsWhenSliScorerIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidSliScorerAddress.selector));
+        vm.prank(admin);
+        f.initialize2(poRepService, filecoinPay, address(0), clientSmartContract, poRepMarket, spRegistry);
+    }
+
+    function testInitialize2RevertsWhenClientSmartContractIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientSmartContractAddress.selector));
+        vm.prank(admin);
+        f.initialize2(poRepService, filecoinPay, sliScorer, address(0), poRepMarket, spRegistry);
+    }
+
+    function testInitialize2RevertsWhenPoRepMarketIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepMarketAddress.selector));
+        vm.prank(admin);
+        f.initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, address(0), spRegistry);
+    }
+
+    function testInitialize2RevertsWhenSPRegistryIsZero() public {
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initData)));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidSPRegistryAddress.selector));
+        vm.prank(admin);
+        f.initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, address(0));
     }
 
     function testInitialize2RevertsWhenNotAdmin() public {
@@ -194,6 +207,6 @@ contract ValidatorFactoryTest is Test {
             )
         );
         vm.prank(client);
-        f.initialize2(poRepMarket, clientSmartContract, filecoinPay);
+        f.initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
     }
 }
