@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable var-name-mixedcase, private-vars-leading-underscore
+// solhint-disable var-name-mixedcase
 
 pragma solidity =0.8.25;
 
@@ -15,6 +15,9 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {Client} from "./Client.sol";
+
+/// NOTE: Temporary usage
+import {SPRegistryMock} from "../test/contracts/SPRegistryMock.sol";
 
 /**
  * @title Validator
@@ -35,27 +38,37 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     /**
      * @notice Error indicating that the admin address provided during initialization is the zero address
      */
-    error AdminCannotBeZeroAddress();
+    error InvalidAdminAddress();
 
     /**
      * @notice Error indicating that the FilecoinPay address provided during initialization is the zero address
      */
-    error FilecoinPayCannotBeZeroAddress();
+    error InvalidFilecoinPayAddress();
 
     /**
-     * @notice Error indicating that the SLC address provided during initialization is the zero address
+     * @notice Error indicating that the SLIScorer address provided during initialization is the zero address
      */
-    error SLCCannotBeZeroAddress();
+    error InvalidSLIScorerAddress();
 
     /**
      * @notice Error indicating that the client smart contract address provided during initialization is the zero address
      */
-    error ClientSCCannotBeZeroAddress();
+    error InvalidClientSCAddress();
 
     /**
      * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
      */
-    error PoRepMarketCannotBeZeroAddress();
+    error InvalidPoRepMarketAddress();
+
+    /**
+     * @notice Error indicating that the PoRep service bot address provided during initialization is the zero address
+     */
+    error InvalidPoRepServiceAddress();
+
+    /**
+     * @notice Error indicating that the SPRegistry address provided during initialization is the zero address
+     */
+    error InvalidSPRegistryAddress();
 
     /**
      * @notice Error indicating that the caller is not the client
@@ -66,6 +79,31 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @notice Error indicating that a payment rail has already been created for this validator
      */
     error RailAlreadyCreated();
+
+    /**
+     * @notice Error indicating that an invalid deal ID was provided
+     */
+    error InvalidDealId();
+
+    /**
+     * @notice Error indicating that the operator is not approved
+     */
+    error OperatorNotApproved();
+
+    /**
+     * @notice Error indicating that the maximum lockup period is less than the minimum required lockup period
+     */
+    error MaxLockupPeriodLessThanMinimum();
+
+    /**
+     * @notice Error indicating that the lockup allowance is not set poroperly
+     */
+    error InvalidLockupAllowance();
+
+    /**
+     * @notice Error indicating that the rate allowance is not set properly
+     */
+    error InvalidRateAllowance();
 
     /**
      * @notice Error indicating that an invalid rail ID was provided
@@ -98,6 +136,19 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     event RailPaymentModified(uint256 indexed railId, uint256 newRate);
 
+    /**
+     * @notice Event emitted when the deal end epoch is updated
+     * @param dealId The ID of the deal
+     * @param endEpoch The Filecoin epoch at which the deal ended
+     */
+    event DealEndEpochUpdated(uint256 indexed dealId, CommonTypes.ChainEpoch endEpoch);
+
+    /**
+     * @notice Event emitted when a rail is disabled for future payments
+     * @param railId The ID of the rail that has been disabled
+     */
+    event RailDisabled(uint256 indexed railId);
+
     // solhint-enable gas-indexed-events
 
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
@@ -105,14 +156,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         uint256 railId;
         uint256 dealId;
         address filecoinPay;
-        address SLC;
+        address SLIScorer;
         address clientSC;
         address poRepMarket;
+        address SPRegistry;
         CommonTypes.FilActorId providerId;
+        CommonTypes.ChainEpoch dealEndEpoch;
     }
 
     /**
-     * @notice Role for POREP Bot which is responsible for automating validator functions
+     * @notice Role for PoRep bot which is responsible for automating validator functions
      */
     bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
@@ -150,25 +203,31 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     /**
      * @notice Initializes the contract
      * @param _admin Address to be granted the default admin role
+     * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
-     * @param _SLC Address of the SLC contract
+     * @param _SLIScorer Address of the SLIScorer contract
      * @param _clientSC Address of the client smart contract
      * @param _poRepMarket Address of the PoRepMarket contract
+     * @param _SPRegistry Address of the SPRegistry contract
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
     function initialize(
         address _admin,
+        address _porepService,
         address _filecoinPay,
-        address _SLC,
+        address _SLIScorer,
         address _clientSC,
         address _poRepMarket,
+        address _SPRegistry,
         uint256 _dealId
     ) external initializer {
-        _validateInitializeAddresses(_admin, _filecoinPay, _SLC, _clientSC, _poRepMarket);
+        _validateInitializeAddresses(
+            _admin, _porepService, _filecoinPay, _SLIScorer, _clientSC, _SPRegistry, _poRepMarket
+        );
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(POREP_SERVICE_ROLE, _admin);
+        _grantRole(POREP_SERVICE_ROLE, _porepService);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -176,9 +235,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         $.providerId = dealProposal.provider;
         $.filecoinPay = _filecoinPay;
-        $.SLC = _SLC;
+        $.SLIScorer = _SLIScorer;
         $.clientSC = _clientSC;
         $.poRepMarket = _poRepMarket;
+        $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
 
         IPoRepMarket(_poRepMarket).updateValidator(_dealId);
@@ -208,55 +268,51 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         _checkRailIdValid(railId);
 
-        Client.Deal memory deal = Client($.clientSC).getClientDealInfo($.dealId);
-        int64 longestDealTerm = CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm);
+        int64 longestDealTerm = CommonTypes.ChainEpoch.unwrap($.dealEndEpoch);
         bool cappedByDealEnd = false;
+
+        result.settleUpto = toEpoch;
+
+        /// TODO: refactor the way we check each conditions
 
         if (longestDealTerm > 0) {
             // forge-lint: disable-next-line(unsafe-typecast)
             uint256 dealEndEpoch = uint256(uint64(longestDealTerm));
 
             if (fromEpoch >= dealEndEpoch) {
-                result.modifiedAmount = 0;
                 result.settleUpto = fromEpoch;
                 result.note = "deal ended";
                 return result;
             }
 
             if (toEpoch > dealEndEpoch) {
-                toEpoch = dealEndEpoch;
                 cappedByDealEnd = true;
-                proposedAmount = rate * (toEpoch - fromEpoch);
+                proposedAmount = rate * (dealEndEpoch - fromEpoch);
             }
         }
 
         if (toEpoch < fromEpoch + EPOCHS_IN_MONTH && !cappedByDealEnd) {
-            result.modifiedAmount = 0;
             result.settleUpto = fromEpoch;
             result.note = "too early for next payout";
             return result;
         }
 
         IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
-        uint256 score = ISLIScorer($.SLC).calculateScore($.providerId, dealProposal.requirements);
+        uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
         bool dataSizeMatches = Client($.clientSC).isDataSizeMatching($.dealId);
 
         if (!dataSizeMatches) {
-            result.modifiedAmount = 0;
-            result.settleUpto = fromEpoch;
-            result.note = "datacap mismatch";
+            result.note = "datasize mismatch";
             return result;
         }
 
         if (score != 100) {
-            result.modifiedAmount = 0;
-            result.note = "full slash";
-        } else {
-            result.modifiedAmount = proposedAmount;
-            result.note = "ok";
+            result.note = "payment slashed";
+            return result;
         }
 
-        result.settleUpto = toEpoch;
+        result.modifiedAmount = proposedAmount;
+        result.note = "payment validated successfully";
     }
 
     // solhint-enable function-max-lines, gas-strict-inequalities
@@ -266,9 +322,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @dev Only callable by the client
      * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
      * @param token The ERC20 token to use for the payment rail
-     * @param payee The address receiving the tokens
      */
-    function createRail(IERC20 token, address payee) external override {
+    function createRail(IERC20 token) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
 
@@ -280,6 +335,28 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert RailAlreadyCreated();
         }
 
+        (bool isApproved, uint256 rateAllowance, uint256 lockupAllowance,,, uint256 maxLockupPeriod) =
+            IFilecoinPayV1($.filecoinPay).operatorApprovals(token, dealProposal.client, address(this));
+
+        if (!isApproved) {
+            revert OperatorNotApproved();
+        }
+
+        if (maxLockupPeriod < EPOCHS_IN_MONTH) {
+            revert MaxLockupPeriodLessThanMinimum();
+        }
+
+        if (lockupAllowance == 0) {
+            revert InvalidLockupAllowance();
+        }
+
+        if (rateAllowance == 0) {
+            revert InvalidRateAllowance();
+        }
+
+        /// TODO: replace it with a real example of retrieving the payee address for the provider from SPRegistry once integrated with the real SPRegistry contract
+        address payee = SPRegistryMock($.SPRegistry).getPayAddressForProvider($.providerId);
+
         uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, dealProposal.client, payee, 0, address(0));
         $.railId = railId;
 
@@ -289,8 +366,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /**
      * @notice Modifies the payment rate
-     * @param railId The ID of the rail to modify.
-     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
+     * @dev Only callable by POREP_SERVICE bot
+     * @param railId The ID of the rail to modify
+     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one
      */
     function modifyRailPayment(uint256 railId, uint256 newRate)
         external
@@ -301,6 +379,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         ValidatorStorage storage $ = _getValidatorStorage();
         _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, newRate, 0);
         emit RailPaymentModified(railId, newRate);
+    }
+
+    /**
+     * @notice Disables future payments for a rail by setting its lockup period to zero
+     * @dev Only callable by POREP_SERVICE bot
+     * @dev Emergency-only function. It sets the rail lockup period to zero so the rail can be settled and terminated immediately.
+     * @param railId The ID of the rail to modify
+     */
+    function disableFutureRailPayments(uint256 railId) external onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, 0, 0);
+        emit RailDisabled(railId);
     }
 
     /**
@@ -351,6 +441,26 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     /**
+     * @notice Sets the end epoch for the deal associated with this validator
+     * @dev Only callable by the client smart contract
+     * @param dealId The ID of the deal
+     * @param endEpoch The Filecoin epoch at which the deal ended
+     */
+    function setDealEndEpoch(uint256 dealId, CommonTypes.ChainEpoch endEpoch) external {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        if (msg.sender != $.clientSC) {
+            revert CallerIsNotClientSC();
+        }
+
+        if (dealId != $.dealId) {
+            revert InvalidDealId();
+        }
+
+        $.dealEndEpoch = endEpoch;
+        emit DealEndEpochUpdated(dealId, endEpoch);
+    }
+
+    /**
      * @notice Checks that the provided rail ID matches the expected rail ID stored in contract state
      * @param railId The rail ID to validate
      */
@@ -369,37 +479,48 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     function _setInitialLockup(uint256 railId, uint256 lockupPeriod) internal {
         ValidatorStorage storage $ = _getValidatorStorage();
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, lockupPeriod, 0);
+        emit LockupPeriodUpdated(railId, lockupPeriod);
     }
 
     /**
      * @notice Validates that the provided addresses for initialization are not zero addresses
-     * @param admin Address to be granted the default admin role
+     * @param _admin Address to be granted the default admin role
+     * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
-     * @param _SLC Address of the SLC contract
+     * @param _SLIScorer Address of the SLIScorer contract
      * @param _clientSC Address of the client smart contract
+     * @param _SPRegistry Address of the SPRegistry contract
      * @param _poRepMarket Address of the PoRepMarket contract
      */
     function _validateInitializeAddresses(
-        address admin,
+        address _admin,
+        address _porepService,
         address _filecoinPay,
-        address _SLC,
+        address _SLIScorer,
         address _clientSC,
+        address _SPRegistry,
         address _poRepMarket
     ) internal pure {
-        if (admin == address(0)) {
-            revert AdminCannotBeZeroAddress();
+        if (_admin == address(0)) {
+            revert InvalidAdminAddress();
+        }
+        if (_porepService == address(0)) {
+            revert InvalidPoRepServiceAddress();
         }
         if (_filecoinPay == address(0)) {
-            revert FilecoinPayCannotBeZeroAddress();
+            revert InvalidFilecoinPayAddress();
         }
-        if (_SLC == address(0)) {
-            revert SLCCannotBeZeroAddress();
+        if (_SLIScorer == address(0)) {
+            revert InvalidSLIScorerAddress();
         }
         if (_clientSC == address(0)) {
-            revert ClientSCCannotBeZeroAddress();
+            revert InvalidClientSCAddress();
+        }
+        if (_SPRegistry == address(0)) {
+            revert InvalidSPRegistryAddress();
         }
         if (_poRepMarket == address(0)) {
-            revert PoRepMarketCannotBeZeroAddress();
+            revert InvalidPoRepMarketAddress();
         }
     }
 

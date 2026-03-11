@@ -119,12 +119,11 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation,
-                totalDealSize: totalDealSize
+                manifestLocation: expectedManifestLocation
             })
         );
     }
@@ -265,12 +264,11 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Completed,
                 railId: 0,
-                manifestLocation: expectedManifestLocation,
-                totalDealSize: 1024
+                manifestLocation: expectedManifestLocation
             })
         );
 
@@ -402,12 +400,11 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation,
-                totalDealSize: 1024
+                manifestLocation: expectedManifestLocation
             })
         );
         vm.prank(clientAddress);
@@ -499,12 +496,11 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(reentrantValidatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation,
-                totalDealSize: 1024
+                manifestLocation: expectedManifestLocation
             })
         );
         reentrantValidatorMock.setAttackParams(address(client), transferParams, dealId);
@@ -530,12 +526,11 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation,
-                totalDealSize: 1024
+                manifestLocation: expectedManifestLocation
             })
         );
         // solhint-disable-next-line reentrancy
@@ -768,32 +763,16 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(0),
                 state: PoRepMarket.DealState.Accepted,
                 railId: 0,
-                manifestLocation: expectedManifestLocation,
-                totalDealSize: 1024
+                manifestLocation: expectedManifestLocation
             })
         );
 
         vm.prank(address(0x123));
         vm.expectRevert(abi.encodeWithSelector(Client.ValidatorNotSet.selector, dealId));
         clientMock.isDataSizeMatching(dealId);
-    }
-
-    function testGetClientDealInfoReturnsStoredDeal() public {
-        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        Client.Deal memory deal = clientMock.getClientDealInfo(dealId);
-
-        assertEq(deal.client, clientAddress);
-        assertEq(deal.validator, address(validatorMock));
-        assertEq(CommonTypes.FilActorId.unwrap(deal.provider), CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(deal.dealId, dealId);
-        assertEq(deal.railId, 0);
     }
 }

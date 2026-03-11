@@ -77,7 +77,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         DealState state;
         uint256 railId;
         string manifestLocation;
-        uint256 totalDealSize;
     }
 
     /**
@@ -261,8 +260,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             validator: address(0),
             state: initialState,
             railId: 0,
-            manifestLocation: manifestLocation,
-            totalDealSize: terms.dealSizeBytes
+            manifestLocation: manifestLocation
         });
 
         emit DealProposalCreated(dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes);
@@ -392,7 +390,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(dp.provider, dp.totalDealSize);
+        $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes);
 
         dp.state = DealState.Terminated;
         emit DealTerminated(dealId, terminator, endEpoch);

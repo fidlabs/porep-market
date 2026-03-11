@@ -492,15 +492,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     }
 
     /**
-     * @notice custom getter to retrieve deal info
-     * @param dealId the id of the deal
-     * @return deal the deal info for the given deal id
-     */
-    function getClientDealInfo(uint256 dealId) external view returns (Deal memory deal) {
-        return _getStorageDeal(dealId);
-    }
-
-    /**
      * @notice custom getter to check if claim is terminated
      * @param claimId the id of the claim
      * @return isTerminated whether the claim is terminated

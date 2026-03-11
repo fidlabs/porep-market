@@ -29,6 +29,30 @@ interface IFilecoinPayV1 {
     ) external returns (uint256);
 
     /**
+     * @notice Custom getter for operator approvals
+     * @param token The ERC20 token address for which the approval is being set
+     * @param client The client address for which to check operator approval
+     * @param operator The operator address for which to check approval
+     * @return isApproved Whether the operator is approved by the client for the specified token
+     * @return rateAllowance The maximum payment rate the operator can set across all rails created by the operator on behalf of the message sender
+     * @return lockupAllowance The maximum amount of funds the operator can lock up on behalf of the message sender towards future payments
+     * @return rateUsage Track actual usage for rate
+     * @return lockupUsage Track actual usage for lockup
+     * @return maxLockupPeriod Maximum lockup period the operator can set for rails created on behalf of the client
+     */
+    function operatorApprovals(IERC20 token, address client, address operator)
+        external
+        view
+        returns (
+            bool isApproved,
+            uint256 rateAllowance,
+            uint256 lockupAllowance,
+            uint256 rateUsage,
+            uint256 lockupUsage,
+            uint256 maxLockupPeriod
+        );
+
+    /**
      * @notice Modifies the fixed lockup and lockup period of a rail.
      * @dev - If the rail has already been terminated, the lockup period may not be altered and the fixed lockup may only be reduced.
      * @dev - If the rail is active, the lockup may only be modified if the payer's account is fully funded and will remain fully funded after the operation.

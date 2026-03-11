@@ -78,8 +78,7 @@ contract PoRepMarketTest is Test {
             validator: validatorAddress,
             railId: railId,
             state: state,
-            manifestLocation: expectedManifestLocation,
-            totalDealSize: totalDealSize
+            manifestLocation: expectedManifestLocation
         });
     }
 

@@ -11,11 +11,10 @@ import {IFilecoinPayV1} from "../interfaces/IFilecoinPayV1.sol";
  */
 abstract contract Operator {
     /**
-     * @notice Creates a payment rail with the specified parameters
+     * @notice Creates a payment rail
      * @param token The ERC20 token to use for the payment rail
-     * @param payee The address receiving the tokens
      */
-    function createRail(IERC20 token, address payee) external virtual;
+    function createRail(IERC20 token) external virtual;
 
     /**
      * @notice Updates the lockup period of a payment rail
