@@ -104,6 +104,22 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     error InvalidRateAllowance();
 
     /**
+     * @notice Error indicating that the number of sectors in the deal is zero, which is invalid
+     */
+    error InvalidSectorCount();
+
+    /**
+     * @notice Error indicating that the duration of the deal is zero, which is invalid
+     */
+    error InvalidDealDuration();
+
+    /**
+     * @notice Error indicating that the deal associated with this validator has not been completed yet
+     * @param dealId The ID of the deal that is not completed
+     */
+    error DealNotCompleted(uint256 dealId);
+
+    /**
      * @notice Error indicating that an invalid rail ID was provided
      * @dev We expect only one rail ID to be valid for per validator
      * @param expected The expected rail ID
@@ -160,6 +176,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         address SPRegistry;
         CommonTypes.FilActorId providerId;
         CommonTypes.ChainEpoch dealEndEpoch;
+        uint256 amountPerEpoch;
     }
 
     /**
@@ -266,51 +283,47 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         _checkRailIdValid(railId);
 
-        int64 longestDealTerm = CommonTypes.ChainEpoch.unwrap($.dealEndEpoch);
-        bool cappedByDealEnd = false;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 dealEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap($.dealEndEpoch)));
 
-        result.settleUpto = toEpoch;
-
-        /// TODO: refactor the way we check each conditions
-
-        if (longestDealTerm > 0) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            uint256 dealEndEpoch = uint256(uint64(longestDealTerm));
-
-            if (fromEpoch >= dealEndEpoch) {
-                result.settleUpto = fromEpoch;
-                result.note = "deal ended";
-                return result;
-            }
-
-            if (toEpoch > dealEndEpoch) {
-                cappedByDealEnd = true;
-                proposedAmount = rate * (dealEndEpoch - fromEpoch);
-            }
+        if (dealEndEpoch == 0) {
+            revert DealNotCompleted($.dealId);
         }
 
-        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH && !cappedByDealEnd) {
+        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
             result.settleUpto = fromEpoch;
-            result.note = "too early for next payout";
+            result.note = "1mo payout period not reached";
             return result;
         }
 
         IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
         uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
+
+        bool scoreMatches = score == 100;
         bool dataSizeMatches = Client($.clientSC).isDataSizeMatching($.dealId);
 
-        if (!dataSizeMatches) {
-            result.note = "datasize mismatch";
+        if (!scoreMatches || !dataSizeMatches) {
+            result.settleUpto = toEpoch;
+            result.note =
+                !scoreMatches ? "score below required threshold" : "data size does not match the deal proposal";
             return result;
         }
 
-        if (score != 100) {
-            result.note = "payment slashed";
+        if (fromEpoch >= dealEndEpoch) {
+            result.settleUpto = fromEpoch;
+            result.note = "deal ended";
             return result;
         }
 
-        result.modifiedAmount = proposedAmount;
-        result.note = "payment validated successfully";
+        if (toEpoch > dealEndEpoch) {
+            result.modifiedAmount = rate * (dealEndEpoch - fromEpoch);
+            result.note = "payment limited to deal endepoch";
+            result.settleUpto = dealEndEpoch;
+        } else {
+            result.modifiedAmount = proposedAmount;
+            result.note = "payment validated successfully";
+            result.settleUpto = toEpoch;
+        }
     }
 
     // solhint-enable function-max-lines, gas-strict-inequalities
@@ -365,15 +378,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @notice Modifies the payment rate
      * @dev Only callable by POREP_SERVICE bot
      * @param railId The ID of the rail to modify
-     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one
      */
-    function modifyRailPayment(uint256 railId, uint256 newRate)
-        external
-        override
-        onlyRole(POREP_SERVICE_ROLE)
-        isRailIdValid(railId)
-    {
+    function modifyRailPayment(uint256 railId) external override onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
         ValidatorStorage storage $ = _getValidatorStorage();
+
+        uint256 newRate = _calculateAmountPerEpoch();
+        $.amountPerEpoch = newRate;
+
         _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, newRate, 0);
         emit RailPaymentModified(railId, newRate);
     }
@@ -477,6 +488,31 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         ValidatorStorage storage $ = _getValidatorStorage();
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, lockupPeriod, 0);
         emit LockupPeriodUpdated(railId, lockupPeriod);
+    }
+
+    /**
+     * @notice Calculates the amount to be paid per epoch for the deal
+     * @return Amount to be paid per epoch
+     */
+    function _calculateAmountPerEpoch() internal view returns (uint256) {
+        ValidatorStorage storage $ = _getValidatorStorage();
+
+        IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
+        CommonTypes.FilActorId[] memory allocationIds = Client($.clientSC).getClientAllocationIdsPerDeal($.dealId);
+
+        uint256 sectorCount = allocationIds.length;
+        /// NOTE: to be discussed if we want to just expect case when durationDays is divisible by 30, then we can just do durationDays / 30 or do it this way to round up to the nearest month
+        uint256 durationMonths = (uint256(dealProposal.terms.durationDays) + 29) / 30;
+
+        if (sectorCount == 0) {
+            revert InvalidSectorCount();
+        }
+
+        if (durationMonths == 0) {
+            revert InvalidDealDuration();
+        }
+
+        return (dealProposal.terms.pricePerSector * sectorCount) / durationMonths / EPOCHS_IN_MONTH;
     }
 
     /**

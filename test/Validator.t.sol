@@ -103,8 +103,17 @@ contract ValidatorTest is Test {
             dealId
         );
 
+        filecoinPayMock.setOperatorApproval(token, admin, address(validator), true, 1_000_000, 1_000_000, 0, 0, 86_400);
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
+        ids[0] = CommonTypes.FilActorId.wrap(1);
+        clientSCMock.setAllocationIds(dealId, ids);
+
         vm.prank(admin);
         validator.createRail(token);
+
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -166,15 +175,16 @@ contract ValidatorTest is Test {
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 0);
-        assertEq(result.note, "too early for next payout");
+        assertEq(result.note, "1mo payout period not reached");
     }
 
     function testValidatePaymentDatacapMismatch() public {
         vm.prank(address(filecoinPayMock));
         IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
+
         assertEq(result.modifiedAmount, 0);
-        assertEq(result.settleUpto, 0);
-        assertEq(result.note, "datacap mismatch");
+        assertEq(result.settleUpto, type(uint256).max);
+        assertEq(result.note, "data size does not match the deal proposal");
     }
 
     function testValidatePaymentFullSlashWhenScoreZero() public {
@@ -191,7 +201,7 @@ contract ValidatorTest is Test {
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
-        assertEq(result.note, "full slash");
+        assertEq(result.note, "score below required threshold");
     }
 
     function testValidatePaymentOkWhenScorePositiveAndDatacapMatches() public {
@@ -201,11 +211,11 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
+        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 86_400, 1);
 
         assertEq(result.modifiedAmount, 100);
-        assertEq(result.settleUpto, type(uint256).max);
-        assertEq(result.note, "ok");
+        assertEq(result.settleUpto, 86_400);
+        assertEq(result.note, "payment validated successfully");
     }
 
     function testValidatePaymentCallerIsNotFilecoinPayRevert() public {
@@ -371,12 +381,13 @@ contract ValidatorTest is Test {
     }
 
     function testModifyRailPaymentEmitsRailPaymentModified() public {
-        uint256 newRate = 42;
+        uint256 expectedRate = 0;
 
         vm.expectEmit(true, false, false, true, address(validator));
-        emit Validator.RailPaymentModified(railId, newRate);
+        emit Validator.RailPaymentModified(railId, expectedRate);
 
-        validator.modifyRailPayment(railId, newRate);
+        vm.prank(porepService);
+        validator.modifyRailPayment(railId);
     }
 
     function testUpdateLockupPeriodEmitsLockupPeriodUpdated() public {
@@ -411,29 +422,34 @@ contract ValidatorTest is Test {
         assertTrue(filecoinPayMock.terminated(railId));
     }
 
-    function testValidatePaymentReturnsDealEndedWhenFromEpochPastLongestDealTerm() public {
-        clientSCMock.setLongestDealTerm(dealId, 10);
+    function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch() public {
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(10)));
+
+        clientSCMock.setDataSizeMatching(dealId, true);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 20, 1);
+        IValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 10);
         assertEq(result.note, "deal ended");
     }
 
-    function testValidatePaymentCapsSettlementToLongestDealTerm() public {
+    function testValidatePaymentCapsSettlementToDealEndEpoch() public {
         clientSCMock.setDataSizeMatching(dealId, true);
-        clientSCMock.setLongestDealTerm(dealId, 1000);
+
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1000)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 2_000, 10);
+        IValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
 
         assertEq(result.modifiedAmount, 10 * 1000);
         assertEq(result.settleUpto, 1000);
-        assertEq(result.note, "ok");
+        assertEq(result.note, "payment limited to deal endepoch");
     }
 }

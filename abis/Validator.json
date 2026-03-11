@@ -173,11 +173,6 @@
         "name": "railId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "newRate",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -587,12 +582,28 @@
   },
   {
     "type": "error",
+    "name": "DealNotCompleted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidAdminAddress",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidClientSCAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealDuration",
     "inputs": []
   },
   {
@@ -654,6 +665,11 @@
   {
     "type": "error",
     "name": "InvalidSPRegistryAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSectorCount",
     "inputs": []
   },
   {

@@ -26,9 +26,8 @@ abstract contract Operator {
     /**
      * @notice Modifies the payment rate and optionally makes a one-time payment.
      * @param railId The ID of the rail to modify.
-     * @param newRate The new payment rate (per epoch). This new rate applies starting the next epoch after the current one.
      */
-    function modifyRailPayment(uint256 railId, uint256 newRate) external virtual;
+    function modifyRailPayment(uint256 railId) external virtual;
 
     /**
      * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.

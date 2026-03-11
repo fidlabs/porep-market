@@ -20,11 +20,6 @@
         "name": "railId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "newRate",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
