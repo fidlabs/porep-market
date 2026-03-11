@@ -54,10 +54,6 @@ contract DeployUtils is Script {
         json = vm.readFile(string.concat("./deployments/", network(), "/latest.json"));
     }
 
-    function readLatestUpgradeArtifact() internal view returns (string memory json) {
-        json = vm.readFile(string.concat("./deployments/", network(), "/upgrades/latest.json"));
-    }
-
     function deserializeContract(string memory json, string memory contractName)
         internal
         pure
@@ -67,17 +63,6 @@ contract DeployUtils is Script {
         impl = abi.decode(json.parseRaw(string.concat(".", contractName, ".impl")), (address));
         codeHash = abi.decode(json.parseRaw(string.concat(".", contractName, ".codeHash")), (bytes32));
         deployedCodeHash = abi.decode(json.parseRaw(string.concat(".", contractName, ".deployedCodeHash")), (bytes32));
-    }
-
-    function deserializeUpgrade(string memory json, string memory contractName)
-        internal
-        pure
-        returns (bytes memory proxy, bytes memory prevImpl, bytes memory newImpl, bytes memory deployedCodeHash)
-    {
-        proxy = json.parseRaw(string.concat(".", contractName, ".proxy"));
-        prevImpl = json.parseRaw(string.concat(".", contractName, ".prevImpl"));
-        newImpl = json.parseRaw(string.concat(".", contractName, ".newImpl"));
-        deployedCodeHash = json.parseRaw(string.concat(".", contractName, ".deployedCodeHash"));
     }
 
     function generateContractHash(string memory contractName) internal view returns (bytes32 hash) {
