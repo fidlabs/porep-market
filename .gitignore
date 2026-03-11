@@ -13,3 +13,7 @@ docs/
 
 lcov.info
 report/
+
+# Worktrees
+.worktrees/
+.worktree-links
