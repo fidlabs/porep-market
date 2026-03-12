@@ -423,10 +423,30 @@ contract ValidatorTest is Test {
         validator.createRail(token);
     }
 
-    function testTerminateRailTerminatesFilecoinPayRail() public {
+    function testTerminateRailTerminatesFilecoinPayRailAsAnAdmin() public {
         assertFalse(filecoinPayMock.terminated(railId));
+        vm.prank(admin);
         validator.terminateRail(railId);
         assertTrue(filecoinPayMock.terminated(railId));
+    }
+
+    function testTerminateRailTerminatesFilecoinPayRailAsPoRepService() public {
+        assertFalse(filecoinPayMock.terminated(railId));
+        vm.prank(porepService);
+        validator.terminateRail(railId);
+        assertTrue(filecoinPayMock.terminated(railId));
+    }
+
+    function testTerminateRailRevertsWhenCallerHasPoRepServiceRole() public {
+        vm.expectRevert(Validator.UnauthorizedCaller.selector);
+        vm.prank(address(123));
+        validator.terminateRail(railId);
+    }
+
+    function testTerminateRailRevertsWhenCallerHasAdminRole() public {
+        vm.expectRevert(Validator.UnauthorizedCaller.selector);
+        vm.prank(address(123));
+        validator.terminateRail(railId);
     }
 
     function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch() public {
@@ -662,5 +682,24 @@ contract ValidatorTest is Test {
 
         vm.prank(porepService);
         validator.disableFutureRailPayments(railId);
+    }
+
+    function testValidatePaymentCapsSettlementToEarlyTerminatedEpoch() public {
+        clientSCMock.setDataSizeMatching(dealId, true);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+
+        vm.warp(100_000);
+
+        vm.prank(porepService);
+        validator.disableFutureRailPayments(railId);
+
+        vm.prank(address(filecoinPayMock));
+        IValidator.ValidationResult memory result = validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
+
+        assertEq(result.modifiedAmount, 10 * 100_000);
+        assertEq(result.settleUpto, 100_000);
+        assertEq(result.note, "payment limited to deal endepoch");
     }
 }

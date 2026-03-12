@@ -1442,7 +1442,7 @@ contract SPRegistryTest is Test {
         vm.etch(address(5555), address(proxy).code);
     }
 
-    function testGetPayAddressForProviderReturnsZeroAddress() public {
+    function testGetPayAddressForProviderReturnsZeroAddress() public view {
         address payAddress = spRegistry.getPayAddressForProvider(provider1);
         assertEq(payAddress, address(0));
     }

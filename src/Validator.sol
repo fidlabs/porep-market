@@ -114,6 +114,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     error InvalidDealDuration();
 
     /**
+     * @notice Error indicating that the caller is not authorized to perform the action
+     */
+    error UnauthorizedCaller();
+
+    /**
      * @notice Error indicating that the deal associated with this validator has not been completed yet
      * @param dealId The ID of the deal that is not completed
      */
@@ -177,6 +182,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         CommonTypes.FilActorId providerId;
         CommonTypes.ChainEpoch dealEndEpoch;
         uint256 amountPerEpoch;
+        uint256 earlyTerminatedEpoch;
     }
 
     /**
@@ -290,6 +296,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert DealNotCompleted($.dealId);
         }
 
+        if ($.earlyTerminatedEpoch != 0 && $.earlyTerminatedEpoch < dealEndEpoch) {
+            dealEndEpoch = $.earlyTerminatedEpoch;
+        }
+
         if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
             result.settleUpto = fromEpoch;
             result.note = "1mo payout period not reached";
@@ -397,6 +407,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     function disableFutureRailPayments(uint256 railId) external onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
         ValidatorStorage storage $ = _getValidatorStorage();
+        $.earlyTerminatedEpoch = block.timestamp;
         _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, 0, 0);
         emit RailDisabled(railId);
     }
@@ -424,6 +435,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     function terminateRail(uint256 railId) external override isRailIdValid(railId) {
         ValidatorStorage storage $ = _getValidatorStorage();
+        if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            revert UnauthorizedCaller();
+        }
         _terminateRail(IFilecoinPayV1($.filecoinPay), railId);
     }
 
