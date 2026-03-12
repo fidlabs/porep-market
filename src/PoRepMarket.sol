@@ -100,9 +100,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice DealCompleted event
      * @param dealId The id of the deal proposal
      * @param client The address of the client
+     * @param actualSizeBytes The actual size of the data in bytes
      * @param provider The address of the provider
      */
-    event DealCompleted(uint256 indexed dealId, address indexed client, CommonTypes.FilActorId indexed provider);
+    event DealCompleted(
+        uint256 indexed dealId, address indexed client, uint256 actualSizeBytes, CommonTypes.FilActorId indexed provider
+    );
 
     /**
      * @notice DealTerminated event
@@ -328,8 +331,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /**
      * @notice Completes a deal
      * @param dealId The id of the deal proposal
+     * @param actualSizeBytes The actual size of the deal in bytes
      */
-    function completeDeal(uint256 dealId) external {
+    function completeDeal(uint256 dealId, uint256 actualSizeBytes) external {
         DealProposalsStorage storage $ = s();
         PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
@@ -340,11 +344,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         dp.state = PoRepTypes.DealState.Completed;
         $._dealIdsReadyForPayment.add(dealId);
-        // TODO: actualSizeBytes should come from Client contract's allocation tracking
-        // For now, use estimated size (no tolerance delta)
-        $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, actualSizeBytes);
 
-        emit DealCompleted(dealId, msg.sender, dp.provider);
+        emit DealCompleted(dealId, msg.sender, actualSizeBytes, dp.provider);
     }
 
     /**

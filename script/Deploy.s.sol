@@ -36,7 +36,6 @@ contract Deploy is Script, DeployUtils {
     address internal spRegistry;
     address internal filecoinPay;
     address internal admin;
-    address internal allocator;
     address internal terminationOracle;
     address internal oracleAddress;
     address internal poRepService;
@@ -47,7 +46,6 @@ contract Deploy is Script, DeployUtils {
 
     function run() external {
         admin = vm.addr(vm.envUint("PRIVATE_KEY_TEST"));
-        allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         oracleAddress = vm.envAddress("ORACLE");
@@ -163,6 +161,7 @@ contract Deploy is Script, DeployUtils {
         json.serialize("Allocator", allocator);
         json.serialize("PoRepService", poRepService);
         json.serialize("MetaAllocator", metaAllocator);
+        json.serialize("SPRegistry", spRegistry);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
         save(output);
