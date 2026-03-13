@@ -29,7 +29,7 @@ contract PoRepMarketTest is Test {
     CommonTypes.FilActorId public providerFilActorId;
 
     SLITypes.SLIThresholds internal defaultRequirements =
-        SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     SLITypes.DealTerms internal defaultTerms =
         SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365});
@@ -98,7 +98,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.dealId, 1);
         assertEq(p.client, clientAddress);
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), CommonTypes.FilActorId.unwrap(providerFilActorId));
-        assertEq(p.requirements.retrievabilityPct, defaultRequirements.retrievabilityPct);
+        assertEq(p.requirements.retrievabilityBps, defaultRequirements.retrievabilityBps);
         assertEq(p.requirements.bandwidthMbps, defaultRequirements.bandwidthMbps);
         assertEq(p.requirements.latencyMs, defaultRequirements.latencyMs);
         assertEq(p.requirements.indexingPct, defaultRequirements.indexingPct);
@@ -114,7 +114,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.dealId, 0);
         assertEq(p.client, address(0));
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), 0);
-        assertEq(p.requirements.retrievabilityPct, 0);
+        assertEq(p.requirements.retrievabilityBps, 0);
         assertEq(p.requirements.bandwidthMbps, 0);
         assertEq(p.requirements.latencyMs, 0);
         assertEq(p.requirements.indexingPct, 0);
@@ -146,7 +146,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.dealId, 0);
         assertEq(p.client, address(0));
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), 0);
-        assertEq(p.requirements.retrievabilityPct, 0);
+        assertEq(p.requirements.retrievabilityBps, 0);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
         assertEq(uint8(p.state), 0);
@@ -466,17 +466,17 @@ contract PoRepMarketTest is Test {
         poRepMarket.upgradeToAndCall(newImpl, "");
     }
 
-    function testProposeDealRevertsWhenRetrievabilityPctExceeds100() public {
+    function testProposeDealRevertsWhenRetrievabilityBpsExceeds10000() public {
         SLITypes.SLIThresholds memory badRequirements =
-            SLITypes.SLIThresholds({retrievabilityPct: 101, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+            SLITypes.SLIThresholds({retrievabilityBps: 10001, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRetrievabilityPct.selector, uint8(101)));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRetrievabilityBps.selector, uint16(10001)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms, expectedManifestLocation);
     }
 
     function testProposeDealRevertsWhenIndexingPctExceeds100() public {
         SLITypes.SLIThresholds memory badRequirements =
-            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
+            SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms, expectedManifestLocation);

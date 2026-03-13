@@ -54,7 +54,7 @@ contract ValidatorFactoryTest is Test {
                 client: client,
                 provider: provider,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSector: 100, durationDays: 365}),
                 validator: vm.addr(10),

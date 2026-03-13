@@ -158,7 +158,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
     error NoProviderFoundForDeal();
     error ValidatorAlreadySet(uint256 dealId);
-    error InvalidRetrievabilityPct(uint8 value);
+    error InvalidRetrievabilityBps(uint16 value);
     error InvalidIndexingPct(uint8 value);
     error InvalidRailId();
     error RailIdAlreadySet();
@@ -213,8 +213,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         SLITypes.DealTerms calldata terms,
         string calldata manifestLocation
     ) external {
-        if (requirements.retrievabilityPct > 100) {
-            revert InvalidRetrievabilityPct(requirements.retrievabilityPct);
+        if (requirements.retrievabilityBps > 10_000) {
+            revert InvalidRetrievabilityBps(requirements.retrievabilityBps);
         }
         if (requirements.indexingPct > 100) {
             revert InvalidIndexingPct(requirements.indexingPct);

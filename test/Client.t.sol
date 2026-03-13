@@ -115,7 +115,7 @@ contract ClientTest is Test {
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
@@ -260,7 +260,7 @@ contract ClientTest is Test {
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
@@ -396,7 +396,7 @@ contract ClientTest is Test {
                 client: clientAddress,
                 provider: SP2,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
@@ -492,7 +492,7 @@ contract ClientTest is Test {
                 client: clientAddress,
                 provider: SP2,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(reentrantValidatorMock),
@@ -522,7 +522,7 @@ contract ClientTest is Test {
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
@@ -759,7 +759,7 @@ contract ClientTest is Test {
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
-                    retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
                 validator: address(0),
