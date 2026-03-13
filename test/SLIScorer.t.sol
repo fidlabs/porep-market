@@ -25,7 +25,7 @@ contract SLIScorerTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         sliScorer = SLIScorer(address(proxy));
         provider = CommonTypes.FilActorId.wrap(1000);
-        sliParams = SLITypes.SLIThresholds({retrievabilityPct: 99, bandwidthMbps: 99, latencyMs: 99, indexingPct: 99});
+        sliParams = SLITypes.SLIThresholds({retrievabilityBps: 9900, bandwidthMbps: 99, latencyMs: 99, indexingPct: 99});
     }
 
     function testIsAdminSet() public view {
@@ -53,14 +53,14 @@ contract SLIScorerTest is Test {
     function testCalculateScoreForNoSLAsDefined() public {
         vm.prank(client);
         oracle.setAttestations(block.timestamp, 0, 0, 0, 0);
-        sliParams = SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0});
+        sliParams = SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0});
         uint256 score = sliScorer.calculateScore(provider, sliParams);
         assertEq(score, 100);
     }
 
     function testCalculateScoreIsNonZeroForSLI() public {
         vm.prank(client);
-        oracle.setAttestations(1000, 100, 100, 100, 80);
+        oracle.setAttestations(1000, 10000, 100, 100, 80);
         vm.roll(1001);
         uint256 score = sliScorer.calculateScore(provider, sliParams);
         assertEq(score, 50);
@@ -68,14 +68,14 @@ contract SLIScorerTest is Test {
 
     function testCalculateScore() public {
         vm.prank(client);
-        oracle.setAttestations(1000, 100, 100, 95, 100);
+        oracle.setAttestations(1000, 10000, 100, 95, 100);
         vm.roll(1001);
         uint256 score = sliScorer.calculateScore(provider, sliParams);
         assertEq(score, 100);
     }
 
     function testCalculateScoreForLatency() public {
-        sliParams = SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 40, indexingPct: 0});
+        sliParams = SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 40, indexingPct: 0});
         oracle.setAttestations(1000, 0, 0, 40, 0);
         vm.roll(1001);
         uint256 score = sliScorer.calculateScore(provider, sliParams);

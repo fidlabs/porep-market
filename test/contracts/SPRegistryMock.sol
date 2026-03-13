@@ -15,6 +15,7 @@ contract SPRegistryMock is ISPRegistry {
     CommonTypes.FilActorId[] private _committedProviders;
     mapping(uint64 => ProviderInfo) private _providerInfos;
     mapping(uint64 => bool) private _registered;
+    mapping(uint64 => address) private _payees;
 
     // ============ Implemented Functions ============
 
@@ -35,6 +36,10 @@ contract SPRegistryMock is ISPRegistry {
 
     function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory) {
         return _committedProviders;
+    }
+
+    function getProvidersByOrganization(address) external pure returns (CommonTypes.FilActorId[] memory) {
+        return new CommonTypes.FilActorId[](0);
     }
 
     function getProviderInfo(CommonTypes.FilActorId provider) external view returns (ProviderInfo memory) {
@@ -81,6 +86,15 @@ contract SPRegistryMock is ISPRegistry {
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
     function setCapabilities(CommonTypes.FilActorId, SLITypes.SLIThresholds calldata) external {}
     function setPrice(CommonTypes.FilActorId, uint256) external {}
+
+    function setPayee(CommonTypes.FilActorId provider, address payee) external {
+        _payees[CommonTypes.FilActorId.unwrap(provider)] = payee;
+    }
+
+    function getPayee(CommonTypes.FilActorId provider) external view returns (address) {
+        return _payees[CommonTypes.FilActorId.unwrap(provider)];
+    }
+
     function setToleranceBps(uint256) external {}
 
     function getToleranceBps() external pure returns (uint256) {

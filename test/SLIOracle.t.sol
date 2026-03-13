@@ -14,7 +14,7 @@ contract SLIOracleTest is Test {
     address public oracle = address(0x123);
     CommonTypes.FilActorId public provider = CommonTypes.FilActorId.wrap(1000);
     SLITypes.SLIThresholds public slis =
-        SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     function setUp() public {
         SLIOracle impl = new SLIOracle();
@@ -58,7 +58,7 @@ contract SLIOracleTest is Test {
 
         SLITypes.Attestation memory storedAttestation = sliOracle.getAttestation(provider);
         assertEq(storedAttestation.lastUpdate, block.number);
-        assertEq(storedAttestation.slis.retrievabilityPct, slis.retrievabilityPct);
+        assertEq(storedAttestation.slis.retrievabilityBps, slis.retrievabilityBps);
         assertEq(storedAttestation.slis.latencyMs, slis.latencyMs);
         assertEq(storedAttestation.slis.indexingPct, slis.indexingPct);
         assertEq(storedAttestation.slis.bandwidthMbps, slis.bandwidthMbps);

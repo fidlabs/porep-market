@@ -8,7 +8,7 @@ import {SLITypes} from "../../src/types/SLITypes.sol";
 
 contract MockSLIOracle {
     uint256 public lastUpdate;
-    uint8 public retrievabilityPct;
+    uint16 public retrievabilityBps;
     uint16 public bandwidthMbps;
     uint16 public latencyMs;
     uint8 public indexingPct;
@@ -19,13 +19,13 @@ contract MockSLIOracle {
 
     function setAttestations(
         uint256 lastUpdate_,
-        uint8 retrievabilityPct_,
+        uint16 retrievabilityBps_,
         uint16 bandwidthMbps_,
         uint16 latencyMs_,
         uint8 indexingPct_
     ) public {
         lastUpdate = lastUpdate_;
-        retrievabilityPct = retrievabilityPct_;
+        retrievabilityBps = retrievabilityBps_;
         bandwidthMbps = bandwidthMbps_;
         latencyMs = latencyMs_;
         indexingPct = indexingPct_;
@@ -33,7 +33,7 @@ contract MockSLIOracle {
 
     function getAttestation(CommonTypes.FilActorId) public view returns (SLITypes.Attestation memory ret) {
         ret.lastUpdate = lastUpdate;
-        ret.slis.retrievabilityPct = retrievabilityPct;
+        ret.slis.retrievabilityBps = retrievabilityBps;
         ret.slis.bandwidthMbps = bandwidthMbps;
         ret.slis.latencyMs = latencyMs;
         ret.slis.indexingPct = indexingPct;

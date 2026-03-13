@@ -11,12 +11,14 @@ import {SLITypes} from "../types/SLITypes.sol";
 interface ISPRegistry {
     struct ProviderInfo {
         address organization;
+        address payee;
         bool paused;
         bool blocked;
         SLITypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 pendingBytes;
+        /// @notice USDFC price per 32 GiB sector in smallest units (0 = manual approval)
         uint256 pricePerSector;
     }
 
@@ -31,6 +33,13 @@ interface ISPRegistry {
      * @return Array of provider actor IDs with permanently allocated storage
      */
     function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory);
+
+    /**
+     * @notice Get all providers registered under an organization
+     * @param organization The organization address
+     * @return Array of provider actor IDs belonging to the organization
+     */
+    function getProvidersByOrganization(address organization) external view returns (CommonTypes.FilActorId[] memory);
 
     /**
      * @notice Get full information about a provider
@@ -143,9 +152,23 @@ interface ISPRegistry {
     /**
      * @notice Set the price per sector for a provider
      * @param provider The provider to update
-     * @param pricePerSector The stablecoin price per 32 GiB sector (0 to disable auto-approve)
+     * @param pricePerSector The USDFC price per 32 GiB sector in smallest units (0 to disable auto-approve)
      */
     function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSector) external;
+
+    /**
+     * @notice Set the payment recipient address for a provider
+     * @param provider The provider to update
+     * @param payee The address that will receive payments for this provider
+     */
+    function setPayee(CommonTypes.FilActorId provider, address payee) external;
+
+    /**
+     * @notice Get the payment recipient address for a provider
+     * @param provider The provider actor ID
+     * @return The payee address
+     */
+    function getPayee(CommonTypes.FilActorId provider) external view returns (address);
 
     /**
      * @notice Set the sector padding tolerance in basis points (admin only)
