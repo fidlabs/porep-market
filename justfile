@@ -41,7 +41,7 @@ devnet_deploy:
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."
 
-pre-push: fmt-check lint test
+pre-push: fmt-check lint test check-abis
     @echo "Ready to push."
 
 fix: fmt lint test

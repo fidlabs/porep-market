@@ -541,6 +541,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidIndexingPct",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
     "inputs": []
   },
@@ -548,6 +559,17 @@
     "type": "error",
     "name": "InvalidOracle",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidRetrievabilityBps",
+    "inputs": [
+      {
+        "name": "value",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ]
   },
   {
     "type": "error",
