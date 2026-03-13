@@ -77,4 +77,44 @@ contract SLIOracleTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidOracle.selector));
         new ERC1967Proxy(address(impl), initData);
     }
+
+    function testSetSLIRevertsInvalidRetrievabilityBps() public {
+        SLITypes.SLIThresholds memory invalidSlis =
+            SLITypes.SLIThresholds({retrievabilityBps: 10_001, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidRetrievabilityBps.selector, uint16(10_001)));
+        sliOracle.setSLI(provider, invalidSlis);
+    }
+
+    function testSetSLIAcceptsMaxRetrievabilityBps() public {
+        SLITypes.SLIThresholds memory maxSlis =
+            SLITypes.SLIThresholds({retrievabilityBps: 10_000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+
+        vm.prank(oracle);
+        sliOracle.setSLI(provider, maxSlis);
+
+        SLITypes.Attestation memory stored = sliOracle.getAttestation(provider);
+        assertEq(stored.slis.retrievabilityBps, 10_000);
+    }
+
+    function testSetSLIRevertsInvalidIndexingPct() public {
+        SLITypes.SLIThresholds memory invalidSlis =
+            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
+
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidIndexingPct.selector, uint8(101)));
+        sliOracle.setSLI(provider, invalidSlis);
+    }
+
+    function testSetSLIAcceptsMaxIndexingPct() public {
+        SLITypes.SLIThresholds memory maxSlis =
+            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 100});
+
+        vm.prank(oracle);
+        sliOracle.setSLI(provider, maxSlis);
+
+        SLITypes.Attestation memory stored = sliOracle.getAttestation(provider);
+        assertEq(stored.slis.indexingPct, 100);
+    }
 }
