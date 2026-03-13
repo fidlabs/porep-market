@@ -31,6 +31,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     bytes32 public constant MARKET_ROLE = keccak256("MARKET_ROLE");
 
     /**
+     * @notice Role for trusted operators to register providers
+     */
+    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
+
+    /**
      * @notice Maximum sector padding tolerance in basis points (100% = 10000)
      */
     uint256 public constant MAX_TOLERANCE_BPS = 10_000;
@@ -185,6 +190,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error ProviderIsBlocked(CommonTypes.FilActorId provider);
     error ToleranceBpsTooHigh(uint256 bps, uint256 maxBps);
     error NotProviderControllerOrAdmin(address caller, CommonTypes.FilActorId provider);
+    error NotAdminOrOperator(address caller);
     error InvalidRetrievabilityBps(uint16 value);
     error InvalidIndexingPct(uint8 value);
     error InvalidAdminAddress();
@@ -231,11 +237,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
 
         _grantRole(MARKET_ROLE, _poRepMarket);
-    }
-
-    /// @inheritdoc ISPRegistry
-    function registerProvider(CommonTypes.FilActorId) external pure {
-        revert NotImplemented();
     }
 
     /// @inheritdoc ISPRegistry
@@ -531,7 +532,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
         uint256 pricePerSector
-    ) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external {
+        _onlyAdminOrOperator();
         if (organization == address(0)) revert InvalidOrganizationAddress();
         if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
@@ -608,6 +610,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) return;
         if (!MinerUtils.isControllingAddress(provider, msg.sender)) {
             revert NotProviderControllerOrAdmin(msg.sender, provider);
+        }
+    }
+
+    /**
+     * @notice Ensures the caller has DEFAULT_ADMIN_ROLE or OPERATOR_ROLE
+     */
+    function _onlyAdminOrOperator() internal view {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(OPERATOR_ROLE, msg.sender)) {
+            revert NotAdminOrOperator(msg.sender);
         }
     }
 

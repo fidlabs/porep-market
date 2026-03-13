@@ -78,7 +78,6 @@ contract SPRegistryMock is ISPRegistry {
     function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
     function releasePendingCapacity(CommonTypes.FilActorId, uint256) external {}
     function commitCapacity(CommonTypes.FilActorId, uint256, uint256) external {}
-    function registerProvider(CommonTypes.FilActorId) external {}
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}
     function blockProvider(CommonTypes.FilActorId) external {}

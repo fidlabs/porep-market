@@ -118,12 +118,6 @@ interface ISPRegistry {
         external;
 
     /**
-     * @notice Register a new provider under caller's ownership
-     * @param provider The provider actor ID to register
-     */
-    function registerProvider(CommonTypes.FilActorId provider) external;
-
-    /**
      * @notice Pause a provider (excluded from matching)
      * @param provider The provider to pause
      */

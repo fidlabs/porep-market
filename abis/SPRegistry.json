@@ -58,6 +58,19 @@
   },
   {
     "type": "function",
+    "name": "OPERATOR_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "UPGRADER_ROLE",
     "inputs": [],
     "outputs": [
@@ -506,19 +519,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "registerProvider",
-    "inputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -1435,6 +1435,17 @@
   },
   {
     "type": "error",
+    "name": "NotAdminOrOperator",
+    "inputs": [
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "NotEnoughBalance",
     "inputs": [
       {
@@ -1448,11 +1459,6 @@
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "NotImplemented",
-    "inputs": []
   },
   {
     "type": "error",
