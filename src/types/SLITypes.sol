@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.24;
+pragma solidity =0.8.25;
 
 /**
  * @title SLI Types
@@ -20,13 +20,13 @@ library SLITypes {
      *      - Old deals automatically skip new SLI dimensions
      *
      * @dev Extension example:
-     *      V1: { retrievabilityPct, bandwidthMbps, latencyMs }
-     *      V2: { retrievabilityPct, bandwidthMbps, latencyMs, indexingPct }
+     *      V1: { retrievabilityBps, bandwidthMbps, latencyMs }
+     *      V2: { retrievabilityBps, bandwidthMbps, latencyMs, indexingPct }
      */
     // forge-lint: disable-next-line(pascal-case-struct)
     struct SLIThresholds {
-        /// @dev Valid range: 0-100. 0 means "don't care". Values above 100 are invalid.
-        uint8 retrievabilityPct;
+        /// @dev Valid range: 0-10000 (basis points, e.g. 7550 = 75.50%). 0 means "don't care".
+        uint16 retrievabilityBps;
         /// @dev Capped at ~64 Gbps
         uint16 bandwidthMbps;
         uint16 latencyMs;
@@ -39,6 +39,7 @@ library SLITypes {
      */
     struct DealTerms {
         uint256 dealSizeBytes;
+        /// @notice Price per 32 GiB sector in USDFC smallest units (wei-equivalent)
         uint256 pricePerSector;
         uint32 durationDays;
     }
