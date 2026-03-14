@@ -77,7 +77,7 @@
       {
         "name": "completedDeals",
         "type": "tuple[]",
-        "internalType": "struct PoRepMarket.DealProposal[]",
+        "internalType": "struct PoRepTypes.DealProposal[]",
         "components": [
           {
             "name": "dealId",
@@ -151,7 +151,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepMarket.DealState"
+            "internalType": "enum PoRepTypes.DealState"
           },
           {
             "name": "railId",
@@ -182,7 +182,7 @@
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct PoRepMarket.DealProposal",
+        "internalType": "struct PoRepTypes.DealProposal",
         "components": [
           {
             "name": "dealId",
@@ -256,7 +256,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepMarket.DealState"
+            "internalType": "enum PoRepTypes.DealState"
           },
           {
             "name": "railId",
@@ -1023,12 +1023,12 @@
       {
         "name": "currentState",
         "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
+        "internalType": "enum PoRepTypes.DealState"
       },
       {
         "name": "expectedState",
         "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
+        "internalType": "enum PoRepTypes.DealState"
       }
     ]
   },

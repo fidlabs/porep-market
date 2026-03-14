@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {SLITypes} from "../types/SLITypes.sol";
+import {PoRepTypes} from "../types/PoRepTypes.sol";
 
 pragma solidity ^0.8.24;
 
@@ -10,35 +9,6 @@ pragma solidity ^0.8.24;
  * @notice IPoRepMarket interface for interacting with PoRepMarket contract
  */
 interface IPoRepMarket {
-    /**
-     * @notice DealState enum
-     * @dev DealState enum is an enum that contains the states of a deal
-     */
-    enum DealState {
-        Proposed,
-        Accepted,
-        Completed,
-        Rejected,
-        Terminated
-    }
-
-    /**
-     * @notice DealProposal struct
-     * @dev DealProposal struct is a struct that contains the details of a deal proposal
-     */
-    struct DealProposal {
-        uint256 dealId;
-        address client;
-        CommonTypes.FilActorId provider;
-        SLITypes.SLIThresholds requirements;
-        SLITypes.DealTerms terms;
-        address validator;
-        DealState state;
-        uint256 railId;
-        string manifestLocation;
-        uint256 totalDealSize;
-    }
-
     /**
      * @notice Updates the validator address for a given deal ID
      * @param dealId The ID of the deal for which the validator address is to be updated
@@ -67,5 +37,5 @@ interface IPoRepMarket {
      * @param dealId The id of the deal proposal
      * @return DealProposal The deal proposal
      */
-    function getDealProposal(uint256 dealId) external view returns (DealProposal memory);
+    function getDealProposal(uint256 dealId) external view returns (PoRepTypes.DealProposal memory);
 }

@@ -10,6 +10,7 @@ import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {ValidatorFactory} from "./ValidatorFactory.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
+import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 /**
@@ -26,7 +27,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
-        mapping(uint256 dealId => DealProposal) _dealProposals;
+        mapping(uint256 dealId => PoRepTypes.DealProposal) _dealProposals;
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         ValidatorFactory _validatorFactoryContract;
@@ -51,32 +52,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function s() private pure returns (DealProposalsStorage storage) {
         return _getDealProposalsStorage();
-    }
-
-    /**
-     * @notice DealState enum
-     */
-    enum DealState {
-        Proposed,
-        Accepted,
-        Completed,
-        Rejected,
-        Terminated
-    }
-
-    /**
-     * @notice DealProposal struct
-     */
-    struct DealProposal {
-        uint256 dealId;
-        address client;
-        CommonTypes.FilActorId provider;
-        SLITypes.SLIThresholds requirements;
-        SLITypes.DealTerms terms;
-        address validator;
-        DealState state;
-        uint256 railId;
-        string manifestLocation;
     }
 
     /**
@@ -165,7 +140,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error NotTheDealValidator(uint256 dealId, address validator);
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
     error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
-    error DealNotInExpectedState(uint256 dealId, DealState currentState, DealState expectedState);
+    error DealNotInExpectedState(uint256 dealId, PoRepTypes.DealState currentState, PoRepTypes.DealState expectedState);
     error CallerIsNotValidator(uint256 dealId, address caller);
     error DealDoesNotExist();
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
@@ -249,9 +224,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         uint256 dealId = ++$._dealIdCounter;
-        DealState initialState = autoApprove ? DealState.Accepted : DealState.Proposed;
+        PoRepTypes.DealState initialState = autoApprove ? PoRepTypes.DealState.Accepted : PoRepTypes.DealState.Proposed;
 
-        $._dealProposals[dealId] = DealProposal({
+        $._dealProposals[dealId] = PoRepTypes.DealProposal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
@@ -275,10 +250,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function updateValidator(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dp = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, DealState.Accepted);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (dp.validator != address(0)) {
             revert ValidatorAlreadySet(dealId);
@@ -300,10 +275,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function updateRailId(uint256 dealId, uint256 railId) external {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dp = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, DealState.Accepted);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (dp.railId != 0) {
             revert RailIdAlreadySet();
@@ -326,7 +301,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal proposal
      * @return DealProposal The deal proposal
      */
-    function getDealProposal(uint256 dealId) external view returns (DealProposal memory) {
+    function getDealProposal(uint256 dealId) external view returns (PoRepTypes.DealProposal memory) {
         DealProposalsStorage storage $ = s();
         return $._dealProposals[dealId];
     }
@@ -337,16 +312,16 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function acceptDeal(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dp = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, DealState.Proposed);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
 
         if (!$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)) {
             revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
         }
 
-        dp.state = DealState.Accepted;
+        dp.state = PoRepTypes.DealState.Accepted;
         emit DealAccepted(dealId, msg.sender, dp.provider);
     }
 
@@ -356,14 +331,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function completeDeal(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dp = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, DealState.Accepted);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
-        dp.state = DealState.Completed;
+        dp.state = PoRepTypes.DealState.Completed;
         $._dealIdsReadyForPayment.add(dealId);
         // TODO: actualSizeBytes should come from Client contract's allocation tracking
         // For now, use estimated size (no tolerance delta)
@@ -381,18 +356,18 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external {
         DealProposalsStorage storage $ = _getDealProposalsStorage();
-        DealProposal storage dp = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, DealState.Accepted);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Completed);
 
         if (msg.sender != dp.validator || dp.validator == address(0)) {
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
 
-        dp.state = DealState.Terminated;
+        dp.state = PoRepTypes.DealState.Terminated;
         emit DealTerminated(dealId, terminator, endEpoch);
     }
 
@@ -402,16 +377,16 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function rejectDeal(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dp = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, DealState.Proposed);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
 
         if (msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)) {
             revert NotTheClientOrStorageProvider(dealId, msg.sender);
         }
 
-        dp.state = DealState.Rejected;
+        dp.state = PoRepTypes.DealState.Rejected;
         $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
         emit DealRejected(dealId, msg.sender);
     }
@@ -420,15 +395,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Gets all completed deals
      * @return completedDeals Array of completed deal proposals
      */
-    function getCompletedDeals() external view returns (DealProposal[] memory completedDeals) {
+    function getCompletedDeals() external view returns (PoRepTypes.DealProposal[] memory completedDeals) {
         DealProposalsStorage storage $ = s();
         uint256[] memory completedDealsIds = $._dealIdsReadyForPayment.values();
-        completedDeals = new DealProposal[](completedDealsIds.length);
+        completedDeals = new PoRepTypes.DealProposal[](completedDealsIds.length);
         uint256 dealCounter = 0;
 
         for (uint256 i = 0; i < completedDealsIds.length; i++) {
-            DealProposal memory dp = $._dealProposals[completedDealsIds[i]];
-            if (dp.state == DealState.Completed) {
+            PoRepTypes.DealProposal memory dp = $._dealProposals[completedDealsIds[i]];
+            if (dp.state == PoRepTypes.DealState.Completed) {
                 completedDeals[dealCounter] = dp;
                 dealCounter++;
             }
@@ -447,7 +422,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation) {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dealProposal = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
         _ensureDealExists(dealProposal);
         return dealProposal.manifestLocation;
     }
@@ -459,7 +434,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external {
         DealProposalsStorage storage $ = s();
-        DealProposal storage dealProposal = $._dealProposals[dealId];
+        PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
         _ensureDealExists(dealProposal);
         if (msg.sender != dealProposal.client) {
             revert UnauthorisedCaller(dealId, msg.sender, dealProposal.client);
@@ -482,7 +457,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Ensures a deal exists
      * @param dealProposal The id of the deal proposal
      */
-    function _ensureDealExists(DealProposal memory dealProposal) internal pure {
+    function _ensureDealExists(PoRepTypes.DealProposal memory dealProposal) internal pure {
         if (dealProposal.dealId == 0) revert DealDoesNotExist();
     }
 
@@ -491,7 +466,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dp The deal proposal
      * @param expectedState The expected state
      */
-    function _ensureDealCorrectState(DealProposal memory dp, DealState expectedState) internal pure {
+    function _ensureDealCorrectState(PoRepTypes.DealProposal memory dp, PoRepTypes.DealState expectedState)
+        internal
+        pure
+    {
         if (dp.state != expectedState) revert DealNotInExpectedState(dp.dealId, dp.state, expectedState);
     }
 

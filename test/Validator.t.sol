@@ -4,10 +4,10 @@ pragma solidity ^0.8.24;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
-import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {IValidator} from "../src/interfaces/IValidator.sol";
+import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 
@@ -43,6 +43,8 @@ contract ValidatorTest is Test {
     string public expectedManifestLocation;
 
     SLITypes.SLIThresholds public defaultRequirements;
+    uint256 public constant BLOCK_TIMESTAMP = 1_772_000_000;
+    int64 public constant CHAIN_EPOCH = 5_800_000;
 
     function setUp() public {
         filecoinPayMock = new FilecoinPayV1Mock();
@@ -65,14 +67,14 @@ contract ValidatorTest is Test {
 
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: dealId,
                 client: admin,
                 provider: providerFilActorId,
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 requirements: defaultRequirements,
                 validator: address(0),
-                state: PoRepMarket.DealState.Proposed,
+                state: PoRepTypes.DealState.Proposed,
                 railId: railId,
                 manifestLocation: expectedManifestLocation
             })
@@ -113,7 +115,7 @@ contract ValidatorTest is Test {
         validator.createRail(token);
 
         vm.prank(clientSC);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -388,7 +390,14 @@ contract ValidatorTest is Test {
     }
 
     function testModifyRailPaymentEmitsRailPaymentModified() public {
-        uint256 expectedRate = 0;
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
+        dealProposal.terms.pricePerSector = 2_000_000;
+        poRepMarketMock.setDealProposal(dealId, dealProposal);
+
+        uint256 sectorCount = clientSCMock.getClientAllocationIdsPerDeal(dealId).length;
+        uint256 durationMonths = (uint256(dealProposal.terms.durationDays) + 29) / 30;
+        uint256 totalEpochs = durationMonths * 86_400;
+        uint256 expectedRate = (dealProposal.terms.pricePerSector * sectorCount) / totalEpochs;
 
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.RailPaymentModified(railId, expectedRate);
@@ -599,7 +608,7 @@ contract ValidatorTest is Test {
         ids[0] = CommonTypes.FilActorId.wrap(1);
         clientSCMock.setAllocationIds(dealId, ids);
 
-        PoRepMarket.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
         dealProposal.terms.durationDays = 0;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
@@ -690,7 +699,10 @@ contract ValidatorTest is Test {
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
-        vm.warp(100_000);
+        vm.roll(BLOCK_TIMESTAMP);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(porepService);
         validator.disableFutureRailPayments(railId);
@@ -698,8 +710,52 @@ contract ValidatorTest is Test {
         vm.prank(address(filecoinPayMock));
         IValidator.ValidationResult memory result = validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
 
-        assertEq(result.modifiedAmount, 10 * 100_000);
-        assertEq(result.settleUpto, 100_000);
+        assertEq(result.modifiedAmount, 2_000_000);
+        assertEq(result.settleUpto, 200_000);
+        assertEq(result.note, "payment validated successfully");
+    }
+
+    function testValidatePaymentUsesEarlyTerminatedEpochWhenEarlierThanDealEndEpoch() public {
+        clientSCMock.setDataSizeMatching(dealId, true);
+
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 chainEpochConversion = uint256(uint64(CHAIN_EPOCH));
+        uint256 earlyTerminationEpoch = chainEpochConversion - 100_000;
+        vm.roll(earlyTerminationEpoch);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+
+        vm.prank(porepService);
+        validator.disableFutureRailPayments(railId);
+
+        vm.prank(address(filecoinPayMock));
+        IValidator.ValidationResult memory result =
+            validator.validatePayment(railId, 50000000, 0, chainEpochConversion, 10);
+
+        assertEq(result.modifiedAmount, 10 * earlyTerminationEpoch);
+        assertEq(result.settleUpto, earlyTerminationEpoch);
         assertEq(result.note, "payment limited to deal endepoch");
+    }
+
+    function testModifyRailPaymentRevertsWhenCalculatedAmountIsZero() public {
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
+        ids[0] = CommonTypes.FilActorId.wrap(1);
+        clientSCMock.setAllocationIds(dealId, ids);
+
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
+        dealProposal.terms.pricePerSector = 1;
+        dealProposal.terms.durationDays = 3650;
+        poRepMarketMock.setDealProposal(dealId, dealProposal);
+
+        vm.expectRevert(Validator.InvalidZeroAmount.selector);
+        vm.prank(porepService);
+        validator.modifyRailPayment(railId);
+    }
+
+    function testSetDealEndEpochNegativeEndEpochRevert() public {
+        vm.expectRevert(Validator.NegativeEndEpoch.selector);
+        vm.prank(clientSC);
+        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(-1)));
     }
 }

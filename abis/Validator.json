@@ -674,7 +674,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidZeroAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MaxLockupPeriodLessThanMinimum",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NegativeEndEpoch",
     "inputs": []
   },
   {

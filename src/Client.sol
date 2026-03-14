@@ -14,6 +14,7 @@ import {UtilsHandlers} from "filecoin-solidity/v0.8/utils/UtilsHandlers.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
+import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {IValidator} from "./interfaces/Validator.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 
@@ -384,13 +385,13 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     function _verifyAndRegisterDeal(uint256 dealId, bool dealCompleted) internal {
         ClientStorage storage $ = s();
 
-        PoRepMarket.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
+        PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
         if (proposal.client != msg.sender) {
             revert InvalidClient();
         }
 
-        if (proposal.state != PoRepMarket.DealState.Accepted) {
+        if (proposal.state != PoRepTypes.DealState.Accepted) {
             revert InvalidDealStateForTransfer();
         }
 

@@ -15,6 +15,7 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {Operator} from "./abstracts/Operator.sol";
+import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {Client} from "./Client.sol";
 
 /**
@@ -117,6 +118,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @notice Error indicating that the caller is not authorized to perform the action
      */
     error UnauthorizedCaller();
+
+    /**
+     * @notice Error indicating that the provided end epoch is negative, which is invalid
+     */
+    error NegativeEndEpoch();
+
+    /**
+     * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
+     */
+    error InvalidZeroAmount();
 
     /**
      * @notice Error indicating that the deal associated with this validator has not been completed yet
@@ -252,7 +263,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
-        IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket(_poRepMarket).getDealProposal(_dealId);
+        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket(_poRepMarket).getDealProposal(_dealId);
 
         $.providerId = dealProposal.provider;
         $.filecoinPay = _filecoinPay;
@@ -306,7 +317,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             return result;
         }
 
-        IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
+        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
         uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
 
         bool scoreMatches = score == 100;
@@ -346,7 +357,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     function createRail(IERC20 token) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-        IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
+        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
 
         if (msg.sender != dealProposal.client) {
             revert CallerIsNotClient();
@@ -400,15 +411,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     }
 
     /**
-     * @notice Disables future payments for a rail by setting its lockup period to zero
+     * @notice Disables future payments for a payment rail by terminating the rail
      * @dev Only callable by POREP_SERVICE bot
-     * @dev Emergency-only function. It sets the rail lockup period to zero so the rail can be settled and terminated immediately.
-     * @param railId The ID of the rail to modify
+     * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
+     * @param railId The ID of the rail to terminate
      */
     function disableFutureRailPayments(uint256 railId) external onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
         ValidatorStorage storage $ = _getValidatorStorage();
-        $.earlyTerminatedEpoch = block.timestamp;
-        _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, 0, 0);
+        $.earlyTerminatedEpoch = block.number;
+        _terminateRail(IFilecoinPayV1($.filecoinPay), railId);
         emit RailDisabled(railId);
     }
 
@@ -478,6 +489,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert InvalidDealId();
         }
 
+        int64 unwrappedEndEpoch = CommonTypes.ChainEpoch.unwrap(endEpoch);
+        if (unwrappedEndEpoch < 0) {
+            revert NegativeEndEpoch();
+        }
+
         $.dealEndEpoch = endEpoch;
         emit DealEndEpochUpdated(dealId, endEpoch);
     }
@@ -511,7 +527,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     function _calculateAmountPerEpoch() internal view returns (uint256) {
         ValidatorStorage storage $ = _getValidatorStorage();
 
-        IPoRepMarket.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
+        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
         CommonTypes.FilActorId[] memory allocationIds = Client($.clientSC).getClientAllocationIdsPerDeal($.dealId);
 
         uint256 sectorCount = allocationIds.length;
@@ -526,7 +542,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert InvalidDealDuration();
         }
 
-        return (dealProposal.terms.pricePerSector * sectorCount) / durationMonths / EPOCHS_IN_MONTH;
+        uint256 totalEpochs = durationMonths * EPOCHS_IN_MONTH;
+        uint256 amount = (dealProposal.terms.pricePerSector * sectorCount) / totalEpochs;
+
+        if (amount == 0) {
+            revert InvalidZeroAmount();
+        }
+
+        return amount;
     }
 
     /**

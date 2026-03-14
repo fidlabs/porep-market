@@ -3,16 +3,16 @@
 
 pragma solidity =0.8.25;
 
-import {PoRepMarket} from "../../src/PoRepMarket.sol";
+import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 
 contract PoRepMarketMock {
-    mapping(uint256 dealId => PoRepMarket.DealProposal deal) public deals;
+    mapping(uint256 dealId => PoRepTypes.DealProposal deal) public deals;
 
-    function setDealProposal(uint256 dealId, PoRepMarket.DealProposal calldata dealProposal) external {
+    function setDealProposal(uint256 dealId, PoRepTypes.DealProposal calldata dealProposal) external {
         deals[dealId] = dealProposal;
     }
 
-    function getDealProposal(uint256 dealId) external view returns (PoRepMarket.DealProposal memory) {
+    function getDealProposal(uint256 dealId) external view returns (PoRepTypes.DealProposal memory) {
         return deals[dealId];
     }
 
@@ -30,7 +30,7 @@ contract PoRepMarketMock {
     }
 
     function terminateDeal(uint256 dealId, address, uint256) external {
-        deals[dealId].state = PoRepMarket.DealState.Terminated;
+        deals[dealId].state = PoRepTypes.DealState.Terminated;
     }
 }
 
