@@ -208,6 +208,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
 
     /**
+     * @notice Number of epochs in one day
+     * @dev 24 hours/day * 60 minutes/hour * 2 epochs/minute = 2_880 epochs
+     */
+    uint256 private constant EPOCHS_IN_DAY = 2_880;
+
+    /**
      * @notice Storage location for ValidatorStorage struct
      * @dev keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorStorage")) - 1)) & ~bytes32(uint256(0xff))
      */
@@ -531,19 +537,19 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         CommonTypes.FilActorId[] memory allocationIds = Client($.clientSC).getClientAllocationIdsPerDeal($.dealId);
 
         uint256 sectorCount = allocationIds.length;
-        /// NOTE: to be discussed if we want to just expect case when durationDays is divisible by 30, then we can just do durationDays / 30 or do it this way to round up to the nearest month
-        uint256 durationMonths = (uint256(dealProposal.terms.durationDays) + 29) / 30;
+        uint256 pricePerSector = dealProposal.terms.pricePerSector;
+        uint32 durationDays = dealProposal.terms.durationDays;
 
         if (sectorCount == 0) {
             revert InvalidSectorCount();
         }
 
-        if (durationMonths == 0) {
+        if (durationDays == 0) {
             revert InvalidDealDuration();
         }
 
-        uint256 totalEpochs = durationMonths * EPOCHS_IN_MONTH;
-        uint256 amount = (dealProposal.terms.pricePerSector * sectorCount) / totalEpochs;
+        uint256 totalEpochs = durationDays * EPOCHS_IN_DAY;
+        uint256 amount = (pricePerSector * sectorCount) / totalEpochs;
 
         if (amount == 0) {
             revert InvalidZeroAmount();
