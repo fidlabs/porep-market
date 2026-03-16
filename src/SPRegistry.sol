@@ -35,8 +35,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant MAX_TOLERANCE_BPS = 10_000;
 
+    /**
+     * @notice Maximum number of providers that can be registered
+     */
+    uint256 public constant MAX_PROVIDERS = 500;
+
     struct ProviderData {
         address organization;
+        address payee;
         bool paused;
         bool blocked;
         SLITypes.SLIThresholds capabilities;
@@ -165,17 +171,28 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event ProviderUnpaused(CommonTypes.FilActorId indexed provider);
 
+    /**
+     * @notice PayeeUpdated event
+     * @dev PayeeUpdated event is emitted when a provider's payee address changes
+     * @param provider The provider actor ID
+     * @param oldPayee The previous payee address
+     * @param newPayee The new payee address
+     */
+    event PayeeUpdated(CommonTypes.FilActorId indexed provider, address indexed oldPayee, address indexed newPayee);
+
     error ProviderAlreadyRegistered(CommonTypes.FilActorId provider);
     error ProviderNotRegistered(CommonTypes.FilActorId provider);
     error ProviderIsBlocked(CommonTypes.FilActorId provider);
     error ToleranceBpsTooHigh(uint256 bps, uint256 maxBps);
     error NotProviderControllerOrAdmin(address caller, CommonTypes.FilActorId provider);
-    error InvalidRetrievabilityPct(uint8 value);
+    error InvalidRetrievabilityBps(uint16 value);
     error InvalidIndexingPct(uint8 value);
     error InvalidAdminAddress();
     error InvalidPoRepMarketAddress();
     error InvalidProviderActorId();
     error InvalidOrganizationAddress();
+    error InvalidPayeeAddress();
+    error MaxProvidersReached(uint256 maxProviders);
     error NotImplemented();
     error ReleaseExceedsCommitted(CommonTypes.FilActorId provider, uint256 sizeBytes, uint256 committedBytes);
     error CommitExceedsAvailable(CommonTypes.FilActorId provider, uint256 newCommitted, uint256 availableBytes);
@@ -199,6 +216,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     function initialize(address _admin) public initializer {
         if (_admin == address(0)) revert InvalidAdminAddress();
+
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
@@ -211,6 +229,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     function initialize2(address _poRepMarket) public reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
+
         _grantRole(MARKET_ROLE, _poRepMarket);
     }
 
@@ -224,7 +243,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
+
         _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = true;
+
         emit ProviderPaused(provider);
     }
 
@@ -233,21 +254,27 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
+
         _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = false;
+
         emit ProviderUnpaused(provider);
     }
 
     /// @inheritdoc ISPRegistry
     function blockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _ensureProviderRegistered(provider);
+
         _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked = true;
+
         emit ProviderBlocked(provider);
     }
 
     /// @inheritdoc ISPRegistry
     function unblockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _ensureProviderRegistered(provider);
+
         _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked = false;
+
         emit ProviderUnblocked(provider);
     }
 
@@ -256,13 +283,16 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
+
         uint256 minRequired = p.committedBytes + p.pendingBytes;
         if (availableBytes < minRequired) {
             revert AvailableBelowCommittedPlusPending(provider, availableBytes, p.committedBytes, p.pendingBytes);
         }
         p.availableBytes = availableBytes;
+
         emit AvailableSpaceUpdated(provider, availableBytes);
     }
 
@@ -271,10 +301,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
-        if (capabilities.retrievabilityPct > 100) revert InvalidRetrievabilityPct(capabilities.retrievabilityPct);
+        if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         $._providers[CommonTypes.FilActorId.unwrap(provider)].capabilities = capabilities;
+
         emit CapabilitiesUpdated(provider, capabilities);
     }
 
@@ -283,10 +315,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         uint256 oldPrice = $._providers[id].pricePerSector;
         $._providers[id].pricePerSector = pricePerSector;
+
         emit PriceUpdated(provider, oldPrice, pricePerSector);
     }
 
@@ -324,6 +358,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
         info = ProviderInfo({
             organization: p.organization,
+            payee: p.payee,
             paused: p.paused,
             blocked: p.blocked,
             capabilities: p.capabilities,
@@ -407,21 +442,25 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
         _ensureProviderRegistered(provider);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 committed = $._providers[CommonTypes.FilActorId.unwrap(provider)].committedBytes;
         if (sizeBytes > committed) revert ReleaseExceedsCommitted(provider, sizeBytes, committed);
         $._providers[CommonTypes.FilActorId.unwrap(provider)].committedBytes = committed - sizeBytes;
+
         emit CapacityReleased(provider, sizeBytes);
     }
 
     /// @inheritdoc ISPRegistry
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
         _ensureProviderRegistered(provider);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         uint256 pending = $._providers[id].pendingBytes;
         if (sizeBytes > pending) revert ReleasePendingExceedsPending(provider, sizeBytes, pending);
         $._providers[id].pendingBytes = pending - sizeBytes;
+
         emit PendingCapacityReleased(provider, sizeBytes);
     }
 
@@ -431,6 +470,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         onlyRole(MARKET_ROLE)
     {
         _ensureProviderRegistered(provider);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         ProviderData storage p = $._providers[CommonTypes.FilActorId.unwrap(provider)];
 
@@ -454,6 +494,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 newCommitted = p.committedBytes + actualSizeBytes;
         if (newCommitted > p.availableBytes) revert CommitExceedsAvailable(provider, newCommitted, p.availableBytes);
         p.committedBytes = newCommitted;
+
         emit PendingCapacityReleased(provider, pendingReleased);
         emit CapacityCommitted(provider, actualSizeBytes);
     }
@@ -461,9 +502,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function setToleranceBps(uint256 bps) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (bps > MAX_TOLERANCE_BPS) revert ToleranceBpsTooHigh(bps, MAX_TOLERANCE_BPS);
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 oldBps = $.sectorPaddingToleranceBps;
         $.sectorPaddingToleranceBps = bps;
+
         emit ToleranceBpsUpdated(oldBps, bps);
     }
 
@@ -490,19 +533,47 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 pricePerSector
     ) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (organization == address(0)) revert InvalidOrganizationAddress();
-        _registerProvider(provider, organization);
-
-        if (capabilities.retrievabilityPct > 100) revert InvalidRetrievabilityPct(capabilities.retrievabilityPct);
+        if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
+
+        _registerProvider(provider, organization);
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         $._providers[id].capabilities = capabilities;
         $._providers[id].availableBytes = availableBytes;
         $._providers[id].pricePerSector = pricePerSector;
+
         emit CapabilitiesUpdated(provider, capabilities);
         emit AvailableSpaceUpdated(provider, availableBytes);
         emit PriceUpdated(provider, 0, pricePerSector);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function getProvidersByOrganization(address organization) external view returns (CommonTypes.FilActorId[] memory) {
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        return _toFilActorIdArray($._orgProviders[organization]);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function setPayee(CommonTypes.FilActorId provider, address payee) external {
+        _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
+        _onlyProviderControllerOrAdmin(provider);
+        if (payee == address(0)) revert InvalidPayeeAddress();
+
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        address oldPayee = $._providers[id].payee;
+        $._providers[id].payee = payee;
+
+        emit PayeeUpdated(provider, oldPayee, payee);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function getPayee(CommonTypes.FilActorId provider) external view returns (address) {
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        return $._providers[CommonTypes.FilActorId.unwrap(provider)].payee;
     }
 
     /**
@@ -512,11 +583,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     function _registerProvider(CommonTypes.FilActorId provider, address organization) internal {
         if (CommonTypes.FilActorId.unwrap(provider) == 0) revert InvalidProviderActorId();
+
         SPRegistryStorage storage $ = _getSPRegistryStorage();
+        // solhint-disable-next-line gas-strict-inequalities
+        if ($._providerIds.length() >= MAX_PROVIDERS) revert MaxProvidersReached(MAX_PROVIDERS);
+
         uint256 id256 = uint256(CommonTypes.FilActorId.unwrap(provider));
         if (!$._providerIds.add(id256)) revert ProviderAlreadyRegistered(provider);
 
-        $._providers[CommonTypes.FilActorId.unwrap(provider)].organization = organization;
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        $._providers[id].organization = organization;
+        $._providers[id].payee = organization;
         $._orgProviders[organization].add(id256);
 
         emit ProviderRegistered(provider, organization);
@@ -567,7 +644,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         pure
         returns (bool)
     {
-        if (reqs.retrievabilityPct != 0 && caps.retrievabilityPct < reqs.retrievabilityPct) return false;
+        if (reqs.retrievabilityBps != 0 && caps.retrievabilityBps < reqs.retrievabilityBps) return false;
         if (reqs.bandwidthMbps != 0 && caps.bandwidthMbps < reqs.bandwidthMbps) return false;
         if (reqs.latencyMs != 0 && caps.latencyMs > reqs.latencyMs) return false; // lower is better
         if (reqs.indexingPct != 0 && caps.indexingPct < reqs.indexingPct) return false;

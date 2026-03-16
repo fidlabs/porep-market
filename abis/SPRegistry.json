@@ -32,6 +32,19 @@
   },
   {
     "type": "function",
+    "name": "MAX_PROVIDERS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_TOLERANCE_BPS",
     "inputs": [],
     "outputs": [
@@ -120,6 +133,25 @@
   },
   {
     "type": "function",
+    "name": "getPayee",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getProviderForDeal",
     "inputs": [
       {
@@ -128,9 +160,9 @@
         "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
-            "name": "retrievabilityPct",
-            "type": "uint8",
-            "internalType": "uint8"
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
           },
           {
             "name": "bandwidthMbps",
@@ -208,6 +240,11 @@
             "internalType": "address"
           },
           {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "paused",
             "type": "bool",
             "internalType": "bool"
@@ -223,9 +260,9 @@
             "internalType": "struct SLITypes.SLIThresholds",
             "components": [
               {
-                "name": "retrievabilityPct",
-                "type": "uint8",
-                "internalType": "uint8"
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
               },
               {
                 "name": "bandwidthMbps",
@@ -273,6 +310,25 @@
     "type": "function",
     "name": "getProviders",
     "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint64[]",
+        "internalType": "CommonTypes.FilActorId[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProvidersByOrganization",
+    "inputs": [
+      {
+        "name": "organization",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -484,9 +540,9 @@
         "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
-            "name": "retrievabilityPct",
-            "type": "uint8",
-            "internalType": "uint8"
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
           },
           {
             "name": "bandwidthMbps",
@@ -606,9 +662,9 @@
         "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
-            "name": "retrievabilityPct",
-            "type": "uint8",
-            "internalType": "uint8"
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
           },
           {
             "name": "bandwidthMbps",
@@ -626,6 +682,24 @@
             "internalType": "uint8"
           }
         ]
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setPayee",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "payee",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -779,9 +853,9 @@
         "internalType": "struct SLITypes.SLIThresholds",
         "components": [
           {
-            "name": "retrievabilityPct",
-            "type": "uint8",
-            "internalType": "uint8"
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
           },
           {
             "name": "bandwidthMbps",
@@ -860,6 +934,31 @@
     "inputs": [
       {
         "name": "organization",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PayeeUpdated",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "oldPayee",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "newPayee",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -1294,6 +1393,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidPayeeAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidPoRepMarketAddress",
     "inputs": []
   },
@@ -1309,12 +1413,23 @@
   },
   {
     "type": "error",
-    "name": "InvalidRetrievabilityPct",
+    "name": "InvalidRetrievabilityBps",
     "inputs": [
       {
         "name": "value",
-        "type": "uint8",
-        "internalType": "uint8"
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MaxProvidersReached",
+    "inputs": [
+      {
+        "name": "maxProviders",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },

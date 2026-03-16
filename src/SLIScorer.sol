@@ -124,9 +124,9 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
         uint256 slasDefined;
         uint256 slasMet;
 
-        if (required.retrievabilityPct != 0) {
+        if (required.retrievabilityBps != 0) {
             slasDefined++;
-            if (required.retrievabilityPct <= attestation.slis.retrievabilityPct) slasMet++;
+            if (required.retrievabilityBps <= attestation.slis.retrievabilityBps) slasMet++;
         }
 
         if (required.bandwidthMbps != 0) {

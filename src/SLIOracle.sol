@@ -24,6 +24,9 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
      */
     error InvalidAdmin();
 
+    error InvalidRetrievabilityBps(uint16 value);
+    error InvalidIndexingPct(uint8 value);
+
     /**
      * @notice Upgradable role which allows for contract upgrades
      */
@@ -97,6 +100,9 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
         external
         onlyRole(ORACLE_ROLE)
     {
+        if (slis.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(slis.retrievabilityBps);
+        if (slis.indexingPct > 100) revert InvalidIndexingPct(slis.indexingPct);
+
         uint256 currentEpoch = block.number;
         s().attestations[provider] = SLITypes.Attestation({lastUpdate: currentEpoch, slis: slis});
         emit SLIAttestationUpdate(provider, currentEpoch, slis);
