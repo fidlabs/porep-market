@@ -10,7 +10,7 @@ import {MockProxy} from "./contracts/MockProxy.sol";
 import {ActorIdMock} from "./contracts/ActorIdMock.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
-import {MinerUtils} from "../src/libs/MinerUtils.sol";
+import {MinerUtils} from "../src/lib/MinerUtils.sol";
 
 contract MinerUtilsTest is Test {
     MinerUtilsHarness public harness;

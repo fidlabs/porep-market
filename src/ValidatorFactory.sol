@@ -10,6 +10,7 @@ import {Validator} from "./Validator.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
+import {PoRepTypes} from "./types/PoRepTypes.sol";
 
 /**
  * @title ValidatorFactory
@@ -135,7 +136,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         ValidatorFactoryStorage storage $ = s();
         if ($._instances[dealId] != address(0)) revert InstanceAlreadyExists();
 
-        PoRepMarket.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(dealId);
+        PoRepTypes.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(dealId);
         if (msg.sender != dp.client) revert InvalidClientAddress();
 
         bytes memory initCode = abi.encodePacked(
@@ -157,7 +158,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
                 )
             )
         );
-
+        // forge-lint: disable-next-line(asm-keccak256)
         bytes32 salt = keccak256(abi.encode(admin, dealId));
         address proxy = Create2.computeAddress(salt, keccak256(initCode), address(this));
         $._instances[dealId] = proxy;

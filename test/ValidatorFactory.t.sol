@@ -13,8 +13,8 @@ import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
-import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
+import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
@@ -49,7 +49,7 @@ contract ValidatorFactoryTest is Test {
         factoryImpl = new ValidatorFactory();
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: dealId,
                 client: client,
                 provider: provider,
@@ -58,7 +58,7 @@ contract ValidatorFactoryTest is Test {
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSector: 100, durationDays: 365}),
                 validator: vm.addr(10),
-                state: PoRepMarket.DealState.Accepted,
+                state: PoRepTypes.DealState.Accepted,
                 railId: 200,
                 manifestLocation: "https://example.com/manifest"
             })

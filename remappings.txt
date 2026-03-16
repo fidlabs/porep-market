@@ -12,3 +12,7 @@ openzeppelin-contracts/=lib/openzeppelin-contracts/
 openzeppelin/=lib/filecoin-solidity/lib/openzeppelin-contracts-upgradeable/contracts/
 solidity-BigNumber/=lib/filecoin-solidity/contracts/vendor/solidity-BigNumber/src/
 solidity-cborutils/=lib/filecoin-solidity/lib/solidity-cborutils/
+@prb-math/=lib/filecoin-pay/lib/prb-math/src/
+filecoin-pay/=lib/filecoin-pay/src/
+fvm-solidity/=lib/filecoin-pay/lib/fvm-solidity/src/
+prb-math/=lib/filecoin-pay/lib/prb-math/src/

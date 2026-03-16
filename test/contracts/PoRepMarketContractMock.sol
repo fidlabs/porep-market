@@ -4,6 +4,7 @@
 pragma solidity =0.8.25;
 
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
+import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract PoRepMarketContractMock is PoRepMarket {
@@ -16,7 +17,7 @@ contract PoRepMarketContractMock is PoRepMarket {
         }
     }
 
-    function setDealProposal(PoRepMarket.DealProposal calldata dealProposal) external {
+    function setDealProposal(PoRepTypes.DealProposal calldata dealProposal) external {
         _getStorage()._dealProposals[++_getStorage()._dealIdCounter] = dealProposal;
     }
 

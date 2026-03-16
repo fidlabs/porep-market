@@ -4,7 +4,6 @@ pragma solidity =0.8.25;
 
 import {Test} from "forge-std/Test.sol";
 import {Client} from "../src/Client.sol";
-import {PoRepMarket} from "../src/PoRepMarket.sol";
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
@@ -28,6 +27,7 @@ import {ClientContractMock} from "./contracts/ClientContractMock.sol";
 import {ReentrantValidatorMock} from "./contracts/ReentrantValidatorMock.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
+import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 
 // solhint-disable max-states-count
 contract ClientTest is Test {
@@ -38,6 +38,7 @@ contract ClientTest is Test {
     address public terminationOracle;
     bytes public transferTo = abi.encodePacked(vm.addr(2));
     uint256 public dealId;
+    uint256 public totalDealSize;
 
     CommonTypes.FilActorId public providerFilActorId;
     // solhint-disable var-name-mixedcase
@@ -77,6 +78,7 @@ contract ClientTest is Test {
         poRepMarketMock = new PoRepMarketMock();
         validatorMock = new ValidatorMock();
         terminationOracle = vm.addr(3);
+        totalDealSize = 1024;
         client = Client(setupProxy(address(impl)));
         actorIdMock = new ActorIdMock();
         failingMockInvalidTopLevelArray = new FailingMockInvalidTopLevelArray();
@@ -110,16 +112,16 @@ contract ClientTest is Test {
         dealId = 1;
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
-                state: PoRepMarket.DealState.Accepted,
+                state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })
@@ -255,16 +257,16 @@ contract ClientTest is Test {
     function testShouldRevertTransferWhenDealIsNotInCorrectState() public {
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
-                state: PoRepMarket.DealState.Completed,
+                state: PoRepTypes.DealState.Completed,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })
@@ -391,16 +393,16 @@ contract ClientTest is Test {
 
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
-                state: PoRepMarket.DealState.Accepted,
+                state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })
@@ -487,16 +489,16 @@ contract ClientTest is Test {
         ReentrantValidatorMock reentrantValidatorMock = new ReentrantValidatorMock();
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(reentrantValidatorMock),
-                state: PoRepMarket.DealState.Accepted,
+                state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })
@@ -517,16 +519,16 @@ contract ClientTest is Test {
 
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: 150,
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(validatorMock),
-                state: PoRepMarket.DealState.Accepted,
+                state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })
@@ -754,16 +756,16 @@ contract ClientTest is Test {
 
         poRepMarketMock.setDealProposal(
             dealId,
-            PoRepMarket.DealProposal({
+            PoRepTypes.DealProposal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1000, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
                 validator: address(0),
-                state: PoRepMarket.DealState.Accepted,
+                state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })

@@ -19,6 +19,45 @@
   },
   {
     "type": "function",
+    "name": "POREP_SERVICE_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "createRail",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "disableFutureRailPayments",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -83,42 +122,78 @@
     "name": "initialize",
     "inputs": [
       {
-        "name": "",
+        "name": "_admin",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_porepService",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_filecoinPay",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_SLIScorer",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_clientSC",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_SPRegistry",
         "type": "address",
         "internalType": "address"
       },
       {
-        "name": "",
+        "name": "_dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "modifyRailPayment",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "railTerminated",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "terminator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "endEpoch",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -164,6 +239,24 @@
   },
   {
     "type": "function",
+    "name": "setDealEndEpoch",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "endEpoch",
+        "type": "int64",
+        "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -182,6 +275,112 @@
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "terminateRail",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateLockupPeriod",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newLockupPeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "validatePayment",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "proposedAmount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "fromEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "toEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "rate",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "result",
+        "type": "tuple",
+        "internalType": "struct IValidator.ValidationResult",
+        "components": [
+          {
+            "name": "modifiedAmount",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "settleUpto",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "note",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "event",
+    "name": "DealEndEpochUpdated",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "endEpoch",
+        "type": "int64",
+        "indexed": false,
+        "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "event",
     "name": "Initialized",
     "inputs": [
@@ -190,6 +389,82 @@
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "LockupPeriodUpdated",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newLockupPeriod",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RailDisabled",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RailPaymentModified",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newRate",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "RailTerminated",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "terminator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "endEpoch",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -292,12 +567,144 @@
   },
   {
     "type": "error",
+    "name": "CallerIsNotClient",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CallerIsNotClientSC",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "CallerIsNotFilecoinPay",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DealNotCompleted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidAdminAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidClientSCAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealDuration",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFilecoinPayAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
     "inputs": []
   },
   {
     "type": "error",
+    "name": "InvalidLockupAllowance",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepMarketAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepServiceAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidRailId",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidRateAllowance",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSLIScorerAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSPRegistryAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSectorCount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidZeroAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MaxLockupPeriodLessThanMinimum",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NegativeEndEpoch",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotInitializing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "OperatorNotApproved",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RailAlreadyCreated",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "UnauthorizedCaller",
     "inputs": []
   }
 ]

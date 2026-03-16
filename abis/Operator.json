@@ -1,0 +1,59 @@
+[
+  {
+    "type": "function",
+    "name": "createRail",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "modifyRailPayment",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "terminateRail",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "updateLockupPeriod",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newLockupPeriod",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  }
+]

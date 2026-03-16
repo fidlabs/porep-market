@@ -21,6 +21,7 @@ contract SPRegistryMock is ISPRegistry {
 
     function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
         external
+        view
         returns (CommonTypes.FilActorId, bool)
     {
         return (nextProvider, nextAutoApprove);
@@ -99,4 +100,6 @@ contract SPRegistryMock is ISPRegistry {
     function getToleranceBps() external pure returns (uint256) {
         return 0;
     }
+
+    function getPayAddressForProvider(CommonTypes.FilActorId provider) external view returns (address) {}
 }

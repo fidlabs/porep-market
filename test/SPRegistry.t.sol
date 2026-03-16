@@ -1441,4 +1441,9 @@ contract SPRegistryTest is Test {
         MockProxy proxy = new MockProxy(address(5555));
         vm.etch(address(5555), address(proxy).code);
     }
+
+    function testGetPayAddressForProviderReturnsZeroAddress() public view {
+        address payAddress = spRegistry.getPayee(provider1);
+        assertEq(payAddress, address(0));
+    }
 }

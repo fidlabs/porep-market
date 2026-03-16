@@ -77,7 +77,7 @@
       {
         "name": "completedDeals",
         "type": "tuple[]",
-        "internalType": "struct PoRepMarket.DealProposal[]",
+        "internalType": "struct PoRepTypes.DealProposal[]",
         "components": [
           {
             "name": "dealId",
@@ -151,7 +151,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepMarket.DealState"
+            "internalType": "enum PoRepTypes.DealState"
           },
           {
             "name": "railId",
@@ -182,7 +182,7 @@
       {
         "name": "",
         "type": "tuple",
-        "internalType": "struct PoRepMarket.DealProposal",
+        "internalType": "struct PoRepTypes.DealProposal",
         "components": [
           {
             "name": "dealId",
@@ -256,7 +256,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepMarket.DealState"
+            "internalType": "enum PoRepTypes.DealState"
           },
           {
             "name": "railId",
@@ -534,6 +534,29 @@
   },
   {
     "type": "function",
+    "name": "terminateDeal",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "terminator",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "endEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "updateManifestLocation",
     "inputs": [
       {
@@ -717,6 +740,12 @@
         "type": "string",
         "indexed": false,
         "internalType": "string"
+      },
+      {
+        "name": "totalDealSize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -736,6 +765,31 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DealTerminated",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "terminator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "endEpoch",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -938,6 +992,22 @@
   },
   {
     "type": "error",
+    "name": "CallerIsNotValidator",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "caller",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "DealDoesNotExist",
     "inputs": []
   },
@@ -953,12 +1023,12 @@
       {
         "name": "currentState",
         "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
+        "internalType": "enum PoRepTypes.DealState"
       },
       {
         "name": "expectedState",
         "type": "uint8",
-        "internalType": "enum PoRepMarket.DealState"
+        "internalType": "enum PoRepTypes.DealState"
       }
     ]
   },
