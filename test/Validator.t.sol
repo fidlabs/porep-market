@@ -491,7 +491,7 @@ contract ValidatorTest is Test {
     }
 
     function testSetDealEndEpochCallerIsNotPoRepServiceRevert() public {
-        address unauthorized = vm.addr(0x123);
+        address unauthorized = vm.addr(0x321);
         bytes32 expectedRole = validator.POREP_SERVICE_ROLE();
 
         vm.expectRevert(
