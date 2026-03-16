@@ -22,6 +22,7 @@ contract SPRegistryTest is Test {
     address public owner1;
     address public owner2;
     address public unauthorizedAddress;
+    address public operatorAddress;
 
     CommonTypes.FilActorId public provider1;
     CommonTypes.FilActorId public provider2;
@@ -42,6 +43,7 @@ contract SPRegistryTest is Test {
         owner1 = vm.addr(0x003);
         owner2 = vm.addr(0x004);
         unauthorizedAddress = vm.addr(0x005);
+        operatorAddress = vm.addr(0x006);
 
         provider1 = CommonTypes.FilActorId.wrap(1000);
         provider2 = CommonTypes.FilActorId.wrap(2000);
@@ -53,6 +55,10 @@ contract SPRegistryTest is Test {
 
         vm.prank(adminAddress);
         spRegistry.initialize2(poRepMarketAddress);
+
+        bytes32 operatorRole = spRegistry.OPERATOR_ROLE();
+        vm.prank(adminAddress);
+        spRegistry.grantRole(operatorRole, operatorAddress);
     }
 
     function testInitializeSetsAdminRole() public view {
@@ -130,11 +136,6 @@ contract SPRegistryTest is Test {
             )
         );
         spRegistry.upgradeToAndCall(newImpl, "");
-    }
-
-    function testRegisterProviderRevertsNotImplemented() public {
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.NotImplemented.selector));
-        spRegistry.registerProvider(provider1);
     }
 
     function testPauseProviderSetsPausedTrue() public {
@@ -354,13 +355,8 @@ contract SPRegistryTest is Test {
     }
 
     function testRegisterProviderForRevertsForNonAdmin() public {
-        bytes32 adminRole = spRegistry.DEFAULT_ADMIN_ROLE();
         vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, adminRole
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.NotAdminOrOperator.selector, unauthorizedAddress));
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
     }
 
@@ -384,6 +380,23 @@ contract SPRegistryTest is Test {
         vm.expectEmit(true, false, false, true);
         emit SPRegistry.PriceUpdated(provider1, 0, 0);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0);
+    }
+
+    function testRegisterProviderForSucceedsWithOperatorRole() public {
+        vm.prank(operatorAddress);
+        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100);
+
+        assertTrue(spRegistry.isProviderRegistered(provider1));
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.organization, owner1);
+        assertEq(info.availableBytes, defaultAvailableBytes);
+        assertEq(info.pricePerSector, 100);
+    }
+
+    function testRegisterProviderForStillWorksForAdmin() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100);
+        assertTrue(spRegistry.isProviderRegistered(provider1));
     }
 
     function testUpdateAvailableSpaceEmitsEvent() public {

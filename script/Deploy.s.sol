@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec, max-states-count
+// solhint-disable use-natspec, max-states-count, no-console
 pragma solidity =0.8.25;
 
 import {Script} from "forge-std/Script.sol";
@@ -12,6 +12,7 @@ import {DeployUtils} from "./utils/DeployUtils.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
+import {console} from "forge-std/console.sol";
 
 contract Deploy is Script, DeployUtils {
     using stdJson for string;
@@ -39,6 +40,7 @@ contract Deploy is Script, DeployUtils {
     address internal terminationOracle;
     address internal oracleAddress;
     address internal poRepService;
+    address internal operatorAddress;
 
     error InvalidEnv();
 
@@ -49,6 +51,7 @@ contract Deploy is Script, DeployUtils {
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         oracleAddress = vm.envAddress("ORACLE");
         poRepService = vm.envAddress("POREP_SERVICE");
+        operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
@@ -67,6 +70,13 @@ contract Deploy is Script, DeployUtils {
         ValidatorFactory(validatorFactory)
             .initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
         SPRegistry(spRegistry).initialize2(poRepMarket);
+
+        if (operatorAddress != address(0)) {
+            SPRegistry(spRegistry).grantRole(SPRegistry(spRegistry).OPERATOR_ROLE(), operatorAddress);
+        } else {
+            // solhint-disable-next-line gas-small-strings
+            console.log("WARNING: OPERATOR_ADDR not set, skipping operator role grant");
+        }
 
         vm.stopBroadcast();
 
