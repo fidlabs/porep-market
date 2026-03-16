@@ -1443,7 +1443,7 @@ contract SPRegistryTest is Test {
     }
 
     function testGetPayAddressForProviderReturnsZeroAddress() public view {
-        address payAddress = spRegistry.getPayAddressForProvider(provider1);
+        address payAddress = spRegistry.getPayee(provider1);
         assertEq(payAddress, address(0));
     }
 }

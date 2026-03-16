@@ -365,7 +365,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes);
 
         dp.state = PoRepTypes.DealState.Terminated;
         emit DealTerminated(dealId, terminator, endEpoch);

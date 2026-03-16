@@ -392,7 +392,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert InvalidRateAllowance();
         }
 
-        address payee = ISPRegistry($.SPRegistry).getPayAddressForProvider($.providerId);
+        address payee = ISPRegistry($.SPRegistry).getPayee($.providerId);
 
         uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, dealProposal.client, payee, 0, address(0));
         $.railId = railId;

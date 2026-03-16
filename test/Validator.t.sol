@@ -63,7 +63,7 @@ contract ValidatorTest is Test {
         expectedManifestLocation = "https://example.com/manifest";
 
         defaultRequirements =
-            SLITypes.SLIThresholds({retrievabilityPct: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
         poRepMarketMock.setDealProposal(
             dealId,
@@ -202,7 +202,7 @@ contract ValidatorTest is Test {
         vm.prank(oracleUpdater);
         sliOracle.setSLI(
             providerFilActorId,
-            SLITypes.SLIThresholds({retrievabilityPct: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0})
+            SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0})
         );
 
         vm.prank(address(filecoinPayMock));
@@ -699,7 +699,7 @@ contract ValidatorTest is Test {
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
-        vm.roll(BLOCK_TIMESTAMP);
+        vm.warp(BLOCK_TIMESTAMP);
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -710,9 +710,9 @@ contract ValidatorTest is Test {
         vm.prank(address(filecoinPayMock));
         IValidator.ValidationResult memory result = validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
 
-        assertEq(result.modifiedAmount, 2_000_000);
-        assertEq(result.settleUpto, 200_000);
-        assertEq(result.note, "payment validated successfully");
+        assertEq(result.modifiedAmount, 10);
+        assertEq(result.settleUpto, 1);
+        assertEq(result.note, "payment limited to deal endepoch");
     }
 
     function testValidatePaymentUsesEarlyTerminatedEpochWhenEarlierThanDealEndEpoch() public {
