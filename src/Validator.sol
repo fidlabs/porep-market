@@ -481,15 +481,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /**
      * @notice Sets the end epoch for the deal associated with this validator
-     * @dev Only callable by the client smart contract
+     * @dev Only callable by POREP_SERVICE bot
      * @param dealId The ID of the deal
      * @param endEpoch The Filecoin epoch at which the deal ended
      */
-    function setDealEndEpoch(uint256 dealId, CommonTypes.ChainEpoch endEpoch) external {
+    function setDealEndEpoch(uint256 dealId, CommonTypes.ChainEpoch endEpoch) external onlyRole(POREP_SERVICE_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
-        if (msg.sender != $.clientSC) {
-            revert CallerIsNotClientSC();
-        }
 
         if (dealId != $.dealId) {
             revert InvalidDealId();

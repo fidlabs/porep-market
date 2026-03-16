@@ -19,6 +19,7 @@ import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
@@ -114,7 +115,7 @@ contract ValidatorTest is Test {
         vm.prank(admin);
         validator.createRail(token);
 
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
 
         vm.prank(oracleUpdater);
@@ -459,7 +460,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch() public {
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(10)));
 
         clientSCMock.setDataSizeMatching(dealId, true);
@@ -475,7 +476,7 @@ contract ValidatorTest is Test {
     function testValidatePaymentCapsSettlementToDealEndEpoch() public {
         clientSCMock.setDataSizeMatching(dealId, true);
 
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1000)));
 
         vm.prank(oracleUpdater);
@@ -489,8 +490,14 @@ contract ValidatorTest is Test {
         assertEq(result.note, "payment limited to deal endepoch");
     }
 
-    function testSetDealEndEpochCallerIsNotClientSCRevert() public {
-        vm.expectRevert(Validator.CallerIsNotClientSC.selector);
+    function testSetDealEndEpochCallerIsNotPoRepServiceRevert() public {
+        address unauthorized = vm.addr(0x123);
+        bytes32 expectedRole = validator.POREP_SERVICE_ROLE();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, expectedRole)
+        );
+        vm.prank(unauthorized);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
     }
 
@@ -498,7 +505,7 @@ contract ValidatorTest is Test {
         uint256 wrongDealId = dealId + 1;
 
         vm.expectRevert(Validator.InvalidDealId.selector);
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(wrongDealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
     }
 
@@ -618,7 +625,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentRevertsWhenDealNotCompleted() public {
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(0)));
 
         vm.expectRevert(abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId));
@@ -681,7 +688,7 @@ contract ValidatorTest is Test {
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.DealEndEpochUpdated(dealId, newEndEpoch);
 
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(dealId, newEndEpoch);
     }
 
@@ -755,7 +762,7 @@ contract ValidatorTest is Test {
 
     function testSetDealEndEpochNegativeEndEpochRevert() public {
         vm.expectRevert(Validator.NegativeEndEpoch.selector);
-        vm.prank(clientSC);
+        vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(-1)));
     }
 }
