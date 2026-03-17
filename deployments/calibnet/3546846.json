@@ -1,0 +1,48 @@
+{
+  "Allocator": "0x9fd24Fc6E377102a911Fb8b1a505443eb5598170",
+  "Client": {
+    "codeHash": "0xb49efd34a5f95e449eca59fe2f4e2f801e188dfa291f3c26eb70b4ba92636a17",
+    "deployedCodeHash": "0x4432f0160d390c8737ceb3e7115ea20ad8635f60f8f7be669d3d815c34db0c13",
+    "impl": "0x24CE9193843a9D2DCbff2b23bAD057A0f5b7e774",
+    "proxy": "0x89b66546dB3b46a22900bCA09B06026A2a7c8df4"
+  },
+  "FilecoinPay": "0x09a0fDc2723fAd1A7b8e3e00eE5DF73841df55a0",
+  "PoRepMarket": {
+    "codeHash": "0x0c97394ffa761dafa92f7a3a76bb9c523a18056a14a2f469915091002e7d7bf6",
+    "deployedCodeHash": "0x3228bd90a2129708c226368d5e4c31a97929e49ba9ccf4688adb676c3087397a",
+    "impl": "0x923E95884Cf38dfD59443605Cd22AbC786149587",
+    "proxy": "0xCa9a7A0c2A781b7cA6D3e36d38863ADFdB41E90F"
+  },
+  "PoRepService": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
+  "SLIOracle": {
+    "codeHash": "0x552bab6a91012658f51fb9692b5702e1ed8c9782bb6834469be02491925f78f7",
+    "deployedCodeHash": "0xb2cf4f478ff232504963e838fb3110330b5241417adaa2d6ccd5ede0269a1de9",
+    "impl": "0xCC201FE04Ea5541047444067D5c37bb915C7F55E",
+    "proxy": "0x752e44b17DFD94de71900390CDA0316ba1D1E0f4"
+  },
+  "SLIScorer": {
+    "codeHash": "0x718cff41e0d6cbab4d205bdc12de3261efb6eb00fa3d7824fd1ac192116fed8d",
+    "deployedCodeHash": "0xd2688d4ad5ed90b831c776f4fd081f79660dbdcb90e09397b642b2bf939eb33b",
+    "impl": "0x62172552F5B55063521A44e7f0FE1267637ac70D",
+    "proxy": "0xA9554C48aaF093a92c8B86E70A2FFba615AE87dD"
+  },
+  "SPRegistry": {
+    "codeHash": "0x4070933114860d12e663851fab66366c5cb6e9ecffd50410a62cc6974b3a2e30",
+    "deployedCodeHash": "0xdca08069048b21fb5c9f7ff079120dd8dffa01ceeee159ec95fbbab579f01bb0",
+    "impl": "0x1b3E4CD6C73E2bA8e3ab4CA672F6c474B77E2815",
+    "proxy": "0xF50897bE366D051962707f9Bd9f380e8A8f3E41e"
+  },
+  "TerminationOracle": "0xe4Cd56f91Bc79cC610AEfB1bE92b07BB5b6F2e30",
+  "ValidatorBeacon": "0x24FEcCD77E605F602BA7a8A06bE4634f40292FDe",
+  "ValidatorFactory": {
+    "codeHash": "0xec75ffb459e44e16ee3f4b1c1e55e293f0f31756ffc6403759951f438869088a",
+    "deployedCodeHash": "0x90ddd6e7f12f3376de71cf17032d10c060d16aabccf45d55ed3fb1e7b082ac86",
+    "impl": "0xC25d14ce4a0cC2e7d44c4eaeBc92c3De4854E567",
+    "proxy": "0xEe64CcA9B2E119BB4168C3a804E89d920eF770d8"
+  },
+  "ValidatorImpl": "0xFC02d9b987Cf9622df5051B9b3aBCe6850253144",
+  "block": 3546846,
+  "chainId": 314159,
+  "deployer": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
+  "timestamp": 1773731760
+}

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable
 
-pragma solidity =0.8.25;
+pragma solidity =0.8.30;
 
 contract ValidatorFactoryMock {
     mapping(address => bool) public validators;

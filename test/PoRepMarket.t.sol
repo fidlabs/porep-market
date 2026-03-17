@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable use-natspec
-pragma solidity =0.8.25;
+pragma solidity =0.8.30;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";

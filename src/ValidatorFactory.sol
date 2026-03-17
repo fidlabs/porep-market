@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable var-name-mixedcase
 
-pragma solidity =0.8.25;
+pragma solidity =0.8.30;
 
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
