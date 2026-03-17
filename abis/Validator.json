@@ -257,7 +257,7 @@
   },
   {
     "type": "function",
-    "name": "setMinTimeBetweenSettlementsInEpochs",
+    "name": "setMinEpochsBetweenSettlements",
     "inputs": [
       {
         "name": "minTime",
@@ -427,7 +427,7 @@
   },
   {
     "type": "event",
-    "name": "MinTimeBetweenSettlementsUpdated",
+    "name": "MinEpochsBetweenSettlementsUpdated",
     "inputs": [
       {
         "name": "dealId",
@@ -660,7 +660,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidMinTimeBetweenSettlements",
+    "name": "InvalidMinEpochsBetweenSettlements",
     "inputs": []
   },
   {
