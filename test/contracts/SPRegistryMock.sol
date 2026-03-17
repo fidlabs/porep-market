@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable
 
-pragma solidity =0.8.25;
+pragma solidity =0.8.30;
 
 import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
 import {SLITypes} from "../../src/types/SLITypes.sol";

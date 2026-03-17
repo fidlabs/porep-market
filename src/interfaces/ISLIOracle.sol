@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.25;
+pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SLITypes} from "../types/SLITypes.sol";

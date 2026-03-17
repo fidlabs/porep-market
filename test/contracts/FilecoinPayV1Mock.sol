@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.30;
 
 import {IFilecoinPayV1} from "../../src/interfaces/IFilecoinPayV1.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";

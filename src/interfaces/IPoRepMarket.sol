@@ -2,7 +2,7 @@
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 
-pragma solidity ^0.8.24;
+pragma solidity ^0.8.30;
 
 /**
  * @title IPoRepMarket interface

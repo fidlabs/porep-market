@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity =0.8.25;
+pragma solidity =0.8.30;
 
 import {CBORDecoder} from "filecoin-solidity/v0.8/utils/CborDecode.sol";
 import {DataCapTypes} from "filecoin-solidity/v0.8/types/DataCapTypes.sol";
