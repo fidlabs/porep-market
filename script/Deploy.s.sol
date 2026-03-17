@@ -56,12 +56,12 @@ contract Deploy is Script, DeployUtils {
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
+        (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         (clientSmartContract, clientSmartContractImpl) =
             _deployClientSmartContract(admin, allocator, terminationOracle, poRepMarket);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
-        (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
