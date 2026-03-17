@@ -143,6 +143,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     error InvalidRailId(uint256 expected, uint256 actual);
 
+    /**
+     * @notice Error indicating that the minimum time between settlements is invalid
+     */
+    error InvalidMinEpochsBetweenSettlements();
+
     // solhint-disable gas-indexed-events
     /**
      * @notice Event emitted when a payment rail is terminated
@@ -179,6 +184,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     event RailDisabled(uint256 indexed railId);
 
+    /**
+     * @notice Event emitted when the minimum time between settlements is updated
+     * @param dealId The ID of the deal associated with the validator
+     * @param minTimeBetweenSettlementsInEpochs The new minimum time between settlements in epochs
+     */
+    event MinEpochsBetweenSettlementsUpdated(uint256 indexed dealId, uint256 minTimeBetweenSettlementsInEpochs);
+
     // solhint-enable gas-indexed-events
 
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
@@ -194,6 +206,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         CommonTypes.ChainEpoch dealEndEpoch;
         uint256 amountPerEpoch;
         uint256 earlyTerminatedEpoch;
+        uint256 minTimeBetweenSettlementsInEpochs;
     }
 
     /**
@@ -278,6 +291,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         $.poRepMarket = _poRepMarket;
         $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
+        $.minTimeBetweenSettlementsInEpochs = EPOCHS_IN_MONTH;
 
         IPoRepMarket(_poRepMarket).updateValidator(_dealId);
     }
@@ -317,9 +331,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             dealEndEpoch = $.earlyTerminatedEpoch;
         }
 
-        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
+        if (toEpoch < fromEpoch + $.minTimeBetweenSettlementsInEpochs) {
             result.settleUpto = fromEpoch;
-            result.note = "1mo payout period not reached";
+            result.note = "too early for settlement";
             return result;
         }
 
@@ -499,6 +513,20 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         $.dealEndEpoch = endEpoch;
         emit DealEndEpochUpdated(dealId, endEpoch);
+    }
+
+    /**
+     * @notice Sets the minimum time between settlements in epochs
+     * @dev Only callable by the admin
+     * @param minTime Minimum time between settlements in epochs
+     */
+    function setMinEpochsBetweenSettlements(uint256 minTime) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (minTime == 0) {
+            revert InvalidMinEpochsBetweenSettlements();
+        }
+        ValidatorStorage storage $ = _getValidatorStorage();
+        $.minTimeBetweenSettlementsInEpochs = minTime;
+        emit MinEpochsBetweenSettlementsUpdated($.dealId, minTime);
     }
 
     /**

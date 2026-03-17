@@ -185,7 +185,7 @@ contract ValidatorTest is Test {
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 0);
-        assertEq(result.note, "1mo payout period not reached");
+        assertEq(result.note, "too early for settlement");
     }
 
     function testValidatePaymentDatacapMismatch() public {
@@ -764,5 +764,43 @@ contract ValidatorTest is Test {
         vm.expectRevert(Validator.NegativeEndEpoch.selector);
         vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(-1)));
+    }
+
+    function testSetMinEpochsBetweenSettlementsReverts() public {
+        vm.expectRevert(Validator.InvalidMinEpochsBetweenSettlements.selector);
+        vm.prank(admin);
+        validator.setMinEpochsBetweenSettlements(0);
+    }
+
+    function testSetMinEpochsBetweenSettlementsRevertsUnathorized() public {
+        address unauthorized = vm.addr(0x321);
+        bytes32 expectedRole = validator.DEFAULT_ADMIN_ROLE();
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, expectedRole)
+        );
+        vm.prank(unauthorized);
+        validator.setMinEpochsBetweenSettlements(0);
+    }
+
+    function testSetMinEpochsBetweenSettlementsEmitEvent() public {
+        vm.expectEmit(true, false, false, true);
+        emit Validator.MinEpochsBetweenSettlementsUpdated(dealId, 1000);
+        vm.prank(admin);
+        validator.setMinEpochsBetweenSettlements(1000);
+    }
+
+    function testSetMinEpochsBetweenSettlementsSuccessful() public {
+        vm.prank(admin);
+        validator.setMinEpochsBetweenSettlements(1000);
+        clientSCMock.setDataSizeMatching(dealId, true);
+
+        vm.prank(oracleUpdater);
+        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+
+        vm.prank(address(filecoinPayMock));
+        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 1000, 1);
+        assertEq(result.modifiedAmount, 100);
+        assertEq(result.settleUpto, 1000);
+        assertEq(result.note, "payment validated successfully");
     }
 }
