@@ -28,6 +28,9 @@ import {ReentrantValidatorMock} from "./contracts/ReentrantValidatorMock.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
+import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
+import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 
 // solhint-disable max-states-count
 contract ClientTest is Test {
@@ -61,6 +64,7 @@ contract ClientTest is Test {
     ResolveAddressPrecompileMock public resolveAddressPrecompileMock;
     PoRepMarketMock public poRepMarketMock;
     ValidatorMock public validatorMock;
+    MetaAllocatorMock public metaAllocatorMock;
 
     ResolveAddressPrecompileMock public resolveAddress =
         ResolveAddressPrecompileMock(payable(0xFE00000000000000000000000000000000000001));
@@ -77,6 +81,7 @@ contract ClientTest is Test {
         clientAddress = address(0x789);
         poRepMarketMock = new PoRepMarketMock();
         validatorMock = new ValidatorMock();
+        metaAllocatorMock = new MetaAllocatorMock();
         terminationOracle = vm.addr(3);
         totalDealSize = 1024;
         client = Client(setupProxy(address(impl)));
@@ -126,12 +131,14 @@ contract ClientTest is Test {
                 manifestLocation: expectedManifestLocation
             })
         );
+        metaAllocatorMock.setAllowance(address(client), uint256(10000));
     }
 
     function setupProxy(address impl) public returns (address) {
         // solhint-disable-next-line gas-small-strings
-        bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)", address(this), allocator, terminationOracle, poRepMarketMock
+        bytes memory initData = abi.encodeCall(
+            Client.initialize,
+            (address(this), allocator, terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return address(proxy);
@@ -165,6 +172,8 @@ contract ClientTest is Test {
 
     function testShouldAddAllocationsIdsAfterTransfer() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
+
         CommonTypes.FilActorId[] memory clientAllocationIdsBefore = client.getClientAllocationIdsPerDeal(dealId);
         assertEq(clientAllocationIdsBefore.length, 0);
 
@@ -284,13 +293,6 @@ contract ClientTest is Test {
         client.transfer(transferParams, dealId, false);
     }
 
-    function testShouldRevertWhenVerifregAddVerifiedClientFails() public {
-        vm.etch(CALL_ACTOR_ID, address(failingMockAddVerifiedClient).code);
-        vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(Client.VerifRegAddVerifiedClientFailed.selector, 1));
-        client.transfer(transferParams, dealId, false);
-    }
-
     function testClaimExtensionNonExistent() public {
         // 0 success_count
         actorIdMock.setGetClaimsResult(hex"8282008080");
@@ -385,6 +387,8 @@ contract ClientTest is Test {
 
     function testShouldNotOverrideDealWhileReplayingIfAlreadyRegistered() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(1000000));
+
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
 
@@ -426,6 +430,8 @@ contract ClientTest is Test {
     // solhint-disable reentrancy
     function testShouldUpdateLongestDealTermWhenNewDealIsLongerThanCurrent() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(1000000));
+
         int64 expectedLongestDealTermBefore = 5256305;
         int64 expectedLongestDealTermAfter = 10256305;
 
@@ -457,6 +463,8 @@ contract ClientTest is Test {
 
     function testShouldNotUpdateLongestDealTermWhenNewDealIsShorterThanCurrent() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(1000000));
+
         int64 expectedLongestDealTermBefore = 5256305;
         int64 expectedLongestDealTermAfter = expectedLongestDealTermBefore;
 
@@ -511,6 +519,8 @@ contract ClientTest is Test {
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(1000000));
+
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
 
@@ -553,6 +563,7 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingHappyPath() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
@@ -570,6 +581,7 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingRemovesTerminatedClaimAndReturnsFalse() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
@@ -594,6 +606,7 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingRemovesExpiredClaimAndReturnsFalse() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         vm.prank(clientAddress);
@@ -611,6 +624,7 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingSkipsFailCodes() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
@@ -643,6 +657,7 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingRemovesTerminatedClaimId() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
 
         actorIdMock.setGetClaimsResult(
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
@@ -701,7 +716,7 @@ contract ClientTest is Test {
 
     function testDeleteDealAllocationIdByValue() public {
         ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-
+        metaAllocatorMock.setAllowance(address(mock), uint256(10000));
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
 
@@ -722,6 +737,7 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingRevertsWhenGetClaimsExitCodeNonZero() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
@@ -740,6 +756,8 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingCallerNotValidator() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
+
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         vm.prank(clientAddress);
@@ -752,6 +770,8 @@ contract ClientTest is Test {
 
     function testIsDataSizeMatchingDealWithNoValidator() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
+
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         poRepMarketMock.setDealProposal(
@@ -774,5 +794,41 @@ contract ClientTest is Test {
         vm.prank(address(0x123));
         vm.expectRevert(abi.encodeWithSelector(Client.ValidatorNotSet.selector, dealId));
         clientMock.isDataSizeMatching(dealId);
+    }
+
+    function testShouldThrowInsufficientAllowance() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(IMetaAllocator.InsufficientAllowance.selector));
+        clientMock.transfer(transferParams, dealId, false);
+    }
+
+    function testShouldThrowAmountEqualZero() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
+
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22001A0007E9001A009C7E801901318183192710011A005034AC";
+        actorIdMock.setGetClaimsResult(
+            hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C7638001A003815911A005034D60000"
+        );
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(IMetaAllocator.AmountEqualZero.selector));
+        clientMock.transfer(transferParams, dealId, false);
+    }
+
+    function testShouldEmitMetaAllocatorDatacapAllocatedEvent() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
+
+        vm.prank(clientAddress);
+        vm.expectEmit(true, true, true, true);
+        emit IMetaAllocator.DatacapAllocated(
+            address(clientMock), FilAddresses.fromEthAddress(address(clientMock)).data, uint256(6144)
+        );
+        clientMock.transfer(transferParams, dealId, false);
     }
 }
