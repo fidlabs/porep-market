@@ -17,6 +17,7 @@ import {PoRepMarket} from "./PoRepMarket.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {IValidator} from "./interfaces/Validator.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
 
 /**
  * @title Client
@@ -30,6 +31,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         mapping(uint256 dealId => Deal deal) _deals;
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         PoRepMarket _poRepMarketContract;
+        IMetaAllocator _metaAllocatorContract;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ClientStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -144,11 +146,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     error InvalidCaller(address caller, address expectedCaller);
 
     /**
-     * @notice Error thrown when VerifReg addVerifiedClient call fails
-     */
-    error VerifRegAddVerifiedClientFailed(int256 exitCode);
-
-    /**
      * @notice Error thrown when deal state is invalid for transfer
      */
     error InvalidDealStateForTransfer();
@@ -197,11 +194,15 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @param allocator Address of the allocator contract that can increase and decrease allowances
      * @param terminationOracle Address of the Termination Oracle
      * @param _poRepMarketContract Address of the PoRepMarket contract
+     * @param _metaAllocatorContract Address of the MetaAllocator contract
      */
-    function initialize(address admin, address allocator, address terminationOracle, address _poRepMarketContract)
-        public
-        initializer
-    {
+    function initialize(
+        address admin,
+        address allocator,
+        address terminationOracle,
+        address _poRepMarketContract,
+        address _metaAllocatorContract
+    ) public initializer {
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
@@ -210,6 +211,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         ClientStorage storage $ = s();
         $._poRepMarketContract = PoRepMarket(_poRepMarketContract);
+        $._metaAllocatorContract = IMetaAllocator(_metaAllocatorContract);
     }
 
     /**
@@ -232,19 +234,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
 
         ClientStorage storage $ = s();
-
-        VerifRegTypes.AddVerifiedClientParams memory verifregParams = VerifRegTypes.AddVerifiedClientParams({
-            addr: FilAddresses.fromEthAddress(address(this)),
-            allowance: CommonTypes.BigInt(abi.encodePacked($._deals[dealId].sizeOfAllocations), false)
-        });
-
-        {
-            emit VerifiedClientAdded(msg.sender, $._deals[dealId].sizeOfAllocations);
-            int256 verifgerApiExitCode = VerifRegAPI.addVerifiedClient(verifregParams);
-            if (verifgerApiExitCode != 0) {
-                revert VerifRegAddVerifiedClientFailed(verifgerApiExitCode);
-            }
-        }
+        $._metaAllocatorContract
+            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, $._deals[dealId].sizeOfAllocations);
 
         emit DatacapSpent(msg.sender, $._deals[dealId].sizeOfAllocations);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
