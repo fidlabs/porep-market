@@ -45,7 +45,8 @@ contract Deploy is Script, DeployUtils {
     error InvalidEnv();
 
     function run() external {
-        admin = vm.addr(vm.envUint("PRIVATE_KEY_TEST"));
+        admin = vm.addr(vm.envUint("PRIVATE_KEY"));
+        allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         oracleAddress = vm.envAddress("ORACLE");
@@ -53,7 +54,7 @@ contract Deploy is Script, DeployUtils {
         operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
         metaAllocator = vm.envAddress("META_ALLOCATOR");
 
-        vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
+        vm.startBroadcast(admin);
 
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);

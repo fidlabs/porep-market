@@ -33,21 +33,27 @@ coverage:
 check-coverage:
     ./ci/check-full-coverage.sh
 
+deploy flags='':
+    forge script script/Deploy.s.sol:Deploy --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+
+upgrade flags='':
+    forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+
 devnet_deploy:
 	forge clean && forge build
-	forge script script/Deploy.s.sol --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_TEST --private-key $PRIVATE_KEY_TEST
+	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just deploy 
+
+calibnet_deploy:
+    # forge clean && forge build
+    RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just deploy --slow
 
 devnet_upgrade:
 	forge clean && forge build
-	forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_TEST --private-key $PRIVATE_KEY_TEST
-
-calibnet_deploy:
-    forge clean && forge build
-    forge script script/Deploy.s.sol --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --slow --rpc-url $RPC_CALIBNET --private-key $PRIVATE_KEY_CALIBNET
+	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST PROXY_ADDRESS=$UPGRADE_PROXY_ADDRESS_TEST just upgrade
 
 calibnet_upgrade:
 	forge clean && forge build
-	forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_CALIBNET --private-key $PRIVATE_KEY_CALIBNET
+	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET PROXY_ADDRESS=$UPGRADE_PROXY_ADDRESS_CALIBNET just upgrade --slow
    
 # CI equivalent check
 check: fmt-check lint test check-coverage build check-abis

@@ -13,6 +13,7 @@ interface IUpgradeable {
 contract Upgrade is Script, DeployUtils {
     using stdJson for string;
 
+    address internal admin;
     address internal proxy;
     address internal prevImpl;
     address internal impl;
@@ -23,7 +24,8 @@ contract Upgrade is Script, DeployUtils {
     error ContractAlreadyDeployed();
 
     function run() external {
-        proxy = vm.envAddress("UPGRADE_PROXY_ADDRESS_TEST");
+        admin = vm.addr(vm.envUint("PRIVATE_KEY"));
+        proxy = vm.envAddress("PROXY_ADDRESS");
         name = vm.envString("UPGRADE_CONTRACT_NAME");
         cd = vm.envOr("UPGRADE_CALLDATA", bytes(""));
 
@@ -35,7 +37,7 @@ contract Upgrade is Script, DeployUtils {
             revert ContractAlreadyDeployed();
         }
 
-        vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
+        vm.startBroadcast(admin);
 
         impl = vm.deployCode(string.concat(name, ".sol:", name));
         IUpgradeable(proxy).upgradeToAndCall(impl, cd);
