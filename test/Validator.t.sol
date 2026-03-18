@@ -150,6 +150,29 @@ contract ValidatorTest is Test {
         assertEq(lockupFixed, 0);
     }
 
+    function testClientCanUpdateLockupPeriod() public {
+        uint256 newLockup = 456;
+
+        vm.prank(clientSC);
+        validator.updateLockupPeriod(railId, newLockup);
+
+        (uint256 lockupPeriod, uint256 lockupFixed) = filecoinPayMock.getRailLockup(railId);
+        assertEq(lockupPeriod, newLockup);
+        assertEq(lockupFixed, 0);
+    }
+
+    function testUpdateLockupPeriodRevertsForUnauthorizedCaller() public {
+        address unauthorized = vm.addr(0xDEAD);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, validator.CLIENT_ROLE()
+            )
+        );
+        vm.prank(unauthorized);
+        validator.updateLockupPeriod(railId, 123);
+    }
+
     function testImplementationContractCannotBeInitialized() public {
         Validator impl = new Validator();
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));

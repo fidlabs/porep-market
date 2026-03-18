@@ -11,7 +11,6 @@ import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {CBORDecoder} from "filecoin-solidity/v0.8/utils/CborDecode.sol";
 import {VerifRegAPI} from "filecoin-solidity/v0.8/VerifRegAPI.sol";
 import {UtilsHandlers} from "filecoin-solidity/v0.8/utils/UtilsHandlers.sol";
-import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -233,18 +232,9 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         ClientStorage storage $ = s();
 
-        VerifRegTypes.AddVerifiedClientParams memory verifregParams = VerifRegTypes.AddVerifiedClientParams({
-            addr: FilAddresses.fromEthAddress(address(this)),
-            allowance: CommonTypes.BigInt(abi.encodePacked($._deals[dealId].sizeOfAllocations), false)
-        });
-
-        {
-            emit VerifiedClientAdded(msg.sender, $._deals[dealId].sizeOfAllocations);
-            int256 verifgerApiExitCode = VerifRegAPI.addVerifiedClient(verifregParams);
-            if (verifgerApiExitCode != 0) {
-                revert VerifRegAddVerifiedClientFailed(verifgerApiExitCode);
-            }
-        }
+        // TODO: addVerifiedClient removed — the caller must be a registered verifier,
+        // but EVM contracts cannot be verifiers. Datacap must be granted to this contract off-chain.
+        // See: https://github.com/filecoin-project/builtin-actors/blob/master/actors/verifreg/src/lib.rs#L176-L181
 
         emit DatacapSpent(msg.sender, $._deals[dealId].sizeOfAllocations);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall

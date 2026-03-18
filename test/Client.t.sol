@@ -284,13 +284,6 @@ contract ClientTest is Test {
         client.transfer(transferParams, dealId, false);
     }
 
-    function testShouldRevertWhenVerifregAddVerifiedClientFails() public {
-        vm.etch(CALL_ACTOR_ID, address(failingMockAddVerifiedClient).code);
-        vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(Client.VerifRegAddVerifiedClientFailed.selector, 1));
-        client.transfer(transferParams, dealId, false);
-    }
-
     function testClaimExtensionNonExistent() public {
         // 0 success_count
         actorIdMock.setGetClaimsResult(hex"8282008080");

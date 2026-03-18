@@ -202,6 +202,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     /**
+     * @notice Role for the Client contract to call updateLockupPeriod during transfer
+     */
+    bytes32 public constant CLIENT_ROLE = keccak256("CLIENT_ROLE");
+
+    /**
      * @notice Number of epochs in one month
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
@@ -226,6 +231,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     modifier isRailIdValid(uint256 railId) {
         _checkRailIdValid(railId);
+        _;
+    }
+
+    /**
+     * @notice Modifier to restrict access to the Client contract or the admin
+     */
+    modifier onlyClientOrAdmin() {
+        if (!hasRole(CLIENT_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
+            revert AccessControlUnauthorizedAccount(msg.sender, CLIENT_ROLE);
+        }
         _;
     }
 
@@ -266,6 +281,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(POREP_SERVICE_ROLE, _porepService);
+        _grantRole(CLIENT_ROLE, _clientSC);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -431,14 +447,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
     /**
      * @notice Updates the lockup period of a payment rail
-     * @dev Only callable by the admin
+     * @dev Only callable by the Client contract or the admin
      * @param railId The ID of the rail to modify
      * @param newLockupPeriod New lockup period to set
      */
     function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod)
         external
         override
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyClientOrAdmin
         isRailIdValid(railId)
     {
         ValidatorStorage storage $ = _getValidatorStorage();
