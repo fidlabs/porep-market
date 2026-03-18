@@ -154,6 +154,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error EmptyManifestLocation();
     error TooLongManifestLocation();
     error InvalidClientSmartContractAddress();
+    error InvalidAdminAddress();
+    error InvalidValidatorFactoryAddress();
+    error InvalidSPRegistryAddress();
 
     /**
      * @notice Constructor
@@ -169,6 +172,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param _spRegistry The address of the SP registry
      */
     function initialize(address _admin, address _validatorFactory, address _spRegistry) public initializer {
+        if (_admin == address(0)) revert InvalidAdminAddress();
+        if (_validatorFactory == address(0)) revert InvalidValidatorFactoryAddress();
+        if (_spRegistry == address(0)) revert InvalidSPRegistryAddress();
+
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);

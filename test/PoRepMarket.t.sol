@@ -83,6 +83,29 @@ contract PoRepMarketTest is Test {
         });
     }
 
+    function testInitializeRevertsWhenAdminIsZeroAddress() public {
+        PoRepMarket impl = new PoRepMarket();
+        bytes memory initData =
+            abi.encodeCall(PoRepMarket.initialize, (address(0), address(validatorFactory), address(spRegistry)));
+        vm.expectRevert(PoRepMarket.InvalidAdminAddress.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function testInitializeRevertsWhenValidatorFactoryIsZeroAddress() public {
+        PoRepMarket impl = new PoRepMarket();
+        bytes memory initData = abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(0), address(spRegistry)));
+        vm.expectRevert(PoRepMarket.InvalidValidatorFactoryAddress.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function testInitializeRevertsWhenSPRegistryIsZeroAddress() public {
+        PoRepMarket impl = new PoRepMarket();
+        bytes memory initData =
+            abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(0)));
+        vm.expectRevert(PoRepMarket.InvalidSPRegistryAddress.selector);
+        new ERC1967Proxy(address(impl), initData);
+    }
+
     function testProposeDealEmitsEvent() public {
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
