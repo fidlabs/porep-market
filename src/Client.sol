@@ -155,6 +155,31 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      */
     error ValidatorNotSet(uint256 dealId);
 
+    /**
+     * @notice Error thrown when invalid admin address is provided
+     */
+    error InvalidAdminAddress();
+
+    /**
+     * @notice Error thrown when invalid allocator address is provided
+     */
+    error InvalidAllocatorAddress();
+
+    /**
+     * @notice Error thrown when invalid termination oracle address is provided
+     */
+    error InvalidTerminationOracleAddress();
+
+    /**
+     * @notice Error thrown when invalid PoRepMarket contract address is provided
+     */
+    error InvalidPoRepMarketContractAddress();
+
+    /**
+     * @notice Error thrown when invalid MetaAllocator contract address is provided
+     */
+    error InvalidMetaAllocatorContractAddress();
+
     struct Deal {
         address client;
         address validator;
@@ -203,6 +228,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         address _poRepMarketContract,
         address _metaAllocatorContract
     ) public initializer {
+        _validateInitializeAddresses(admin, allocator, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
+
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
@@ -212,6 +239,38 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         ClientStorage storage $ = s();
         $._poRepMarketContract = PoRepMarket(_poRepMarketContract);
         $._metaAllocatorContract = IMetaAllocator(_metaAllocatorContract);
+    }
+
+    /**
+     * @notice Validates the addresses passed to the initialize function
+     * @param admin Contract owner
+     * @param allocator Address of the allocator contract that can increase and decrease allowances
+     * @param terminationOracle Address of the Termination Oracle
+     * @param poRepMarketContract Address of the PoRepMarket contract
+     * @param metaAllocatorContract Address of the MetaAllocator contract
+     */
+    function _validateInitializeAddresses(
+        address admin,
+        address allocator,
+        address terminationOracle,
+        address poRepMarketContract,
+        address metaAllocatorContract
+    ) internal pure {
+        if (admin == address(0)) {
+            revert InvalidAdminAddress();
+        }
+        if (allocator == address(0)) {
+            revert InvalidAllocatorAddress();
+        }
+        if (terminationOracle == address(0)) {
+            revert InvalidTerminationOracleAddress();
+        }
+        if (poRepMarketContract == address(0)) {
+            revert InvalidPoRepMarketContractAddress();
+        }
+        if (metaAllocatorContract == address(0)) {
+            revert InvalidMetaAllocatorContractAddress();
+        }
     }
 
     /**

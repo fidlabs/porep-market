@@ -831,4 +831,71 @@ contract ClientTest is Test {
         );
         clientMock.transfer(transferParams, dealId, false);
     }
+
+    function testInitializeRevertsWhenAdminAddressIsZero() public {
+        Client impl = new Client();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Client c = Client(address(proxy));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAdminAddress.selector));
+        c.initialize(
+            address(0),
+            address(metaAllocatorMock),
+            terminationOracle,
+            address(poRepMarketMock),
+            address(metaAllocatorMock)
+        );
+    }
+
+    function testInitializeRevertsWhenAllocatorIsZero() public {
+        Client impl = new Client();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Client c = Client(address(proxy));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocatorAddress.selector));
+        c.initialize(
+            address(clientAddress), address(0), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock)
+        );
+    }
+
+    function testInitializeRevertsWhenTerminationOracleIsZero() public {
+        Client impl = new Client();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Client c = Client(address(proxy));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidTerminationOracleAddress.selector));
+        c.initialize(
+            address(clientAddress),
+            address(metaAllocatorMock),
+            address(0),
+            address(poRepMarketMock),
+            address(metaAllocatorMock)
+        );
+    }
+
+    function testInitializeRevertsWhenPoRepMarketIsZero() public {
+        Client impl = new Client();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Client c = Client(address(proxy));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidPoRepMarketContractAddress.selector));
+        c.initialize(
+            address(clientAddress),
+            address(metaAllocatorMock),
+            terminationOracle,
+            address(0),
+            address(metaAllocatorMock)
+        );
+    }
+
+    function testInitializeRevertsWhenMetaAllocatorIsZero() public {
+        Client impl = new Client();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Client c = Client(address(proxy));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidMetaAllocatorContractAddress.selector));
+        c.initialize(
+            address(clientAddress), address(metaAllocatorMock), terminationOracle, address(poRepMarketMock), address(0)
+        );
+    }
 }
