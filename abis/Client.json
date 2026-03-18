@@ -224,6 +224,11 @@
         "name": "_poRepMarketContract",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_metaAllocatorContract",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -813,17 +818,6 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "VerifRegAddVerifiedClientFailed",
-    "inputs": [
-      {
-        "name": "exitCode",
-        "type": "int256",
-        "internalType": "int256"
       }
     ]
   }
