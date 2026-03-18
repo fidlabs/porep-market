@@ -56,6 +56,7 @@ contract Upgrade is Script, DeployUtils {
         json.serialize("newCodeHash", vm.toString(impl.codehash));
         json.serialize("upgradedAt", block.timestamp);
         json.serialize("chainId", block.chainid);
+        json.serialize("deployer", admin);
 
         string memory output =
             json.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name))));
