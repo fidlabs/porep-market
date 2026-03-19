@@ -645,7 +645,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidAdminAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidAllocationRequest",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidAllocatorAddress",
     "inputs": []
   },
   {
@@ -713,7 +723,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidMetaAllocatorContractAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidOperatorData",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepMarketContractAddress",
     "inputs": []
   },
   {
@@ -729,6 +749,11 @@
   {
     "type": "error",
     "name": "InvalidSecondElement",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTerminationOracleAddress",
     "inputs": []
   },
   {
