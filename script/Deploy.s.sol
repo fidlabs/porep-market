@@ -53,7 +53,7 @@ contract Deploy is Script, DeployUtils {
         oracleAddress = vm.envAddress("ORACLE");
         poRepService = vm.envAddress("POREP_SERVICE");
         operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
-        metaAllocator = vm.envOr("META_ALLOCATOR", address(0));
+        metaAllocator = vm.envAddress("META_ALLOCATOR");
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 

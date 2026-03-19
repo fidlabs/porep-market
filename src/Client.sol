@@ -89,13 +89,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     event ValidatorLockupPeriodUpdated(uint256 indexed dealId, address indexed validator);
 
     /**
-     * @notice Emitted when a verified client is added
-     * @param client Client address
-     * @param allowance Allowance amount
-     */
-    event VerifiedClientAdded(address indexed client, uint256 indexed allowance);
-
-    /**
      * @notice Thrown if sender is not proposed client
      */
     error InvalidClient();
