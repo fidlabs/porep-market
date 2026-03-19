@@ -557,25 +557,6 @@
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "VerifiedClientAdded",
-    "inputs": [
-      {
-        "name": "client",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "allowance",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "AccessControlBadConfirmation",
     "inputs": []
