@@ -535,7 +535,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             revert InvalidMinEpochsBetweenSettlements();
         }
 
-        if (minTimeInEpochs > EPOCHS_IN_YEAR) {
+        if (minEpochs > EPOCHS_IN_YEAR) {
             revert MinEpochsBetweenSettlementsExceeded();
         }
         ValidatorStorage storage $ = _getValidatorStorage();
