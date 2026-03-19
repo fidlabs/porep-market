@@ -58,6 +58,19 @@
   },
   {
     "type": "function",
+    "name": "getMinEpochsBetweenSettlements",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "minTimeBetweenSettlementsInEpochs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -260,7 +273,7 @@
     "name": "setMinEpochsBetweenSettlements",
     "inputs": [
       {
-        "name": "minTime",
+        "name": "minTimeInEpochs",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -717,6 +730,11 @@
   {
     "type": "error",
     "name": "MaxLockupPeriodLessThanMinimum",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MinEpochsBetweenSettlementsExceeded",
     "inputs": []
   },
   {

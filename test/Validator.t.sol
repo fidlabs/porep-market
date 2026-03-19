@@ -766,7 +766,7 @@ contract ValidatorTest is Test {
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(-1)));
     }
 
-    function testSetMinEpochsBetweenSettlementsReverts() public {
+    function testSetMinEpochsBetweenSettlementsRevertsMinTimeNotReached() public {
         vm.expectRevert(Validator.InvalidMinEpochsBetweenSettlements.selector);
         vm.prank(admin);
         validator.setMinEpochsBetweenSettlements(0);
@@ -790,17 +790,17 @@ contract ValidatorTest is Test {
     }
 
     function testSetMinEpochsBetweenSettlementsSuccessful() public {
+        uint256 minEpochsBefore = validator.getMinEpochsBetweenSettlements();
+        assertEq(minEpochsBefore, 86400);
         vm.prank(admin);
         validator.setMinEpochsBetweenSettlements(1000);
-        clientSCMock.setDataSizeMatching(dealId, true);
+        uint256 minEpochsAfter = validator.getMinEpochsBetweenSettlements();
+        assertEq(minEpochsAfter, 1000);
+    }
 
-        vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
-
-        vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 1000, 1);
-        assertEq(result.modifiedAmount, 100);
-        assertEq(result.settleUpto, 1000);
-        assertEq(result.note, "payment validated successfully");
+    function testSetMinEpochsBetweenSettlementsRevertsMinTimeExceeded() public {
+        vm.expectRevert(Validator.MinEpochsBetweenSettlementsExceeded.selector);
+        vm.prank(admin);
+        validator.setMinEpochsBetweenSettlements(11051200);
     }
 }

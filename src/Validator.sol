@@ -148,6 +148,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     error InvalidMinEpochsBetweenSettlements();
 
+    /**
+     * @notice Error indicating that the maximum time between settlements is exceeded
+     */
+    error MinEpochsBetweenSettlementsExceeded();
+
     // solhint-disable gas-indexed-events
     /**
      * @notice Event emitted when a payment rail is terminated
@@ -220,6 +225,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
 
+    /**
+     * @notice Number of epochs in one year
+     * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
+     */
+    uint256 private constant EPOCHS_IN_YEAR = 1_051_200;
     /**
      * @notice Number of epochs in one day
      * @dev 24 hours/day * 60 minutes/hour * 2 epochs/minute = 2_880 epochs
@@ -518,15 +528,27 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     /**
      * @notice Sets the minimum time between settlements in epochs
      * @dev Only callable by the admin
-     * @param minTime Minimum time between settlements in epochs
+     * @param minEpochs Minimum time between settlements in epochs
      */
-    function setMinEpochsBetweenSettlements(uint256 minTime) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (minTime == 0) {
+    function setMinEpochsBetweenSettlements(uint256 minEpochs) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (minEpochs == 0) {
             revert InvalidMinEpochsBetweenSettlements();
         }
+
+        if (minTimeInEpochs > EPOCHS_IN_YEAR) {
+            revert MinEpochsBetweenSettlementsExceeded();
+        }
         ValidatorStorage storage $ = _getValidatorStorage();
-        $.minTimeBetweenSettlementsInEpochs = minTime;
-        emit MinEpochsBetweenSettlementsUpdated($.dealId, minTime);
+        $.minTimeBetweenSettlementsInEpochs = minEpochs;
+        emit MinEpochsBetweenSettlementsUpdated($.dealId, minEpochs);
+    }
+
+    /**
+     * @notice Retrieves the minimum time between settlements in epochs
+     * @return minTimeBetweenSettlementsInEpochs Minimum time between settlements in epochs
+     */
+    function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs) {
+        minTimeBetweenSettlementsInEpochs = _getValidatorStorage().minTimeBetweenSettlementsInEpochs;
     }
 
     /**
