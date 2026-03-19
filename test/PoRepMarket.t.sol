@@ -560,7 +560,7 @@ contract PoRepMarketTest is Test {
         SLITypes.DealTerms memory badTerms =
             SLITypes.DealTerms({durationDays: 0, dealSizeBytes: 1024, pricePerSector: 100});
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EmptyDealDuration.selector));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 

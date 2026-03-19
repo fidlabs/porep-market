@@ -1050,11 +1050,6 @@
   },
   {
     "type": "error",
-    "name": "EmptyDealDuration",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "EmptyManifestLocation",
     "inputs": []
   },

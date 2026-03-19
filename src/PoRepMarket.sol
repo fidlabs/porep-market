@@ -154,7 +154,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error EmptyManifestLocation();
     error TooLongManifestLocation();
     error InvalidClientSmartContractAddress();
-    error EmptyDealDuration();
     error InvalidDealDuration();
 
     /**
@@ -485,7 +484,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     function _ensureCorrectTerms(SLITypes.DealTerms calldata terms) internal pure {
         if (terms.durationDays == 0) {
-            revert EmptyDealDuration();
+            revert InvalidDealDuration();
         }
         if (terms.durationDays % 30 != 0) {
             revert InvalidDealDuration();
