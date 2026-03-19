@@ -162,6 +162,7 @@ contract Deploy is Script, DeployUtils {
         json.serialize("FilecoinPay", filecoinPay);
         json.serialize("Allocator", allocator);
         json.serialize("PoRepService", poRepService);
+        json.serialize("MetaAllocator", metaAllocator);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
         save(output);
