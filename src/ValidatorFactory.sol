@@ -33,6 +33,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address _poRepMarket;
         address _SPRegistry;
         address _beacon;
+        address _admin;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorFactoryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -59,13 +60,15 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InstanceAlreadyExists();
     error InvalidAdminAddress();
     error InvalidClientAddress();
-    error InvalidSlcAddress();
     error InvalidPoRepMarketAddress();
     error InvalidClientSmartContractAddress();
     error InvalidFilecoinPayAddress();
     error InvalidPoRepServiceAddress();
     error InvalidSliScorerAddress();
     error InvalidSPRegistryAddress();
+    error InvalidImplementationAddress();
+    error InvalidNewAdminAddress();
+    error RoleManagementDisabled();
 
     /**
      * @notice Emitted when a new proxy is successfully created
@@ -75,18 +78,32 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     event ProxyCreated(address indexed proxy, uint256 indexed dealId);
 
     /**
+     * @notice Emitted when the admin is changed
+     * @param newAdmin The address of the new admin
+     */
+    event AdminChanged(address indexed newAdmin);
+
+    /**
      * @notice Initializes the contract
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param admin The address of the admin responsible for the contract
      * @param implementation The address of the implementation contract
      */
     function initialize(address admin, address implementation) public initializer {
+        if (admin == address(0)) {
+            revert InvalidAdminAddress();
+        }
+        if (implementation == address(0)) {
+            revert InvalidImplementationAddress();
+        }
+
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
 
         ValidatorFactoryStorage storage $ = s();
         $._beacon = address(new UpgradeableBeacon(implementation, admin));
+        $._admin = admin;
     }
 
     /**
@@ -127,12 +144,9 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @notice Creates a new instance of an upgradeable contract.
      * @dev Uses BeaconProxy to create a new proxy instance, pointing to the Beacon for the logic contract.
      * @dev Reverts if an instance for the given dealId already exists.
-     * @param admin The address of the admin responsible for the contract.
      * @param dealId The dealId for which the proxy was created.
      */
-    function create(address admin, uint256 dealId) external {
-        if (admin == address(0)) revert InvalidAdminAddress();
-
+    function create(uint256 dealId) external {
         ValidatorFactoryStorage storage $ = s();
         if ($._instances[dealId] != address(0)) revert InstanceAlreadyExists();
 
@@ -146,7 +160,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
                 abi.encodeCall(
                     Validator.initialize,
                     (
-                        admin,
+                        $._admin,
                         $._poRepService,
                         $._filecoinPay,
                         $._sliScorer,
@@ -159,7 +173,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
             )
         );
         // forge-lint: disable-next-line(asm-keccak256)
-        bytes32 salt = keccak256(abi.encode(admin, dealId));
+        bytes32 salt = keccak256(abi.encode($._admin, dealId));
         address proxy = Create2.computeAddress(salt, keccak256(initCode), address(this));
         $._instances[dealId] = proxy;
         $._isValidatorContract[proxy] = true;
@@ -167,6 +181,51 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         Create2.deploy(0, salt, initCode);
         emit ProxyCreated(proxy, dealId);
     }
+
+    /**
+     * @notice Sets a new admin for the contract and revoke the role from the old admin
+     * @dev Only callable by the current admin. Reverts if the new admin address is the zero address.
+     * @param newAdmin The new admin address
+     */
+    function setAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newAdmin == address(0)) {
+            revert InvalidNewAdminAddress();
+        }
+        ValidatorFactoryStorage storage $ = s();
+
+        _revokeRole(DEFAULT_ADMIN_ROLE, $._admin);
+        _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
+        $._admin = newAdmin;
+
+        emit AdminChanged(newAdmin);
+    }
+
+    // solhint-disable use-natspec
+    /**
+     * @notice Disabled role management functions
+     * @dev This contract has a fixed admin and does not allow for dynamic role management
+     */
+    function grantRole(bytes32, address) public pure override {
+        revert RoleManagementDisabled();
+    }
+
+    /**
+     * @notice Disabled role management functions
+     * @dev This contract has a fixed admin and does not allow for dynamic role management
+     */
+    function revokeRole(bytes32, address) public pure override {
+        revert RoleManagementDisabled();
+    }
+
+    /**
+     * @notice Disabled role management functions
+     * @dev This contract has a fixed admin and does not allow for dynamic role management
+     */
+    function renounceRole(bytes32, address) public pure override {
+        revert RoleManagementDisabled();
+    }
+
+    // solhint-enable use-natspec
 
     /**
      * @notice Checks if an address is a validator contract
