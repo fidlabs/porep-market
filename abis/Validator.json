@@ -273,7 +273,7 @@
     "name": "setMinEpochsBetweenSettlements",
     "inputs": [
       {
-        "name": "minTimeInEpochs",
+        "name": "minEpochs",
         "type": "uint256",
         "internalType": "uint256"
       }
