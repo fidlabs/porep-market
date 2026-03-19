@@ -1050,6 +1050,11 @@
   },
   {
     "type": "error",
+    "name": "EmptyDealDuration",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "EmptyManifestLocation",
     "inputs": []
   },
@@ -1061,6 +1066,11 @@
   {
     "type": "error",
     "name": "InvalidClientSmartContractAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealDuration",
     "inputs": []
   },
   {
