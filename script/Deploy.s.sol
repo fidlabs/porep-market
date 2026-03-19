@@ -41,6 +41,7 @@ contract Deploy is Script, DeployUtils {
     address internal oracleAddress;
     address internal poRepService;
     address internal operatorAddress;
+    address internal metaAllocator;
 
     error InvalidEnv();
 
@@ -52,13 +53,14 @@ contract Deploy is Script, DeployUtils {
         oracleAddress = vm.envAddress("ORACLE");
         poRepService = vm.envAddress("POREP_SERVICE");
         operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
+        metaAllocator = vm.envAddress("META_ALLOCATOR");
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
 
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         (clientSmartContract, clientSmartContractImpl) =
-            _deployClientSmartContract(admin, allocator, terminationOracle, poRepMarket);
+            _deployClientSmartContract(admin, allocator, terminationOracle, poRepMarket, metaAllocator);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
         (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
@@ -109,10 +111,12 @@ contract Deploy is Script, DeployUtils {
         address _admin,
         address _allocator,
         address _terminationOracle,
-        address _porepMarket
+        address _porepMarket,
+        address _metaAllocator
     ) internal returns (address proxy, address impl) {
         Client _impl = new Client();
-        bytes memory init = abi.encodeCall(Client.initialize, (_admin, _allocator, _terminationOracle, _porepMarket));
+        bytes memory init =
+            abi.encodeCall(Client.initialize, (_admin, _allocator, _terminationOracle, _porepMarket, _metaAllocator));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
@@ -158,6 +162,7 @@ contract Deploy is Script, DeployUtils {
         json.serialize("FilecoinPay", filecoinPay);
         json.serialize("Allocator", allocator);
         json.serialize("PoRepService", poRepService);
+        json.serialize("MetaAllocator", metaAllocator);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
         save(output);
