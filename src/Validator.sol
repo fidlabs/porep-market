@@ -143,6 +143,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     error InvalidRailId(uint256 expected, uint256 actual);
 
+    /**
+     * @notice Error indicating that the minimum time between settlements is invalid
+     */
+    error InvalidMinEpochsBetweenSettlements();
+
+    /**
+     * @notice Error indicating that the maximum time between settlements is exceeded
+     */
+    error MinEpochsBetweenSettlementsExceeded();
+
     // solhint-disable gas-indexed-events
     /**
      * @notice Event emitted when a payment rail is terminated
@@ -179,6 +189,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     event RailDisabled(uint256 indexed railId);
 
+    /**
+     * @notice Event emitted when the minimum time between settlements is updated
+     * @param dealId The ID of the deal associated with the validator
+     * @param minTimeBetweenSettlementsInEpochs The new minimum time between settlements in epochs
+     */
+    event MinEpochsBetweenSettlementsUpdated(uint256 indexed dealId, uint256 minTimeBetweenSettlementsInEpochs);
+
     // solhint-enable gas-indexed-events
 
     /// @custom:storage-location erc7201:porepmarket.storage.ValidatorStorage
@@ -194,6 +211,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         CommonTypes.ChainEpoch dealEndEpoch;
         uint256 amountPerEpoch;
         uint256 earlyTerminatedEpoch;
+        uint256 minTimeBetweenSettlementsInEpochs;
     }
 
     /**
@@ -207,6 +225,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
 
+    /**
+     * @notice Number of epochs in one year
+     * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
+     */
+    uint256 private constant EPOCHS_IN_YEAR = 1_051_200;
     /**
      * @notice Number of epochs in one day
      * @dev 24 hours/day * 60 minutes/hour * 2 epochs/minute = 2_880 epochs
@@ -278,6 +301,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         $.poRepMarket = _poRepMarket;
         $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
+        $.minTimeBetweenSettlementsInEpochs = EPOCHS_IN_MONTH;
 
         IPoRepMarket(_poRepMarket).updateValidator(_dealId);
     }
@@ -317,9 +341,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
             dealEndEpoch = $.earlyTerminatedEpoch;
         }
 
-        if (toEpoch < fromEpoch + EPOCHS_IN_MONTH) {
+        if (toEpoch < fromEpoch + $.minTimeBetweenSettlementsInEpochs) {
             result.settleUpto = fromEpoch;
-            result.note = "1mo payout period not reached";
+            result.note = "too early for settlement";
             return result;
         }
 
@@ -499,6 +523,32 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
 
         $.dealEndEpoch = endEpoch;
         emit DealEndEpochUpdated(dealId, endEpoch);
+    }
+
+    /**
+     * @notice Sets the minimum time between settlements in epochs
+     * @dev Only callable by the admin
+     * @param minEpochs Minimum time between settlements in epochs
+     */
+    function setMinEpochsBetweenSettlements(uint256 minEpochs) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (minEpochs == 0) {
+            revert InvalidMinEpochsBetweenSettlements();
+        }
+
+        if (minEpochs > EPOCHS_IN_YEAR) {
+            revert MinEpochsBetweenSettlementsExceeded();
+        }
+        ValidatorStorage storage $ = _getValidatorStorage();
+        $.minTimeBetweenSettlementsInEpochs = minEpochs;
+        emit MinEpochsBetweenSettlementsUpdated($.dealId, minEpochs);
+    }
+
+    /**
+     * @notice Retrieves the minimum time between settlements in epochs
+     * @return minTimeBetweenSettlementsInEpochs Minimum time between settlements in epochs
+     */
+    function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs) {
+        minTimeBetweenSettlementsInEpochs = _getValidatorStorage().minTimeBetweenSettlementsInEpochs;
     }
 
     /**

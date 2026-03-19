@@ -58,6 +58,19 @@
   },
   {
     "type": "function",
+    "name": "getMinEpochsBetweenSettlements",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "minTimeBetweenSettlementsInEpochs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {
@@ -257,6 +270,19 @@
   },
   {
     "type": "function",
+    "name": "setMinEpochsBetweenSettlements",
+    "inputs": [
+      {
+        "name": "minEpochs",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -405,6 +431,25 @@
       },
       {
         "name": "newLockupPeriod",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "MinEpochsBetweenSettlementsUpdated",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "minTimeBetweenSettlementsInEpochs",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -628,6 +673,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidMinEpochsBetweenSettlements",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidPoRepMarketAddress",
     "inputs": []
   },
@@ -680,6 +730,11 @@
   {
     "type": "error",
     "name": "MaxLockupPeriodLessThanMinimum",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "MinEpochsBetweenSettlementsExceeded",
     "inputs": []
   },
   {
