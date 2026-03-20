@@ -25,6 +25,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
+    /**
+     * @notice Maximum Filecoin storage deal duration: 1278 days (~3.5 years),
+     * per FIP-0052 (NV21 actor policy update).
+     * References:
+     * https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0052.md
+     * https://github.com/filecoin-project/core-devs/blob/master/Network%20Upgrades/v21.md
+     */
+    uint32 public constant MAX_DEAL_DURATION_DAYS = 1278;
+
     /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => PoRepTypes.DealProposal) _dealProposals;
@@ -154,6 +163,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error EmptyManifestLocation();
     error TooLongManifestLocation();
     error InvalidClientSmartContractAddress();
+    error InvalidDealDuration();
 
     /**
      * @notice Constructor
@@ -201,19 +211,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         SLITypes.DealTerms calldata terms,
         string calldata manifestLocation
     ) external {
-        if (requirements.retrievabilityBps > 10_000) {
-            revert InvalidRetrievabilityBps(requirements.retrievabilityBps);
-        }
-        if (requirements.indexingPct > 100) {
-            revert InvalidIndexingPct(requirements.indexingPct);
-        }
-
-        if (bytes(manifestLocation).length == 0) {
-            revert EmptyManifestLocation();
-        }
-        if (bytes(manifestLocation).length > 2048) {
-            revert TooLongManifestLocation();
-        }
+        _ensureCorrectManifestLocation(manifestLocation);
+        _ensureCorrectRequirements(requirements);
+        _ensureCorrectTerms(terms);
 
         DealProposalsStorage storage $ = s();
 
@@ -472,6 +472,48 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         pure
     {
         if (dp.state != expectedState) revert DealNotInExpectedState(dp.dealId, dp.state, expectedState);
+    }
+
+    /**
+     * @notice Ensures the requirements are correct
+     * @param requirements The SLI thresholds for the deal
+     */
+    function _ensureCorrectRequirements(SLITypes.SLIThresholds calldata requirements) internal pure {
+        if (requirements.retrievabilityBps > 10_000) {
+            revert InvalidRetrievabilityBps(requirements.retrievabilityBps);
+        }
+        if (requirements.indexingPct > 100) {
+            revert InvalidIndexingPct(requirements.indexingPct);
+        }
+    }
+
+    /**
+     * @notice Ensures the terms are correct
+     * @param terms The terms for the deal
+     */
+    function _ensureCorrectTerms(SLITypes.DealTerms calldata terms) internal pure {
+        if (terms.durationDays == 0) {
+            revert InvalidDealDuration();
+        }
+        if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {
+            revert InvalidDealDuration();
+        }
+        if (terms.durationDays % 30 != 0) {
+            revert InvalidDealDuration();
+        }
+    }
+
+    /**
+     * @notice Ensures the manifest location is correct
+     * @param manifestLocation The manifest location for the deal
+     */
+    function _ensureCorrectManifestLocation(string calldata manifestLocation) internal pure {
+        if (bytes(manifestLocation).length == 0) {
+            revert EmptyManifestLocation();
+        }
+        if (bytes(manifestLocation).length > 2048) {
+            revert TooLongManifestLocation();
+        }
     }
 
     // solhint-disable no-empty-blocks

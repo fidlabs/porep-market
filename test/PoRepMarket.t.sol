@@ -34,7 +34,7 @@ contract PoRepMarketTest is Test {
         SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365});
+        SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 360});
 
     string public expectedManifestLocation = "https://example.com/manifest";
 
@@ -554,6 +554,31 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EmptyManifestLocation.selector, ""));
         poRepMarket.updateManifestLocation(dealId, "");
+    }
+
+    function testProposeDealRevertsWhenDealDurationIsZero() public {
+        SLITypes.DealTerms memory badTerms =
+            SLITypes.DealTerms({durationDays: 0, dealSizeBytes: 1024, pricePerSector: 100});
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
+        poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
+    }
+
+    function testProposeDealRevertsWhenDealDurationIsNotMultiplicatioveOf30() public {
+        SLITypes.DealTerms memory badTerms =
+            SLITypes.DealTerms({durationDays: 31, dealSizeBytes: 1024, pricePerSector: 100});
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
+        poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
+    }
+
+    function testProposeDealRevertsWhenDealDurationExceedsMaximum() public {
+        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+            durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 12, dealSizeBytes: 1024, pricePerSector: 100
+        });
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
+        poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 
     function testUpdateManifestLocationRevertsUnauthorisedCaller() public {
