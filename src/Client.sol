@@ -164,7 +164,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         uint256 dealId;
         uint256 railId;
         uint256 sizeOfAllocations;
-        CommonTypes.ChainEpoch maxAllocationEndTime;
         CommonTypes.FilActorId[] allocationIds;
     }
 
