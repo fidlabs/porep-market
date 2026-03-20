@@ -134,8 +134,7 @@ contract ClientTest is Test {
     function setupProxy(address impl) public returns (address) {
         // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeCall(
-            Client.initialize,
-            (address(this), allocator, terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
+            Client.initialize, (address(this), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return address(proxy);
@@ -821,24 +820,7 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAdminAddress.selector));
-        c.initialize(
-            address(0),
-            address(metaAllocatorMock),
-            terminationOracle,
-            address(poRepMarketMock),
-            address(metaAllocatorMock)
-        );
-    }
-
-    function testInitializeRevertsWhenAllocatorIsZero() public {
-        Client impl = new Client();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
-        Client c = Client(address(proxy));
-
-        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocatorAddress.selector));
-        c.initialize(
-            address(clientAddress), address(0), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock)
-        );
+        c.initialize(address(0), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock));
     }
 
     function testInitializeRevertsWhenTerminationOracleIsZero() public {
@@ -847,13 +829,7 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidTerminationOracleAddress.selector));
-        c.initialize(
-            address(clientAddress),
-            address(metaAllocatorMock),
-            address(0),
-            address(poRepMarketMock),
-            address(metaAllocatorMock)
-        );
+        c.initialize(address(clientAddress), address(0), address(poRepMarketMock), address(metaAllocatorMock));
     }
 
     function testInitializeRevertsWhenPoRepMarketIsZero() public {
@@ -862,13 +838,7 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidPoRepMarketContractAddress.selector));
-        c.initialize(
-            address(clientAddress),
-            address(metaAllocatorMock),
-            terminationOracle,
-            address(0),
-            address(metaAllocatorMock)
-        );
+        c.initialize(address(clientAddress), terminationOracle, address(0), address(metaAllocatorMock));
     }
 
     function testInitializeRevertsWhenMetaAllocatorIsZero() public {
@@ -877,11 +847,9 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidMetaAllocatorContractAddress.selector));
-        c.initialize(
-            address(clientAddress), address(metaAllocatorMock), terminationOracle, address(poRepMarketMock), address(0)
-        );
+        c.initialize(address(clientAddress), terminationOracle, address(poRepMarketMock), address(0));
     }
-    
+
     function testShouldRevertWhenAlreadyRegisteredDealTransferIsCalledByNotTheClient() public {
         vm.prank(clientAddress);
         client.transfer(transferParams, dealId, false);
@@ -898,17 +866,6 @@ contract ClientTest is Test {
 
         vm.expectEmit(true, false, false, true);
         emit Client.DatacapSpent(clientAddress, 4096);
-
-        vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
-    }
-
-    function testTransferEmitsDatacapAllocated() public {
-        transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
-
-        vm.expectEmit(true, false, false, false);
-        emit Client.DatacapAllocated(4096);
 
         vm.prank(clientAddress);
         client.transfer(transferParams, dealId, false);

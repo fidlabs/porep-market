@@ -77,12 +77,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     // solhint-enable gas-indexed-events
 
     /**
-     * @notice Emitted when a datacap is successfully allocated to client contract
-     * @param allowance Allowance amount
-     */
-    event DatacapAllocated(uint256 indexed allowance);
-
-    /**
      * @notice Thrown if sender is not proposed client
      */
     error InvalidClient();
@@ -148,11 +142,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     error InvalidAdminAddress();
 
     /**
-     * @notice Error thrown when invalid allocator address is provided
-     */
-    error InvalidAllocatorAddress();
-
-    /**
      * @notice Error thrown when invalid termination oracle address is provided
      */
     error InvalidTerminationOracleAddress();
@@ -204,12 +193,11 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      */
     function initialize(
         address admin,
-        address allocator,
         address terminationOracle,
         address _poRepMarketContract,
         address _metaAllocatorContract
     ) public initializer {
-        _validateInitializeAddresses(admin, allocator, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
+        _validateInitializeAddresses(admin, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -224,23 +212,18 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     /**
      * @notice Validates the addresses passed to the initialize function
      * @param admin Contract owner
-     * @param allocator Address of the allocator contract that can increase and decrease allowances
      * @param terminationOracle Address of the Termination Oracle
      * @param poRepMarketContract Address of the PoRepMarket contract
      * @param metaAllocatorContract Address of the MetaAllocator contract
      */
     function _validateInitializeAddresses(
         address admin,
-        address allocator,
         address terminationOracle,
         address poRepMarketContract,
         address metaAllocatorContract
     ) internal pure {
         if (admin == address(0)) {
             revert InvalidAdminAddress();
-        }
-        if (allocator == address(0)) {
-            revert InvalidAllocatorAddress();
         }
         if (terminationOracle == address(0)) {
             revert InvalidTerminationOracleAddress();
@@ -279,7 +262,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         uint256 sizeOfAllocations = _verifyAndRegisterAllocations(dealId, allocations);
         uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
         uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
-         $._metaAllocatorContract
+        $._metaAllocatorContract
             .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
 
         emit DatacapSpent(msg.sender, allocationsAndClaimsSize);
