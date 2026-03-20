@@ -25,7 +25,6 @@ contract Upgrade is Script, DeployUtils {
 
     function run() external {
         admin = vm.addr(vm.envUint("PRIVATE_KEY"));
-        proxy = vm.envAddress("PROXY_ADDRESS");
         name = vm.envString("UPGRADE_CONTRACT_NAME");
         cd = vm.envOr("UPGRADE_CALLDATA", bytes(""));
 
