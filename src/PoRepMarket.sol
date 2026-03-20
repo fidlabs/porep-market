@@ -28,7 +28,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /**
      * @notice Maximum Filecoin storage deal duration: 1278 days (~3.5 years),
      * per FIP-0052 (NV21 actor policy update).
+     * References:
      * https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0052.md
+     * https://github.com/filecoin-project/core-devs/blob/master/Network%20Upgrades/v21.md
      */
     uint32 public constant MAX_DEAL_DURATION_DAYS = 1278;
 
