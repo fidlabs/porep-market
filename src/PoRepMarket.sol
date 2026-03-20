@@ -491,10 +491,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (terms.durationDays == 0) {
             revert InvalidDealDuration();
         }
-        if (terms.durationDays % 30 != 0) {
+        if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
-        if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {
+        if (terms.durationDays % 30 != 0) {
             revert InvalidDealDuration();
         }
     }

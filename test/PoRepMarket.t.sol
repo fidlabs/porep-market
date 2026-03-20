@@ -574,7 +574,7 @@ contract PoRepMarketTest is Test {
 
     function testProposeDealRevertsWhenDealDurationExceedsMaximum() public {
         SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
-            durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 1, dealSizeBytes: 1024, pricePerSector: 100
+            durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 12, dealSizeBytes: 1024, pricePerSector: 100
         });
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
