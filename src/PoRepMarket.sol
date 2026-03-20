@@ -26,7 +26,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /**
-     * @notice Maximum deal duration in days
+     * @notice Maximum Filecoin storage deal duration: 1278 days (~3.5 years),
+     * per FIP-0052 (NV21 actor policy update).
+     * https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0052.md
      */
     uint32 public constant MAX_DEAL_DURATION_DAYS = 1278;
 
