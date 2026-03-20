@@ -572,6 +572,15 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 
+    function testProposeDealRevertsWhenDealDurationExceedsMaximum() public {
+        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+            durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 1, dealSizeBytes: 1024, pricePerSector: 100
+        });
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
+        poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
+    }
+
     function testUpdateManifestLocationRevertsUnauthorisedCaller() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);

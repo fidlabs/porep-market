@@ -19,6 +19,19 @@
   },
   {
     "type": "function",
+    "name": "MAX_DEAL_DURATION_DAYS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "UPGRADER_ROLE",
     "inputs": [],
     "outputs": [

@@ -25,6 +25,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
+    /**
+     * @notice Maximum deal duration in days
+     */
+    uint32 public constant MAX_DEAL_DURATION_DAYS = 1278;
+
     /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => PoRepTypes.DealProposal) _dealProposals;
@@ -487,6 +492,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert InvalidDealDuration();
         }
         if (terms.durationDays % 30 != 0) {
+            revert InvalidDealDuration();
+        }
+        if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
     }
