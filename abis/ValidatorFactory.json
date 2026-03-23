@@ -43,11 +43,6 @@
     "name": "create",
     "inputs": [
       {
-        "name": "admin",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
@@ -112,18 +107,18 @@
     "name": "grantRole",
     "inputs": [
       {
-        "name": "role",
+        "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "account",
+        "name": "",
         "type": "address",
         "internalType": "address"
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -242,30 +237,43 @@
     "name": "renounceRole",
     "inputs": [
       {
-        "name": "role",
+        "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "callerConfirmation",
+        "name": "",
         "type": "address",
         "internalType": "address"
       }
     ],
     "outputs": [],
-    "stateMutability": "nonpayable"
+    "stateMutability": "pure"
   },
   {
     "type": "function",
     "name": "revokeRole",
     "inputs": [
       {
-        "name": "role",
+        "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
       },
       {
-        "name": "account",
+        "name": "",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "setAdmin",
+    "inputs": [
+      {
+        "name": "newAdmin",
         "type": "address",
         "internalType": "address"
       }
@@ -309,6 +317,19 @@
     ],
     "outputs": [],
     "stateMutability": "payable"
+  },
+  {
+    "type": "event",
+    "name": "AdminChanged",
+    "inputs": [
+      {
+        "name": "newAdmin",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
   },
   {
     "type": "event",
@@ -536,7 +557,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidImplementationAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNewAdminAddress",
     "inputs": []
   },
   {
@@ -556,17 +587,17 @@
   },
   {
     "type": "error",
-    "name": "InvalidSlcAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidSliScorerAddress",
     "inputs": []
   },
   {
     "type": "error",
     "name": "NotInitializing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "RoleManagementDisabled",
     "inputs": []
   },
   {

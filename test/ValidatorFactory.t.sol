@@ -83,25 +83,25 @@ contract ValidatorFactoryTest is Test {
         emit ValidatorFactory.ProxyCreated(expectedProxy, dealId);
 
         vm.prank(client);
-        factory.create(admin, dealId);
+        factory.create(dealId);
         assertTrue(factory.isValidatorContract(expectedProxy));
     }
 
     function testDeployMarksProxyAsDeployed() public {
         address expectedProxy = computeProxyAddress(admin, dealId);
         vm.prank(client);
-        factory.create(admin, dealId);
+        factory.create(dealId);
 
         assertTrue(factory.getInstance(dealId) == expectedProxy);
     }
 
     function testDeployRevertsIfInstanceExists() public {
         vm.prank(client);
-        factory.create(admin, dealId);
+        factory.create(dealId);
 
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InstanceAlreadyExists.selector));
         vm.prank(client);
-        factory.create(admin, dealId);
+        factory.create(dealId);
     }
 
     function computeProxyAddress(address admin_, uint256 dealId_) private view returns (address) {
@@ -144,17 +144,11 @@ contract ValidatorFactoryTest is Test {
         assertFalse(factory.isValidatorContract(address(0)));
     }
 
-    function testShouldRevertWhenAdminAddressIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidAdminAddress.selector));
-        vm.prank(client);
-        factory.create(address(0), dealId);
-    }
-
     function testShouldRevertWhenIncorrectClientAddress() public {
         address incorrectClient = vm.addr(999);
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidClientAddress.selector));
         vm.prank(incorrectClient);
-        factory.create(admin, dealId);
+        factory.create(dealId);
     }
 
     function testInitialize2RevertsWhenPoRepServiceIsZero() public {
@@ -208,5 +202,68 @@ contract ValidatorFactoryTest is Test {
         );
         vm.prank(client);
         f.initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
+    }
+
+    function testInitializeRevertsWhenAdminIsZero() public {
+        address zeroAddress = address(0);
+        address validImplementation = address(0x1234);
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        vm.expectRevert(ValidatorFactory.InvalidAdminAddress.selector);
+        factoryImplementation.initialize(zeroAddress, validImplementation);
+    }
+
+    function testInitializeRevertsWhenImplementationIsZero() public {
+        address validAdmin = address(0x1234);
+        address zeroAddress = address(0);
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        vm.expectRevert(ValidatorFactory.InvalidImplementationAddress.selector);
+        factoryImplementation.initialize(validAdmin, zeroAddress);
+    }
+
+    function testSetAdminRevertsWhenNewAdminIsZero() public {
+        Validator validatorImplementation = new Validator();
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        address validAdmin = address(0xABCD);
+
+        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+
+        vm.prank(validAdmin);
+        vm.expectRevert(ValidatorFactory.InvalidNewAdminAddress.selector);
+        factoryImplementation.setAdmin(address(0));
+    }
+
+    function testSetsNewAdminCorrectly() public {
+        Validator validatorImplementation = new Validator();
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        address validAdmin = address(0xABCD);
+        address newValidAdmin = address(0xDCBA);
+
+        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+
+        vm.prank(validAdmin);
+        factoryImplementation.setAdmin(newValidAdmin);
+
+        assertTrue(factoryImplementation.hasRole(factoryImplementation.DEFAULT_ADMIN_ROLE(), newValidAdmin));
+    }
+
+    function testGrantRoleReverts() public {
+        bytes32 adminRole = factory.DEFAULT_ADMIN_ROLE();
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.RoleManagementDisabled.selector));
+        factory.grantRole(adminRole, client);
+    }
+
+    function testRevokeRoleReverts() public {
+        bytes32 adminRole = factory.DEFAULT_ADMIN_ROLE();
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.RoleManagementDisabled.selector));
+        factory.revokeRole(adminRole, client);
+    }
+
+    function testRenounceRoleReverts() public {
+        bytes32 adminRole = factory.DEFAULT_ADMIN_ROLE();
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.RoleManagementDisabled.selector));
+        factory.renounceRole(adminRole, admin);
     }
 }
