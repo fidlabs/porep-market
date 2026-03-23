@@ -870,4 +870,13 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         client.transfer(transferParams, dealId, false);
     }
+
+    function testTransferRevertsWhenDealAlreadyCompleted() public {
+        vm.startPrank(clientAddress);
+        client.transfer(transferParams, dealId, true);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidDealStateForTransfer.selector));
+        client.transfer(transferParams, dealId, false);
+        vm.stopPrank();
+    }
 }

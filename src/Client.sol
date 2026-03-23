@@ -157,6 +157,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     error InvalidMetaAllocatorContractAddress();
 
     struct Deal {
+        bool completed;
         address client;
         address validator;
         CommonTypes.FilActorId provider;
@@ -251,7 +252,12 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         if ($._deals[dealId].dealId == 0) {
             _registerDeal(dealId);
         }
+
         Deal storage deal = $._deals[dealId];
+        if (deal.completed) {
+            revert InvalidDealStateForTransfer();
+        }
+
         if (msg.sender != deal.client) revert InvalidClient();
         (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 maxAllocationEndTime) =
             _deserializeVerifregOperatorData(params.operator_data);
@@ -281,6 +287,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         deal.sizeOfAllocations += allocationsAndClaimsSize;
 
         if (dealCompleted) {
+            deal.completed = true;
             $._poRepMarketContract.completeDeal(dealId, deal.sizeOfAllocations);
         }
     }
@@ -427,6 +434,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         deal.dealId = proposal.dealId;
         deal.validator = proposal.validator;
         deal.railId = proposal.railId;
+        deal.completed = false;
     }
 
     /**
