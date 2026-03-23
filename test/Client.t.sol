@@ -407,7 +407,7 @@ contract ClientTest is Test {
         transferParams.operator_data =
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710011A005034AC";
         vm.expectEmit(true, true, true, true);
-        emit Client.DatacapSpent(clientAddress, 28672);
+        emit Client.DatacapSpent(clientAddress, 24576);
         clientMock.transfer(transferParams, dealId, false);
 
         Client.Deal memory deal = clientMock.getDeal(dealId);
@@ -418,19 +418,19 @@ contract ClientTest is Test {
         assertEq(deal.client, clientAddress);
     }
 
-    function testShouldNotTransferIfReentrantCall() public {
+    function testReentryAttemptWillThrowInvalidClientError() public {
         ReentrantMetaAllocatorMock reentrantMetaAllocatorMock = new ReentrantMetaAllocatorMock();
         address impl = address(new Client());
         bytes memory initData = abi.encodeCall(
             Client.initialize,
-            (address(this), allocator, terminationOracle, address(poRepMarketMock), address(reentrantMetaAllocatorMock))
+            (address(this), terminationOracle, address(poRepMarketMock), address(reentrantMetaAllocatorMock))
         );
         Client clientWithReentrancy = Client(address(new ERC1967Proxy(address(impl), initData)));
 
         poRepMarketMock.setDealProposal(
             dealId,
             PoRepTypes.DealProposal({
-                dealId: 150,
+                dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
@@ -446,7 +446,7 @@ contract ClientTest is Test {
         reentrantMetaAllocatorMock.setAttackParams(address(clientWithReentrancy), transferParams, dealId);
         vm.prank(clientAddress);
         client.transfer(transferParams, dealId, true);
-        vm.expectRevert(abi.encodeWithSelector(ReentrancyGuard.ReentrancyGuardReentrantCall.selector));
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidClient.selector));
         clientWithReentrancy.transfer(transferParams, dealId, false);
     }
 
@@ -481,7 +481,7 @@ contract ClientTest is Test {
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710041A005034AC";
         actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808102");
         vm.expectEmit(true, true, true, true);
-        emit Client.DatacapSpent(clientAddress, 28672);
+        emit Client.DatacapSpent(clientAddress, 24576);
 
         vm.prank(clientAddress);
         clientMock.transfer(transferParams, dealId, false);

@@ -5,7 +5,6 @@ pragma solidity =0.8.30;
 import {IMetaAllocator} from "../../src/interfaces/IMetaAllocator.sol";
 import {Client} from "../../src/Client.sol";
 import {DataCapTypes} from "filecoin-solidity/v0.8/types/DataCapTypes.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract ReentrantMetaAllocatorMock is IMetaAllocator {
     Client public client;
@@ -21,13 +20,6 @@ contract ReentrantMetaAllocatorMock is IMetaAllocator {
     }
 
     function addVerifiedClient(bytes calldata, uint256) external override {
-        if (shouldAttack) {
-            shouldAttack = false;
-            client.transfer(attackParams, attackDealId, false);
-        }
-    }
-
-    function setDealEndEpoch(uint256, CommonTypes.ChainEpoch) external override {
         if (shouldAttack) {
             shouldAttack = false;
             client.transfer(attackParams, attackDealId, false);

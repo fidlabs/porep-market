@@ -258,12 +258,9 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         }
 
         if (msg.sender != deal.client) revert InvalidClient();
-        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 maxAllocationEndTime) =
+        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
             _deserializeVerifregOperatorData(params.operator_data);
 
-        if (maxAllocationEndTime > CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime)) {
-            deal.maxAllocationEndTime = CommonTypes.ChainEpoch.wrap(maxAllocationEndTime);
-        }
         uint256 sizeOfAllocations = _verifyAndRegisterAllocations(dealId, allocations);
         uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
         uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
@@ -398,6 +395,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         }
     }
 
+    event debug(address, address);
+
     /**
      * @notice Verifies and registers a deal.
      * @param dealId The deal id.
@@ -407,6 +406,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
+        emit debug(proposal.client, msg.sender);
         if (proposal.client != msg.sender) {
             revert InvalidClient();
         }
