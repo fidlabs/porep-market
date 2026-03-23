@@ -266,4 +266,58 @@ contract ValidatorFactoryTest is Test {
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.RoleManagementDisabled.selector));
         factory.renounceRole(adminRole, admin);
     }
+
+    function testSetUpgraderRoleRevertsWhenNewUpgraderRoleIsZero() public {
+        Validator validatorImplementation = new Validator();
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        address validAdmin = address(0xABCD);
+
+        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+
+        vm.prank(validAdmin);
+        vm.expectRevert(ValidatorFactory.InvalidNewUpgraderRoleAddress.selector);
+        factoryImplementation.setUpgraderRole(address(0));
+    }
+
+    function testSetsNewUpgraderRoleCorrectly() public {
+        Validator validatorImplementation = new Validator();
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        address validAdmin = address(0xABCD);
+        address newUpgrader = address(0xDCBA);
+
+        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+
+        vm.prank(validAdmin);
+        factoryImplementation.setUpgraderRole(newUpgrader);
+
+        assertTrue(factoryImplementation.hasRole(factoryImplementation.UPGRADER_ROLE(), newUpgrader));
+    }
+
+    function testSetAdminEmitsAdminChangedEvent() public {
+        Validator validatorImplementation = new Validator();
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        address validAdmin = address(0xABCD);
+        address newValidAdmin = address(0xDCBA);
+
+        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+
+        vm.expectEmit(true, false, false, false);
+        emit ValidatorFactory.AdminChanged(newValidAdmin);
+        vm.prank(validAdmin);
+        factoryImplementation.setAdmin(newValidAdmin);
+    }
+
+    function testSetUpgraderRoleEmitsUpgraderRoleChangedEvent() public {
+        Validator validatorImplementation = new Validator();
+        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        address validAdmin = address(0xABCD);
+        address newUpgrader = address(0xDCBA);
+
+        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+
+        vm.expectEmit(true, false, false, false);
+        emit ValidatorFactory.UpgraderRoleChanged(newUpgrader);
+        vm.prank(validAdmin);
+        factoryImplementation.setUpgraderRole(newUpgrader);
+    }
 }
