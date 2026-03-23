@@ -15,7 +15,6 @@ import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {PoRepMarket} from "./PoRepMarket.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
-import {IValidator} from "./interfaces/Validator.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
 
@@ -55,10 +54,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         return _getClientStorage();
     }
 
-    /**
-     * @notice Allocator role which allows for increasing and decreasing allowances
-     */
-    bytes32 public constant ALLOCATOR_ROLE = keccak256("ALLOCATOR_ROLE");
     uint32 private constant _FRC46_TOKEN_TYPE = 2233613279; // method_hash!("FRC46") as u32;
     address private constant _DATACAP_ADDRESS = address(0xfF00000000000000000000000000000000000007);
 
@@ -80,13 +75,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      */
     event DatacapSpent(address indexed client, uint256 amount);
     // solhint-enable gas-indexed-events
-
-    /**
-     * @notice Emited when lockupPeriod is called
-     * @param dealId Deal id
-     * @param validator Validator address
-     */
-    event ValidatorLockupPeriodUpdated(uint256 indexed dealId, address indexed validator);
 
     /**
      * @notice Thrown if sender is not proposed client
@@ -154,11 +142,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     error InvalidAdminAddress();
 
     /**
-     * @notice Error thrown when invalid allocator address is provided
-     */
-    error InvalidAllocatorAddress();
-
-    /**
      * @notice Error thrown when invalid termination oracle address is provided
      */
     error InvalidTerminationOracleAddress();
@@ -174,13 +157,14 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     error InvalidMetaAllocatorContractAddress();
 
     struct Deal {
+        bool completed;
         address client;
         address validator;
         CommonTypes.FilActorId provider;
         uint256 dealId;
         uint256 railId;
         uint256 sizeOfAllocations;
-        CommonTypes.ChainEpoch longestDealTerm;
+        CommonTypes.ChainEpoch maxAllocationEndTime;
         CommonTypes.FilActorId[] allocationIds;
     }
 
@@ -194,11 +178,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         CommonTypes.FilActorId claim;
     }
 
-    struct ClientDataUsage {
-        address client;
-        uint256 usage;
-    }
-
     /**
      * @notice Disabled constructor (proxy pattern)
      */
@@ -209,24 +188,21 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     /**
      * @notice Contract initializator. Should be called during deployment
      * @param admin Contract owner
-     * @param allocator Address of the allocator contract that can increase and decrease allowances
      * @param terminationOracle Address of the Termination Oracle
      * @param _poRepMarketContract Address of the PoRepMarket contract
      * @param _metaAllocatorContract Address of the MetaAllocator contract
      */
     function initialize(
         address admin,
-        address allocator,
         address terminationOracle,
         address _poRepMarketContract,
         address _metaAllocatorContract
     ) public initializer {
-        _validateInitializeAddresses(admin, allocator, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
+        _validateInitializeAddresses(admin, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
-        _grantRole(ALLOCATOR_ROLE, allocator);
         _grantRole(TERMINATION_ORACLE, terminationOracle);
 
         ClientStorage storage $ = s();
@@ -237,23 +213,18 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     /**
      * @notice Validates the addresses passed to the initialize function
      * @param admin Contract owner
-     * @param allocator Address of the allocator contract that can increase and decrease allowances
      * @param terminationOracle Address of the Termination Oracle
      * @param poRepMarketContract Address of the PoRepMarket contract
      * @param metaAllocatorContract Address of the MetaAllocator contract
      */
     function _validateInitializeAddresses(
         address admin,
-        address allocator,
         address terminationOracle,
         address poRepMarketContract,
         address metaAllocatorContract
     ) internal pure {
         if (admin == address(0)) {
             revert InvalidAdminAddress();
-        }
-        if (allocator == address(0)) {
-            revert InvalidAllocatorAddress();
         }
         if (terminationOracle == address(0)) {
             revert InvalidTerminationOracleAddress();
@@ -277,31 +248,47 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         external
         nonReentrant
     {
-        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 longestDealTerm) =
+        ClientStorage storage $ = s();
+        if ($._deals[dealId].dealId == 0) {
+            _registerDeal(dealId);
+        }
+
+        Deal storage deal = $._deals[dealId];
+        if (deal.completed) {
+            revert InvalidDealStateForTransfer();
+        }
+
+        if (msg.sender != deal.client) revert InvalidClient();
+        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 maxAllocationEndTime) =
             _deserializeVerifregOperatorData(params.operator_data);
 
-        _verifyAndRegisterDeal(dealId, dealCompleted);
-        _updateValidatorLockupPeriodAndLongestTermForDeal(dealId, longestDealTerm);
-        _verifyAndRegisterAllocations(dealId, allocations);
-        _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
-
-        ClientStorage storage $ = s();
+        if (maxAllocationEndTime > CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime)) {
+            deal.maxAllocationEndTime = CommonTypes.ChainEpoch.wrap(maxAllocationEndTime);
+        }
+        uint256 sizeOfAllocations = _verifyAndRegisterAllocations(dealId, allocations);
+        uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
+        uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
         $._metaAllocatorContract
-            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, $._deals[dealId].sizeOfAllocations);
+            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
 
-        emit DatacapSpent(msg.sender, $._deals[dealId].sizeOfAllocations);
+        emit DatacapSpent(msg.sender, allocationsAndClaimsSize);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
         (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
         if (exitCode != 0) {
             revert TransferFailed(exitCode);
         }
-
         if (allocations.length != 0) {
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
             for (uint256 i = 0; i < allocationIds.length; i++) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
-                $._deals[dealId].allocationIds.push(allocId);
+                deal.allocationIds.push(allocId);
             }
+        }
+        deal.sizeOfAllocations += allocationsAndClaimsSize;
+
+        if (dealCompleted) {
+            deal.completed = true;
+            $._poRepMarketContract.completeDeal(dealId, deal.sizeOfAllocations);
         }
     }
 
@@ -346,12 +333,16 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @param cborData The cbor encoded operator data.
      * @return allocations Array of provider allocations.
      * @return claimExtensions Array of provider claims.
-     * @return longestDealTerm Allocation with the longest term.
+     * @return maxAllocationEndTime Allocation with the longest term.
      */
     function _deserializeVerifregOperatorData(bytes memory cborData)
         internal
         pure
-        returns (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 longestDealTerm)
+        returns (
+            ProviderAllocation[] memory allocations,
+            ProviderClaim[] memory claimExtensions,
+            int64 maxAllocationEndTime
+        )
     {
         uint256 resultLength;
         uint64 provider;
@@ -390,8 +381,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
                     (termMax, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
                     (expiration, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
 
-                    if (termMax + expiration > longestDealTerm) {
-                        longestDealTerm = termMax + expiration;
+                    if (termMax + expiration > maxAllocationEndTime) {
+                        maxAllocationEndTime = termMax + expiration;
                     }
                 }
             }
@@ -423,9 +414,8 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
     /**
      * @notice Verifies and registers a deal.
      * @param dealId The deal id.
-     * @param dealCompleted flag to check if deal is completed
      */
-    function _verifyAndRegisterDeal(uint256 dealId, bool dealCompleted) internal {
+    function _registerDeal(uint256 dealId) internal {
         ClientStorage storage $ = s();
 
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
@@ -438,53 +428,34 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             revert InvalidDealStateForTransfer();
         }
 
-        if (dealCompleted) {
-            $._poRepMarketContract.completeDeal(dealId);
-        }
-
         Deal storage deal = $._deals[dealId];
-        if (deal.dealId != 0) return;
-
         deal.client = proposal.client;
         deal.provider = proposal.provider;
         deal.dealId = proposal.dealId;
         deal.validator = proposal.validator;
         deal.railId = proposal.railId;
-    }
-
-    /**
-     * @notice Updates validator lockup period if needed
-     * @param dealId The deal id.
-     * @param longestDealTerm The longest allocation.
-     */
-    function _updateValidatorLockupPeriodAndLongestTermForDeal(uint256 dealId, int64 longestDealTerm) internal {
-        Deal storage deal = _getStorageDeal(dealId);
-
-        if (longestDealTerm > CommonTypes.ChainEpoch.unwrap(deal.longestDealTerm)) {
-            IValidator validator = IValidator(deal.validator);
-            // forge-lint: disable-next-line(unsafe-typecast)
-            validator.updateLockupPeriod(deal.railId, uint256(uint64(longestDealTerm)));
-
-            emit ValidatorLockupPeriodUpdated(dealId, deal.validator);
-            deal.longestDealTerm = CommonTypes.ChainEpoch.wrap(longestDealTerm);
-        }
+        deal.completed = false;
     }
 
     /**
      * @notice Verifies and registers allocations.
      * @param dealId The deal id.
      * @param allocations The array of provider allocations.
+     * @return sizeOfAllocations The total size of allocations
      */
-    function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations) internal {
+    function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations)
+        internal
+        view
+        returns (uint256 sizeOfAllocations)
+    {
         Deal storage deal = _getStorageDeal(dealId);
-
         for (uint256 i = 0; i < allocations.length; i++) {
             ProviderAllocation memory alloc = allocations[i];
             if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
                 revert InvalidProvider();
             }
 
-            deal.sizeOfAllocations += alloc.size;
+            sizeOfAllocations += alloc.size;
         }
     }
 
@@ -493,8 +464,12 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @notice Verifies and registers claim extensions.
      * @param dealId The id of the deal.
      * @param claimExtensions The array of provider claims.
+     * @return sizeOfClaims The total size of claims
      */
-    function _verifyAndRegisterClaimExtensions(uint256 dealId, ProviderClaim[] memory claimExtensions) internal {
+    function _verifyAndRegisterClaimExtensions(uint256 dealId, ProviderClaim[] memory claimExtensions)
+        internal
+        returns (uint256 sizeOfClaims)
+    {
         Deal storage deal = _getStorageDeal(dealId);
         CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](claimExtensions.length);
         CommonTypes.FilActorId dealProvider = deal.provider;
@@ -521,7 +496,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
                 deal.allocationIds.push(claimIds[i]);
-                deal.sizeOfAllocations += claim.size;
+                sizeOfClaims += claim.size;
             }
         }
     }

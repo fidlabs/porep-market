@@ -25,7 +25,7 @@ contract ClientSCMock {
     }
 
     function setLongestDealTerm(uint256 dealId, int64 longestDealTerm) external {
-        deals[dealId].longestDealTerm = CommonTypes.ChainEpoch.wrap(longestDealTerm);
+        deals[dealId].maxAllocationEndTime = CommonTypes.ChainEpoch.wrap(longestDealTerm);
     }
 
     function getClientDealInfo(uint256 dealId) external view returns (Client.Deal memory) {

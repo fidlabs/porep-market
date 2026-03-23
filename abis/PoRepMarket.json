@@ -77,6 +77,11 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "actualSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -688,6 +693,12 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      },
+      {
+        "name": "actualSizeBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       },
       {
         "name": "provider",

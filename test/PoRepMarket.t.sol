@@ -336,9 +336,11 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientSmartContractAddress);
         vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.DealCompleted(dealId, clientSmartContractAddress, providerFilActorId);
+        emit PoRepMarket.DealCompleted(
+            dealId, clientSmartContractAddress, defaultTerms.dealSizeBytes, providerFilActorId
+        );
 
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
     }
 
     function testShouldAddDealIdToCompletedDealsIdsSet() public {
@@ -357,7 +359,7 @@ contract PoRepMarketTest is Test {
         porepMarekMock.acceptDeal(dealId);
 
         vm.prank(clientSmartContractAddress);
-        porepMarekMock.completeDeal(dealId);
+        porepMarekMock.completeDeal(dealId, defaultTerms.dealSizeBytes);
 
         uint256[] memory completedDealsIds = porepMarekMock.getCompletedDealsIds();
         assertEq(completedDealsIds.length, 1);
@@ -366,7 +368,7 @@ contract PoRepMarketTest is Test {
 
     function testCompleteDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
     }
 
     function testCompleteDealRevertsWhenNotTheSPClient() public {
@@ -380,7 +382,7 @@ contract PoRepMarketTest is Test {
             abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, dealId, notTheClientSmartContract)
         );
         vm.prank(notTheClientSmartContract);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
     }
 
     function testCompleteDealRevertsWhenDealNotAcceptedByStorageProvider() public {
@@ -396,7 +398,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
     }
 
     function testCompleteDealRevertsWhenDealAlreadyCompleted() public {
@@ -405,7 +407,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -416,7 +418,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
     }
 
     function testRejectAsClientDealEmitsDealRejectedEvent() public {
@@ -659,7 +661,7 @@ contract PoRepMarketTest is Test {
         vm.stopPrank();
 
         vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
 
         vm.expectEmit(true, true, true, true);
 
@@ -700,7 +702,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
 
         vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
 
         address caller = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
@@ -719,7 +721,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateValidator(dealId);
 
         vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId);
+        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
 
         address caller = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));

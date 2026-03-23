@@ -6,19 +6,6 @@
   },
   {
     "type": "function",
-    "name": "ALLOCATOR_ROLE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "DEFAULT_ADMIN_ROLE",
     "inputs": [],
     "outputs": [
@@ -207,11 +194,6 @@
     "inputs": [
       {
         "name": "admin",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "allocator",
         "type": "address",
         "internalType": "address"
       },
@@ -538,25 +520,6 @@
     "anonymous": false
   },
   {
-    "type": "event",
-    "name": "ValidatorLockupPeriodUpdated",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "validator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      }
-    ],
-    "anonymous": false
-  },
-  {
     "type": "error",
     "name": "AccessControlBadConfirmation",
     "inputs": []
@@ -632,11 +595,6 @@
   {
     "type": "error",
     "name": "InvalidAllocationRequest",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidAllocatorAddress",
     "inputs": []
   },
   {

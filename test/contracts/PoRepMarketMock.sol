@@ -17,7 +17,7 @@ contract PoRepMarketMock {
     }
 
     // solhint-disable-next-line no-empty-blocks
-    function completeDeal(uint256) external {
+    function completeDeal(uint256, uint256) external {
         //noop
     }
 

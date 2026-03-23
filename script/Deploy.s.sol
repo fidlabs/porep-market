@@ -36,7 +36,6 @@ contract Deploy is Script, DeployUtils {
     address internal spRegistry;
     address internal filecoinPay;
     address internal admin;
-    address internal allocator;
     address internal terminationOracle;
     address internal oracleAddress;
     address internal poRepService;
@@ -47,7 +46,6 @@ contract Deploy is Script, DeployUtils {
 
     function run() external {
         admin = vm.addr(vm.envUint("PRIVATE_KEY_TEST"));
-        allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         oracleAddress = vm.envAddress("ORACLE");
@@ -60,7 +58,7 @@ contract Deploy is Script, DeployUtils {
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         (clientSmartContract, clientSmartContractImpl) =
-            _deployClientSmartContract(admin, allocator, terminationOracle, poRepMarket, metaAllocator);
+            _deployClientSmartContract(admin, terminationOracle, poRepMarket, metaAllocator);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
         (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
@@ -109,14 +107,13 @@ contract Deploy is Script, DeployUtils {
 
     function _deployClientSmartContract(
         address _admin,
-        address _allocator,
         address _terminationOracle,
         address _porepMarket,
         address _metaAllocator
     ) internal returns (address proxy, address impl) {
         Client _impl = new Client();
         bytes memory init =
-            abi.encodeCall(Client.initialize, (_admin, _allocator, _terminationOracle, _porepMarket, _metaAllocator));
+            abi.encodeCall(Client.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
@@ -160,9 +157,9 @@ contract Deploy is Script, DeployUtils {
         json.serialize("ValidatorBeacon", validatorBeacon);
         json.serialize("ValidatorImpl", validatorImpl);
         json.serialize("FilecoinPay", filecoinPay);
-        json.serialize("Allocator", allocator);
         json.serialize("PoRepService", poRepService);
         json.serialize("MetaAllocator", metaAllocator);
+        json.serialize("SPRegistry", spRegistry);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
         save(output);
