@@ -25,7 +25,6 @@ import {FailingMockAddVerifiedClient} from "./contracts/FailingMockAddVerifiedCl
 import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {ClientContractMock} from "./contracts/ClientContractMock.sol";
 import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
-import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";

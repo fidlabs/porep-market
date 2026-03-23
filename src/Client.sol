@@ -395,8 +395,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         }
     }
 
-    event debug(address, address);
-
     /**
      * @notice Verifies and registers a deal.
      * @param dealId The deal id.
@@ -406,7 +404,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
-        emit debug(proposal.client, msg.sender);
         if (proposal.client != msg.sender) {
             revert InvalidClient();
         }
