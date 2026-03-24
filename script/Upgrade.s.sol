@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
 // solhint-disable use-natspec
-pragma solidity ^0.8.30;
+pragma solidity =0.8.30;
 
 import {Script} from "forge-std/Script.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
