@@ -3,10 +3,9 @@
 
 pragma solidity =0.8.30;
 
-import {IValidator} from "../../src/interfaces/Validator.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
-contract ValidatorMock is IValidator {
+contract ValidatorMock {
     function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external {
         // noop
     }

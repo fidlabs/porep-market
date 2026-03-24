@@ -164,7 +164,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         uint256 dealId;
         uint256 railId;
         uint256 sizeOfAllocations;
-        CommonTypes.ChainEpoch maxAllocationEndTime;
         CommonTypes.FilActorId[] allocationIds;
     }
 
@@ -259,15 +258,13 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         }
 
         if (msg.sender != deal.client) revert InvalidClient();
-        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions, int64 maxAllocationEndTime) =
+        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
             _deserializeVerifregOperatorData(params.operator_data);
 
-        if (maxAllocationEndTime > CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime)) {
-            deal.maxAllocationEndTime = CommonTypes.ChainEpoch.wrap(maxAllocationEndTime);
-        }
         uint256 sizeOfAllocations = _verifyAndRegisterAllocations(dealId, allocations);
         uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
         uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
+
         $._metaAllocatorContract
             .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
 
@@ -333,16 +330,11 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
      * @param cborData The cbor encoded operator data.
      * @return allocations Array of provider allocations.
      * @return claimExtensions Array of provider claims.
-     * @return maxAllocationEndTime Allocation with the longest term.
      */
     function _deserializeVerifregOperatorData(bytes memory cborData)
         internal
         pure
-        returns (
-            ProviderAllocation[] memory allocations,
-            ProviderClaim[] memory claimExtensions,
-            int64 maxAllocationEndTime
-        )
+        returns (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions)
     {
         uint256 resultLength;
         uint64 provider;
@@ -353,8 +345,6 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
         {
             uint64 size;
-            int64 termMax;
-            int64 expiration;
             (resultLength, byteIdx) = CBORDecoder.readFixedArray(cborData, byteIdx);
             allocations = new ProviderAllocation[](resultLength);
             for (uint256 i = 0; i < resultLength; i++) {
@@ -376,15 +366,9 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
                     allocations[i].size = size;
                 }
                 (, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx); // termMin
+                (, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx); // termMax
+                (, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx); // expiration
                 // slither-disable-end unused-return
-                {
-                    (termMax, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
-                    (expiration, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
-
-                    if (termMax + expiration > maxAllocationEndTime) {
-                        maxAllocationEndTime = termMax + expiration;
-                    }
-                }
             }
         }
         {

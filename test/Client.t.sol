@@ -24,7 +24,7 @@ import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorF
 import {FailingMockAddVerifiedClient} from "./contracts/FailingMockAddVerifiedClient.sol";
 import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {ClientContractMock} from "./contracts/ClientContractMock.sol";
-import {ReentrantValidatorMock} from "./contracts/ReentrantValidatorMock.sol";
+import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
@@ -132,7 +132,6 @@ contract ClientTest is Test {
     }
 
     function setupProxy(address impl) public returns (address) {
-        // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeCall(
             Client.initialize, (address(this), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
         );
@@ -406,6 +405,8 @@ contract ClientTest is Test {
         // solhint-disable-next-line reentrancy
         transferParams.operator_data =
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710011A005034AC";
+        vm.expectEmit(true, true, true, true);
+        emit Client.DatacapSpent(clientAddress, 24576);
         clientMock.transfer(transferParams, dealId, false);
 
         Client.Deal memory deal = clientMock.getDeal(dealId);
@@ -416,89 +417,36 @@ contract ClientTest is Test {
         assertEq(deal.client, clientAddress);
     }
 
-    // solhint-disable reentrancy
-    function testShouldUpdateMaxAllocationEndTimeWhenNewDealIsLongerThanCurrent() public {
-        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-        metaAllocatorMock.setAllowance(address(clientMock), uint256(1000000));
-        int64 expectedMaxAllocationEndTimeBefore = 5256305;
-        int64 expectedMaxAllocationEndTimeAfter = 10256305;
+    function testReentryAttemptWillThrowInvalidClientError() public {
+        ReentrantMetaAllocatorMock reentrantMetaAllocatorMock = new ReentrantMetaAllocatorMock();
+        address impl = address(new Client());
+        bytes memory initData = abi.encodeCall(
+            Client.initialize,
+            (address(this), terminationOracle, address(poRepMarketMock), address(reentrantMetaAllocatorMock))
+        );
+        Client clientWithReentrancy = Client(address(new ERC1967Proxy(address(impl), initData)));
 
-        // termMax + expiration -> 5256305
-        transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        Client.Deal memory deal = clientMock.getDeal(dealId);
-        assertTrue(CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime) == expectedMaxAllocationEndTimeBefore);
-
-        // termMax + expiration -> 10256305
-        transferParams.operator_data =
-            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710011A005034AC";
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        deal = clientMock.getDeal(dealId);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.provider) == CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(deal.dealId, dealId);
-        assertEq(deal.validator, address(validatorMock));
-        assertEq(deal.railId, 0);
-        assertEq(deal.client, clientAddress);
-        assertTrue(CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime) == expectedMaxAllocationEndTimeAfter);
-    }
-
-    function testShouldNotUpdateMaxAllocationEndTimeWhenNewDealIsShorterThanCurrent() public {
-        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
-        metaAllocatorMock.setAllowance(address(clientMock), uint256(1000000));
-        int64 expectedMaxAllocationEndTimeBefore = 5256305;
-        int64 expectedMaxAllocationEndTimeAfter = expectedMaxAllocationEndTimeBefore;
-
-        // termMax + expiration -> 5256305 from operator_data
-        transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        Client.Deal memory deal = clientMock.getDeal(dealId);
-        assertTrue(CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime) == expectedMaxAllocationEndTimeBefore);
-
-        // termMax + expiration -> 2256305 from operator_data
-        transferParams.operator_data =
-            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A00226C801901318183192710011A005034AC";
-        vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
-
-        deal = clientMock.getDeal(dealId);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.provider) == CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(deal.dealId, dealId);
-        assertEq(deal.validator, address(validatorMock));
-        assertEq(deal.railId, 0);
-        assertEq(deal.client, clientAddress);
-        assertTrue(CommonTypes.ChainEpoch.unwrap(deal.maxAllocationEndTime) == expectedMaxAllocationEndTimeAfter);
-    }
-
-    // solhint-enable reentrancy
-    function testShouldNotTransferIfReentrantCall() public {
-        ReentrantValidatorMock reentrantValidatorMock = new ReentrantValidatorMock();
         poRepMarketMock.setDealProposal(
             dealId,
             PoRepTypes.DealProposal({
-                dealId: 150,
+                dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
-                validator: address(reentrantValidatorMock),
                 state: PoRepTypes.DealState.Accepted,
+                validator: address(validatorMock),
                 railId: 0,
                 manifestLocation: expectedManifestLocation
             })
         );
-        reentrantValidatorMock.setAttackParams(address(client), transferParams, dealId);
+        reentrantMetaAllocatorMock.setAttackParams(address(clientWithReentrancy), transferParams, dealId);
         vm.prank(clientAddress);
         client.transfer(transferParams, dealId, true);
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidClient.selector));
+        clientWithReentrancy.transfer(transferParams, dealId, false);
     }
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
@@ -531,6 +479,8 @@ contract ClientTest is Test {
         transferParams.operator_data =
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710041A005034AC";
         actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808102");
+        vm.expectEmit(true, true, true, true);
+        emit Client.DatacapSpent(clientAddress, 24576);
 
         vm.prank(clientAddress);
         clientMock.transfer(transferParams, dealId, false);
