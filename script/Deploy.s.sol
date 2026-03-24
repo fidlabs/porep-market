@@ -44,7 +44,6 @@ contract Deploy is Script, DeployUtils {
 
     function run() external {
         admin = vm.addr(vm.envUint("PRIVATE_KEY"));
-        allocator = vm.envAddress("ALLOCATOR");
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         oracleAddress = vm.envAddress("ORACLE");
