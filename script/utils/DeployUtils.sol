@@ -17,6 +17,23 @@ contract DeployUtils is Script {
         vm.writeJson(json, string.concat(base, "/", vm.toString(block.number), ".json"));
     }
 
+    function saveUpgrade(string memory json, string memory contractName) internal {
+        string memory base = string.concat("./deployments/", network(), "/upgrades");
+        vm.createDir(base, true);
+        vm.writeJson(json, string.concat(base, "/", vm.toString(block.number), "_", contractName, ".json"));
+    }
+
+    function updateLatestImpl(string memory contractName, address newImpl) internal {
+        string memory path = string.concat("./deployments/", network(), "/latest.json");
+        vm.writeJson(vm.toString(newImpl), path, string.concat(".", contractName, ".impl"));
+        vm.writeJson(vm.toString(newImpl.codehash), path, string.concat(".", contractName, ".codeHash"));
+        vm.writeJson(
+            vm.toString(keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName)))),
+            path,
+            string.concat(".", contractName, ".deployedCodeHash")
+        );
+    }
+
     function createProxy(bytes memory init, address impl) internal returns (address proxy) {
         proxy = address(new ERC1967Proxy(address(impl), init));
     }
@@ -26,8 +43,30 @@ contract DeployUtils is Script {
         obj.serialize("proxy", proxy);
         obj.serialize("impl", impl);
         obj.serialize("codeHash", vm.toString(impl.codehash));
-        string memory serialized = obj.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(contractName)));
+        string memory serialized = obj.serialize(
+            "deployedCodeHash",
+            keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName))) // <-- fix
+        );
         json.serialize(contractName, serialized);
+    }
+
+    function readLatestDeploymentArtifact() internal view returns (string memory json) {
+        json = vm.readFile(string.concat("./deployments/", network(), "/latest.json"));
+    }
+
+    function deserializeContract(string memory json, string memory contractName)
+        internal
+        pure
+        returns (address proxy, address impl, bytes32 codeHash, bytes32 deployedCodeHash)
+    {
+        proxy = abi.decode(json.parseRaw(string.concat(".", contractName, ".proxy")), (address));
+        impl = abi.decode(json.parseRaw(string.concat(".", contractName, ".impl")), (address));
+        codeHash = abi.decode(json.parseRaw(string.concat(".", contractName, ".codeHash")), (bytes32));
+        deployedCodeHash = abi.decode(json.parseRaw(string.concat(".", contractName, ".deployedCodeHash")), (bytes32));
+    }
+
+    function generateContractHash(string memory contractName) internal view returns (bytes32 hash) {
+        hash = keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName)));
     }
 
     function network() internal view returns (string memory) {

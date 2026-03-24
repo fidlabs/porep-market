@@ -42,10 +42,8 @@ contract Deploy is Script, DeployUtils {
     address internal operatorAddress;
     address internal metaAllocator;
 
-    error InvalidEnv();
-
     function run() external {
-        admin = vm.addr(vm.envUint("PRIVATE_KEY_TEST"));
+        admin = vm.addr(vm.envUint("PRIVATE_KEY"));
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
         oracleAddress = vm.envAddress("ORACLE");
@@ -53,15 +51,15 @@ contract Deploy is Script, DeployUtils {
         operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
         metaAllocator = vm.envAddress("META_ALLOCATOR");
 
-        vm.startBroadcast(vm.envUint("PRIVATE_KEY_TEST"));
+        vm.startBroadcast(admin);
 
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
+        (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         (clientSmartContract, clientSmartContractImpl) =
             _deployClientSmartContract(admin, terminationOracle, poRepMarket, metaAllocator);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
-        (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 

@@ -17,6 +17,9 @@ test:
 build:
     forge build --build-info --sizes
 
+clean:
+    forge clean
+
 gen-abis:
     forge build
     for f in $(find src -name '*.sol' ! -path "*/interfaces/*" ! -path "*/types/*" ! -path "*/libs/*"); do \
@@ -33,10 +36,24 @@ coverage:
 check-coverage:
     ./ci/check-full-coverage.sh
 
-devnet_deploy:
-	forge clean && forge build
-	forge script script/Deploy.s.sol --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_TEST --private-key $PRIVATE_KEY_TEST
+deploy flags='':
+    forge script script/Deploy.s.sol:Deploy --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
 
+upgrade flags='':
+    forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+
+devnet_deploy: clean build
+	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just deploy 
+
+calibnet_deploy: clean build
+    RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just deploy --slow
+
+devnet_upgrade: clean build
+	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just upgrade
+
+calibnet_upgrade: clean build
+	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade --slow
+   
 # CI equivalent check
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."
