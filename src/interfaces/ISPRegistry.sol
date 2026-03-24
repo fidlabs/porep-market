@@ -18,7 +18,7 @@ interface ISPRegistry {
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 pendingBytes;
-        /// @notice Monthly USDFC price per 32 GiB sector in smallest units (0 = manual approval)
+        /// @notice Monthly ERC20 token price per 32 GiB sector in smallest units (0 = manual approval)
         uint256 pricePerSectorPerMonth;
     }
 
@@ -146,7 +146,7 @@ interface ISPRegistry {
     /**
      * @notice Set the monthly price per sector for a provider
      * @param provider The provider to update
-     * @param pricePerSectorPerMonth The monthly USDFC price per 32 GiB sector in smallest units (0 to disable auto-approve)
+     * @param pricePerSectorPerMonth The monthly ERC20 token price per 32 GiB sector in smallest units (0 to disable auto-approve)
      */
     function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSectorPerMonth) external;
 
