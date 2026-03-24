@@ -121,7 +121,7 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
@@ -263,7 +263,7 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Completed,
                 railId: 0,
@@ -394,7 +394,7 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
@@ -435,7 +435,7 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 state: PoRepTypes.DealState.Accepted,
                 validator: address(validatorMock),
                 railId: 0,
@@ -468,7 +468,7 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
@@ -715,7 +715,7 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(0),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,

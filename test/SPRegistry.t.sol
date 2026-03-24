@@ -32,7 +32,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds({retrievabilityBps: 9500, bandwidthMbps: 1000, latencyMs: 100, indexingPct: 90});
 
     SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSector: 100, durationDays: 365});
+        SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 365});
 
     uint256 internal defaultAvailableBytes = 10_000_000;
 
@@ -304,7 +304,7 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.setPrice(provider1, 250);
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSector, 250);
+        assertEq(info.pricePerSectorPerMonth, 250);
     }
 
     function testRegisterProviderForRevertsForActorIdZero() public {
@@ -365,7 +365,7 @@ contract SPRegistryTest is Test {
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0));
 
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSector, 250);
+        assertEq(info.pricePerSectorPerMonth, 250);
     }
 
     function testRegisterProviderForEmitsDefaultPriceEvent() public {
@@ -390,7 +390,7 @@ contract SPRegistryTest is Test {
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
         assertEq(info.organization, owner1);
         assertEq(info.availableBytes, defaultAvailableBytes);
-        assertEq(info.pricePerSector, 100);
+        assertEq(info.pricePerSectorPerMonth, 100);
     }
 
     function testRegisterProviderForStillWorksForAdmin() public {
@@ -583,7 +583,7 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSector, 0);
+        assertEq(info.pricePerSectorPerMonth, 0);
     }
 
     function testGetProviderForDealAutoApproveTrueWhenPriceMatches() public {
@@ -698,7 +698,7 @@ contract SPRegistryTest is Test {
         assertEq(info.availableBytes, defaultAvailableBytes);
         assertEq(info.committedBytes, 0);
         assertEq(info.pendingBytes, 0);
-        assertEq(info.pricePerSector, 0);
+        assertEq(info.pricePerSectorPerMonth, 0);
     }
 
     function testGetProviderForDealReturnsZeroWhenNoProviders() public {
@@ -1197,7 +1197,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         SLITypes.DealTerms memory smallTerms =
-            SLITypes.DealTerms({dealSizeBytes: 500, pricePerSector: 100, durationDays: 365});
+            SLITypes.DealTerms({dealSizeBytes: 500, pricePerSectorPerMonth: 100, durationDays: 365});
 
         vm.prank(poRepMarketAddress);
         spRegistry.getProviderForDeal(req, smallTerms);

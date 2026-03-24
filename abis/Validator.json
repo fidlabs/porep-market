@@ -648,11 +648,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidDealDuration",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidDealId",
     "inputs": []
   },

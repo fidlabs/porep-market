@@ -34,7 +34,7 @@ contract PoRepMarketTest is Test {
         SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
     SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 360});
+        SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 360});
 
     string public expectedManifestLocation = "https://example.com/manifest";
 
@@ -107,7 +107,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.requirements.indexingPct, defaultRequirements.indexingPct);
         assertEq(p.manifestLocation, expectedManifestLocation);
         assertEq(p.terms.dealSizeBytes, defaultTerms.dealSizeBytes);
-        assertEq(p.terms.pricePerSector, defaultTerms.pricePerSector);
+        assertEq(p.terms.pricePerSectorPerMonth, defaultTerms.pricePerSectorPerMonth);
         assertEq(p.terms.durationDays, defaultTerms.durationDays);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
@@ -122,7 +122,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.requirements.latencyMs, 0);
         assertEq(p.requirements.indexingPct, 0);
         assertEq(p.terms.dealSizeBytes, 0);
-        assertEq(p.terms.pricePerSector, 0);
+        assertEq(p.terms.pricePerSectorPerMonth, 0);
         assertEq(p.terms.durationDays, 0);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
@@ -560,7 +560,7 @@ contract PoRepMarketTest is Test {
 
     function testProposeDealRevertsWhenDealDurationIsZero() public {
         SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 0, dealSizeBytes: 1024, pricePerSector: 100});
+            SLITypes.DealTerms({durationDays: 0, dealSizeBytes: 1024, pricePerSectorPerMonth: 100});
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
@@ -568,7 +568,7 @@ contract PoRepMarketTest is Test {
 
     function testProposeDealRevertsWhenDealDurationIsNotMultiplicatioveOf30() public {
         SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 31, dealSizeBytes: 1024, pricePerSector: 100});
+            SLITypes.DealTerms({durationDays: 31, dealSizeBytes: 1024, pricePerSectorPerMonth: 100});
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
@@ -576,7 +576,7 @@ contract PoRepMarketTest is Test {
 
     function testProposeDealRevertsWhenDealDurationExceedsMaximum() public {
         SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
-            durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 12, dealSizeBytes: 1024, pricePerSector: 100
+            durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 12, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));

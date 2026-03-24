@@ -54,7 +54,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 pendingBytes;
-        uint256 pricePerSector;
+        uint256 pricePerSectorPerMonth;
     }
 
     /// @custom:storage-location erc7201:porepmarket.storage.SPRegistryStorage
@@ -312,17 +312,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSector) external {
+    function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSectorPerMonth) external {
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
-        uint256 oldPrice = $._providers[id].pricePerSector;
-        $._providers[id].pricePerSector = pricePerSector;
+        uint256 oldPrice = $._providers[id].pricePerSectorPerMonth;
+        $._providers[id].pricePerSectorPerMonth = pricePerSectorPerMonth;
 
-        emit PriceUpdated(provider, oldPrice, pricePerSector);
+        emit PriceUpdated(provider, oldPrice, pricePerSectorPerMonth);
     }
 
     /// @inheritdoc ISPRegistry
@@ -366,7 +366,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             availableBytes: p.availableBytes,
             committedBytes: p.committedBytes,
             pendingBytes: p.pendingBytes,
-            pricePerSector: p.pricePerSector
+            pricePerSectorPerMonth: p.pricePerSectorPerMonth
         });
     }
 
@@ -421,7 +421,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             if (p.committedBytes < lowestCommitted) {
                 lowestCommitted = p.committedBytes;
                 bestProvider = CommonTypes.FilActorId.wrap(id);
-                bestProviderPrice = p.pricePerSector;
+                bestProviderPrice = p.pricePerSectorPerMonth;
                 if (lowestCommitted == 0) break;
             }
         }
@@ -434,7 +434,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         // solhint-disable gas-strict-inequalities
         bool autoApprove = bestProviderPrice > 0 && CommonTypes.FilActorId.unwrap(bestProvider) != 0
-            && terms.pricePerSector >= bestProviderPrice;
+            && terms.pricePerSectorPerMonth >= bestProviderPrice;
         // solhint-enable gas-strict-inequalities
 
         return (bestProvider, autoApprove);
@@ -524,7 +524,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param organization The address of the provider's organization
      * @param capabilities The SLI thresholds this provider guarantees
      * @param availableBytes The provider's available storage capacity
-     * @param pricePerSector The provider's auto-approve price per sector (0 to skip)
+     * @param pricePerSectorPerMonth The provider's auto-approve price per sector per month (0 to skip)
      * @param payee The payment recipient address (address(0) defaults to organization)
      */
     function registerProviderFor(
@@ -532,7 +532,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         address organization,
         SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
-        uint256 pricePerSector,
+        uint256 pricePerSectorPerMonth,
         address payee
     ) external {
         _onlyAdminOrOperator();
@@ -546,11 +546,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         $._providers[id].capabilities = capabilities;
         $._providers[id].availableBytes = availableBytes;
-        $._providers[id].pricePerSector = pricePerSector;
+        $._providers[id].pricePerSectorPerMonth = pricePerSectorPerMonth;
 
         emit CapabilitiesUpdated(provider, capabilities);
         emit AvailableSpaceUpdated(provider, availableBytes);
-        emit PriceUpdated(provider, 0, pricePerSector);
+        emit PriceUpdated(provider, 0, pricePerSectorPerMonth);
     }
 
     /// @inheritdoc ISPRegistry

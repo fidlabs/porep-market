@@ -72,7 +72,7 @@ contract ValidatorTest is Test {
                 dealId: dealId,
                 client: admin,
                 provider: providerFilActorId,
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSector: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 requirements: defaultRequirements,
                 validator: address(0),
                 state: PoRepTypes.DealState.Proposed,
@@ -392,13 +392,11 @@ contract ValidatorTest is Test {
 
     function testModifyRailPaymentEmitsRailPaymentModified() public {
         PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSector = 2_000_000;
+        dealProposal.terms.pricePerSectorPerMonth = 2_000_000;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
         uint256 sectorCount = clientSCMock.getClientAllocationIdsPerDeal(dealId).length;
-        uint256 durationMonths = (uint256(dealProposal.terms.durationDays) + 29) / 30;
-        uint256 totalEpochs = durationMonths * 86_400;
-        uint256 expectedRate = (dealProposal.terms.pricePerSector * sectorCount) / totalEpochs;
+        uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
 
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.RailPaymentModified(railId, expectedRate);
@@ -610,20 +608,6 @@ contract ValidatorTest is Test {
         validator.modifyRailPayment(railId);
     }
 
-    function testModifyRailPaymentRevertsWhenDealDurationIsZero() public {
-        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
-        ids[0] = CommonTypes.FilActorId.wrap(1);
-        clientSCMock.setAllocationIds(dealId, ids);
-
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.durationDays = 0;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
-
-        vm.expectRevert(Validator.InvalidDealDuration.selector);
-        vm.prank(porepService);
-        validator.modifyRailPayment(railId);
-    }
-
     function testValidatePaymentRevertsWhenDealNotCompleted() public {
         vm.prank(porepService);
         validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(0)));
@@ -751,8 +735,7 @@ contract ValidatorTest is Test {
         clientSCMock.setAllocationIds(dealId, ids);
 
         PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSector = 1;
-        dealProposal.terms.durationDays = 3650;
+        dealProposal.terms.pricePerSectorPerMonth = 1;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
         vm.expectRevert(Validator.InvalidZeroAmount.selector);

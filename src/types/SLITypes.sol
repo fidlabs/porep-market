@@ -39,8 +39,8 @@ library SLITypes {
      */
     struct DealTerms {
         uint256 dealSizeBytes;
-        /// @notice Price per 32 GiB sector in USDFC smallest units (wei-equivalent)
-        uint256 pricePerSector;
+        /// @notice Monthly price per 32 GiB sector in USDFC smallest units (wei-equivalent)
+        uint256 pricePerSectorPerMonth;
         uint32 durationDays;
     }
 
