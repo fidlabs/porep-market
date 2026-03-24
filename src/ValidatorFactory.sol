@@ -34,6 +34,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address _SPRegistry;
         address _beacon;
         address _admin;
+        address _upgraderRole;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorFactoryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -68,6 +69,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InvalidSPRegistryAddress();
     error InvalidImplementationAddress();
     error InvalidNewAdminAddress();
+    error InvalidNewUpgraderRoleAddress();
     error RoleManagementDisabled();
 
     /**
@@ -82,6 +84,12 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @param newAdmin The address of the new admin
      */
     event AdminChanged(address indexed newAdmin);
+
+    /**
+     * @notice Emitted when the upgrader role is changed
+     * @param newUpgraderRole The address of the new upgrader role
+     */
+    event UpgraderRoleChanged(address indexed newUpgraderRole);
 
     /**
      * @notice Initializes the contract
@@ -104,6 +112,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         ValidatorFactoryStorage storage $ = s();
         $._beacon = address(new UpgradeableBeacon(implementation, admin));
         $._admin = admin;
+        $._upgraderRole = admin;
     }
 
     /**
@@ -198,6 +207,25 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         $._admin = newAdmin;
 
         emit AdminChanged(newAdmin);
+    }
+
+    /**
+     * @notice Sets a new upgrader role for the contract
+     * @dev Only callable by the current admin. Reverts if the new upgrader role address is the zero address.
+     * @param newUpgraderRole The new upgrader role address
+     */
+    function setUpgraderRole(address newUpgraderRole) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newUpgraderRole == address(0)) {
+            revert InvalidNewUpgraderRoleAddress();
+        }
+        ValidatorFactoryStorage storage $ = s();
+
+        _revokeRole(UPGRADER_ROLE, $._upgraderRole);
+        _grantRole(UPGRADER_ROLE, newUpgraderRole);
+
+        $._upgraderRole = newUpgraderRole;
+
+        emit UpgraderRoleChanged(newUpgraderRole);
     }
 
     // solhint-disable use-natspec

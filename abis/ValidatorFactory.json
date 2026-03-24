@@ -283,6 +283,19 @@
   },
   {
     "type": "function",
+    "name": "setUpgraderRole",
+    "inputs": [
+      {
+        "name": "newUpgraderRole",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -452,6 +465,19 @@
     "anonymous": false
   },
   {
+    "type": "event",
+    "name": "UpgraderRoleChanged",
+    "inputs": [
+      {
+        "name": "newUpgraderRole",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
     "type": "error",
     "name": "AccessControlBadConfirmation",
     "inputs": []
@@ -568,6 +594,11 @@
   {
     "type": "error",
     "name": "InvalidNewAdminAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNewUpgraderRoleAddress",
     "inputs": []
   },
   {
