@@ -525,20 +525,22 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param capabilities The SLI thresholds this provider guarantees
      * @param availableBytes The provider's available storage capacity
      * @param pricePerSector The provider's auto-approve price per sector (0 to skip)
+     * @param payee The payment recipient address (address(0) defaults to organization)
      */
     function registerProviderFor(
         CommonTypes.FilActorId provider,
         address organization,
         SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
-        uint256 pricePerSector
+        uint256 pricePerSector,
+        address payee
     ) external {
         _onlyAdminOrOperator();
         if (organization == address(0)) revert InvalidOrganizationAddress();
         if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
 
-        _registerProvider(provider, organization);
+        _registerProvider(provider, organization, payee);
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
@@ -582,8 +584,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @notice Registers a provider under the given organization
      * @param provider The provider actor ID to register
      * @param organization The address of the provider's organization
+     * @param payee The payment recipient address (address(0) defaults to organization)
      */
-    function _registerProvider(CommonTypes.FilActorId provider, address organization) internal {
+    function _registerProvider(CommonTypes.FilActorId provider, address organization, address payee) internal {
         if (CommonTypes.FilActorId.unwrap(provider) == 0) revert InvalidProviderActorId();
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
@@ -595,7 +598,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         $._providers[id].organization = organization;
-        $._providers[id].payee = organization;
+        $._providers[id].payee = payee == address(0) ? organization : payee;
         $._orgProviders[organization].add(id256);
 
         emit ProviderRegistered(provider, organization);
