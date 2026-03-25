@@ -158,10 +158,6 @@ Implementation
 
 A typical full flow from proposing a deal to withdrawing rewards will look as follows:
 
-## Diagrams
-
-A typical full flow from proposing a deal to withdrawing rewards will look as follows:
-
 ```mermaid
 sequenceDiagram
   actor Client
