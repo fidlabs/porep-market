@@ -150,7 +150,7 @@
                 "internalType": "uint256"
               },
               {
-                "name": "pricePerSector",
+                "name": "pricePerSectorPerMonth",
                 "type": "uint256",
                 "internalType": "uint256"
               },
@@ -255,7 +255,7 @@
                 "internalType": "uint256"
               },
               {
-                "name": "pricePerSector",
+                "name": "pricePerSectorPerMonth",
                 "type": "uint256",
                 "internalType": "uint256"
               },
@@ -436,7 +436,7 @@
             "internalType": "uint256"
           },
           {
-            "name": "pricePerSector",
+            "name": "pricePerSectorPerMonth",
             "type": "uint256",
             "internalType": "uint256"
           },

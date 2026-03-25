@@ -110,11 +110,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
     error InvalidSectorCount();
 
     /**
-     * @notice Error indicating that the duration of the deal is zero, which is invalid
-     */
-    error InvalidDealDuration();
-
-    /**
      * @notice Error indicating that the caller is not authorized to perform the action
      */
     error UnauthorizedCaller();
@@ -230,11 +225,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
      */
     uint256 private constant EPOCHS_IN_YEAR = 1_051_200;
-    /**
-     * @notice Number of epochs in one day
-     * @dev 24 hours/day * 60 minutes/hour * 2 epochs/minute = 2_880 epochs
-     */
-    uint256 private constant EPOCHS_IN_DAY = 2_880;
 
     /**
      * @notice Storage location for ValidatorStorage struct
@@ -584,19 +574,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         CommonTypes.FilActorId[] memory allocationIds = Client($.clientSC).getClientAllocationIdsPerDeal($.dealId);
 
         uint256 sectorCount = allocationIds.length;
-        uint256 pricePerSector = dealProposal.terms.pricePerSector;
-        uint32 durationDays = dealProposal.terms.durationDays;
+        uint256 pricePerSectorPerMonth = dealProposal.terms.pricePerSectorPerMonth;
 
         if (sectorCount == 0) {
             revert InvalidSectorCount();
         }
 
-        if (durationDays == 0) {
-            revert InvalidDealDuration();
-        }
-
-        uint256 totalEpochs = durationDays * EPOCHS_IN_DAY;
-        uint256 amount = (pricePerSector * sectorCount) / totalEpochs;
+        uint256 amount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
 
         if (amount == 0) {
             revert InvalidZeroAmount();
