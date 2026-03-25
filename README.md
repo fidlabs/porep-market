@@ -20,7 +20,7 @@ The ecosystem is divided into three functional pillars:
 
 - **Quality Control (SLA)**
   * **SLIScorer:** Defines the rules of the deal by evaluating Storage Providers based on selected indicators and calculating their overall score.
-  * **OracleSLI:** It feeds off-chain performance data into the blockchain so the SLC contract can evaluate the provider.
+  * **OracleSLI:** It feeds off-chain performance data into the blockchain so the SLIScorer can evaluate the provider.
 
 - **Financial Settlement & Operations**
   * **Validator:** A specific Validator is deployed for each deal. It validates the provider's performance score before approving any payout.
@@ -45,18 +45,20 @@ The PoRep Market turns Filecoin storage from a simple yes/no deal into a practic
 
 ## Glossary
 We expect following actors and contracts in the system:
-1. **Client** - person that has data and wants to store it 
+1. **Client** - person that has data and wants to store it
 2. **SP** - person that runs a miner that can store data and mine blocks
 3. **Gov** - Filecoin governance team
 4. **SettlementBot** - off-chain service that triggers settlement-related transaction
-5. **SPRegistry** - smart contract that tracks registered Storage Providers participating in the PoRep Market
-6. **OracleSLI** -  smart contract that stores off-chain data regarding SLIs for providers
-7. **SLIScorer** - smart contract that evaluates Storage Providers by calculating a score based on predefined minimum values for selected Service Level Indicators (SLIs).8. **PoRepMarket** - smart contract coordinating deals
-9. **Client Smart Contract** - singleton smart contract that helps **Clients** to make allocation and helps track metrics
-10. **ValidatorFactory** - smart contract that deploys and registers Validator contracts
-11. **Validator** - smart contract that validate payments during settlement
-12. [**FilecoinPay**](https://github.com/FilOzone/filecoin-pay) - smart contract enables automated payment channels between payers and recipient
-13. **Miner** - instance of the [Miner Actor](https://github.com/filecoin-project/builtin-actors/tree/master/actors/miner)
+5. [**SPRegistry**](#spregistry) - smart contract that tracks registered Storage Providers participating in the PoRep Market
+6. [**OracleSLI**](#oraclesli) - smart contract that stores off-chain data regarding SLIs for providers
+7. [**SLIScorer**](#sliscorer) - smart contract that evaluates Storage Providers by calculating a score based on predefined minimum values for selected Service Level Indicators (SLIs).
+8. [**PoRepMarket**](#porep-market) - smart contract coordinating deals
+9. [**Client Smart Contract**](#client-smart-contract) - singleton smart contract that helps **Clients** to make allocation and helps track metrics
+10. [**ValidatorFactory**](#validatorfactory) - smart contract that deploys and registers Validator contracts
+11. [**Validator**](#validator) - smart contract that validate payments during settlement
+12. [**MetaAllocator**](https://github.com/fidlabs/contract-metaallocator) - external FIDL contract acting as a Notary/Verifier on Filecoin that grants DataCap allowances to clients
+13. [**FilecoinPay**](https://github.com/FilOzone/filecoin-pay) - smart contract enables automated payment channels between payers and recipient
+14. **Miner** - instance of the [Miner Actor](https://github.com/filecoin-project/builtin-actors/tree/master/actors/miner)
 
 
 ## PoRep Market
@@ -64,52 +66,12 @@ We expect following actors and contracts in the system:
 **PoRep Market** is a smart contract responsible for managing deal proposals and updates. It allows clients to propose new deals, automatically selects a Storage Provider (SP) via an external registry, and stores deal proposals on-chain. 
 
 There will be following roles in this contract:
-* `ADMIN`, who can upgrade the contract
+* `DEFAULT_ADMIN_ROLE`, who can manage the contract and set the Client Smart Contract address
 * `UPGRADER_ROLE`, who can upgrade the contract
 
-Expected interface:
-```
-interface PoRepMarket {
-    function proposeDeal(uint256 expectedDealSize, uint256 priceForDeal, address SLC) external;
-    function updateValidatorAndRailId(uint256 dealId, uint256 railId) external;
-    function getDealProposal(uint256 dealId) external view returns (DealProposal memory);
-    function getCompletedDeals() external returns (DealProposal[] memory);
-    function acceptDeal(uint256 dealId) external;
-    function rejectDeal(uint256 dealId) external;
-    function completeDeal(uint256 dealId) external;
-    function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external;
-}
-```
-
-Expected storage items:
-```
-struct DealProposal {
-    uint256 dealId;
-    address client;
-    CommonTypes.FilActorId provider;
-    SLIThresholds slis;
-    address validator;
-    DealState state;
-    uint256 railId;
-    uint256 price;
-    uint256 totalDealSize;
-}
-
-enum DealState {
-    Proposed,
-    Accepted,
-    Completed,
-    Rejected,
-    Terminated
-}
-
-mapping(uint256 => DealProposal) dealProposals;
-address SPRegistry;
-address ValidatorRegistry;
-address ClientContract;
-uint256 dealIdCounter;
-```
-// and items inherited from OpenZeppelin's AccessControl, UUPSUpgradeable and Multicall
+Implementation
+* interface: [IPoRepMarket](src/interfaces/IPoRepMarket.sol)
+* smart contract: [PoRepMarket](src/PoRepMarket.sol)
 
 ## Client Smart Contract
 
@@ -120,34 +82,14 @@ The main function it will implement is `transfer`, which copies the interface of
 
 It will also track how much a given **Client** allocated with a given **SP** for a given deal, so that the Validator can check the size of allocations made by the client and compare it with the actual size of **SP** data.
 
-There will be following role in this contract:
-* `ADMIN`, who can upgrade the contract
+There will be following roles in this contract:
+* `DEFAULT_ADMIN_ROLE`, who can manage the contract
+* `UPGRADER_ROLE`, who can upgrade the contract
+* `ALLOCATOR_ROLE`, who can increase and decrease allowances
 * `TERMINATION_ORACLE`, external service that updates the contract about early terminated sectors
 
-Expected interface:
-```
-interface Client {
-    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealID, bool completed) external;
-    function isDataSizeMatching(uint256 dealId) external;
-}
-```
-
-Expected storage items:
-```
-  struct Deal {
-      address client;
-      address validator;
-      CommonTypes.FilActorId provider;
-      uint256 dealId;
-      uint256 railId;
-      uint256 sizeOfAllocations;
-      CommonTypes.ChainEpoch longestDealTerm;
-      CommonTypes.FilActorId[] allocationIds;
-  }
-
-address PoRepMarket;
-// and items inherited from OpenZeppelin's AccessControl, UUPSUpgradeable and Multicall
-```
+Implementation
+* smart contract: [Client](src/Client.sol)
 
 ## OracleSLI
 
@@ -155,147 +97,62 @@ address PoRepMarket;
 
 **FIDLOracle** is a reference **Oracle** provided by FIDL that uses data from DataCapStats for SLIs. It will be upgradeable and implement a following interface:
 
-There will be following role in this contract:
-* `UPGRADER`, who can upgrade the contract
-* `ORACLE`, which allows to update SLI values
+There will be following roles in this contract:
+* `UPGRADER_ROLE`, who can upgrade the contract
+* `ORACLE_ROLE`, which allows to update SLI values
 
-```
-interface OracleSLI {
-  struct SLIThresholds {
-      uint8 retrievabilityPct;
-      uint16 bandwidthMbps;
-      uint16 latencyMs;
-      uint8 indexingPct;
-  }
-
-  struct Attestation {
-      uint256 lastUpdate;
-      SLIThresholds slis;
-  }
-
-  function setSLI(CommonTypes.FilActorId provider, SLIThresholds calldata slis) external onlyRole(ORACLE_ROLE);
-}
-```
-
-Expected storage items:
-```
-mapping(address provider => Attestation attestation) public attestations;
-```
+Implementation
+* interface: [ISLIOracle](src/interfaces/ISLIOracle.sol)
+* smart contract: [SLIOracle](src/SLIOracle.sol)
 
 ## SLIScorer
 
 **SLIScorer** is a smart contract responsible for calculating a score for a given provider based on the required Service Level Indicators (SLIs) and the actual SLIs reported by the **OracleSLI** contract.
 
-```
-interface ServiceLevelClass {
-  struct SLIThresholds {
-      uint8 retrievabilityPct;
-      uint16 bandwidthMbps;
-      uint16 latencyMs;
-      uint8 indexingPct;
-  }
-  function calculateScore(address provider, SLIThresholds calldata required) external view returns (uint256 score);
-}
-```
+There will be following roles in this contract:
+* `DEFAULT_ADMIN_ROLE`, who can manage the contract
+* `UPGRADER_ROLE`, who can upgrade the contract
 
-Expected storage items:
-```
-  address OracleSLI;
-```
+Implementation
+* interface: [ISLIScorer](src/interfaces/ISLIScorer.sol)
+* smart contract: [SLIScorer](src/SLIScorer.sol)
 
 ## SPRegistry
 
 **SPRegistry** is a smart contract responsible for storing available Storage Providers (SPs) together with their service parameters. The contract participates in the selection of a Storage Provider based on required deal parameters provided by **PoRep Market**.
 
-The selection logic verifies whether a given SP supports the **ServiceLevelClass (SLC)** chosen by the client and whether its declared capacity is sufficient to handle the deal.
+The selection logic verifies whether a given SP meets the **SLI thresholds** required by the client and whether its declared capacity is sufficient to handle the deal.
 
-> **Note:** Function definitions may change after the contract is created.
-
-Expected interface:
-```
-interface SPRegistry {
-    function createStorageEntity(address entityOwner, uint64[] calldata storageProviders) external;
-    function addStorageProviders(address entityOwner, uint64[] calldata storageProviders) external;
-    function removeStorageProviders(address entityOwner, uint64[] calldata storageProviders) external;
-    function setStorageEntityActiveStatus(address entityOwner, bool isActive) external;
-    function setStorageProviderDetails(address entityOwner, uint64 storageProvider, ProviderDetails calldata details) external;
-    function isStorageProviderUsed(uint64 storageProvider) external;
-    function getStorageEntity(address entityOwner) external;
-    function getStorageEntities() external;
-    function selectSp(uint256 dealSize, address SLC) external;
-}
-```
-Expected storage items:
-```
-struct StorageEntity {
-    bool isActive;
-    address owner;
-    uint64[] storageProviders;
-    mapping(uint64 => ProviderDetails) providerDetails;
-}
-
-struct ProviderDetails {
-    bool isActive;
-    uint256 spaceLeft;
-}
-
-mapping(address entityOwner => StorageEntity entity) public storageEntities;
-mapping(uint64 storageProvider => bool isUsed) public usedStorageProviders;
-address[] public entityAddresses;
-// and items inherited from OpenZeppelin's AccessControl, UUPSUpgradeable
-```
+Implementation
+* interface: [ISPRegistry](src/interfaces/ISPRegistry.sol)
+* smart contract: [SPRegistry](src/SPRegistry.sol)
 
 ## ValidatorFactory
 
-**ValidatorFactory** is a smart contract responsible for creating new validator instances with a specified admin, **SLIs**, and Storage Provider Actor ID.
+**ValidatorFactory** is a smart contract responsible for creating new validator instances for a given deal.
 
 The contract stores the addresses of all validator contracts it creates and provides a function to verify whether a given address is a validator instance created by the factory.
 
-Expected interface:
-```
-interface ValidatorFactory {
-    function create(address admin, SLIThresholds slis, CommonTypes.FilActorId provider, Validator.DepositWithRailParams) external;
-    function isValidatorContract(address contractAddress) external view returns (bool);
-}
-```
+There will be following roles in this contract:
+* `DEFAULT_ADMIN_ROLE`, who can manage the contract
+* `UPGRADER_ROLE`, who can upgrade the contract
 
-// and items inherited from OpenZeppelin's AccessControl and the Beacon Proxy Factory upgradeable pattern
+Implementation
+* smart contract: [ValidatorFactory](src/ValidatorFactory.sol)
 
 ## Validator
 
 **Validator** is a smart contract responsible for validating storage deals and managing payments for a specific Storage Provider under defined **Service Level Indicators** (SLIs) requirements.
-It interacts with **ClientSC** to verify DataCap allocations, computes a score based on the required **SLIs**, and manages deposits and payouts.  
+It interacts with **ClientSC** to verify DataCap allocations, computes a score based on the required **SLIs**, and manages deposits and payouts.
 The contract separates **Validator** and **Operator** responsibilities by inheriting from abstract contracts and maintains a lockup period for funds.
 
-Expected interface:
-```
-interface Validator {
-    function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256 rate) external view returns (ValidationResult memory result);
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external;
-    function railTerminated(uint256 railId, address terminator, uint256 endEpoch) external;
-}
-```
-Expected storage items:
-```
-struct ValidationResult {
-    uint256 modifiedAmount;
-    uint256 settleUpto;
-    string note;
-}
+There will be following roles in this contract:
+* `DEFAULT_ADMIN_ROLE`, who can manage the contract and update the lockup period
+* `POREP_SERVICE_ROLE`, the off-chain bot that triggers settlement, modifies rail payment rate, and disables future payments
 
-struct DepositWithRailInputParams {
-    IERC20 token;
-    uint8 v;
-    uint256 amount;
-    uint256 deadline;
-    bytes32 r;
-    bytes32 s;
-    uint256 dealId;
-}
-
-address ClientSmartContract
-address PoRepMarket
-```
+Implementation
+* interface: [IValidator](src/interfaces/IValidator.sol)
+* smart contract: [Validator](src/Validator.sol)
 
 ## Diagrams
 
