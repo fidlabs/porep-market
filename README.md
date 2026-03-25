@@ -158,6 +158,10 @@ Implementation
 
 A typical full flow from proposing a deal to withdrawing rewards will look as follows:
 
+## Diagrams
+
+A typical full flow from proposing a deal to withdrawing rewards will look as follows:
+
 ```mermaid
 sequenceDiagram
   actor Client
@@ -166,7 +170,7 @@ sequenceDiagram
   actor SettlementBot
   participant SPRegistry
   participant OracleSLI@{ "type" : "collections" }
-  participant SLIScorer
+  participant ServiceLevelClass@{ "type" : "collections" }
   participant PoRepMarket
   participant ClientSC as Client Smart Contract
   participant ValidatorFactory
@@ -176,15 +180,14 @@ sequenceDiagram
   participant Verifreg
   participant Miner
   
-
-note over Gov,ClientSC: Tx 1: Assign Allowance
+  note over Gov, ClientSC: Tx 1: Assign Allowance
     Gov->>ClientSC: Assign allowance to contract
 
-note over SP,SPRegistry: Tx 2: Register SP
+  note over SP,SPRegistry: Tx 2: Register SP
     SP->>SPRegistry: Register as SP
 
-note over Client, PoRepMarket: Tx 3: Propose a Deal
-    Client->>PoRepMarket: Propose deal with expected deal size, price and SLIThresholds 
+  note over Client, PoRepMarket: Tx 3: Propose a Deal
+    Client->>PoRepMarket: Propose deal with expected deal size, price and SLC 
     activate PoRepMarket
     PoRepMarket->>SPRegistry: Ask for SP
     activate SPRegistry
@@ -195,23 +198,27 @@ note over Client, PoRepMarket: Tx 3: Propose a Deal
     PoRepMarket->>PoRepMarket: Create deal proposal
     deactivate PoRepMarket
 
-note over SP, PoRepMarket: Tx 4: Accept deal
+  note over SP, PoRepMarket: Tx 4: Accept deal
     SP->>PoRepMarket: Accept proposed deal
 
-note over Client, FilecoinPay: Tx 5: Register Validator And Initialize FilecoinPay
-    Client->>ValidatorFactory: Trigger creation of Validator contract with SLIThresholds, , dealID and permit for token transfer
+  note over Client, FilecoinPay: Tx 5: Register Validator And Initialize FilecoinPay
+    Client->>ValidatorFactory: Trigger creation of Validator contract with SLC, SLIOracle, provider, dealID and permit for token transfer
     activate ValidatorFactory
     ValidatorFactory->>Validator: Deploy new Validator
     deactivate ValidatorFactory
     activate Validator
-    Validator->>Validator: Initialize SLIThresholds
+    Validator->>Validator: Initialize SLC address
     Validator->>Validator: Initialize provider address
     Validator->>FilecoinPay: Deposit with permit and approve operator
     Validator->>FilecoinPay: Rail Creation with Validator address
     Validator->>PoRepMarket: Update deal
     deactivate Validator
+
+  note over Client, SP: Data preparation
+    Client->>SP: Transfer data
+    SP-->>Client: Send data manifest with piece CID
   
-note over Client,DataCap: Tx 6: Make DDO Allocation
+  note over Client,DataCap: Tx 6: Make DDO Allocation
     Client->>ClientSC: Make DDO Allocation with dealID and information if completed
     activate ClientSC
     ClientSC->>DataCap: Make DDO Allocation
@@ -231,22 +238,22 @@ note over Client,DataCap: Tx 6: Make DDO Allocation
     deactivate ClientSC
     deactivate Validator 
   
-note over SP,DataCap: Tx 7: Start mining
+  note over SP,DataCap: Tx 7: Start mining
   SP->>Miner: Claim DC allocations 
 
-loop
-note over Client, FilecoinPay: Tx 8: Calculate withdrawal
+  loop
+  note over Client, FilecoinPay: Tx 8: Calculate withdrawal
     SettlementBot->>FilecoinPay: Trigger settle rail  
     FilecoinPay->>Validator: Validate payment
     activate Validator
     Validator->>Validator: Check if one month has passed since the last payout
-    Validator->>SLIScorer: Get score
-    activate SLIScorer
-    SLIScorer->>OracleSLI: Get attestations
-    SLIScorer-->>Validator: Return score
-    deactivate SLIScorer
+    Validator->>ServiceLevelClass: Get score
+    activate ServiceLevelClass
+    ServiceLevelClass->>OracleSLI: Get attestations
+    ServiceLevelClass-->>Validator: Return score
+    deactivate ServiceLevelClass
     Validator ->>PoRepMarket: Get DealID
-    Validator->>ClientSC: Get info about actual size of the deal
+    Validator->>ClientSC: Get info about total size of all deals
     activate ClientSC
     ClientSC->>ClientSC: Check terminated sectors
     ClientSC-->>Validator: Return the actual total size of all deals
@@ -256,23 +263,9 @@ note over Client, FilecoinPay: Tx 8: Calculate withdrawal
     deactivate Validator
   end
 
-note over SP, FilecoinPay: Tx 9: Withdraw payments
+  note over SP, FilecoinPay: Tx 9: Withdraw payments
   SP->>FilecoinPay: Withdraw funds to recipient
   activate FilecoinPay
   FilecoinPay-->>SP: Transfer funds to recipient
   deactivate FilecoinPay
-
-note over SettlementBot, Validator: Tx 10: Rail termination
-    SettlementBot->>Validator: Trigger rail termination
-    activate Validator
-    Validator->>FilecoinPay: Terminate Rail
-    activate FilecoinPay
-    FilecoinPay->>Validator: Notify about rail termination 
-    deactivate FilecoinPay
-    Validator->>PoRepMarket: Terminate deal
-    activate PoRepMarket
-    PoRepMarket->>SPRegistry: Release SP capacity
-    deactivate PoRepMarket
-    deactivate Validator
-    
 ```
