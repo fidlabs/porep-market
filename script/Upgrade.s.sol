@@ -6,20 +6,19 @@ import {Script} from "forge-std/Script.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 
-interface IUpgradeable {
-    function upgradeToAndCall(address newImpl, bytes calldata data) external;
-}
-
 contract Upgrade is Script, DeployUtils {
     using stdJson for string;
 
     address internal admin;
-    address internal proxy;
+    address internal proxyAddr;
     address internal prevImpl;
     address internal impl;
     string internal name;
     bytes32 internal deployedCodeHash;
     bytes internal cd;
+
+    string internal upgradeArtifact;
+    string internal latestArtifact;
 
     error ContractAlreadyDeployed();
 
@@ -27,40 +26,40 @@ contract Upgrade is Script, DeployUtils {
         admin = vm.addr(vm.envUint("PRIVATE_KEY"));
         name = vm.envString("UPGRADE_CONTRACT_NAME");
         cd = vm.envOr("UPGRADE_CALLDATA", bytes(""));
+        upgradeArtifact = name;
+        latestArtifact = readLatestDeploymentArtifact();
 
         bytes32 hash = generateContractHash(name);
-        string memory json = readLatestDeploymentArtifact();
-        (proxy, prevImpl,, deployedCodeHash) = deserializeContract(json, name);
+        (proxyAddr, prevImpl,, deployedCodeHash) = deserializeContract(latestArtifact, name);
 
         if (hash == deployedCodeHash) {
             revert ContractAlreadyDeployed();
         }
 
         vm.startBroadcast(admin);
-
-        impl = vm.deployCode(string.concat(name, ".sol:", name));
-        IUpgradeable(proxy).upgradeToAndCall(impl, cd);
-
+        impl = upgrade(proxyAddr, name, cd);
         vm.stopBroadcast();
+
         serializeAndSaveArtifact();
     }
 
     function serializeAndSaveArtifact() internal {
-        string memory json = name;
+        upgradeArtifact.serialize("proxy", proxyAddr);
+        upgradeArtifact.serialize("prevImpl", prevImpl);
+        upgradeArtifact.serialize("newImpl", impl);
+        upgradeArtifact.serialize("prevCodeHash", vm.toString(prevImpl.codehash));
+        upgradeArtifact.serialize("newCodeHash", vm.toString(impl.codehash));
+        upgradeArtifact.serialize("upgradedAt", block.timestamp);
+        upgradeArtifact.serialize("chainId", block.chainid);
+        upgradeArtifact.serialize("deployer", admin);
 
-        json.serialize("proxy", proxy);
-        json.serialize("prevImpl", prevImpl);
-        json.serialize("newImpl", impl);
-        json.serialize("prevCodeHash", vm.toString(prevImpl.codehash));
-        json.serialize("newCodeHash", vm.toString(impl.codehash));
-        json.serialize("upgradedAt", block.timestamp);
-        json.serialize("chainId", block.chainid);
-        json.serialize("deployer", admin);
+        string memory output = upgradeArtifact.serialize(
+            "deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name)))
+        );
 
-        string memory output =
-            json.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name))));
+        saveUpgradeArtifact(output, name);
 
-        saveUpgrade(output, name);
+        serializeContract(latestArtifact, name, proxyAddr, impl);
         updateLatestImpl(name, impl);
     }
 }

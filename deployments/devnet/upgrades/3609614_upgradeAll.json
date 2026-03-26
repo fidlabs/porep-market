@@ -1,0 +1,15 @@
+{
+  "Client": {
+    "codeHash": "0x134d906a942d176f42b9b4e01c75532d8582b6abb39d3b251ce827e081dbda66",
+    "deployedCodeHash": "0xa895fe1eb9ba00400e53c6ec5e99be56fae1dbc37c8cdcf1e1c9f9a0c771fd43",
+    "impl": "0x1Dc60EF2950a896a45eBB5d0d06bCA836996D58d",
+    "prevCodeHash": "0x08970f9df13737d1161518869cb86f80a1ac74f14801e329242f96122b13aa49",
+    "prevDeployedCodeHash": "0xc3f8c46aecf491da6e7c66f9a61338038e044f50a953c561703f288192c32a8b",
+    "prevImpl": "0xCC68C154001e0db56011a14A167E214Ee65307fF",
+    "proxy": "0x7B4EC6E508a319493D44eEaa92e77BF39ae43E34"
+  },
+  "block": 3609614,
+  "chainId": 31415926,
+  "deployer": "0x149661aB3B2d343114e4F518fF3cC3b47266d8C4",
+  "timestamp": 1774532209
+}

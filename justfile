@@ -42,6 +42,9 @@ deploy flags='':
 upgrade flags='':
     forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
 
+upgrade-all flags='':
+    forge script script/UpgradeAll.s.sol:UpgradeAll --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+
 devnet_deploy: clean build
 	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just deploy 
 
@@ -53,7 +56,13 @@ devnet_upgrade: clean build
 
 calibnet_upgrade: clean build
 	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade --slow
-   
+
+devnet_upgrade_all: clean build
+	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just upgrade-all
+
+calibnet_upgrade_all: clean build
+	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade-all --slow
+
 # CI equivalent check
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."

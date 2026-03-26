@@ -151,15 +151,14 @@ contract Deploy is Script, DeployUtils {
         serializeContract(json, "SLIOracle", sliOracle, sliOracleImpl);
         serializeContract(json, "SLIScorer", sliScorer, sliScorerImpl);
         serializeContract(json, "SPRegistry", spRegistry, spRegistryImpl);
+        serializeContract(json, "Validator", validatorBeacon, validatorImpl);
 
         json.serialize("ValidatorBeacon", validatorBeacon);
-        json.serialize("ValidatorImpl", validatorImpl);
         json.serialize("FilecoinPay", filecoinPay);
         json.serialize("PoRepService", poRepService);
         json.serialize("MetaAllocator", metaAllocator);
-        json.serialize("SPRegistry", spRegistry);
         string memory output = json.serialize("TerminationOracle", terminationOracle);
 
-        save(output);
+        saveDeploymentArtifact(output);
     }
 }
