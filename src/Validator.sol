@@ -26,107 +26,128 @@ import {Client} from "./Client.sol";
 contract Validator is Initializable, AccessControlUpgradeable, IValidator, Operator {
     /**
      * @notice Error indicating that the caller is not the FilecoinPay contract
+     * @dev 0x46a5d52f
      */
     error CallerIsNotFilecoinPay();
 
     /**
      * @notice Error indicating that the caller is not the Client Smart Contract
+     * @dev 0x669fc0af
      */
     error CallerIsNotClientSC();
 
     /**
      * @notice Error indicating that the admin address provided during initialization is the zero address
+     * @dev 0x05bb467c
      */
     error InvalidAdminAddress();
 
     /**
      * @notice Error indicating that the FilecoinPay address provided during initialization is the zero address
+     * @dev 0x5419d62f
      */
     error InvalidFilecoinPayAddress();
 
     /**
      * @notice Error indicating that the SLIScorer address provided during initialization is the zero address
+     * @dev 0x91d3d465
      */
     error InvalidSLIScorerAddress();
 
     /**
      * @notice Error indicating that the client smart contract address provided during initialization is the zero address
+     * @dev 0xe75a5f1c
      */
     error InvalidClientSCAddress();
 
     /**
      * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
+     * @dev 0xc9cc4a06
      */
     error InvalidPoRepMarketAddress();
 
     /**
      * @notice Error indicating that the PoRep service bot address provided during initialization is the zero address
+     * @dev 0x7725d473
      */
     error InvalidPoRepServiceAddress();
 
     /**
      * @notice Error indicating that the SPRegistry address provided during initialization is the zero address
+     * @dev 0xe6e262d1
      */
     error InvalidSPRegistryAddress();
 
     /**
      * @notice Error indicating that the caller is not the client
+     * @dev 0x370ce6d7
      */
     error CallerIsNotClient();
 
     /**
      * @notice Error indicating that a payment rail has already been created for this validator
+     * @dev 0xde605aee
      */
     error RailAlreadyCreated();
 
     /**
      * @notice Error indicating that an invalid deal ID was provided
+     * @dev 0xb06db32a
      */
     error InvalidDealId();
 
     /**
      * @notice Error indicating that the operator is not approved
+     * @dev 0xe3129001
      */
     error OperatorNotApproved();
 
     /**
      * @notice Error indicating that the maximum lockup period is less than the minimum required lockup period
+     * @dev 0x1f27f313
      */
     error MaxLockupPeriodLessThanMinimum();
 
     /**
      * @notice Error indicating that the lockup allowance is not set properly
+     * @dev 0xae339be9
      */
     error InvalidLockupAllowance();
 
     /**
      * @notice Error indicating that the rate allowance is not set properly
+     * @dev 0xf55adfc6
      */
     error InvalidRateAllowance();
 
     /**
      * @notice Error indicating that the number of sectors in the deal is zero, which is invalid
+     * @dev 0xe725084a
      */
     error InvalidSectorCount();
 
     /**
      * @notice Error indicating that the caller is not authorized to perform the action
+     * @dev 0x5c427cd9
      */
     error UnauthorizedCaller();
 
     /**
      * @notice Error indicating that the provided end epoch is negative, which is invalid
+     * @dev 0x122b2d2c
      */
     error NegativeEndEpoch();
 
     /**
      * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
+     * @dev 0xdd484e70
      */
     error InvalidZeroAmount();
 
     /**
      * @notice Error indicating that the deal associated with this validator has not been completed yet
      * @param dealId The ID of the deal that is not completed
+     * @dev 0xe03f8b0e
      */
     error DealNotCompleted(uint256 dealId);
 
@@ -135,16 +156,19 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      * @dev We expect only one rail ID to be valid for per validator
      * @param expected The expected rail ID
      * @param actual The actual rail ID provided in the function call
+     * @dev 0x664f7d6c
      */
     error InvalidRailId(uint256 expected, uint256 actual);
 
     /**
      * @notice Error indicating that the minimum time between settlements is invalid
+     * @dev 0xf90f5b8f
      */
     error InvalidMinEpochsBetweenSettlements();
 
     /**
      * @notice Error indicating that the maximum time between settlements is exceeded
+     * @dev 0xb0c81e57
      */
     error MinEpochsBetweenSettlementsExceeded();
 

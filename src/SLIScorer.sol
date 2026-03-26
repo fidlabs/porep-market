@@ -16,23 +16,27 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     /**
      * @notice Thrown when an invalid oracle address is provided
+     * @dev 0x9589a27d
      */
     error InvalidOracle();
 
     /**
-     *@notice Thrown when an invalid admin address is provided
+     * @notice Thrown when an invalid admin address is provided
+     * @dev 0xb5eba9f0
      */
     error InvalidAdmin();
 
     /**
-     *@notice Thrown when no attestation exists for the given provider
+     * @notice Thrown when no attestation exists for the given provider
      * @param provider The FilActor ID of the provider without attestation
+     * @dev 0xddd4695c
      */
     error NoAttestation(CommonTypes.FilActorId provider);
 
     /**
-     *@notice Thrown when an attestation has expired for the given provider
-     *@param provider The FilActor ID of the provider with expired attestation
+     * @notice Thrown when an attestation has expired for the given provider
+     * @param provider The FilActor ID of the provider with expired attestation
+     * @dev 0x06c09405
      */
     error AttestationExpired(CommonTypes.FilActorId provider);
 

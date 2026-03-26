@@ -12,8 +12,22 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
  *         used in DataCap transfer returns.
  */
 library AllocationResponseCbor {
+    /**
+     * @notice Error indicating an unexpected top-level array structure in the CBOR data
+     * @dev 0x3a4735aa
+     */
     error InvalidTopLevelArray();
+
+    /**
+     * @notice Error indicating an unexpected structure in the first element of the CBOR data
+     * @dev 0xccfa6de2
+     */
     error InvalidFirstElement();
+
+    /**
+     * @notice Error indicating an unexpected structure in the second element of the CBOR data
+     * @dev 0x87537aa0
+     */
     error InvalidSecondElement();
 
     // solhint-disable function-max-lines

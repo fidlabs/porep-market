@@ -58,18 +58,83 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         return _getValidatorFactoryStorage();
     }
 
+    /**
+     * @notice Error indicating that an instance for the given dealId already exists
+     * @dev 0x1144626f
+     */
     error InstanceAlreadyExists();
+
+    /**
+     * @notice Error indicating that the provided admin address is invalid
+     * @dev 0x05bb467c
+     */
     error InvalidAdminAddress();
+
+    /**
+     * @notice Error indicating that the provided implementation address is invalid
+     * @dev 0x4d9c0a3f
+     */
     error InvalidClientAddress();
+
+    /**
+     * @notice Error indicating that the provided PoRepMarket address is invalid
+     * @dev 0xc9cc4a06
+     */
     error InvalidPoRepMarketAddress();
+
+    /**
+     * @notice Error indicating that the provided ClientSmartContract address is invalid
+     * @dev 0x39ee49ba
+     */
     error InvalidClientSmartContractAddress();
+
+    /**
+     * @notice Error indicating that the provided FilecoinPay address is invalid
+     * @dev 0x5419d62f
+     */
     error InvalidFilecoinPayAddress();
+
+    /**
+     * @notice Error indicating that the provided SLIScorer address is invalid
+     * @dev 0x7725d473
+     */
     error InvalidPoRepServiceAddress();
+
+    /**
+     * @notice Error indicating that the provided SLIScorer address is invalid
+     * @dev 0xf234bc02
+     */
     error InvalidSliScorerAddress();
+
+    /**
+     * @notice Error indicating that the provided SPRegistry address is invalid
+     * @dev 0xe6e262d1
+     */
     error InvalidSPRegistryAddress();
+
+    /**
+     * @notice Error indicating that the provided implementation address is invalid
+     * @dev 0xc970156c
+     */
     error InvalidImplementationAddress();
+
+    /**
+     * @notice Error indicating that the provided new admin address is invalid
+     * @dev 0xb5aaecfd
+     */
     error InvalidNewAdminAddress();
+
+    /**
+     * @notice Error indicating that the provided new upgrader role address is invalid
+     * @dev 0xe7124f5b
+     */
     error InvalidNewUpgraderRoleAddress();
+
+    /**
+     * @notice Error indicating that role management functions are disabled
+     * @dev This contract has a fixed admin and does not allow for dynamic role management
+     * @dev 0xd6758507
+     */
     error RoleManagementDisabled();
 
     /**

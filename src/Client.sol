@@ -78,81 +78,97 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
 
     /**
      * @notice Thrown if sender is not proposed client
+     * @dev 0xda945128
      */
     error InvalidClient();
 
     /**
      * @notice Thrown if alloc provider is not proposed provider
+     * @dev 0x7626db82
      */
     error InvalidProvider();
 
     /**
      * @notice Datacap transfer failed
+     * @dev 0xef0ec453
      */
     error TransferFailed(int256 exitCode);
 
     /**
      * @notice Error thrown when claim extension request length is invalid
+     * @dev 0x2edb7542
      */
     error InvalidClaimExtensionRequest();
 
     /**
      * @notice Error thrown when allocation request length is invalid
+     * @dev 0x46ac3f35
      */
     error InvalidAllocationRequest();
 
     /**
      * @notice GetClaims call to VerifReg failed
+     * @dev 0x9359037c
      */
     error GetClaimsCallFailed();
 
     /**
      * @notice Error thrown when operator_data length is invalid
+     * @dev 0x5e9b2d53
      */
     error InvalidOperatorData();
 
     /**
      * @notice Thrown if trying to receive invalid token
+     * @dev 0x6d5f86d5
      */
     error InvalidTokenReceived();
 
     /**
      * @notice Thrown if trying to receive unsupported token type
+     * @dev 0xc6de466a
      */
     error UnsupportedType();
 
     /**
      * @notice Thrown if caller is invalid
+     * @dev 0x16cece48
      */
     error InvalidCaller(address caller, address expectedCaller);
 
     /**
      * @notice Error thrown when deal state is invalid for transfer
+     * @dev 0x804fe482
      */
     error InvalidDealStateForTransfer();
 
     /**
      * @notice Error thrown when validator is not set for the deal
+     * @dev 0xcb304fac
      */
     error ValidatorNotSet(uint256 dealId);
 
     /**
      * @notice Error thrown when invalid admin address is provided
+     * @dev 0x05bb467c
      */
     error InvalidAdminAddress();
 
     /**
      * @notice Error thrown when invalid termination oracle address is provided
+     * @dev 0x2673f088
      */
     error InvalidTerminationOracleAddress();
 
     /**
      * @notice Error thrown when invalid PoRepMarket contract address is provided
+     * @dev 0xcd041c17
      */
     error InvalidPoRepMarketContractAddress();
 
     /**
      * @notice Error thrown when invalid MetaAllocator contract address is provided
+     * @dev 0x469f7a0a
      */
     error InvalidMetaAllocatorContractAddress();
 
