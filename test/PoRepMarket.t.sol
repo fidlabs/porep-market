@@ -454,7 +454,7 @@ contract PoRepMarketTest is Test {
         address notTheClientOrStorageProviderOwner = vm.addr(0x999);
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.NotTheClientOrStorageProvider.selector, dealId, notTheClientOrStorageProviderOwner
+                PoRepMarket.NotTheClientOrStorageProviderOrAdmin.selector, dealId, notTheClientOrStorageProviderOwner
             )
         );
         vm.prank(notTheClientOrStorageProviderOwner);
@@ -787,5 +787,14 @@ contract PoRepMarketTest is Test {
             assertEq(deals[i].dealId, i + 1);
             assertEq(deals[i].client, vm.addr(i + 1));
         }
+    }
+
+    function testProposeDealRevertsWhenPricePerSectorPerMonthIsZero() public {
+        SLITypes.DealTerms memory badTerms =
+            SLITypes.DealTerms({durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: 0});
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealPricePerSectorPerMonth.selector));
+        poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 }
