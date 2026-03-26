@@ -3,38 +3,14 @@ pragma solidity =0.8.30;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IFilecoinPayV1} from "../interfaces/IFilecoinPayV1.sol";
+import {IOperator} from "../interfaces/IOperator.sol";
 
 /**
  * @title Operator abstract contract
  * @notice Abstract contract defining operator functions for creating and managing payment rails in the FilecoinPayV1 system.
  * This contract provides internal helper functions for interacting with the FilecoinPayV1 interface, while leaving the implementation of the external functions to derived contracts.
  */
-abstract contract Operator {
-    /**
-     * @notice Creates a payment rail
-     * @param token The ERC20 token to use for the payment rail
-     */
-    function createRail(IERC20 token) external virtual;
-
-    /**
-     * @notice Updates the lockup period of a payment rail
-     * @param railId ID of the payment rail
-     * @param newLockupPeriod New lockup period to set
-     */
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external virtual;
-
-    /**
-     * @notice Modifies the payment rate and optionally makes a one-time payment.
-     * @param railId The ID of the rail to modify.
-     */
-    function modifyRailPayment(uint256 railId) external virtual;
-
-    /**
-     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
-     * @param railId The ID of the rail to terminate.
-     */
-    function terminateRail(uint256 railId) external virtual;
-
+abstract contract Operator is IOperator {
     /**
      * @notice Internal function to create a payment rail
      * @param filecoinPay The FilecoinPayV1 interface

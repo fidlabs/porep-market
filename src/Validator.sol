@@ -10,20 +10,21 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
-import {IValidator} from "./interfaces/IValidator.sol";
+import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
+import {IClient} from "./interfaces/IClient.sol";
+import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
-import {Client} from "./Client.sol";
 
 /**
  * @title Validator
  * @dev Implements validator and operator logic for managing Filecoin Pay rails
  * @notice Validator contract for Filecoin Pay
  */
-contract Validator is Initializable, AccessControlUpgradeable, IValidator, Operator {
+contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValidator, IValidator, Operator {
     /**
      * @notice Error indicating that the caller is not the FilecoinPay contract
      */
@@ -311,7 +312,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
      */
     function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256 rate)
         external
-        returns (IValidator.ValidationResult memory result)
+        override
+        returns (ValidationResult memory result)
     {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
@@ -341,7 +343,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
 
         bool scoreMatches = score == 100;
-        bool dataSizeMatches = Client($.clientSC).isDataSizeMatching($.dealId);
+        bool dataSizeMatches = IClient($.clientSC).isDataSizeMatching($.dealId);
 
         if (!scoreMatches || !dataSizeMatches) {
             result.settleUpto = toEpoch;
@@ -571,7 +573,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IValidator, Opera
         ValidatorStorage storage $ = _getValidatorStorage();
 
         PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
-        CommonTypes.FilActorId[] memory allocationIds = Client($.clientSC).getClientAllocationIdsPerDeal($.dealId);
+        CommonTypes.FilActorId[] memory allocationIds = IClient($.clientSC).getClientAllocationIdsPerDeal($.dealId);
 
         uint256 sectorCount = allocationIds.length;
         uint256 pricePerSectorPerMonth = dealProposal.terms.pricePerSectorPerMonth;

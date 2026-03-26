@@ -13,23 +13,24 @@ import {VerifRegAPI} from "filecoin-solidity/v0.8/VerifRegAPI.sol";
 import {UtilsHandlers} from "filecoin-solidity/v0.8/utils/UtilsHandlers.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
-import {PoRepMarket} from "./PoRepMarket.sol";
+import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {IClient} from "./interfaces/IClient.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
 
 /**
  * @title Client
- * @notice Upgradeable contract for managing client allowances with role-based access control
+ * @notice Contract for clients to interact with storage providers, manage deals, and handle DataCap transfers
  */
-contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuard {
+contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuard {
     using AllocationResponseCbor for DataCapTypes.TransferReturn;
 
     // @custom:storage-location erc7201:porepmarket.storage.ClientStorage
     struct ClientStorage {
         mapping(uint256 dealId => Deal deal) _deals;
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
-        PoRepMarket _poRepMarketContract;
+        IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
     }
 
@@ -205,7 +206,7 @@ contract Client is Initializable, AccessControlUpgradeable, UUPSUpgradeable, Ree
         _grantRole(TERMINATION_ORACLE, terminationOracle);
 
         ClientStorage storage $ = s();
-        $._poRepMarketContract = PoRepMarket(_poRepMarketContract);
+        $._poRepMarketContract = IPoRepMarket(_poRepMarketContract);
         $._metaAllocatorContract = IMetaAllocator(_metaAllocatorContract);
     }
 

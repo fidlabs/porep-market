@@ -365,7 +365,7 @@
       {
         "name": "result",
         "type": "tuple",
-        "internalType": "struct IValidator.ValidationResult",
+        "internalType": "struct IFilecoinPayValidator.ValidationResult",
         "components": [
           {
             "name": "modifiedAmount",

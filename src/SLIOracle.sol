@@ -11,7 +11,7 @@ import {SLITypes} from "./types/SLITypes.sol";
 
 /**
  * @title SLI Oracle
- * @notice
+ * @notice Contract for managing and retrieving SLI values for storage providers
  */
 contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSUpgradeable, MulticallUpgradeable {
     /**
