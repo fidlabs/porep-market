@@ -2,7 +2,7 @@
 
 ## Overview
 
-The **PoRep Market** is a set of smart contracts and off-chain actors designed to automate, manage, and settle storage deals on the Filecoin network. It connects **Clients** (data owners) with **Storage Providers** (miners), ensuring that data is not only stored but maintained according to specific quality standards defined by SLI thresholds.
+The **PoRep Market** is a set of smart contracts and off-chain actors designed to automate, manage, and settle storage deals on the Filecoin network. It connects **Clients** (data owners) with **Storage Providers** (miners), ensuring that data is not only stored but maintained according to specific quality standards defined by SLI (Service Level Indicator) thresholds.
 
 ### Key Value Propositions
 
@@ -15,17 +15,17 @@ The **PoRep Market** is a set of smart contracts and off-chain actors designed t
 The system is organized into three pillars:
 
 **Deal Orchestration & Provider Selection**
-* **PoRepMarket** -- Core deal state machine. Manages the full deal lifecycle: proposal, acceptance, completion, rejection, and termination.
-* **SPRegistry** -- Provider directory. Stores provider capabilities, capacity, pricing, and handles provider matching for incoming deals.
+* **[PoRepMarket](src/interfaces/IPoRepMarket.sol)** -- Core deal state machine. Manages the full deal lifecycle: proposal, acceptance, completion, rejection, and termination.
+* **[SPRegistry](src/interfaces/ISPRegistry.sol)** -- Provider directory. Stores provider capabilities, capacity, pricing, and handles provider matching for incoming deals.
 
 **Quality Control (SLI)**
-* **SLIScorer** -- Computes a performance score for a provider by comparing deal requirements against oracle attestations.
-* **SLIOracle** -- Stores off-chain SLI attestation data (retrievability, bandwidth, latency, indexing) pushed by an oracle service.
+* **[SLIScorer](src/interfaces/ISLIScorer.sol)** -- Computes a performance score for a provider by comparing deal requirements against oracle attestations.
+* **[SLIOracle](src/interfaces/ISLIOracle.sol)** -- Stores off-chain SLI attestation data (retrievability, bandwidth, latency, indexing) pushed by an oracle service.
 
 **Financial Settlement**
-* **Validator** -- One instance per deal (deployed via beacon proxy). Validates provider performance before approving payouts, manages lockup periods, and handles deal termination.
-* **ValidatorFactory** -- Creates Validator instances via the beacon proxy pattern.
-* **Client** -- Manages DataCap allocations via FEVM precompiles, tracks allocation sizes per deal, and monitors sector terminations. Receives its DataCap allowance from the MetaAllocator.
+* **[Validator](src/interfaces/IValidator.sol)** -- One instance per deal (deployed via beacon proxy). Validates provider performance before approving payouts, manages lockup periods, and handles deal termination.
+* **[ValidatorFactory](src/ValidatorFactory.sol)** -- Creates Validator instances via the beacon proxy pattern.
+* **[Client](src/Client.sol)** -- Manages DataCap allocations via FEVM precompiles, tracks allocation sizes per deal, and monitors sector terminations. Receives its DataCap allowance from the MetaAllocator.
 * **[FilecoinPay](https://github.com/FilOzone/filecoin-pay)** -- External payment rail that executes streaming transfers once validated.
 
 ## Deal Lifecycle
@@ -43,6 +43,7 @@ proposeDeal() --> [Proposed] --> acceptDeal() --> [Accepted] --> completeDeal() 
 5. **Mining** -- The SP claims DataCap allocations and begins sealing sectors.
 6. **Settlement** -- A SettlementBot periodically triggers settlement. The Validator queries the SLIScorer for a performance score, verifies allocation sizes against the Client contract, and returns a modified payout amount to FilecoinPay.
 7. **Withdrawal** -- The SP withdraws earned funds from FilecoinPay.
+8. **Termination** -- When the deal duration expires or a deal is terminated early, the payment rail is closed, final settlement is processed, and the provider's reserved capacity is released.
 
 ## Glossary
 
