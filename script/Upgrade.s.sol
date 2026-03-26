@@ -17,17 +17,13 @@ contract Upgrade is Script, DeployUtils {
     bytes32 internal deployedCodeHash;
     bytes internal cd;
 
-    string internal upgradeArtifact;
-    string internal latestArtifact;
-
     error ContractAlreadyDeployed();
 
     function run() external {
         admin = vm.addr(vm.envUint("PRIVATE_KEY"));
         name = vm.envString("UPGRADE_CONTRACT_NAME");
         cd = vm.envOr("UPGRADE_CALLDATA", bytes(""));
-        upgradeArtifact = name;
-        latestArtifact = readLatestDeploymentArtifact();
+        string memory latestArtifact = readLatestDeploymentArtifact();
 
         bytes32 hash = generateContractHash(name);
         (proxyAddr, prevImpl,, deployedCodeHash) = deserializeContract(latestArtifact, name);
@@ -44,22 +40,19 @@ contract Upgrade is Script, DeployUtils {
     }
 
     function serializeAndSaveArtifact() internal {
-        upgradeArtifact.serialize("proxy", proxyAddr);
-        upgradeArtifact.serialize("prevImpl", prevImpl);
-        upgradeArtifact.serialize("newImpl", impl);
-        upgradeArtifact.serialize("prevCodeHash", vm.toString(prevImpl.codehash));
-        upgradeArtifact.serialize("newCodeHash", vm.toString(impl.codehash));
-        upgradeArtifact.serialize("upgradedAt", block.timestamp);
-        upgradeArtifact.serialize("chainId", block.chainid);
-        upgradeArtifact.serialize("deployer", admin);
+        string memory json   = name;
 
-        string memory output = upgradeArtifact.serialize(
+        json.serialize("upgradedAt", block.timestamp);
+        json.serialize("chainId", block.chainid);
+        json.serialize("deployer", admin);
+        serializeContract(json, name, proxyAddr, impl);
+        serializePreviousVersion(json, name, prevImpl, prevImpl.codehash);
+
+        string memory output = json.serialize(
             "deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name)))
         );
 
         saveUpgradeArtifact(output, name);
-
-        serializeContract(latestArtifact, name, proxyAddr, impl);
         updateLatestImpl(name, impl);
     }
 }
