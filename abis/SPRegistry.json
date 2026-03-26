@@ -313,6 +313,16 @@
             "name": "pricePerSectorPerMonth",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "minDealDurationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "maxDealDurationDays",
+            "type": "uint32",
+            "internalType": "uint32"
           }
         ]
       }
@@ -694,6 +704,29 @@
   },
   {
     "type": "function",
+    "name": "setDealDurationLimits",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "minDealDurationDays",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "maxDealDurationDays",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setPayee",
     "inputs": [
       {
@@ -916,6 +949,31 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DealDurationLimitsUpdated",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "minDealDurationDays",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
+      },
+      {
+        "name": "maxDealDurationDays",
+        "type": "uint32",
+        "indexed": false,
+        "internalType": "uint32"
       }
     ],
     "anonymous": false
@@ -1435,6 +1493,22 @@
         "name": "maxProviders",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "MinDurationExceedsMax",
+    "inputs": [
+      {
+        "name": "minDays",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "maxDays",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ]
   },

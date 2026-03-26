@@ -45,6 +45,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant MAX_PROVIDERS = 500;
 
+    // solhint-disable-next-line gas-struct-packing
     struct ProviderData {
         address organization;
         address payee;
@@ -55,6 +56,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 committedBytes;
         uint256 pendingBytes;
         uint256 pricePerSectorPerMonth;
+        uint32 minDealDurationDays;
+        uint32 maxDealDurationDays;
     }
 
     /// @custom:storage-location erc7201:porepmarket.storage.SPRegistryStorage
@@ -186,6 +189,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     event PayeeUpdated(CommonTypes.FilActorId indexed provider, address indexed oldPayee, address indexed newPayee);
 
     /**
+     * @notice DealDurationLimitsUpdated event
+     * @dev DealDurationLimitsUpdated event is emitted when a provider's deal duration limits change
+     * @param provider The provider actor ID
+     * @param minDealDurationDays The minimum deal duration in days (0 = no minimum)
+     * @param maxDealDurationDays The maximum deal duration in days (0 = no maximum)
+     */
+    event DealDurationLimitsUpdated(
+        CommonTypes.FilActorId indexed provider, uint32 minDealDurationDays, uint32 maxDealDurationDays
+    );
+
+    /**
      * @notice Error indicating that a provider is already registered
      * @dev 0xf91794e7
      */
@@ -300,6 +314,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error AvailableBelowCommittedPlusPending(
         CommonTypes.FilActorId provider, uint256 availableBytes, uint256 committedBytes, uint256 pendingBytes
     );
+    error MinDurationExceedsMax(uint32 minDays, uint32 maxDays);
 
     /**
      * @notice Constructor
@@ -459,7 +474,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             availableBytes: p.availableBytes,
             committedBytes: p.committedBytes,
             pendingBytes: p.pendingBytes,
-            pricePerSectorPerMonth: p.pricePerSectorPerMonth
+            pricePerSectorPerMonth: p.pricePerSectorPerMonth,
+            minDealDurationDays: p.minDealDurationDays,
+            maxDealDurationDays: p.maxDealDurationDays
         });
     }
 
@@ -665,6 +682,27 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         $._providers[id].payee = payee;
 
         emit PayeeUpdated(provider, oldPayee, payee);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function setDealDurationLimits(
+        CommonTypes.FilActorId provider,
+        uint32 minDealDurationDays,
+        uint32 maxDealDurationDays
+    ) external {
+        _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
+        _onlyProviderControllerOrAdmin(provider);
+        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
+            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
+        }
+
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        $._providers[id].minDealDurationDays = minDealDurationDays;
+        $._providers[id].maxDealDurationDays = maxDealDurationDays;
+
+        emit DealDurationLimitsUpdated(provider, minDealDurationDays, maxDealDurationDays);
     }
 
     /// @inheritdoc ISPRegistry

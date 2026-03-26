@@ -9,6 +9,7 @@ import {SLITypes} from "../types/SLITypes.sol";
  * @notice Interface for storage provider registration, matching, and capacity management
  */
 interface ISPRegistry {
+    // solhint-disable-next-line gas-struct-packing
     struct ProviderInfo {
         address organization;
         address payee;
@@ -20,6 +21,8 @@ interface ISPRegistry {
         uint256 pendingBytes;
         /// @notice Monthly ERC20 token price per 32 GiB sector in smallest units (0 = manual approval)
         uint256 pricePerSectorPerMonth;
+        uint32 minDealDurationDays;
+        uint32 maxDealDurationDays;
     }
 
     /**
@@ -156,6 +159,18 @@ interface ISPRegistry {
      * @param payee The address that will receive payments for this provider
      */
     function setPayee(CommonTypes.FilActorId provider, address payee) external;
+
+    /**
+     * @notice Set the acceptable deal duration range for a provider
+     * @param provider The provider to update
+     * @param minDealDurationDays Minimum deal duration in days (0 = no minimum)
+     * @param maxDealDurationDays Maximum deal duration in days (0 = no maximum)
+     */
+    function setDealDurationLimits(
+        CommonTypes.FilActorId provider,
+        uint32 minDealDurationDays,
+        uint32 maxDealDurationDays
+    ) external;
 
     /**
      * @notice Get the payment recipient address for a provider
