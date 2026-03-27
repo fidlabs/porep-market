@@ -67,6 +67,7 @@ contract UpgradeAll is Script, DeployUtils {
             count++;
         }
 
+        // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
             mstore(pending, count)
         }

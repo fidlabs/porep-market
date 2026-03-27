@@ -40,7 +40,7 @@ contract Upgrade is Script, DeployUtils {
     }
 
     function serializeAndSaveArtifact() internal {
-        string memory json   = name;
+        string memory json = name;
 
         json.serialize("upgradedAt", block.timestamp);
         json.serialize("chainId", block.chainid);
@@ -48,9 +48,8 @@ contract Upgrade is Script, DeployUtils {
         serializeContract(json, name, proxyAddr, impl);
         serializePreviousVersion(json, name, prevImpl, prevImpl.codehash);
 
-        string memory output = json.serialize(
-            "deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name)))
-        );
+        string memory output =
+            json.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name))));
 
         saveUpgradeArtifact(output, name);
         updateLatestImpl(name, impl);
