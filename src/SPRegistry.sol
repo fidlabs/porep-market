@@ -664,15 +664,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (organization == address(0)) revert InvalidOrganizationAddress();
         if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
-        if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
-            revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
-        }
-        if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
-            revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
-        }
-        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
-            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
-        }
+        _ensureDurationLimitsValid(minDealDurationDays, maxDealDurationDays);
 
         _registerProvider(provider, organization, payee);
 
@@ -720,15 +712,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
-        if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
-            revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
-        }
-        if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
-            revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
-        }
-        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
-            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
-        }
+        _ensureDurationLimitsValid(minDealDurationDays, maxDealDurationDays);
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
@@ -797,6 +781,23 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         if (!$._providerIds.contains(uint256(CommonTypes.FilActorId.unwrap(provider)))) {
             revert ProviderNotRegistered(provider);
+        }
+    }
+
+    /**
+     * @notice Ensures deal duration limits are within the protocol maximum and internally consistent
+     * @param minDealDurationDays The minimum deal duration to validate
+     * @param maxDealDurationDays The maximum deal duration to validate
+     */
+    function _ensureDurationLimitsValid(uint32 minDealDurationDays, uint32 maxDealDurationDays) internal pure {
+        if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
+            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
         }
     }
 
