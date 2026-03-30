@@ -10,6 +10,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SLITypes} from "./types/SLITypes.sol";
+import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {MinerUtils} from "./lib/MinerUtils.sol";
 
 /**
@@ -46,10 +47,10 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     uint256 public constant MAX_PROVIDERS = 500;
 
     /**
-     * @notice Maximum deal duration in days — mirrors PoRepMarket.MAX_DEAL_DURATION_DAYS.
+     * @notice Maximum deal duration in days, sourced from PoRepTypes.MAX_DEAL_DURATION_DAYS.
      * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
-    uint32 public constant MAX_DEAL_DURATION_DAYS = 1278;
+    uint32 public constant MAX_DEAL_DURATION_DAYS = PoRepTypes.MAX_DEAL_DURATION_DAYS;
 
     // solhint-disable-next-line gas-struct-packing
     struct ProviderData {
@@ -663,14 +664,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (organization == address(0)) revert InvalidOrganizationAddress();
         if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
-        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
-            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
-        }
         if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
             revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
         }
         if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
             revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
+            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
         }
 
         _registerProvider(provider, organization, payee);
@@ -719,14 +720,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
-        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
-            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
-        }
         if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
             revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
         }
         if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
             revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
+            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
         }
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();

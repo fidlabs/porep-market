@@ -1868,6 +1868,31 @@ contract SPRegistryTest is Test {
         assertEq(info.maxDealDurationDays, 1278);
     }
 
+    function testSetDealDurationLimitsRevertsProtocolMaxBeforeCrossCheck() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
+        vm.prank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+        );
+        spRegistry.setDealDurationLimits(provider1, 1279, 90);
+    }
+
+    function testRegisterProviderForRevertsProtocolMaxBeforeCrossCheck() public {
+        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
+        vm.prank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+        );
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 1279, 90
+        );
+    }
+
     function testSetDealDurationLimitsRevertsUnregistered() public {
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
