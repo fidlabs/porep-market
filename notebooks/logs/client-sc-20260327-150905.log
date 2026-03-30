@@ -1,0 +1,41 @@
+2026-03-27 15:09:05,571  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/client-sc-20260327-150905.log ===
+2026-03-27 15:09:13,739  INFO   Connected  chain_id=31415926  latest_block=3877
+2026-03-27 15:09:16,152  INFO   Account : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:09:16,163  INFO   Balance : 40999.985666579811573332 FIL
+2026-03-27 15:09:18,507  INFO   Client SC contract loaded.
+2026-03-27 15:09:18,514  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 15:09:23,808  INFO   DEFAULT_ADMIN_ROLE   : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 15:09:23,809  INFO   UPGRADER_ROLE        : 189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3
+2026-03-27 15:09:23,811  INFO   TERMINATION_ORACLE   : c368dd69a1791df65cd13e566a3c9de1268c66b726dff83916d52cec1b11e292
+2026-03-27 15:09:23,814  INFO   UPGRADE_INTERFACE_VERSION : 5.0.0
+2026-03-27 15:09:23,817  INFO   
+2026-03-27 15:09:23,837  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has DEFAULT_ADMIN_ROLE: True
+2026-03-27 15:09:23,861  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has UPGRADER_ROLE: True
+2026-03-27 15:09:23,884  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has TERMINATION_ORACLE: True
+2026-03-27 15:09:32,056  INFO   getClientAllocationIdsPerDeal(1) → 0 allocation(s)
+2026-03-27 15:09:36,660  INFO   terminatedClaims(0) : False
+2026-03-27 15:09:42,371  INFO   terminatedClaims(1) : False
+2026-03-27 15:09:49,221  INFO     → isDataSizeMatching  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=77
+2026-03-27 15:09:49,268  ERROR    ✗ estimate_gas reverted: ValidatorNotSet(uint256)
+2026-03-27 15:09:53,303  INFO     → isDataSizeMatching  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=77
+2026-03-27 15:09:53,342  ERROR    ✗ estimate_gas reverted: ValidatorNotSet(uint256)
+2026-03-27 15:10:24,523  INFO   TransferParams built — provider=1000  size=536,870,912
+2026-03-27 15:10:24,524  INFO     to (hex)         : 00e807
+2026-03-27 15:10:24,524  INFO     operator_data    : 8281821903e81a2000000080
+2026-03-27 15:10:39,924  INFO   TransferParams built — provider=1000  size=536,870,912
+2026-03-27 15:10:39,925  INFO     to (hex)         : 00e807
+2026-03-27 15:10:39,929  INFO     operator_data    : 8281821903e81a2000000080
+2026-03-27 15:10:54,127  INFO   Account has TERMINATION_ORACLE role: True
+2026-03-27 15:10:54,136  INFO     → claimsTerminatedEarly  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=77
+2026-03-27 15:10:54,197  INFO     ⏳ sent tx=cad9395485648359d1bf2dff683f948a3c0b2ab6ddab73ef2ce81ef7aa78fd71
+2026-03-27 15:11:05,043  INFO     ✅ success  tx=cad9395485648359d1bf2dff683f948a3c0b2ab6ddab73ef2ce81ef7aa78fd71  gas_used=11950478
+2026-03-27 15:11:05,044  INFO   Marked 3 claim(s) as terminated: [1, 2, 3]
+2026-03-27 15:11:05,077  INFO     terminatedClaims(1) : True
+2026-03-27 15:11:05,102  INFO     terminatedClaims(2) : True
+2026-03-27 15:11:05,122  INFO     terminatedClaims(3) : True
+2026-03-27 15:11:30,168  INFO   TransferParams built — provider=1000  size=536,870,912
+2026-03-27 15:11:30,169  INFO     to (hex)         : 00e807
+2026-03-27 15:11:30,170  INFO     operator_data    : 8281821903e81a2000000080
+2026-03-27 15:12:50,683  INFO   TransferParams built — provider=1000  size=536,870,912
+2026-03-27 15:12:50,687  INFO     to (hex)         : 00e807
+2026-03-27 15:12:50,688  INFO     operator_data    : 8281821903e81a2000000080

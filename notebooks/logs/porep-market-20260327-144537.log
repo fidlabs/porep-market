@@ -1,0 +1,187 @@
+2026-03-27 14:45:37,672  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/porep-market-20260327-144537.log ===
+2026-03-27 14:45:46,445  INFO   Connected  chain_id=31415926  latest_block=3525
+2026-03-27 14:45:47,741  INFO   Account : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:45:47,749  INFO   Balance : 40999.985708259967946711 FIL
+2026-03-27 14:45:49,961  INFO   PoRepMarket contract loaded.
+2026-03-27 14:45:49,968  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 14:47:45,272  INFO   DEFAULT_ADMIN_ROLE
+2026-03-27 14:47:45,274  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has role : True
+2026-03-27 14:47:45,274  INFO     role admin               : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 14:47:45,328  INFO   UPGRADER_ROLE
+2026-03-27 14:47:45,331  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has role : True
+2026-03-27 14:47:45,332  INFO     role admin               : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 14:48:29,319  INFO   MAX_DEAL_DURATION_DAYS    : 1278
+2026-03-27 14:48:29,321  INFO   DEFAULT_ADMIN_ROLE        : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 14:48:29,321  INFO   UPGRADER_ROLE             : 189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3
+2026-03-27 14:48:29,323  INFO   UPGRADE_INTERFACE_VERSION : 5.0.0
+2026-03-27 14:48:37,129  INFO   getDealProposal(1):
+2026-03-27 14:48:51,820  INFO   Completed deals in settlement queue: 0
+2026-03-27 14:52:34,109  INFO   getDealProposal(1):
+2026-03-27 14:52:53,160  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/porep-market-20260327-144537.log ===
+2026-03-27 14:52:53,247  INFO   Connected  chain_id=31415926  latest_block=3632
+2026-03-27 14:52:53,276  INFO   Account : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:52:53,292  INFO   Balance : 40999.985708259967946711 FIL
+2026-03-27 14:52:55,967  INFO   PoRepMarket contract loaded.
+2026-03-27 14:52:55,974  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 14:53:09,134  INFO   MAX_DEAL_DURATION_DAYS    : 1278
+2026-03-27 14:53:09,136  INFO   DEFAULT_ADMIN_ROLE        : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 14:53:09,137  INFO   UPGRADER_ROLE             : 189ab7a9244df0848122154315af71fe140f3db0fe014031783b0946b8c9d2e3
+2026-03-27 14:53:09,139  INFO   UPGRADE_INTERFACE_VERSION : 5.0.0
+2026-03-27 14:53:11,278  INFO   DEFAULT_ADMIN_ROLE
+2026-03-27 14:53:11,279  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has role : True
+2026-03-27 14:53:11,279  INFO     role admin               : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 14:53:11,342  INFO   UPGRADER_ROLE
+2026-03-27 14:53:11,344  INFO     0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b has role : True
+2026-03-27 14:53:11,344  INFO     role admin               : 0000000000000000000000000000000000000000000000000000000000000000
+2026-03-27 14:53:13,636  INFO   getDealProposal(1):
+2026-03-27 14:53:13,639  INFO     dealId     : 1
+2026-03-27 14:53:13,640  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:53:13,641  INFO     provider   : 1000
+2026-03-27 14:53:13,645  INFO     state      : Proposed
+2026-03-27 14:53:13,647  INFO     validator  : 0x0000000000000000000000000000000000000000
+2026-03-27 14:53:13,650  INFO     railId     : 0
+2026-03-27 14:53:13,651  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:53:13,652  INFO     size       : 536,870,912 bytes
+2026-03-27 14:53:13,654  INFO     price/mo   : 1000000
+2026-03-27 14:53:13,656  INFO     duration   : 30 days
+2026-03-27 14:53:13,659  INFO     req.retr   : 9500 bps
+2026-03-27 14:53:13,662  INFO     req.bw     : 100 Mbps
+2026-03-27 14:53:13,665  INFO     req.lat    : 0 ms
+2026-03-27 14:53:13,666  INFO     req.idx    : 0%
+2026-03-27 14:53:19,675  INFO   getManifestLocation(1) : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:53:23,132  INFO   Completed deals in settlement queue: 0
+2026-03-27 14:53:49,319  INFO     dealId     : 1
+2026-03-27 14:53:49,320  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:53:49,323  INFO     provider   : 1000
+2026-03-27 14:53:49,328  INFO     state      : Proposed
+2026-03-27 14:53:49,328  INFO     validator  : 0x0000000000000000000000000000000000000000
+2026-03-27 14:53:49,329  INFO     railId     : 0
+2026-03-27 14:53:49,330  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:53:49,331  INFO     size       : 536,870,912 bytes
+2026-03-27 14:53:49,331  INFO     price/mo   : 1000000
+2026-03-27 14:53:49,331  INFO     duration   : 30 days
+2026-03-27 14:53:49,333  INFO     req.retr   : 9500 bps
+2026-03-27 14:53:49,333  INFO     req.bw     : 100 Mbps
+2026-03-27 14:53:49,334  INFO     req.lat    : 0 ms
+2026-03-27 14:53:49,334  INFO     req.idx    : 0%
+2026-03-27 14:53:57,212  INFO     → acceptDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=73
+2026-03-27 14:53:57,285  INFO     ⏳ sent tx=f4fbb30331ccbbf1203da979a79a155722647a57e5911cfd470422358ac61651
+2026-03-27 14:54:05,068  INFO     ✅ success  tx=f4fbb30331ccbbf1203da979a79a155722647a57e5911cfd470422358ac61651  gas_used=24455150
+2026-03-27 14:54:14,507  INFO     dealId     : 1
+2026-03-27 14:54:14,508  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:54:14,509  INFO     provider   : 1000
+2026-03-27 14:54:14,510  INFO     state      : Accepted
+2026-03-27 14:54:14,510  INFO     validator  : 0x0000000000000000000000000000000000000000
+2026-03-27 14:54:14,511  INFO     railId     : 0
+2026-03-27 14:54:14,512  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:54:14,514  INFO     size       : 536,870,912 bytes
+2026-03-27 14:54:14,514  INFO     price/mo   : 1000000
+2026-03-27 14:54:14,515  INFO     duration   : 30 days
+2026-03-27 14:54:14,517  INFO     req.retr   : 9500 bps
+2026-03-27 14:54:14,517  INFO     req.bw     : 100 Mbps
+2026-03-27 14:54:14,518  INFO     req.lat    : 0 ms
+2026-03-27 14:54:14,520  INFO     req.idx    : 0%
+2026-03-27 14:54:33,251  INFO     → create  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=74
+2026-03-27 14:54:33,353  INFO     ⏳ sent tx=a5f5d3a66fef70ed3b326599180c1ba5340731a4a73d01db0a1c3009ddb47762
+2026-03-27 14:54:41,064  INFO     ✅ success  tx=a5f5d3a66fef70ed3b326599180c1ba5340731a4a73d01db0a1c3009ddb47762  gas_used=101455982
+2026-03-27 14:57:46,687  INFO     dealId     : 1
+2026-03-27 14:57:46,688  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:57:46,690  INFO     provider   : 1000
+2026-03-27 14:57:46,691  INFO     state      : Accepted
+2026-03-27 14:57:46,691  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 14:57:46,692  INFO     railId     : 0
+2026-03-27 14:57:46,693  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:57:46,694  INFO     size       : 536,870,912 bytes
+2026-03-27 14:57:46,695  INFO     price/mo   : 1000000
+2026-03-27 14:57:46,696  INFO     duration   : 30 days
+2026-03-27 14:57:46,697  INFO     req.retr   : 9500 bps
+2026-03-27 14:57:46,698  INFO     req.bw     : 100 Mbps
+2026-03-27 14:57:46,700  INFO     req.lat    : 0 ms
+2026-03-27 14:57:46,701  INFO     req.idx    : 0%
+2026-03-27 14:58:08,703  INFO     dealId     : 1
+2026-03-27 14:58:08,705  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:58:08,705  INFO     provider   : 1000
+2026-03-27 14:58:08,706  INFO     state      : Accepted
+2026-03-27 14:58:08,707  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 14:58:08,708  INFO     railId     : 0
+2026-03-27 14:58:08,708  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:58:08,709  INFO     size       : 536,870,912 bytes
+2026-03-27 14:58:08,709  INFO     price/mo   : 1000000
+2026-03-27 14:58:08,710  INFO     duration   : 30 days
+2026-03-27 14:58:08,710  INFO     req.retr   : 9500 bps
+2026-03-27 14:58:08,711  INFO     req.bw     : 100 Mbps
+2026-03-27 14:58:08,711  INFO     req.lat    : 0 ms
+2026-03-27 14:58:08,712  INFO     req.idx    : 0%
+2026-03-27 14:58:23,017  INFO     dealId     : 1
+2026-03-27 14:58:23,018  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:58:23,019  INFO     provider   : 1000
+2026-03-27 14:58:23,021  INFO     state      : Accepted
+2026-03-27 14:58:23,022  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 14:58:23,022  INFO     railId     : 0
+2026-03-27 14:58:23,023  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:58:23,024  INFO     size       : 536,870,912 bytes
+2026-03-27 14:58:23,025  INFO     price/mo   : 1000000
+2026-03-27 14:58:23,026  INFO     duration   : 30 days
+2026-03-27 14:58:23,027  INFO     req.retr   : 9500 bps
+2026-03-27 14:58:23,028  INFO     req.bw     : 100 Mbps
+2026-03-27 14:58:23,029  INFO     req.lat    : 0 ms
+2026-03-27 14:58:23,029  INFO     req.idx    : 0%
+2026-03-27 14:59:04,415  INFO     dealId     : 1
+2026-03-27 14:59:04,416  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:59:04,417  INFO     provider   : 1000
+2026-03-27 14:59:04,419  INFO     state      : Accepted
+2026-03-27 14:59:04,420  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 14:59:04,421  INFO     railId     : 0
+2026-03-27 14:59:04,422  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:59:04,423  INFO     size       : 536,870,912 bytes
+2026-03-27 14:59:04,423  INFO     price/mo   : 1000000
+2026-03-27 14:59:04,423  INFO     duration   : 30 days
+2026-03-27 14:59:04,425  INFO     req.retr   : 9500 bps
+2026-03-27 14:59:04,426  INFO     req.bw     : 100 Mbps
+2026-03-27 14:59:04,426  INFO     req.lat    : 0 ms
+2026-03-27 14:59:04,427  INFO     req.idx    : 0%
+2026-03-27 14:59:37,383  INFO     dealId     : 1
+2026-03-27 14:59:37,385  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:59:37,385  INFO     provider   : 1000
+2026-03-27 14:59:37,386  INFO     state      : Accepted
+2026-03-27 14:59:37,386  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 14:59:37,386  INFO     railId     : 0
+2026-03-27 14:59:37,387  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:59:37,387  INFO     size       : 536,870,912 bytes
+2026-03-27 14:59:37,387  INFO     price/mo   : 1000000
+2026-03-27 14:59:37,388  INFO     duration   : 30 days
+2026-03-27 14:59:37,388  INFO     req.retr   : 9500 bps
+2026-03-27 14:59:37,388  INFO     req.bw     : 100 Mbps
+2026-03-27 14:59:37,389  INFO     req.lat    : 0 ms
+2026-03-27 14:59:37,389  INFO     req.idx    : 0%
+2026-03-27 14:59:43,983  INFO     dealId     : 1
+2026-03-27 14:59:43,984  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:59:43,985  INFO     provider   : 1000
+2026-03-27 14:59:43,986  INFO     state      : Accepted
+2026-03-27 14:59:43,987  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 14:59:43,988  INFO     railId     : 0
+2026-03-27 14:59:43,988  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 14:59:43,988  INFO     size       : 536,870,912 bytes
+2026-03-27 14:59:43,989  INFO     price/mo   : 1000000
+2026-03-27 14:59:43,989  INFO     duration   : 30 days
+2026-03-27 14:59:43,989  INFO     req.retr   : 9500 bps
+2026-03-27 14:59:43,990  INFO     req.bw     : 100 Mbps
+2026-03-27 14:59:43,990  INFO     req.lat    : 0 ms
+2026-03-27 14:59:43,990  INFO     req.idx    : 0%
+2026-03-27 15:00:37,514  INFO     dealId     : 1
+2026-03-27 15:00:37,516  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:00:37,520  INFO     provider   : 1000
+2026-03-27 15:00:37,521  INFO     state      : Accepted
+2026-03-27 15:00:37,522  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 15:00:37,522  INFO     railId     : 0
+2026-03-27 15:00:37,523  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:00:37,523  INFO     size       : 536,870,912 bytes
+2026-03-27 15:00:37,524  INFO     price/mo   : 1000000
+2026-03-27 15:00:37,525  INFO     duration   : 30 days
+2026-03-27 15:00:37,525  INFO     req.retr   : 9500 bps
+2026-03-27 15:00:37,525  INFO     req.bw     : 100 Mbps
+2026-03-27 15:00:37,526  INFO     req.lat    : 0 ms
+2026-03-27 15:00:37,526  INFO     req.idx    : 0%
+2026-03-27 15:01:28,007  INFO     → approve  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=75
+2026-03-27 15:01:28,100  INFO     ⏳ sent tx=e95f5ae79f806a375712a4aa63b2f99e7e6c0006978f5dd8eede8c448721fb30
+2026-03-27 15:01:37,060  INFO     ✅ success  tx=e95f5ae79f806a375712a4aa63b2f99e7e6c0006978f5dd8eede8c448721fb30  gas_used=2597895

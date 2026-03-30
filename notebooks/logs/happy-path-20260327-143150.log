@@ -1,0 +1,358 @@
+2026-03-27 14:31:50,136  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 14:32:26,130  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 14:32:28,172  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 14:32:34,166  INFO   Connected  chain_id=31415926  latest_block=3327
+2026-03-27 14:32:36,679  INFO   Client   : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:36,681  INFO   Provider : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:36,682  INFO   PoRepSvc : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:39,489  INFO   Contracts loaded.
+2026-03-27 14:32:41,171  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 14:32:47,959  INFO   Client FIL balance : 40999.985718597682149513 FIL
+2026-03-27 14:32:53,621  INFO   Registered providers (3): [1000, 1001, 1002]
+
+2026-03-27 14:32:53,647  INFO     Provider 1000 [active]
+2026-03-27 14:32:53,648  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:53,648  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:53,649  INFO       available : 10,737,418,240 bytes
+2026-03-27 14:32:53,650  INFO       committed : 0 bytes
+2026-03-27 14:32:53,651  INFO       pending   : 0 bytes
+2026-03-27 14:32:53,652  INFO       price/mo  : 0
+2026-03-27 14:32:53,652  INFO       sli caps  : retrievability=9500 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 14:32:53,679  INFO     Provider 1001 [active]
+2026-03-27 14:32:53,680  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:53,680  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:53,681  INFO       available : 5,368,709,120 bytes
+2026-03-27 14:32:53,682  INFO       committed : 0 bytes
+2026-03-27 14:32:53,682  INFO       pending   : 0 bytes
+2026-03-27 14:32:53,683  INFO       price/mo  : 0
+2026-03-27 14:32:53,686  INFO       sli caps  : retrievability=8000 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 14:32:53,718  INFO     Provider 1002 [active]
+2026-03-27 14:32:53,719  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:53,720  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:32:53,720  INFO       available : 10,737,418,240 bytes
+2026-03-27 14:32:53,720  INFO       committed : 0 bytes
+2026-03-27 14:32:53,723  INFO       pending   : 0 bytes
+2026-03-27 14:32:53,723  INFO       price/mo  : 100
+2026-03-27 14:32:53,724  INFO       sli caps  : retrievability=5000 bps  bandwidth=100 Mbps  latency=500 ms  indexing=50%
+2026-03-27 14:33:08,828  INFO     → approve  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=71
+2026-03-27 14:33:08,942  INFO     ⏳ sent tx=ba37df7e8393212485bca177b8d26c915d488cc1cc05d0499d09e05947b37e35
+2026-03-27 14:33:17,101  INFO     ✅ success  tx=ba37df7e8393212485bca177b8d26c915d488cc1cc05d0499d09e05947b37e35  gas_used=5088037
+2026-03-27 14:33:25,531  INFO     → proposeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=72
+2026-03-27 14:33:25,568  ERROR    ✗ estimate_gas reverted: NoProviderFoundForDeal()
+2026-03-27 14:39:30,624  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 14:39:30,683  INFO   Connected  chain_id=31415926  latest_block=3431
+2026-03-27 14:39:30,730  INFO   Client   : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:30,731  INFO   Provider : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:30,735  INFO   PoRepSvc : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:30,791  INFO   Contracts loaded.
+2026-03-27 14:39:30,829  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 14:39:30,945  INFO   Client FIL balance : 40999.985717319386522831 FIL
+2026-03-27 14:39:31,087  INFO   Registered providers (3): [1000, 1001, 1002]
+
+2026-03-27 14:39:31,109  INFO     Provider 1000 [active]
+2026-03-27 14:39:31,110  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:31,111  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:31,111  INFO       available : 10,737,418,240 bytes
+2026-03-27 14:39:31,112  INFO       committed : 0 bytes
+2026-03-27 14:39:31,112  INFO       pending   : 0 bytes
+2026-03-27 14:39:31,113  INFO       price/mo  : 0
+2026-03-27 14:39:31,113  INFO       sli caps  : retrievability=9500 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 14:39:31,148  INFO     Provider 1001 [active]
+2026-03-27 14:39:31,150  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:31,150  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:31,151  INFO       available : 5,368,709,120 bytes
+2026-03-27 14:39:31,152  INFO       committed : 0 bytes
+2026-03-27 14:39:31,153  INFO       pending   : 0 bytes
+2026-03-27 14:39:31,153  INFO       price/mo  : 0
+2026-03-27 14:39:31,154  INFO       sli caps  : retrievability=8000 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 14:39:31,175  INFO     Provider 1002 [active]
+2026-03-27 14:39:31,176  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:31,177  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 14:39:31,178  INFO       available : 10,737,418,240 bytes
+2026-03-27 14:39:31,178  INFO       committed : 0 bytes
+2026-03-27 14:39:31,179  INFO       pending   : 0 bytes
+2026-03-27 14:39:31,179  INFO       price/mo  : 100
+2026-03-27 14:39:31,180  INFO       sli caps  : retrievability=5000 bps  bandwidth=100 Mbps  latency=500 ms  indexing=50%
+2026-03-27 14:39:39,829  INFO     → proposeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=72
+2026-03-27 14:39:39,933  INFO     ⏳ sent tx=47bbafd3b785e8f7fa695d9eae82eb6847a5f753ad6b77f69afd779bf18f62ca
+2026-03-27 14:39:49,111  INFO     ✅ success  tx=47bbafd3b785e8f7fa695d9eae82eb6847a5f753ad6b77f69afd779bf18f62ca  gas_used=36171952
+2026-03-27 15:02:06,679  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 15:02:18,834  INFO     → createRail  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=76
+2026-03-27 15:02:18,889  ERROR    ✗ estimate_gas reverted: OperatorNotApproved()
+2026-03-27 15:06:14,268  INFO     dealId     : 1
+2026-03-27 15:06:14,269  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:06:14,270  INFO     provider   : 1000
+2026-03-27 15:06:14,271  INFO     state      : Accepted
+2026-03-27 15:06:14,271  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 15:06:14,272  INFO     railId     : 0
+2026-03-27 15:06:14,273  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:06:14,274  INFO     size       : 536,870,912 bytes
+2026-03-27 15:06:14,274  INFO     price/mo   : 1000000
+2026-03-27 15:06:14,275  INFO     duration   : 30 days
+2026-03-27 15:06:14,276  INFO     req.retr   : 9500 bps
+2026-03-27 15:06:14,277  INFO     req.bw     : 100 Mbps
+2026-03-27 15:06:14,278  INFO     req.lat    : 0 ms
+2026-03-27 15:06:14,280  INFO     req.idx    : 0%
+2026-03-27 15:06:43,588  INFO     → proposeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=76
+2026-03-27 15:06:43,700  INFO     ⏳ sent tx=4ae2fe8ed9fe88f49a5135f9f145bddcad6e170871e9746701b5d7636e6b5e93
+2026-03-27 15:06:53,066  INFO     ✅ success  tx=4ae2fe8ed9fe88f49a5135f9f145bddcad6e170871e9746701b5d7636e6b5e93  gas_used=38388700
+2026-03-27 15:07:37,992  INFO   Completed deals in settlement queue: 0
+2026-03-27 15:07:41,258  INFO   getDealProposal(1):
+2026-03-27 15:07:41,260  INFO     dealId     : 1
+2026-03-27 15:07:41,263  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:07:41,264  INFO     provider   : 1000
+2026-03-27 15:07:41,265  INFO     state      : Accepted
+2026-03-27 15:07:41,265  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 15:07:41,268  INFO     railId     : 0
+2026-03-27 15:07:41,269  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:07:41,270  INFO     size       : 536,870,912 bytes
+2026-03-27 15:07:41,272  INFO     price/mo   : 1000000
+2026-03-27 15:07:41,273  INFO     duration   : 30 days
+2026-03-27 15:07:41,274  INFO     req.retr   : 9500 bps
+2026-03-27 15:07:41,276  INFO     req.bw     : 100 Mbps
+2026-03-27 15:07:41,278  INFO     req.lat    : 0 ms
+2026-03-27 15:07:41,279  INFO     req.idx    : 0%
+2026-03-27 15:07:42,086  INFO   getDealProposal(1):
+2026-03-27 15:07:42,088  INFO     dealId     : 1
+2026-03-27 15:07:42,090  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:07:42,091  INFO     provider   : 1000
+2026-03-27 15:07:42,091  INFO     state      : Accepted
+2026-03-27 15:07:42,092  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 15:07:42,093  INFO     railId     : 0
+2026-03-27 15:07:42,094  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:07:42,095  INFO     size       : 536,870,912 bytes
+2026-03-27 15:07:42,096  INFO     price/mo   : 1000000
+2026-03-27 15:07:42,097  INFO     duration   : 30 days
+2026-03-27 15:07:42,098  INFO     req.retr   : 9500 bps
+2026-03-27 15:07:42,099  INFO     req.bw     : 100 Mbps
+2026-03-27 15:07:42,100  INFO     req.lat    : 0 ms
+2026-03-27 15:07:42,101  INFO     req.idx    : 0%
+2026-03-27 15:07:42,381  INFO   getDealProposal(1):
+2026-03-27 15:07:42,382  INFO     dealId     : 1
+2026-03-27 15:07:42,383  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:07:42,384  INFO     provider   : 1000
+2026-03-27 15:07:42,384  INFO     state      : Accepted
+2026-03-27 15:07:42,385  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 15:07:42,385  INFO     railId     : 0
+2026-03-27 15:07:42,385  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:07:42,386  INFO     size       : 536,870,912 bytes
+2026-03-27 15:07:42,386  INFO     price/mo   : 1000000
+2026-03-27 15:07:42,387  INFO     duration   : 30 days
+2026-03-27 15:07:42,388  INFO     req.retr   : 9500 bps
+2026-03-27 15:07:42,388  INFO     req.bw     : 100 Mbps
+2026-03-27 15:07:42,389  INFO     req.lat    : 0 ms
+2026-03-27 15:07:42,389  INFO     req.idx    : 0%
+2026-03-27 15:07:45,167  INFO   getDealProposal(2):
+2026-03-27 15:07:45,168  INFO     dealId     : 2
+2026-03-27 15:07:45,169  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:07:45,169  INFO     provider   : 1000
+2026-03-27 15:07:45,170  INFO     state      : Proposed
+2026-03-27 15:07:45,170  INFO     validator  : 0x0000000000000000000000000000000000000000
+2026-03-27 15:07:45,170  INFO     railId     : 0
+2026-03-27 15:07:45,170  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:07:45,171  INFO     size       : 536,870,912 bytes
+2026-03-27 15:07:45,172  INFO     price/mo   : 1000000
+2026-03-27 15:07:45,172  INFO     duration   : 30 days
+2026-03-27 15:07:45,172  INFO     req.retr   : 9500 bps
+2026-03-27 15:07:45,173  INFO     req.bw     : 100 Mbps
+2026-03-27 15:07:45,173  INFO     req.lat    : 0 ms
+2026-03-27 15:07:45,175  INFO     req.idx    : 0%
+2026-03-27 15:07:49,386  INFO   getDealProposal(1):
+2026-03-27 15:07:49,387  INFO     dealId     : 1
+2026-03-27 15:07:49,387  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:07:49,388  INFO     provider   : 1000
+2026-03-27 15:07:49,390  INFO     state      : Accepted
+2026-03-27 15:07:49,390  INFO     validator  : 0xD8411fC71115D5D78A3a417D252e7c7529C49Dea
+2026-03-27 15:07:49,390  INFO     railId     : 0
+2026-03-27 15:07:49,391  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:07:49,391  INFO     size       : 536,870,912 bytes
+2026-03-27 15:07:49,392  INFO     price/mo   : 1000000
+2026-03-27 15:07:49,393  INFO     duration   : 30 days
+2026-03-27 15:07:49,393  INFO     req.retr   : 9500 bps
+2026-03-27 15:07:49,393  INFO     req.bw     : 100 Mbps
+2026-03-27 15:07:49,394  INFO     req.lat    : 0 ms
+2026-03-27 15:07:49,394  INFO     req.idx    : 0%
+2026-03-27 15:13:47,539  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 15:14:03,776  INFO     → approve  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=78
+2026-03-27 15:14:03,857  INFO     ⏳ sent tx=4bbccd2b0b279cfa34deecaebf1f1d2388919eaf641b22fe6e5a6ca341377303
+2026-03-27 15:14:13,105  INFO     ✅ success  tx=4bbccd2b0b279cfa34deecaebf1f1d2388919eaf641b22fe6e5a6ca341377303  gas_used=2597895
+2026-03-27 15:14:24,178  INFO     → proposeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=79
+2026-03-27 15:14:24,263  INFO     ⏳ sent tx=97868a72c0c45a4fdcf296166230a576792fffdaf0fe4893018808bcc7f59c12
+2026-03-27 15:14:33,121  INFO     ✅ success  tx=97868a72c0c45a4fdcf296166230a576792fffdaf0fe4893018808bcc7f59c12  gas_used=38306201
+2026-03-27 15:14:46,756  INFO     dealId     : 3
+2026-03-27 15:14:46,757  INFO     client     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:14:46,760  INFO     provider   : 1000
+2026-03-27 15:14:46,760  INFO     state      : Proposed
+2026-03-27 15:14:46,761  INFO     validator  : 0x0000000000000000000000000000000000000000
+2026-03-27 15:14:46,762  INFO     railId     : 0
+2026-03-27 15:14:46,763  INFO     manifest   : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:14:46,763  INFO     size       : 536,870,912 bytes
+2026-03-27 15:14:46,765  INFO     price/mo   : 1000000
+2026-03-27 15:14:46,766  INFO     duration   : 30 days
+2026-03-27 15:14:46,768  INFO     req.retr   : 9500 bps
+2026-03-27 15:14:46,769  INFO     req.bw     : 100 Mbps
+2026-03-27 15:14:46,769  INFO     req.lat    : 0 ms
+2026-03-27 15:14:46,771  INFO     req.idx    : 0%
+2026-03-27 15:15:19,560  INFO     → createRail  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=80
+2026-03-27 15:15:19,608  ERROR    ✗ estimate_gas reverted: OperatorNotApproved()
+2026-03-27 15:21:05,843  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 15:21:08,815  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 15:21:12,940  INFO   Connected  chain_id=31415926  latest_block=4056
+2026-03-27 15:21:14,611  INFO   Client   : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:14,614  INFO   Provider : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:14,615  INFO   PoRepSvc : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:19,695  INFO   Contracts loaded.
+2026-03-27 15:21:24,360  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 15:21:32,348  INFO   Client FIL balance : 40999.985653388748341589 FIL
+2026-03-27 15:21:37,200  INFO   Registered providers (3): [1000, 1001, 1002]
+
+2026-03-27 15:21:37,223  INFO     Provider 1000 [active]
+2026-03-27 15:21:37,226  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:37,227  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:37,229  INFO       available : 10,737,418,240 bytes
+2026-03-27 15:21:37,229  INFO       committed : 0 bytes
+2026-03-27 15:21:37,230  INFO       pending   : 1,610,612,736 bytes
+2026-03-27 15:21:37,231  INFO       price/mo  : 0
+2026-03-27 15:21:37,232  INFO       sli caps  : retrievability=9500 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 15:21:37,252  INFO     Provider 1001 [active]
+2026-03-27 15:21:37,253  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:37,255  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:37,255  INFO       available : 5,368,709,120 bytes
+2026-03-27 15:21:37,256  INFO       committed : 0 bytes
+2026-03-27 15:21:37,256  INFO       pending   : 0 bytes
+2026-03-27 15:21:37,256  INFO       price/mo  : 0
+2026-03-27 15:21:37,257  INFO       sli caps  : retrievability=8000 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 15:21:37,283  INFO     Provider 1002 [active]
+2026-03-27 15:21:37,283  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:37,284  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:21:37,284  INFO       available : 10,737,418,240 bytes
+2026-03-27 15:21:37,284  INFO       committed : 0 bytes
+2026-03-27 15:21:37,285  INFO       pending   : 0 bytes
+2026-03-27 15:21:37,285  INFO       price/mo  : 100
+2026-03-27 15:21:37,285  INFO       sli caps  : retrievability=5000 bps  bandwidth=100 Mbps  latency=500 ms  indexing=50%
+2026-03-27 15:22:08,585  INFO     dealId           : 3
+2026-03-27 15:22:08,586  INFO     client           : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:22:08,587  INFO     provider (actor) : 1000
+2026-03-27 15:22:08,588  INFO     state            : Proposed
+2026-03-27 15:22:08,588  INFO     validator        : 0x0000000000000000000000000000000000000000
+2026-03-27 15:22:08,589  INFO     railId           : 0
+2026-03-27 15:22:08,589  INFO     manifestLocation : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:22:08,590  INFO     terms.sizeBytes  : 536,870,912
+2026-03-27 15:22:08,590  INFO     terms.price/mo   : 1000000
+2026-03-27 15:22:08,591  INFO     terms.duration   : 30 days
+2026-03-27 15:22:08,593  INFO     req.retrievability : 9500 bps
+2026-03-27 15:22:08,594  INFO     req.bandwidth      : 100 Mbps
+2026-03-27 15:22:08,595  INFO     req.latency        : 0 ms
+2026-03-27 15:22:08,596  INFO     req.indexing       : 0%
+2026-03-27 15:22:50,734  INFO     → createRail  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=80
+2026-03-27 15:22:50,796  ERROR    ✗ estimate_gas reverted: OperatorNotApproved()
+2026-03-27 15:31:36,410  INFO   === Session log: /home/rafal/Projects/porep-market/notebooks/logs/happy-path-20260327-143150.log ===
+2026-03-27 15:31:41,018  INFO   Connected  chain_id=31415926  latest_block=4213
+2026-03-27 15:31:42,942  INFO   Client   : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:31:42,943  INFO   Provider : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:31:42,944  INFO   PoRepSvc : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:31:44,809  INFO   Contracts loaded.
+2026-03-27 15:31:46,448  INFO   Helpers ready. 110 error selectors loaded.
+2026-03-27 15:32:15,290  INFO   Client FIL balance : 40999.985653388748341589 FIL
+2026-03-27 15:32:34,860  INFO   Registered providers (3): [1000, 1001, 1002]
+
+2026-03-27 15:32:34,887  INFO     Provider 1000 [active]
+2026-03-27 15:32:34,888  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:32:34,889  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:32:34,889  INFO       available : 10,737,418,240 bytes
+2026-03-27 15:32:34,890  INFO       committed : 0 bytes
+2026-03-27 15:32:34,891  INFO       pending   : 1,610,612,736 bytes
+2026-03-27 15:32:34,892  INFO       price/mo  : 0
+2026-03-27 15:32:34,893  INFO       sli caps  : retrievability=9500 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 15:32:34,920  INFO     Provider 1001 [active]
+2026-03-27 15:32:34,924  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:32:34,925  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:32:34,926  INFO       available : 5,368,709,120 bytes
+2026-03-27 15:32:34,927  INFO       committed : 0 bytes
+2026-03-27 15:32:34,928  INFO       pending   : 0 bytes
+2026-03-27 15:32:34,928  INFO       price/mo  : 0
+2026-03-27 15:32:34,929  INFO       sli caps  : retrievability=8000 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 15:32:34,957  INFO     Provider 1002 [active]
+2026-03-27 15:32:34,957  INFO       org       : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:32:34,958  INFO       payee     : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:32:34,959  INFO       available : 10,737,418,240 bytes
+2026-03-27 15:32:34,960  INFO       committed : 0 bytes
+2026-03-27 15:32:34,962  INFO       pending   : 0 bytes
+2026-03-27 15:32:34,963  INFO       price/mo  : 100
+2026-03-27 15:32:34,964  INFO       sli caps  : retrievability=5000 bps  bandwidth=100 Mbps  latency=500 ms  indexing=50%
+2026-03-27 15:32:53,600  INFO     → approve  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=80
+2026-03-27 15:32:53,673  INFO     ⏳ sent tx=f10911b310b6c9e6741d70da0ca5bccf2a1752b2d328a69d9aa4e7b91c827346
+2026-03-27 15:33:01,245  INFO     ✅ success  tx=f10911b310b6c9e6741d70da0ca5bccf2a1752b2d328a69d9aa4e7b91c827346  gas_used=2597895
+2026-03-27 15:33:30,286  INFO     → proposeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=81
+2026-03-27 15:33:30,518  INFO     ⏳ sent tx=3dedaab234f28daa7a22b8102affbcfceafa3b7d027483c4f2e64fe94b9124d1
+2026-03-27 15:33:41,071  INFO     ✅ success  tx=3dedaab234f28daa7a22b8102affbcfceafa3b7d027483c4f2e64fe94b9124d1  gas_used=40020808
+2026-03-27 15:33:53,663  INFO     dealId           : 4
+2026-03-27 15:33:53,664  INFO     client           : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:33:53,665  INFO     provider (actor) : 1000
+2026-03-27 15:33:53,668  INFO     state            : Proposed
+2026-03-27 15:33:53,669  INFO     validator        : 0x0000000000000000000000000000000000000000
+2026-03-27 15:33:53,670  INFO     railId           : 0
+2026-03-27 15:33:53,671  INFO     manifestLocation : ipfs://bafybeigdyrzt5sfp7udm7hu76uh7y26nf3efuylqabf3oclgtqy55fbzdi
+2026-03-27 15:33:53,671  INFO     terms.sizeBytes  : 536,870,912
+2026-03-27 15:33:53,672  INFO     terms.price/mo   : 1000000
+2026-03-27 15:33:53,672  INFO     terms.duration   : 30 days
+2026-03-27 15:33:53,673  INFO     req.retrievability : 9500 bps
+2026-03-27 15:33:53,674  INFO     req.bandwidth      : 100 Mbps
+2026-03-27 15:33:53,675  INFO     req.latency        : 0 ms
+2026-03-27 15:33:53,677  INFO     req.indexing       : 0%
+2026-03-27 15:33:57,250  INFO     → acceptDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=82
+2026-03-27 15:33:57,328  INFO     ⏳ sent tx=61a81ee44ed4b6552fd37e4a1f39695e6f4c9fc616791e7d011ec52e11e11340
+2026-03-27 15:34:05,129  INFO     ✅ success  tx=61a81ee44ed4b6552fd37e4a1f39695e6f4c9fc616791e7d011ec52e11e11340  gas_used=26122416
+2026-03-27 15:34:16,105  INFO     → create  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=83
+2026-03-27 15:34:16,223  INFO     ⏳ sent tx=65c98a1f5a8377b26d29ae805c2dccae13e06a9802c6f76d97adad9c2ce1eb27
+2026-03-27 15:34:25,185  INFO     ✅ success  tx=65c98a1f5a8377b26d29ae805c2dccae13e06a9802c6f76d97adad9c2ce1eb27  gas_used=102993815
+2026-03-27 15:34:47,121  INFO   Client MockUSDC balance  : 1,000,000.000000 USDFC
+2026-03-27 15:34:47,146  INFO     → approve  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=84
+2026-03-27 15:34:47,220  INFO     ⏳ sent tx=fa000343bde0aef5f356746cf47f0b876ea071c80bd26650ab16e8d7f8488443
+2026-03-27 15:34:57,068  INFO     ✅ success  tx=fa000343bde0aef5f356746cf47f0b876ea071c80bd26650ab16e8d7f8488443  gas_used=5349218
+2026-03-27 15:34:57,069  INFO   MockUSDC approved for FilecoinPay ✅
+2026-03-27 15:34:57,094  INFO   FilecoinPay account before deposit: funds=0
+2026-03-27 15:34:57,102  INFO     → deposit  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=85
+2026-03-27 15:34:57,175  INFO     ⏳ sent tx=5a33be0735a4a45d3b80c33312186b0893e8fe06a145eaa1c6234c2e2ce100da
+2026-03-27 15:35:05,083  INFO     ✅ success  tx=5a33be0735a4a45d3b80c33312186b0893e8fe06a145eaa1c6234c2e2ce100da  gas_used=21623105
+2026-03-27 15:35:05,103  INFO   FilecoinPay account after deposit : funds=10000000
+2026-03-27 15:35:05,122  INFO   operatorApprovals before: isApproved=False  maxLockupPeriod=0
+2026-03-27 15:35:05,130  INFO     → setOperatorApproval  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=86
+2026-03-27 15:35:05,205  INFO     ⏳ sent tx=b4ebc1882836e1dfcb3f1d9bb447e7f23a4972cae334fcc2ea01d9fc763c4f28
+2026-03-27 15:35:13,039  INFO     ✅ success  tx=b4ebc1882836e1dfcb3f1d9bb447e7f23a4972cae334fcc2ea01d9fc763c4f28  gas_used=10852952
+2026-03-27 15:35:13,053  INFO   operatorApprovals after : isApproved=True  maxLockupPeriod=86400 ✅
+2026-03-27 15:35:21,223  INFO     → createRail  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=87
+2026-03-27 15:35:21,317  INFO     ⏳ sent tx=507453398da080eac3a064bec03b946610ca4a573f348a5450982ab8b4d8b9f4
+2026-03-27 15:35:29,085  INFO     ✅ success  tx=507453398da080eac3a064bec03b946610ca4a573f348a5450982ab8b4d8b9f4  gas_used=89762139
+2026-03-27 15:36:14,548  INFO     → completeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=88
+2026-03-27 15:36:14,579  ERROR    ✗ estimate_gas reverted: NotTheClientSmartContract(uint256,address)
+2026-03-27 15:37:10,823  INFO   Registered providers (3): [1000, 1001, 1002]
+2026-03-27 15:37:15,882  INFO   Provider 1000 [active]
+2026-03-27 15:37:15,884  INFO     organization : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:37:15,889  INFO     payee        : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:37:15,890  INFO     available    : 10,737,418,240 bytes  (10.0 GiB)
+2026-03-27 15:37:15,891  INFO     committed    : 0 bytes
+2026-03-27 15:37:15,893  INFO     pending      : 2,147,483,648 bytes
+2026-03-27 15:37:15,894  INFO     price/mo     : 0  (0 = manual approval)
+2026-03-27 15:37:15,894  INFO     capabilities : retrievability=9500 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 15:37:15,895  INFO   
+2026-03-27 15:37:15,920  INFO   Provider 1001 [active]
+2026-03-27 15:37:15,921  INFO     organization : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:37:15,923  INFO     payee        : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:37:15,924  INFO     available    : 5,368,709,120 bytes  (5.0 GiB)
+2026-03-27 15:37:15,925  INFO     committed    : 0 bytes
+2026-03-27 15:37:15,926  INFO     pending      : 0 bytes
+2026-03-27 15:37:15,927  INFO     price/mo     : 0  (0 = manual approval)
+2026-03-27 15:37:15,927  INFO     capabilities : retrievability=8000 bps  bandwidth=500 Mbps  latency=200 ms  indexing=80%
+2026-03-27 15:37:15,928  INFO   
+2026-03-27 15:37:15,957  INFO   Provider 1002 [active]
+2026-03-27 15:37:15,958  INFO     organization : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:37:15,959  INFO     payee        : 0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b
+2026-03-27 15:37:15,960  INFO     available    : 10,737,418,240 bytes  (10.0 GiB)
+2026-03-27 15:37:15,961  INFO     committed    : 0 bytes
+2026-03-27 15:37:15,962  INFO     pending      : 0 bytes
+2026-03-27 15:37:15,962  INFO     price/mo     : 100  (0 = manual approval)
+2026-03-27 15:37:15,963  INFO     capabilities : retrievability=5000 bps  bandwidth=100 Mbps  latency=500 ms  indexing=50%
+2026-03-27 15:37:15,964  INFO   
+2026-03-27 16:11:11,783  INFO     → completeDeal  from=0x7C8c2A74cBf81395A156746e62d8FaE1071f1b7b  nonce=88
+2026-03-27 16:11:11,825  ERROR    ✗ estimate_gas reverted: NotTheClientSmartContract(uint256,address)
