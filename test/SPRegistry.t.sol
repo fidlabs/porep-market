@@ -744,21 +744,24 @@ contract SPRegistryTest is Test {
         assertEq(CommonTypes.FilActorId.unwrap(result), 0);
     }
 
-    function testGetProviderForDealPicksLeastCommitted() public {
+    function testGetProviderForDealPicksLeastPending() public {
         vm.startPrank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
         spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
         vm.stopPrank();
 
-        // Commit some capacity to provider1 so provider2 has less committed
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 5000, 5000);
-
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
+
+        // First call routes to provider1 (insertion order tiebreak), giving it pending bytes
         vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider2));
+        (CommonTypes.FilActorId first,) = spRegistry.getProviderForDeal(req, defaultTerms);
+        assertEq(CommonTypes.FilActorId.unwrap(first), CommonTypes.FilActorId.unwrap(provider1));
+
+        // Second call must route to provider2 — it has 0 pending vs provider1's dealSizeBytes
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId second,) = spRegistry.getProviderForDeal(req, defaultTerms);
+        assertEq(CommonTypes.FilActorId.unwrap(second), CommonTypes.FilActorId.unwrap(provider2));
     }
 
     function testGetProviderForDealZeroRequirementSkipsDimension() public {
@@ -920,7 +923,7 @@ contract SPRegistryTest is Test {
         spRegistry.releaseCapacity(provider1, 1000);
     }
 
-    function testGetProviderForDealTiebreakEqualCommitted() public {
+    function testGetProviderForDealTiebreakEqualPending() public {
         vm.startPrank(adminAddress);
         spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
         spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
@@ -931,7 +934,7 @@ contract SPRegistryTest is Test {
         vm.prank(poRepMarketAddress);
         (CommonTypes.FilActorId result,) = spRegistry.getProviderForDeal(req, defaultTerms);
 
-        // Both have 0 committed bytes; first registered wins (EnumerableSet insertion order)
+        // Both have 0 pending bytes; first registered wins (EnumerableSet insertion order)
         assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider1));
     }
 

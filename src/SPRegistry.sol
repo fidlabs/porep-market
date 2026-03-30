@@ -384,7 +384,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice Find a provider matching requirements and reserve pending capacity
-     * @dev Selects the least-committed eligible provider. Reserves `pendingBytes` atomically
+     * @dev Selects the least-pending eligible provider. Reserves `pendingBytes` atomically
      *      so capacity is held between matching and commitment.
      *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
@@ -401,7 +401,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 length = $._providerIds.length();
 
         CommonTypes.FilActorId bestProvider;
-        uint256 lowestCommitted = type(uint256).max;
+        uint256 lowestPending = type(uint256).max;
         uint256 bestProviderPrice;
 
         for (uint256 i = 0; i < length; i++) {
@@ -418,11 +418,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
             if (!_meetsRequirements(p.capabilities, requirements)) continue;
 
-            if (p.committedBytes < lowestCommitted) {
-                lowestCommitted = p.committedBytes;
+            if (p.pendingBytes < lowestPending) {
+                lowestPending = p.pendingBytes;
                 bestProvider = CommonTypes.FilActorId.wrap(id);
                 bestProviderPrice = p.pricePerSectorPerMonth;
-                if (lowestCommitted == 0) break;
+                if (lowestPending == 0) break;
             }
         }
 
