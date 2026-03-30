@@ -32,6 +32,19 @@
   },
   {
     "type": "function",
+    "name": "MAX_DEAL_DURATION_DAYS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MAX_PROVIDERS",
     "inputs": [],
     "outputs": [
@@ -585,6 +598,16 @@
         "name": "payee",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "minDealDurationDays",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "maxDealDurationDays",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ],
     "outputs": [],
@@ -1372,6 +1395,22 @@
         "name": "availableBytes",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DurationExceedsProtocolMax",
+    "inputs": [
+      {
+        "name": "durationDays",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "maxDays",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ]
   },

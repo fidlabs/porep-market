@@ -45,6 +45,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant MAX_PROVIDERS = 500;
 
+    /**
+     * @notice Maximum deal duration in days — mirrors PoRepMarket.MAX_DEAL_DURATION_DAYS.
+     * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
+     */
+    uint32 public constant MAX_DEAL_DURATION_DAYS = 1278;
+
     // solhint-disable-next-line gas-struct-packing
     struct ProviderData {
         address organization;
@@ -315,6 +321,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         CommonTypes.FilActorId provider, uint256 availableBytes, uint256 committedBytes, uint256 pendingBytes
     );
     error MinDurationExceedsMax(uint32 minDays, uint32 maxDays);
+    error DurationExceedsProtocolMax(uint32 durationDays, uint32 maxDays);
 
     /**
      * @notice Constructor
@@ -528,6 +535,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
             if (!_meetsRequirements(p.capabilities, requirements)) continue;
 
+            if (p.minDealDurationDays != 0 && terms.durationDays < p.minDealDurationDays) continue;
+            if (p.maxDealDurationDays != 0 && terms.durationDays > p.maxDealDurationDays) continue;
+
             if (p.pendingBytes < lowestPending) {
                 lowestPending = p.pendingBytes;
                 bestProvider = CommonTypes.FilActorId.wrap(id);
@@ -636,6 +646,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param availableBytes The provider's available storage capacity
      * @param pricePerSectorPerMonth The provider's auto-approve price per sector per month (0 to skip)
      * @param payee The payment recipient address (address(0) defaults to organization)
+     * @param minDealDurationDays Minimum deal duration in days (0 = no minimum)
+     * @param maxDealDurationDays Maximum deal duration in days (0 = no maximum)
      */
     function registerProviderFor(
         CommonTypes.FilActorId provider,
@@ -643,12 +655,23 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
         uint256 pricePerSectorPerMonth,
-        address payee
+        address payee,
+        uint32 minDealDurationDays,
+        uint32 maxDealDurationDays
     ) external {
         _onlyAdminOrOperator();
         if (organization == address(0)) revert InvalidOrganizationAddress();
         if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
+        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
+            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
+        }
+        if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
 
         _registerProvider(provider, organization, payee);
 
@@ -657,10 +680,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         $._providers[id].capabilities = capabilities;
         $._providers[id].availableBytes = availableBytes;
         $._providers[id].pricePerSectorPerMonth = pricePerSectorPerMonth;
+        $._providers[id].minDealDurationDays = minDealDurationDays;
+        $._providers[id].maxDealDurationDays = maxDealDurationDays;
 
         emit CapabilitiesUpdated(provider, capabilities);
         emit AvailableSpaceUpdated(provider, availableBytes);
         emit PriceUpdated(provider, 0, pricePerSectorPerMonth);
+        emit DealDurationLimitsUpdated(provider, minDealDurationDays, maxDealDurationDays);
     }
 
     /// @inheritdoc ISPRegistry
@@ -695,6 +721,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _onlyProviderControllerOrAdmin(provider);
         if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
             revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
+        }
+        if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
         }
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();

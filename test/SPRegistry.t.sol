@@ -140,7 +140,9 @@ contract SPRegistryTest is Test {
 
     function testPauseProviderSetsPausedTrue() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         vm.prank(adminAddress);
         spRegistry.pauseProvider(provider1);
@@ -151,7 +153,9 @@ contract SPRegistryTest is Test {
 
     function testUnpauseProviderSetsPausedFalse() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.pauseProvider(provider1);
         spRegistry.unpauseProvider(provider1);
         vm.stopPrank();
@@ -162,7 +166,9 @@ contract SPRegistryTest is Test {
 
     function testPauseProviderEmitsEvent() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         vm.prank(adminAddress);
         vm.expectEmit(true, false, false, false);
@@ -172,7 +178,9 @@ contract SPRegistryTest is Test {
 
     function testUnpauseProviderEmitsEvent() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.pauseProvider(provider1);
         vm.expectEmit(true, false, false, false);
         emit SPRegistry.ProviderUnpaused(provider1);
@@ -188,7 +196,9 @@ contract SPRegistryTest is Test {
 
     function testPauseProviderRevertsWhenBlocked() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
         spRegistry.pauseProvider(provider1);
@@ -197,7 +207,9 @@ contract SPRegistryTest is Test {
 
     function testUnpauseProviderRevertsWhenBlocked() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.pauseProvider(provider1);
         spRegistry.blockProvider(provider1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
@@ -207,7 +219,9 @@ contract SPRegistryTest is Test {
 
     function testBlockProviderSetsBlockedTrue() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.stopPrank();
 
@@ -217,7 +231,9 @@ contract SPRegistryTest is Test {
 
     function testUnblockProviderSetsBlockedFalse() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         spRegistry.unblockProvider(provider1);
         vm.stopPrank();
@@ -228,7 +244,9 @@ contract SPRegistryTest is Test {
 
     function testBlockProviderRevertsForNonAdmin() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         vm.prank(unauthorizedAddress);
         vm.expectRevert();
@@ -237,7 +255,9 @@ contract SPRegistryTest is Test {
 
     function testUnblockProviderRevertsForNonAdmin() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.stopPrank();
 
@@ -254,7 +274,9 @@ contract SPRegistryTest is Test {
 
     function testBlockedProviderCannotUpdateAvailableSpace() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
         spRegistry.updateAvailableSpace(provider1, 999);
@@ -263,7 +285,9 @@ contract SPRegistryTest is Test {
 
     function testBlockedProviderCannotSetCapabilities() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
         spRegistry.setCapabilities(provider1, defaultCapabilities);
@@ -272,7 +296,9 @@ contract SPRegistryTest is Test {
 
     function testBlockedProviderCannotSetPrice() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
         spRegistry.setPrice(provider1, 500);
@@ -281,7 +307,9 @@ contract SPRegistryTest is Test {
 
     function testBlockProviderEmitsEvent() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         vm.expectEmit(true, false, false, false);
         emit SPRegistry.ProviderBlocked(provider1);
         spRegistry.blockProvider(provider1);
@@ -290,7 +318,9 @@ contract SPRegistryTest is Test {
 
     function testUnblockProviderEmitsEvent() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.expectEmit(true, false, false, false);
         emit SPRegistry.ProviderUnblocked(provider1);
@@ -300,7 +330,9 @@ contract SPRegistryTest is Test {
 
     function testSetPriceUpdatesProviderPrice() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.prank(adminAddress);
         spRegistry.setPrice(provider1, 250);
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
@@ -311,14 +343,16 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidProviderActorId.selector));
         spRegistry.registerProviderFor(
-            CommonTypes.FilActorId.wrap(0), owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0)
+            CommonTypes.FilActorId.wrap(0), owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
         );
     }
 
     function testRegisterProviderForRevertsForZeroOwner() public {
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidOrganizationAddress.selector));
-        spRegistry.registerProviderFor(provider1, address(0), defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, address(0), defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
     }
 
     function testIsProviderRegisteredReturnsFalseForUnregistered() public view {
@@ -331,12 +365,16 @@ contract SPRegistryTest is Test {
         emit SPRegistry.ProviderRegistered(provider1, owner1);
         vm.expectEmit(true, false, false, true);
         emit SPRegistry.CapabilitiesUpdated(provider1, defaultCapabilities);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
     }
 
     function testRegisterProviderForSetsAllFields() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         assertTrue(spRegistry.isProviderRegistered(provider1));
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
@@ -348,21 +386,29 @@ contract SPRegistryTest is Test {
 
     function testRegisterProviderForRevertsIfAlreadyRegistered() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderAlreadyRegistered.selector, provider1));
-        spRegistry.registerProviderFor(provider1, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.stopPrank();
     }
 
     function testRegisterProviderForRevertsForNonAdmin() public {
         vm.prank(unauthorizedAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.NotAdminOrOperator.selector, unauthorizedAddress));
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
     }
 
     function testRegisterProviderForSetsDefaultPrice() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0), 0, 0
+        );
 
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
         assertEq(info.pricePerSectorPerMonth, 250);
@@ -372,19 +418,25 @@ contract SPRegistryTest is Test {
         vm.prank(adminAddress);
         vm.expectEmit(true, false, false, true);
         emit SPRegistry.PriceUpdated(provider1, 0, 250);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0), 0, 0
+        );
     }
 
     function testRegisterProviderForZeroPriceEmitsDefaultPriceEvent() public {
         vm.prank(adminAddress);
         vm.expectEmit(true, false, false, true);
         emit SPRegistry.PriceUpdated(provider1, 0, 0);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
     }
 
     function testRegisterProviderForSucceedsWithOperatorRole() public {
         vm.prank(operatorAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         assertTrue(spRegistry.isProviderRegistered(provider1));
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
@@ -395,13 +447,17 @@ contract SPRegistryTest is Test {
 
     function testRegisterProviderForStillWorksForAdmin() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         assertTrue(spRegistry.isProviderRegistered(provider1));
     }
 
     function testUpdateAvailableSpaceEmitsEvent() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // Use admin path since MinerAPI precompile is not available in Foundry
         // TODO: integration test with MinerAPI mock for controlling-address path
         vm.prank(adminAddress);
@@ -412,7 +468,9 @@ contract SPRegistryTest is Test {
 
     function testUpdateAvailableSpaceSetsValue() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // Use admin path since MinerAPI precompile is not available in Foundry
         // TODO: integration test with MinerAPI mock for controlling-address path
         vm.prank(adminAddress);
@@ -423,7 +481,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesEmitsEvent() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // Use admin path since MinerAPI precompile is not available in Foundry
         // TODO: integration test with MinerAPI mock for controlling-address path
         vm.prank(adminAddress);
@@ -434,7 +494,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesSetsValues() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // Use admin path since MinerAPI precompile is not available in Foundry
         // TODO: integration test with MinerAPI mock for controlling-address path
         vm.prank(adminAddress);
@@ -448,7 +510,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesRevertsInvalidRetrievabilityBps() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         SLITypes.SLIThresholds memory bad =
             SLITypes.SLIThresholds({retrievabilityBps: 10001, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
         vm.prank(adminAddress);
@@ -458,7 +522,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesAcceptsMaxRetrievabilityBps() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         SLITypes.SLIThresholds memory maxBps =
             SLITypes.SLIThresholds({retrievabilityBps: 10000, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
         vm.prank(adminAddress);
@@ -469,7 +535,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesRevertsInvalidIndexingPct() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         SLITypes.SLIThresholds memory bad =
             SLITypes.SLIThresholds({retrievabilityBps: 5000, bandwidthMbps: 100, latencyMs: 100, indexingPct: 101});
         vm.prank(adminAddress);
@@ -479,7 +547,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesAdminCanSet() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         SLITypes.SLIThresholds memory newCaps =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
         vm.prank(adminAddress);
@@ -490,7 +560,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesRevertsForNonControllerNonAdmin() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // MinerUtils precompile doesn't exist in Foundry, so calling from a non-admin address
         // will revert when MinerUtils tries to call MinerAPI precompile
         // TODO: integration test with MinerAPI mock for controlling-address path
@@ -501,7 +573,9 @@ contract SPRegistryTest is Test {
 
     function testUpdateAvailableSpaceAdminCanSet() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.prank(adminAddress);
         spRegistry.updateAvailableSpace(provider1, 5_000_000);
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
@@ -510,7 +584,9 @@ contract SPRegistryTest is Test {
 
     function testUpdateAvailableSpaceRevertsForNonControllerNonAdmin() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // MinerUtils precompile doesn't exist in Foundry, so calling from a non-admin address
         // will revert when MinerUtils tries to call MinerAPI precompile
         // TODO: integration test with MinerAPI mock for controlling-address path
@@ -521,7 +597,9 @@ contract SPRegistryTest is Test {
 
     function testUpdateAvailableSpaceRevertsWhenBelowCommittedPlusPending() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         // Create pending reservation
         SLITypes.SLIThresholds memory req =
@@ -542,7 +620,9 @@ contract SPRegistryTest is Test {
 
     function testUpdateAvailableSpaceAllowsExactCommittedPlusPending() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         // Create pending reservation
         SLITypes.SLIThresholds memory req =
@@ -560,13 +640,17 @@ contract SPRegistryTest is Test {
 
     function testIsAuthorizedForProviderReturnsTrueForAdmin() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         assertTrue(spRegistry.isAuthorizedForProvider(adminAddress, provider1));
     }
 
     function testIsAuthorizedForProviderRevertsForNonAdminWithoutPrecompile() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         // MinerUtils precompile doesn't exist in Foundry, so calling with a non-admin address
         // will revert when MinerUtils tries to call MinerAPI precompile
         // TODO: integration test with MinerAPI mock for controlling-address path
@@ -581,14 +665,18 @@ contract SPRegistryTest is Test {
 
     function testGetProviderInfoDefaultPriceIsZeroByDefault() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
         assertEq(info.pricePerSectorPerMonth, 0);
     }
 
     function testGetProviderForDealAutoApproveTrueWhenPriceMatches() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -599,7 +687,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealAutoApproveTrueWhenPriceExceeds() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 50, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 50, address(0), 0, 0
+        );
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -610,7 +700,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealAutoApproveFalseWhenPriceBelowDefault() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 200, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 200, address(0), 0, 0
+        );
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -621,7 +713,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealAutoApproveFalseWhenPriceNotSet() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -646,8 +740,12 @@ contract SPRegistryTest is Test {
 
     function testGetProvidersReturnsRegistered() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.stopPrank();
 
         CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
@@ -656,7 +754,9 @@ contract SPRegistryTest is Test {
 
     function testGetCommittedProvidersReturnsEmpty() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         CommonTypes.FilActorId[] memory committed = spRegistry.getCommittedProviders();
         assertEq(committed.length, 0);
@@ -664,8 +764,12 @@ contract SPRegistryTest is Test {
 
     function testGetCommittedProvidersReturnsOnlyCommitted() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.stopPrank();
 
         // Commit capacity for provider1 only
@@ -685,7 +789,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderInfoReturnsFullData() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
         assertEq(info.organization, owner1);
@@ -711,7 +817,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealReturnsMatchingProvider() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -722,7 +830,7 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealSkipsInsufficientCapacity() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, 500, 0, address(0)); // less than defaultTerms.dealSizeBytes
+        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, 500, 0, address(0), 0, 0); // less than defaultTerms.dealSizeBytes
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -735,7 +843,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds memory lowCapabilities =
             SLITypes.SLIThresholds({retrievabilityBps: 5000, bandwidthMbps: 100, latencyMs: 500, indexingPct: 30});
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0, address(0), 0, 0);
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -746,8 +854,12 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealPicksLeastPending() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.stopPrank();
 
         SLITypes.SLIThresholds memory req =
@@ -768,7 +880,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds memory lowCapabilities =
             SLITypes.SLIThresholds({retrievabilityBps: 1000, bandwidthMbps: 50, latencyMs: 999, indexingPct: 5});
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0, address(0), 0, 0);
 
         // All zeros = don't care about any SLI dimension
         SLITypes.SLIThresholds memory req =
@@ -782,7 +894,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds memory lowBandwidth =
             SLITypes.SLIThresholds({retrievabilityBps: 9500, bandwidthMbps: 100, latencyMs: 100, indexingPct: 90});
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowBandwidth, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, lowBandwidth, defaultAvailableBytes, 0, address(0), 0, 0);
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 500, latencyMs: 0, indexingPct: 0});
@@ -796,7 +908,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds memory highLatency =
             SLITypes.SLIThresholds({retrievabilityBps: 9500, bandwidthMbps: 1000, latencyMs: 500, indexingPct: 90});
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, highLatency, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, highLatency, defaultAvailableBytes, 0, address(0), 0, 0);
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 100, indexingPct: 0});
@@ -809,7 +921,7 @@ contract SPRegistryTest is Test {
         SLITypes.SLIThresholds memory lowIndexing =
             SLITypes.SLIThresholds({retrievabilityBps: 9500, bandwidthMbps: 1000, latencyMs: 100, indexingPct: 30});
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowIndexing, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, lowIndexing, defaultAvailableBytes, 0, address(0), 0, 0);
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 80});
@@ -833,7 +945,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityIncrementsCommittedBytes() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, 1000, 1000);
@@ -844,7 +958,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityAccumulates() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.startPrank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, 1000, 1000);
@@ -857,7 +973,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityEmitsEvent() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(poRepMarketAddress);
         vm.expectEmit(true, false, false, true);
@@ -884,7 +1002,9 @@ contract SPRegistryTest is Test {
 
     function testReleaseCapacityEmitsEvent() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.prank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, 3000, 3000);
 
@@ -896,7 +1016,9 @@ contract SPRegistryTest is Test {
 
     function testReleaseCapacityDecrementsCommittedBytes() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.startPrank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, 3000, 3000);
         spRegistry.releaseCapacity(provider1, 1000);
@@ -925,8 +1047,12 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealTiebreakEqualPending() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.stopPrank();
 
         SLITypes.SLIThresholds memory req =
@@ -940,7 +1066,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityRevertsWhenExceedingAvailable() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(poRepMarketAddress);
         vm.expectRevert(
@@ -953,7 +1081,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityRevertsWhenAccumulatedExceedsAvailable() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.startPrank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, defaultAvailableBytes, defaultAvailableBytes);
@@ -968,7 +1098,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacitySucceedsAtExactAvailable() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, defaultAvailableBytes, defaultAvailableBytes);
@@ -979,7 +1111,9 @@ contract SPRegistryTest is Test {
 
     function testReleaseCapacityRevertsWhenExceedingCommitted() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.startPrank(poRepMarketAddress);
         spRegistry.commitCapacity(provider1, 1000, 1000);
@@ -990,7 +1124,9 @@ contract SPRegistryTest is Test {
 
     function testReleaseCapacityRevertsWhenNothingCommitted() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(poRepMarketAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ReleaseExceedsCommitted.selector, provider1, 1, 0));
@@ -1002,7 +1138,7 @@ contract SPRegistryTest is Test {
             SLITypes.SLIThresholds({retrievabilityBps: 10001, bandwidthMbps: 100, latencyMs: 100, indexingPct: 50});
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidRetrievabilityBps.selector, uint16(10001)));
-        spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0, address(0), 0, 0);
     }
 
     function testRegisterProviderForRevertsInvalidIndexingPct() public {
@@ -1010,12 +1146,14 @@ contract SPRegistryTest is Test {
             SLITypes.SLIThresholds({retrievabilityBps: 5000, bandwidthMbps: 100, latencyMs: 100, indexingPct: 101});
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidIndexingPct.selector, uint8(101)));
-        spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0, address(0), 0, 0);
     }
 
     function testGetProviderForDealReservesPendingBytes() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         SLITypes.SLIThresholds memory req =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 50});
@@ -1030,7 +1168,7 @@ contract SPRegistryTest is Test {
         // Register provider1 with capacity just enough for one deal
         vm.prank(adminAddress);
         spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultTerms.dealSizeBytes, 0, address(0)
+            provider1, owner1, defaultCapabilities, defaultTerms.dealSizeBytes, 0, address(0), 0, 0
         );
 
         SLITypes.SLIThresholds memory req =
@@ -1049,7 +1187,9 @@ contract SPRegistryTest is Test {
 
     function testReleasePendingCapacityDecrementsPending() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         // Reserve pending via getProviderForDeal
         SLITypes.SLIThresholds memory req =
@@ -1067,7 +1207,9 @@ contract SPRegistryTest is Test {
 
     function testReleasePendingCapacityRevertsWhenExceedsPending() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(poRepMarketAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ReleasePendingExceedsPending.selector, provider1, 100, 0));
@@ -1124,7 +1266,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityRevertsWhenActualExceedsTolerance() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         spRegistry.setToleranceBps(1000); // 10% tolerance
         vm.stopPrank();
 
@@ -1141,7 +1285,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityAllowsWithinTolerance() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         spRegistry.setToleranceBps(1000); // 10% tolerance
         vm.stopPrank();
 
@@ -1158,7 +1304,9 @@ contract SPRegistryTest is Test {
 
     function testSetPriceEmitsEvent() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         vm.prank(adminAddress);
         vm.expectEmit(true, false, false, true);
@@ -1174,7 +1322,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityReleasesPendingWhenEstimatedWithinPending() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         // Reserve pending via getProviderForDeal
         vm.prank(poRepMarketAddress);
@@ -1194,7 +1344,9 @@ contract SPRegistryTest is Test {
 
     function testCommitCapacityEmitsCorrectReleasedAmountWhenEstimatedExceedsPending() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         // Reserve 500 pending via getProviderForDeal
         SLITypes.SLIThresholds memory req =
@@ -1215,7 +1367,9 @@ contract SPRegistryTest is Test {
 
     function testSetCapabilitiesRevertsWithNotControllerForNonControllingAddress() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         // Set up MinerAPI precompile mocks so isControllingAddress returns false (not reverts)
         address nonController = vm.addr(0x099);
@@ -1230,8 +1384,12 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealSkipsPausedProvider() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.pauseProvider(provider1);
         vm.stopPrank();
 
@@ -1244,7 +1402,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealReturnsZeroWhenAllPaused() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.pauseProvider(provider1);
         vm.stopPrank();
 
@@ -1257,8 +1417,12 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealSkipsBlockedProvider() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.stopPrank();
 
@@ -1271,7 +1435,9 @@ contract SPRegistryTest is Test {
 
     function testGetProviderForDealReturnsZeroWhenAllBlocked() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         spRegistry.blockProvider(provider1);
         vm.stopPrank();
 
@@ -1293,7 +1459,14 @@ contract SPRegistryTest is Test {
         // solhint-disable-next-line gas-strict-inequalities
         for (uint64 i = 1; i <= 500; i++) {
             spRegistry.registerProviderFor(
-                CommonTypes.FilActorId.wrap(i), owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0)
+                CommonTypes.FilActorId.wrap(i),
+                owner1,
+                defaultCapabilities,
+                defaultAvailableBytes,
+                100,
+                address(0),
+                0,
+                0
             );
         }
         vm.stopPrank();
@@ -1305,12 +1478,19 @@ contract SPRegistryTest is Test {
         // solhint-disable-next-line gas-strict-inequalities
         for (uint64 i = 1; i <= 500; i++) {
             spRegistry.registerProviderFor(
-                CommonTypes.FilActorId.wrap(i), owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0)
+                CommonTypes.FilActorId.wrap(i),
+                owner1,
+                defaultCapabilities,
+                defaultAvailableBytes,
+                100,
+                address(0),
+                0,
+                0
             );
         }
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.MaxProvidersReached.selector, 500));
         spRegistry.registerProviderFor(
-            CommonTypes.FilActorId.wrap(501), owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0)
+            CommonTypes.FilActorId.wrap(501), owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
         );
         vm.stopPrank();
     }
@@ -1324,7 +1504,9 @@ contract SPRegistryTest is Test {
 
     function testGetProvidersByOrganizationReturnsSingleProvider() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
 
         CommonTypes.FilActorId[] memory providers = spRegistry.getProvidersByOrganization(owner1);
         assertEq(providers.length, 1);
@@ -1333,8 +1515,12 @@ contract SPRegistryTest is Test {
 
     function testGetProvidersByOrganizationReturnsMultipleProviders() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
-        spRegistry.registerProviderFor(provider2, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         vm.stopPrank();
 
         CommonTypes.FilActorId[] memory providers = spRegistry.getProvidersByOrganization(owner1);
@@ -1343,8 +1529,12 @@ contract SPRegistryTest is Test {
 
     function testGetProvidersByOrganizationIsolatesOrganizations() public {
         vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0));
-        spRegistry.registerProviderFor(provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
         vm.stopPrank();
 
         CommonTypes.FilActorId[] memory org1Providers = spRegistry.getProvidersByOrganization(owner1);
@@ -1359,7 +1549,9 @@ contract SPRegistryTest is Test {
 
     function testRegisterProviderForSetsPayeeToOrganization() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         assertEq(spRegistry.getPayee(provider1), owner1);
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
@@ -1368,7 +1560,9 @@ contract SPRegistryTest is Test {
 
     function testSetPayeeUpdatesPayee() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         address newPayee = vm.addr(0x099);
 
@@ -1382,7 +1576,9 @@ contract SPRegistryTest is Test {
 
     function testSetPayeeRevertsForZeroAddress() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidPayeeAddress.selector));
@@ -1391,7 +1587,9 @@ contract SPRegistryTest is Test {
 
     function testSetPayeeRevertsForUnauthorizedCaller() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         _setupMinerPrecompileMocks(unauthorizedAddress);
 
@@ -1404,7 +1602,9 @@ contract SPRegistryTest is Test {
 
     function testAdminCanSetPayee() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
 
         address newPayee = vm.addr(0x099);
         vm.prank(adminAddress);
@@ -1421,7 +1621,9 @@ contract SPRegistryTest is Test {
 
     function testSetPayeeRevertsForBlockedProvider() public {
         vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
+        );
         vm.prank(adminAddress);
         spRegistry.blockProvider(provider1);
 
@@ -1450,5 +1652,395 @@ contract SPRegistryTest is Test {
     function testGetPayAddressForProviderReturnsZeroAddress() public view {
         address payAddress = spRegistry.getPayee(provider1);
         assertEq(payAddress, address(0));
+    }
+
+    function testRegisterProviderForWithDurationLimits() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 90, 365
+        );
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 90);
+        assertEq(info.maxDealDurationDays, 365);
+    }
+
+    function testRegisterProviderForRevertsMinExceedsMax() public {
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MinDurationExceedsMax.selector, 365, 90));
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 365, 90
+        );
+    }
+
+    function testRegisterProviderForEmitsDurationEvent() public {
+        vm.prank(adminAddress);
+        vm.expectEmit(true, false, false, true);
+        emit SPRegistry.DealDurationLimitsUpdated(provider1, 90, 365);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 90, 365
+        );
+    }
+
+    // -----------------------------------------------------------------------
+    // setDealDurationLimits tests
+    // -----------------------------------------------------------------------
+
+    function testSetDealDurationLimitsBothNonZero() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        vm.prank(adminAddress);
+        spRegistry.setDealDurationLimits(provider1, 90, 365);
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 90);
+        assertEq(info.maxDealDurationDays, 365);
+    }
+
+    function testSetDealDurationLimitsMinOnly() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        vm.prank(adminAddress);
+        spRegistry.setDealDurationLimits(provider1, 90, 0);
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 90);
+        assertEq(info.maxDealDurationDays, 0);
+    }
+
+    function testSetDealDurationLimitsMaxOnly() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        vm.prank(adminAddress);
+        spRegistry.setDealDurationLimits(provider1, 0, 365);
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 0);
+        assertEq(info.maxDealDurationDays, 365);
+    }
+
+    function testSetDealDurationLimitsClearLimits() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 90, 365
+        );
+
+        vm.prank(adminAddress);
+        spRegistry.setDealDurationLimits(provider1, 0, 0);
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 0);
+        assertEq(info.maxDealDurationDays, 0);
+    }
+
+    function testSetDealDurationLimitsRevertsMinExceedsMax() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MinDurationExceedsMax.selector, 365, 90));
+        spRegistry.setDealDurationLimits(provider1, 365, 90);
+    }
+
+    function testSetDealDurationLimitsRevertsUnauthorized() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        _setupMinerPrecompileMocks(unauthorizedAddress);
+
+        vm.prank(unauthorizedAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.NotProviderControllerOrAdmin.selector, unauthorizedAddress, provider1)
+        );
+        spRegistry.setDealDurationLimits(provider1, 90, 365);
+    }
+
+    function testSetDealDurationLimitsEmitsEvent() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        vm.prank(adminAddress);
+        vm.expectEmit(true, false, false, true);
+        emit SPRegistry.DealDurationLimitsUpdated(provider1, 90, 365);
+        spRegistry.setDealDurationLimits(provider1, 90, 365);
+    }
+
+    function testSetDealDurationLimitsRevertsBlockedProvider() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.blockProvider(provider1);
+        vm.stopPrank();
+
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
+        spRegistry.setDealDurationLimits(provider1, 90, 365);
+    }
+
+    function testSetDealDurationLimitsRevertsMinExceedsProtocolMax() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
+        vm.prank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+        );
+        spRegistry.setDealDurationLimits(provider1, 1279, 0);
+    }
+
+    function testSetDealDurationLimitsRevertsMaxExceedsProtocolMax() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
+        vm.prank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+        );
+        spRegistry.setDealDurationLimits(provider1, 0, 1279);
+    }
+
+    function testRegisterProviderForRevertsMinExceedsProtocolMax() public {
+        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
+        vm.prank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+        );
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 1279, 0
+        );
+    }
+
+    function testRegisterProviderForRevertsMaxExceedsProtocolMax() public {
+        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
+        vm.prank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+        );
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 1279
+        );
+    }
+
+    function testSetDealDurationLimitsAcceptsProtocolMax() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        vm.prank(adminAddress);
+        spRegistry.setDealDurationLimits(provider1, 1278, 1278);
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 1278);
+        assertEq(info.maxDealDurationDays, 1278);
+    }
+
+    function testRegisterProviderForAcceptsProtocolMax() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 1278, 1278
+        );
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 1278);
+        assertEq(info.maxDealDurationDays, 1278);
+    }
+
+    function testSetDealDurationLimitsRevertsUnregistered() public {
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
+        spRegistry.setDealDurationLimits(provider1, 90, 365);
+    }
+
+    // -----------------------------------------------------------------------
+    // getProviderForDeal duration filter tests
+    // -----------------------------------------------------------------------
+
+    function testGetProviderForDealSkipsBelowMinDuration() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 180, 0);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 90});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), 0);
+    }
+
+    function testGetProviderForDealSkipsAboveMaxDuration() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 0, 180);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 360});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), 0);
+    }
+
+    function testGetProviderForDealMatchesExactMinDuration() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 180, 0);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 180});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+    }
+
+    function testGetProviderForDealMatchesExactMaxDuration() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 0, 360);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 360});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+    }
+
+    function testGetProviderForDealZeroDurationLimitsMatchAll() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 1080});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+    }
+
+    function testGetProviderForDealMinOnlyNoUpperBound() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 90, 0);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 1080});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+    }
+
+    function testGetProviderForDealMaxOnlyNoLowerBound() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 0, 360);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 30});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+    }
+
+    function testGetProviderForDealSelectsProviderWithMatchingDuration() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 360, 0);
+
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider2, 30, 180);
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 90});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider2));
+    }
+
+    function testGetProviderForDealDurationFilterBeforeEarlyBreak() public {
+        vm.startPrank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        spRegistry.setDealDurationLimits(provider1, 360, 0);
+
+        spRegistry.registerProviderFor(
+            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        );
+        vm.stopPrank();
+
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 90});
+
+        vm.prank(poRepMarketAddress);
+        (CommonTypes.FilActorId matched,) = spRegistry.getProviderForDeal(SLITypes.SLIThresholds(0, 0, 0, 0), terms);
+        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider2));
+    }
+
+    // -----------------------------------------------------------------------
+    // getProviderInfo duration limits test
+    // -----------------------------------------------------------------------
+
+    function testGetProviderInfoIncludesDurationLimits() public {
+        vm.prank(adminAddress);
+        spRegistry.registerProviderFor(
+            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 60, 720
+        );
+
+        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
+        assertEq(info.minDealDurationDays, 60);
+        assertEq(info.maxDealDurationDays, 720);
     }
 }
