@@ -12,6 +12,7 @@ import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 library MinerUtils {
     /**
      * @notice Error indicating a non-zero exit code from an FVM call
+     * @dev 0x502218a0
      */
     error ExitCodeError();
 

@@ -149,24 +149,118 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     event ClientSmartContractUpdated(address indexed clientSmartContract);
 
+    /**
+     * @notice Error thrown when caller is not the registered validator for the deal
+     * @dev 0x64544c54
+     */
     error NotTheRegisteredValidator(uint256 dealId, address validator);
+
+    /**
+     * @notice Error thrown when caller is not the validator for the deal
+     * @dev 0xbfbc5a6b
+     */
     error NotTheDealValidator(uint256 dealId, address validator);
+
+    /**
+     * @notice Error thrown when caller is not the client smart contract
+     * @dev 0xe3186bfd
+     */
     error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
+
+    /**
+     * @notice Error thrown when caller is not the controlling address for the provider
+     * @dev 0xf91c5b99
+     */
     error NotTheControllingAddress(uint256 dealId, address msgSender, CommonTypes.FilActorId provider);
+
+    /**
+     * @notice Error thrown when a deal is not in the expected state for an action
+     * @dev 0x023e4e7c
+     */
     error DealNotInExpectedState(uint256 dealId, PoRepTypes.DealState currentState, PoRepTypes.DealState expectedState);
+
+    /**
+     * @notice Error thrown when caller is not the validator for the deal or validator is not set
+     * @dev 0xd325131b
+     */
     error CallerIsNotValidator(uint256 dealId, address caller);
+
+    /**
+     * @notice Error thrown when a deal proposal does not exist for a given id
+     * @dev 0xa72c631d
+     */
     error DealDoesNotExist();
+
+    /**
+     * @notice Error thrown when caller is not the client or storage provider for the deal
+     * @dev 0x55a2c6ce
+     */
     error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
+
+    /**
+     * @notice Error thrown when no provider is found for the deal
+     * @dev 0x66dab3aa
+     */
     error NoProviderFoundForDeal();
+
+    /**
+     * @notice Error thrown when trying to set a validator that is already set for the deal
+     * @dev 0xfb35e366
+     */
     error ValidatorAlreadySet(uint256 dealId);
+
+    /**
+     * @notice Error thrown when retrievabilityBps in requirements is greater than 10_000
+     * @dev 0x26f456b9
+     */
     error InvalidRetrievabilityBps(uint16 value);
+
+    /**
+     * @notice Error thrown when indexingPct in requirements is greater than 100
+     * @dev 0xad23dabc
+     */
     error InvalidIndexingPct(uint8 value);
+
+    /**
+     * @notice Error thrown when rail id is invalid
+     * @dev 0x9b721aad
+     */
     error InvalidRailId();
+
+    /**
+     * @notice Error thrown when trying to set a rail id that is already set for the deal
+     * @dev 0x23c224b6
+     */
     error RailIdAlreadySet();
+
+    /**
+     * @notice Error thrown when trying to update manifest location by an unauthorised caller
+     * @dev 0x6138b40f
+     */
     error UnauthorisedCaller(uint256 dealId, address caller, address expectedCaller);
+
+    /**
+     * @notice Error thrown when empty manifest location is provided
+     * @dev 0x323de5da
+     */
     error EmptyManifestLocation();
+
+    /**
+     * @notice Error thrown when manifest location is too long
+     * @dev 0xa76fb58b
+     */
     error TooLongManifestLocation();
+
+    /**
+     * @notice Error thrown when trying to set an invalid client smart contract address
+     * @dev 0x39ee49ba
+     */
     error InvalidClientSmartContractAddress();
+
+    /**
+     * @notice Error thrown when deal duration in terms is invalid
+     * @dev 0xab1a0367
+     */
     error InvalidDealDuration();
 
     /**

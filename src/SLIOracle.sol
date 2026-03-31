@@ -16,15 +16,26 @@ import {SLITypes} from "./types/SLITypes.sol";
 contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSUpgradeable, MulticallUpgradeable {
     /**
      * @notice Thrown when an invalid oracle address is provided
+     * @dev 0x9589a27d
      */
     error InvalidOracle();
 
     /**
      * @notice Thrown when an invalid admin address is provided
+     * @dev 0xb5eba9f0
      */
     error InvalidAdmin();
 
+    /**
+     * @notice Error thrown when retrievabilityBps in requirements is greater than 10_000
+     * @dev 0x26f456b9
+     */
     error InvalidRetrievabilityBps(uint16 value);
+
+    /**
+     * @notice Error thrown when indexingPct in requirements is greater than 100
+     * @dev 0xad23dabc
+     */
     error InvalidIndexingPct(uint8 value);
 
     /**

@@ -185,25 +185,118 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event PayeeUpdated(CommonTypes.FilActorId indexed provider, address indexed oldPayee, address indexed newPayee);
 
+    /**
+     * @notice Error indicating that a provider is already registered
+     * @dev 0xf91794e7
+     */
     error ProviderAlreadyRegistered(CommonTypes.FilActorId provider);
+
+    /**
+     * @notice Error indicating that a provider is not registered
+     * @dev 0x2b87b09e
+     */
     error ProviderNotRegistered(CommonTypes.FilActorId provider);
+
+    /**
+     * @notice Error indicating that a provider is blocked
+     * @dev 0x5c675853
+     */
     error ProviderIsBlocked(CommonTypes.FilActorId provider);
+
+    /**
+     * @notice Error indicating that bps is above the maximum allowed value
+     * @dev 0xb25e9f7b
+     */
     error ToleranceBpsTooHigh(uint256 bps, uint256 maxBps);
+
+    /**
+     * @notice Error indicating that the caller is not authorized to manage the provider
+     * @dev 0xf3da36ec
+     */
     error NotProviderControllerOrAdmin(address caller, CommonTypes.FilActorId provider);
+
+    /**
+     * @notice Error indicating that the caller is not an admin or operator
+     * @dev 0xe525bbbc
+     */
     error NotAdminOrOperator(address caller);
+
+    /**
+     * @notice Error indicating that the retrievabilityBps value is above the maximum allowed value
+     * @dev 0x26f456b9
+     */
     error InvalidRetrievabilityBps(uint16 value);
+
+    /**
+     * @notice Error indicating that the indexingPct value is above the maximum allowed value
+     * @dev 0xad23dabc
+     */
     error InvalidIndexingPct(uint8 value);
+
+    /**
+     * @notice Error indicating that the admin address provided is invalid
+     * @dev 0x05bb467c
+     */
     error InvalidAdminAddress();
+
+    /**
+     * @notice Error indicating that the PoRepMarket address provided is invalid
+     * @dev 0xc9cc4a06
+     */
     error InvalidPoRepMarketAddress();
+
+    /**
+     * @notice Error indicating that the provider actor ID is invalid
+     * @dev 0x7599e239
+     */
     error InvalidProviderActorId();
+
+    /**
+     * @notice Error indicating that the organization address provided is invalid
+     * @dev 0x98fd3e14
+     */
     error InvalidOrganizationAddress();
+
+    /**
+     * @notice Error indicating that the payee address provided is invalid
+     * @dev 0xf25dd3b6
+     */
     error InvalidPayeeAddress();
+
+    /**
+     * @notice Error indicating that the maximum number of providers has been reached
+     * @dev 0xce14fdbb
+     */
     error MaxProvidersReached(uint256 maxProviders);
-    error NotImplemented();
+
+    /**
+     * @notice Error indicating that size bytes being released exceeds the committed bytes for the provider
+     * @dev 0x014d0038
+     */
     error ReleaseExceedsCommitted(CommonTypes.FilActorId provider, uint256 sizeBytes, uint256 committedBytes);
+
+    /**
+     * @notice Error indicating that the new committed size exceeds the provider's available bytes
+     * @dev 0x2578fa12
+     */
     error CommitExceedsAvailable(CommonTypes.FilActorId provider, uint256 newCommitted, uint256 availableBytes);
+
+    /**
+     * @notice Error indicating that the actual size of a deal exceeds the maximum allowed size based on tolerance
+     * @dev 0xc7fee2cc
+     */
     error ActualSizeExceedsTolerance(CommonTypes.FilActorId provider, uint256 actualSize, uint256 maxAllowed);
+
+    /**
+     * @notice Error indicating that the size bytes being released exceeds the pending bytes for the provider
+     * @dev 0xe8ac622c
+     */
     error ReleasePendingExceedsPending(CommonTypes.FilActorId provider, uint256 sizeBytes, uint256 pendingBytes);
+
+    /**
+     * @notice Error indicating that the available bytes for a provider is below the sum of committed and pending bytes
+     * @dev 0x708e0591
+     */
     error AvailableBelowCommittedPlusPending(
         CommonTypes.FilActorId provider, uint256 availableBytes, uint256 committedBytes, uint256 pendingBytes
     );
