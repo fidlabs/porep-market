@@ -10,6 +10,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SLITypes} from "./types/SLITypes.sol";
+import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {MinerUtils} from "./lib/MinerUtils.sol";
 
 /**
@@ -45,6 +46,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     uint256 public constant MAX_PROVIDERS = 500;
 
+    /**
+     * @notice Maximum deal duration in days, sourced from PoRepTypes.MAX_DEAL_DURATION_DAYS.
+     * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
+     */
+    uint32 public constant MAX_DEAL_DURATION_DAYS = PoRepTypes.MAX_DEAL_DURATION_DAYS;
+
+    // solhint-disable-next-line gas-struct-packing
     struct ProviderData {
         address organization;
         address payee;
@@ -55,6 +63,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 committedBytes;
         uint256 pendingBytes;
         uint256 pricePerSectorPerMonth;
+        uint32 minDealDurationDays;
+        uint32 maxDealDurationDays;
     }
 
     /// @custom:storage-location erc7201:porepmarket.storage.SPRegistryStorage
@@ -186,6 +196,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     event PayeeUpdated(CommonTypes.FilActorId indexed provider, address indexed oldPayee, address indexed newPayee);
 
     /**
+     * @notice DealDurationLimitsUpdated event
+     * @dev DealDurationLimitsUpdated event is emitted when a provider's deal duration limits change
+     * @param provider The provider actor ID
+     * @param minDealDurationDays The minimum deal duration in days (0 = no minimum)
+     * @param maxDealDurationDays The maximum deal duration in days (0 = no maximum)
+     */
+    event DealDurationLimitsUpdated(
+        CommonTypes.FilActorId indexed provider, uint32 minDealDurationDays, uint32 maxDealDurationDays
+    );
+
+    /**
      * @notice Error indicating that a provider is already registered
      * @dev 0xf91794e7
      */
@@ -300,6 +321,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error AvailableBelowCommittedPlusPending(
         CommonTypes.FilActorId provider, uint256 availableBytes, uint256 committedBytes, uint256 pendingBytes
     );
+    error MinDurationExceedsMax(uint32 minDays, uint32 maxDays);
+    error DurationExceedsProtocolMax(uint32 durationDays, uint32 maxDays);
 
     /**
      * @notice Constructor
@@ -459,7 +482,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             availableBytes: p.availableBytes,
             committedBytes: p.committedBytes,
             pendingBytes: p.pendingBytes,
-            pricePerSectorPerMonth: p.pricePerSectorPerMonth
+            pricePerSectorPerMonth: p.pricePerSectorPerMonth,
+            minDealDurationDays: p.minDealDurationDays,
+            maxDealDurationDays: p.maxDealDurationDays
         });
     }
 
@@ -510,6 +535,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             }
 
             if (!_meetsRequirements(p.capabilities, requirements)) continue;
+
+            if (p.minDealDurationDays != 0 && terms.durationDays < p.minDealDurationDays) continue;
+            if (p.maxDealDurationDays != 0 && terms.durationDays > p.maxDealDurationDays) continue;
 
             if (p.pendingBytes < lowestPending) {
                 lowestPending = p.pendingBytes;
@@ -619,6 +647,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param availableBytes The provider's available storage capacity
      * @param pricePerSectorPerMonth The provider's auto-approve price per sector per month (0 to skip)
      * @param payee The payment recipient address (address(0) defaults to organization)
+     * @param minDealDurationDays Minimum deal duration in days (0 = no minimum)
+     * @param maxDealDurationDays Maximum deal duration in days (0 = no maximum)
      */
     function registerProviderFor(
         CommonTypes.FilActorId provider,
@@ -626,12 +656,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SLITypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
         uint256 pricePerSectorPerMonth,
-        address payee
+        address payee,
+        uint32 minDealDurationDays,
+        uint32 maxDealDurationDays
     ) external {
         _onlyAdminOrOperator();
         if (organization == address(0)) revert InvalidOrganizationAddress();
         if (capabilities.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(capabilities.retrievabilityBps);
         if (capabilities.indexingPct > 100) revert InvalidIndexingPct(capabilities.indexingPct);
+        _ensureDurationLimitsValid(minDealDurationDays, maxDealDurationDays);
 
         _registerProvider(provider, organization, payee);
 
@@ -640,10 +673,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         $._providers[id].capabilities = capabilities;
         $._providers[id].availableBytes = availableBytes;
         $._providers[id].pricePerSectorPerMonth = pricePerSectorPerMonth;
+        $._providers[id].minDealDurationDays = minDealDurationDays;
+        $._providers[id].maxDealDurationDays = maxDealDurationDays;
 
         emit CapabilitiesUpdated(provider, capabilities);
         emit AvailableSpaceUpdated(provider, availableBytes);
         emit PriceUpdated(provider, 0, pricePerSectorPerMonth);
+        emit DealDurationLimitsUpdated(provider, minDealDurationDays, maxDealDurationDays);
     }
 
     /// @inheritdoc ISPRegistry
@@ -665,6 +701,25 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         $._providers[id].payee = payee;
 
         emit PayeeUpdated(provider, oldPayee, payee);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function setDealDurationLimits(
+        CommonTypes.FilActorId provider,
+        uint32 minDealDurationDays,
+        uint32 maxDealDurationDays
+    ) external {
+        _ensureProviderRegistered(provider);
+        _ensureProviderNotBlocked(provider);
+        _onlyProviderControllerOrAdmin(provider);
+        _ensureDurationLimitsValid(minDealDurationDays, maxDealDurationDays);
+
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        $._providers[id].minDealDurationDays = minDealDurationDays;
+        $._providers[id].maxDealDurationDays = maxDealDurationDays;
+
+        emit DealDurationLimitsUpdated(provider, minDealDurationDays, maxDealDurationDays);
     }
 
     /// @inheritdoc ISPRegistry
@@ -726,6 +781,23 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         if (!$._providerIds.contains(uint256(CommonTypes.FilActorId.unwrap(provider)))) {
             revert ProviderNotRegistered(provider);
+        }
+    }
+
+    /**
+     * @notice Ensures deal duration limits are within the protocol maximum and internally consistent
+     * @param minDealDurationDays The minimum deal duration to validate
+     * @param maxDealDurationDays The maximum deal duration to validate
+     */
+    function _ensureDurationLimitsValid(uint32 minDealDurationDays, uint32 maxDealDurationDays) internal pure {
+        if (minDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(minDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (maxDealDurationDays != 0 && maxDealDurationDays > MAX_DEAL_DURATION_DAYS) {
+            revert DurationExceedsProtocolMax(maxDealDurationDays, MAX_DEAL_DURATION_DAYS);
+        }
+        if (minDealDurationDays != 0 && maxDealDurationDays != 0 && minDealDurationDays > maxDealDurationDays) {
+            revert MinDurationExceedsMax(minDealDurationDays, maxDealDurationDays);
         }
     }
 

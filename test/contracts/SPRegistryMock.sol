@@ -91,6 +91,8 @@ contract SPRegistryMock is ISPRegistry {
         _payees[CommonTypes.FilActorId.unwrap(provider)] = payee;
     }
 
+    function setDealDurationLimits(CommonTypes.FilActorId, uint32, uint32) external {}
+
     function getPayee(CommonTypes.FilActorId provider) external view returns (address) {
         return _payees[CommonTypes.FilActorId.unwrap(provider)];
     }
