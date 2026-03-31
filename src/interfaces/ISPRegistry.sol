@@ -57,7 +57,7 @@ interface ISPRegistry {
 
     /**
      * @notice Find a provider matching requirements and reserve pending capacity
-     * @dev Selects the least-committed eligible provider. Reserves `pendingBytes` atomically
+     * @dev Selects the least-pending eligible provider. Reserves `pendingBytes` atomically
      *      so capacity is held between matching and commitment.
      *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
