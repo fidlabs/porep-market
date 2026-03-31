@@ -29,6 +29,8 @@ contract PoRepMarketTest is Test {
     uint256 public dealId;
     uint256 public totalDealSize;
 
+    uint256 public constant EPOCHS_IN_MONTH = 86_400;
+
     CommonTypes.FilActorId public providerFilActorId;
 
     SLITypes.SLIThresholds internal defaultRequirements =
@@ -791,7 +793,7 @@ contract PoRepMarketTest is Test {
 
     function testProposeDealRevertsWhenPricePerSectorPerMonthIsZero() public {
         SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: 0});
+            SLITypes.DealTerms({durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: EPOCHS_IN_MONTH - 1});
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealPricePerSectorPerMonth.selector));

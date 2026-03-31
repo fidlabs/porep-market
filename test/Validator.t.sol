@@ -795,9 +795,8 @@ contract ValidatorTest is Test {
         public
     {
         sectorCount = bound(sectorCount, 1, 1_000);
-        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, 1, 1_000_000);
-
-        vm.assume(uint256(sectorCount) * pricePerSectorPerMonth < EPOCHS_IN_MONTH);
+        uint256 maxPricePerSectorPerMonth = (EPOCHS_IN_MONTH - 1) / sectorCount;
+        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, 1, maxPricePerSectorPerMonth);
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](sectorCount);
         for (uint256 i = 0; i < sectorCount; ++i) {
@@ -823,9 +822,8 @@ contract ValidatorTest is Test {
         uint256 pricePerSectorPerMonth
     ) public {
         sectorCount = bound(sectorCount, 1, 1_000);
-        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, 1, 1_000_000);
-
-        vm.assume(uint256(sectorCount) * pricePerSectorPerMonth >= EPOCHS_IN_MONTH);
+        uint256 minPricePerSectorPerMonth = (EPOCHS_IN_MONTH + sectorCount - 1) / sectorCount;
+        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, minPricePerSectorPerMonth, 1_000_000);
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](sectorCount);
         for (uint256 i = 0; i < sectorCount; ++i) {
