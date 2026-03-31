@@ -1,50 +1,40 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+
 /**
  * @title Interface for Validator
- * @notice Defines the interface for payment validation in Filecoin Pay rails
+ * @notice Defines the interface for the part of the Validator contract that is exposed to the Operator
+ *  allowing the Operator to disable future payments for a rail and set deal end epochs, as well as configure and retrieve the minimum time between settlements in epochs.
  */
 interface IValidator {
     /**
-     * @notice Result structure for validation during rail settlement
-     * @param modifiedAmount The actual payment amount determined by the validator after validation of a rail during settlement
-     * @param settleUpto The epoch up to and including which settlement should occur
-     * @param note A placeholder note for any additional information the validator wants to send to the caller of `settleRail`
+     * @notice Disables future payments for a payment rail by terminating the rail
+     * @dev Only callable by POREP_SERVICE bot
+     * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
+     * @param railId The ID of the rail to terminate
      */
-    struct ValidationResult {
-        // The actual payment amount determined by the validator after validation of a rail during settlement
-        uint256 modifiedAmount;
-        // The epoch up to and including which settlement should occur.
-        uint256 settleUpto;
-        // A placeholder note for any additional information the validator wants to send to the caller of `settleRail`
-        string note;
-    }
+    function disableFutureRailPayments(uint256 railId) external;
 
     /**
-     * @notice Validates a proposed payment amount for a payment rail
-     * @param railId ID of the payment rail
-     * @param proposedAmount Proposed payment amount to validate
-     * @param fromEpoch The epoch up to and including which the rail has already been settled
-     * @param toEpoch The epoch up to and including which validation is requested; payment will be validated for (toEpoch - fromEpoch) epochs
-     * @param rate Rate used for payment calculation
-     * @return result ValidationResult struct containing validation outcome
+     * @notice Sets the end epoch for the deal associated with this validator
+     * @dev Only callable by POREP_SERVICE bot
+     * @param dealId The ID of the deal
+     * @param endEpoch The Filecoin epoch at which the deal ended
      */
-    function validatePayment(
-        uint256 railId,
-        uint256 proposedAmount,
-        // the epoch up to and including which the rail has already been settled
-        uint256 fromEpoch,
-        // the epoch up to and including which validation is requested; payment will be validated for (toEpoch - fromEpoch) epochs
-        uint256 toEpoch,
-        uint256 rate
-    ) external returns (ValidationResult memory result);
+    function setDealEndEpoch(uint256 dealId, CommonTypes.ChainEpoch endEpoch) external;
 
     /**
-     * @notice Invoked when a payment rail is terminated
-     * @param railId The ID of the terminated rail
-     * @param terminator Address that initiated the termination
-     * @param endEpoch Filecoin epoch at which the rail was terminated
+     * @notice Sets the minimum time between settlements in epochs
+     * @dev Only callable by the admin
+     * @param minEpochs Minimum time between settlements in epochs
      */
-    function railTerminated(uint256 railId, address terminator, uint256 endEpoch) external;
+    function setMinEpochsBetweenSettlements(uint256 minEpochs) external;
+
+    /**
+     * @notice Retrieves the minimum time between settlements in epochs
+     * @return minTimeBetweenSettlementsInEpochs Minimum time between settlements in epochs
+     */
+    function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs);
 }

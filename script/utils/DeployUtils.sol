@@ -51,6 +51,7 @@ contract DeployUtils is Script {
     }
 
     function readLatestDeploymentArtifact() internal view returns (string memory json) {
+        // forge-lint: disable-next-line(unsafe-cheatcode)
         json = vm.readFile(string.concat("./deployments/", network(), "/latest.json"));
     }
 

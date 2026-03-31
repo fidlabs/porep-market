@@ -9,14 +9,15 @@ import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol"
 import {Validator} from "./Validator.sol";
 import {Create2} from "@openzeppelin/contracts/utils/Create2.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts/proxy/utils/UUPSUpgradeable.sol";
-import {PoRepMarket} from "./PoRepMarket.sol";
+import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 
 /**
  * @title ValidatorFactory
  * @notice Beacon factory contract for creating Validator instances
  */
-contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
+contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUpgradeable {
     /**
      * @notice Upgradable role which allows for contract upgrades
      */
@@ -159,7 +160,7 @@ contract ValidatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         ValidatorFactoryStorage storage $ = s();
         if ($._instances[dealId] != address(0)) revert InstanceAlreadyExists();
 
-        PoRepTypes.DealProposal memory dp = PoRepMarket($._poRepMarket).getDealProposal(dealId);
+        PoRepTypes.DealProposal memory dp = IPoRepMarket($._poRepMarket).getDealProposal(dealId);
         if (msg.sender != dp.client) revert InvalidClientAddress();
 
         bytes memory initCode = abi.encodePacked(

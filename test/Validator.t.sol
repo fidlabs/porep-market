@@ -6,7 +6,7 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
-import {IValidator} from "../src/interfaces/IValidator.sol";
+import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
@@ -181,7 +181,7 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentTooEarlyForNextPayout() public {
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 0, 1);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 0, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 0);
@@ -190,7 +190,8 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentDatacapMismatch() public {
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(1, 100, 0, type(uint256).max, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
@@ -207,7 +208,8 @@ contract ValidatorTest is Test {
         );
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, type(uint256).max, 1);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(1, 100, 0, type(uint256).max, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
@@ -221,7 +223,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 86_400, 1);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 86_400, 1);
 
         assertEq(result.modifiedAmount, 100);
         assertEq(result.settleUpto, 86_400);
@@ -464,7 +466,7 @@ contract ValidatorTest is Test {
         clientSCMock.setDataSizeMatching(dealId, true);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 10);
@@ -481,7 +483,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
 
         assertEq(result.modifiedAmount, 10 * 1000);
         assertEq(result.settleUpto, 1000);
@@ -699,7 +701,8 @@ contract ValidatorTest is Test {
         validator.disableFutureRailPayments(railId);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result = validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
 
         assertEq(result.modifiedAmount, 10);
         assertEq(result.settleUpto, 1);
@@ -721,7 +724,7 @@ contract ValidatorTest is Test {
         validator.disableFutureRailPayments(railId);
 
         vm.prank(address(filecoinPayMock));
-        IValidator.ValidationResult memory result =
+        IFilecoinPayValidator.ValidationResult memory result =
             validator.validatePayment(railId, 50000000, 0, chainEpochConversion, 10);
 
         assertEq(result.modifiedAmount, 10 * earlyTerminationEpoch);

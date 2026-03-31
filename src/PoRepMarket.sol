@@ -7,7 +7,8 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
-import {ValidatorFactory} from "./ValidatorFactory.sol";
+import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
+import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -18,7 +19,7 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
  * @dev PoRepMarket contract is a contract that allows users to create and manage deal proposals for PoRep deals
  * @notice PoRepMarket contract
  */
-contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     using EnumerableSet for EnumerableSet.UintSet;
     /**
      * @notice role to manage contract upgrades
@@ -39,7 +40,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         mapping(uint256 dealId => PoRepTypes.DealProposal) _dealProposals;
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
-        ValidatorFactory _validatorFactoryContract;
+        IValidatorFactory _validatorFactoryContract;
         address _clientSmartContract;
         uint256 _dealIdCounter;
     }
@@ -187,7 +188,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _grantRole(UPGRADER_ROLE, _admin);
 
         DealProposalsStorage storage $ = s();
-        $._validatorFactoryContract = ValidatorFactory(_validatorFactory);
+        $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
     }
 
@@ -248,7 +249,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @notice Updates the validator and rail id for a deal proposal
+     * @notice Updates the validator for a deal proposal
      * @param dealId The id of the deal proposal
      */
     function updateValidator(uint256 dealId) external {
