@@ -222,7 +222,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error NotAdminOrOperator(address caller);
 
     /**
-     * @notice Error indicating that the retraievabilityBps value is above the maximum allowed value
+     * @notice Error indicating that the retrievabilityBps value is above the maximum allowed value
      * @dev 0x26f456b9
      */
     error InvalidRetrievabilityBps(uint16 value);
@@ -276,7 +276,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error ReleaseExceedsCommitted(CommonTypes.FilActorId provider, uint256 sizeBytes, uint256 committedBytes);
 
     /**
-     * @notice Error indicating that size bytes being released exceeds the pending bytes for the provider
+     * @notice Error indicating that the new committed size exceeds the provider's available bytes
      * @dev 0x2578fa12
      */
     error CommitExceedsAvailable(CommonTypes.FilActorId provider, uint256 newCommitted, uint256 availableBytes);
