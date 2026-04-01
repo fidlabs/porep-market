@@ -10,6 +10,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
+import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
@@ -727,5 +728,44 @@ contract PoRepMarketTest is Test {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
         vm.prank(caller);
         poRepMarket.terminateDeal(dealId, vm.addr(0x4), 4);
+    }
+
+    function testGetDealsForOrganizationByStateZeroAddressOfOrganizationReverts() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidOrganizationAddress.selector, address(0)));
+        poRepMarket.getDealsForOrganizationByState(address(0), PoRepTypes.DealState.Proposed);
+    }
+
+    function testGetDealsForOrganizationByStateProposed() public {
+        address organization1 = vm.addr(0x111);
+        address organization2 = vm.addr(0x222);
+
+        spRegistry.setProviderInfo(
+            providerFilActorId,
+            ISPRegistry.ProviderInfo({
+                organization: organization1,
+                payee: address(0),
+                paused: false,
+                blocked: false,
+                capabilities: defaultRequirements,
+                availableBytes: 0,
+                committedBytes: 0,
+                pendingBytes: 0,
+                pricePerSectorPerMonth: 0,
+                minDealDurationDays: 0,
+                maxDealDurationDays: 0
+            })
+        );
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        PoRepTypes.DealProposal[] memory dealsOrg1 =
+            poRepMarket.getDealsForOrganizationByState(organization1, PoRepTypes.DealState.Proposed);
+        assertEq(dealsOrg1.length, 1);
+        assertEq(dealsOrg1[0].dealId, dealId);
+
+        PoRepTypes.DealProposal[] memory dealsOrg2 =
+            poRepMarket.getDealsForOrganizationByState(organization2, PoRepTypes.DealState.Proposed);
+        assertEq(dealsOrg2.length, 0);
     }
 }

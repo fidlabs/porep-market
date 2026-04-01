@@ -240,6 +240,11 @@
         "name": "",
         "type": "bool",
         "internalType": "bool"
+      },
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "nonpayable"

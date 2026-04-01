@@ -35,6 +35,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
     struct DealProposalsStorage {
         mapping(uint256 dealId => PoRepTypes.DealProposal) _dealProposals;
+        mapping(uint256 dealId => address organization) _dealOrganization;
+        mapping(PoRepTypes.DealState state => mapping(address organization => EnumerableSet.UintSet dealIds))
+            _dealIdsByStateByOrganization;
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
@@ -261,6 +264,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidDealDuration();
 
     /**
+     * @notice Error thrown when organization address provided is invalid
+     * @dev 0x98fd3e14
+     */
+    error InvalidOrganizationAddress();
+
+    /**
      * @notice Constructor
      */
     constructor() {
@@ -312,7 +321,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
         DealProposalsStorage storage $ = s();
 
-        (CommonTypes.FilActorId provider, bool autoApprove) =
+        (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
             $._SPRegistryContract.getProviderForDeal(requirements, terms);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
@@ -334,6 +343,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         });
 
         emit DealProposalCreated(dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes);
+
+        $._dealOrganization[dealId] = organization;
+        $._dealIdsByStateByOrganization[initialState][organization].add(dealId);
+
         if (autoApprove) {
             emit DealAccepted(dealId, msg.sender, provider);
         }
@@ -416,7 +429,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
         }
 
-        dp.state = PoRepTypes.DealState.Accepted;
+        _changeDealState(dealId, PoRepTypes.DealState.Accepted);
         emit DealAccepted(dealId, msg.sender, dp.provider);
     }
 
@@ -434,10 +447,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
         if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
 
-        dp.state = PoRepTypes.DealState.Completed;
         $._dealIdsReadyForPayment.add(dealId);
         $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, actualSizeBytes);
 
+        _changeDealState(dealId, PoRepTypes.DealState.Completed);
         emit DealCompleted(dealId, msg.sender, actualSizeBytes, dp.provider);
     }
 
@@ -462,7 +475,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes);
         $._dealIdsReadyForPayment.remove(dealId);
 
-        dp.state = PoRepTypes.DealState.Terminated;
+        _changeDealState(dealId, PoRepTypes.DealState.Terminated);
         emit DealTerminated(dealId, terminator, endEpoch);
     }
 
@@ -481,8 +494,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert NotTheClientOrStorageProvider(dealId, msg.sender);
         }
 
-        dp.state = PoRepTypes.DealState.Rejected;
         $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        _changeDealState(dealId, PoRepTypes.DealState.Rejected);
         emit DealRejected(dealId, msg.sender);
     }
 
@@ -507,6 +520,32 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
             mstore(completedDeals, dealCounter)
+        }
+    }
+
+    /**
+     * @notice Gets deals for a specific organization by state
+     * @param organization The address of the organization
+     * @param state The state of the deals to retrieve
+     * @return deals Array of deal proposals for the organization in the specified state (from all providers associated with the organization)
+     */
+    function getDealsForOrganizationByState(address organization, PoRepTypes.DealState state)
+        external
+        view
+        returns (PoRepTypes.DealProposal[] memory deals)
+    {
+        if (organization == address(0)) {
+            revert InvalidOrganizationAddress();
+        }
+
+        DealProposalsStorage storage $ = s();
+        EnumerableSet.UintSet storage ids = $._dealIdsByStateByOrganization[state][organization];
+
+        uint256 lengthOfDeals = ids.length();
+        deals = new PoRepTypes.DealProposal[](lengthOfDeals);
+
+        for (uint256 i = 0; i < lengthOfDeals; i++) {
+            deals[i] = $._dealProposals[ids.at(i)];
         }
     }
 
@@ -546,6 +585,21 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         string memory oldManifestLocation = dealProposal.manifestLocation;
         dealProposal.manifestLocation = newManifestLocation;
         emit ManifestLocationUpdated(dealId, oldManifestLocation, newManifestLocation);
+    }
+
+    /**
+     * @notice Changes the state of a deal
+     * @param dealId The id of the deal
+     * @param toState The new state of the deal
+     */
+    function _changeDealState(uint256 dealId, PoRepTypes.DealState toState) internal {
+        DealProposalsStorage storage $ = s();
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        address organization = $._dealOrganization[dealId];
+
+        $._dealIdsByStateByOrganization[dp.state][organization].remove(dealId);
+        $._dealIdsByStateByOrganization[toState][organization].add(dealId);
+        dp.state = toState;
     }
 
     /**
