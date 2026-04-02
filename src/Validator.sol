@@ -472,11 +472,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @dev Only callable by the admin
      * @param newLockupPeriod New lockup period to set
      */
-    function updateLockupPeriod(uint256 newLockupPeriod)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    function updateLockupPeriod(uint256 newLockupPeriod) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), $.railId, newLockupPeriod, 0);
         emit LockupPeriodUpdated($.railId, newLockupPeriod);
