@@ -13,17 +13,15 @@ interface IValidator {
      * @notice Disables future payments for a payment rail by terminating the rail
      * @dev Only callable by POREP_SERVICE bot
      * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
-     * @param railId The ID of the rail to terminate
      */
-    function disableFutureRailPayments(uint256 railId) external;
+    function disableFutureRailPayments() external;
 
     /**
      * @notice Sets the end epoch for the deal associated with this validator
      * @dev Only callable by POREP_SERVICE bot
-     * @param dealId The ID of the deal
      * @param endEpoch The Filecoin epoch at which the deal ended
      */
-    function setDealEndEpoch(uint256 dealId, CommonTypes.ChainEpoch endEpoch) external;
+    function setDealEndEpoch(CommonTypes.ChainEpoch endEpoch) external;
 
     /**
      * @notice Sets the minimum time between settlements in epochs
