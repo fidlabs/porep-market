@@ -71,10 +71,10 @@ sequenceDiagram
   actor Client
   actor SP
   actor Gov
-  actor SettlementBot
+  actor PoRepMarketBot
   participant SPRegistry
-  participant SLIOracle@{ "type" : "collections" }
-  participant SLIScorer@{ "type" : "collections" }
+  participant OracleSLI@{ "type" : "collections" }
+  participant SLIScorer
   participant PoRepMarket
   participant ClientSC as Client Smart Contract
   participant ValidatorFactory
@@ -83,15 +83,17 @@ sequenceDiagram
   participant DataCap
   participant Verifreg
   participant Miner
+  participant Blockchain
+  
 
-  note over Gov, ClientSC: Tx 1: Assign Allowance
+note over Gov,ClientSC: Tx 1: Assign Allowance
     Gov->>ClientSC: Assign allowance to contract
 
-  note over SP,SPRegistry: Tx 2: Register SP
+note over SP,SPRegistry: Tx 2: Register SP
     SP->>SPRegistry: Register as SP
 
-  note over Client, PoRepMarket: Tx 3: Propose a Deal
-    Client->>PoRepMarket: Propose deal with expected deal size, price and SLI requirements
+note over Client, PoRepMarket: Tx 3: Propose a Deal
+    Client->>PoRepMarket: Propose deal with terms 
     activate PoRepMarket
     PoRepMarket->>SPRegistry: Ask for SP
     activate SPRegistry
@@ -102,26 +104,31 @@ sequenceDiagram
     PoRepMarket->>PoRepMarket: Create deal proposal
     deactivate PoRepMarket
 
-  note over SP, PoRepMarket: Tx 4: Accept deal
+note over SP, PoRepMarket: Tx 4: Accept deal
     SP->>PoRepMarket: Accept proposed deal
 
-  note over Client, FilecoinPay: Tx 5: Register Validator And Initialize FilecoinPay
-    Client->>ValidatorFactory: Trigger creation of Validator contract for dealID
+note over Client, FilecoinPay: Tx 5: Register Validator
+    Client->>ValidatorFactory: Trigger creation of Validator contract for a specific deal
     activate ValidatorFactory
-    ValidatorFactory->>Validator: Deploy new Validator (beacon proxy)
+    ValidatorFactory->>Validator: Deploy new Validator
     deactivate ValidatorFactory
     activate Validator
-    Validator->>Validator: Initialize with deal parameters
-    Validator->>FilecoinPay: Deposit with permit and approve operator
-    Validator->>FilecoinPay: Rail Creation with Validator address
-    Validator->>PoRepMarket: Update deal
+    Validator->>Validator: Initialize required data
+    Validator->>PoRepMarket: Update deal validator address 
     deactivate Validator
 
-  note over Client, SP: Data preparation
-    Client->>SP: Transfer data
-    SP-->>Client: Send data manifest with piece CID
+note over Client, FilecoinPay: Tx 6: Deposit and Operator Approval (Single transaction)
+    Client->> FilecoinPay: Deposit with permit and approve operator(validator address)
 
-  note over Client,DataCap: Tx 6: Make DDO Allocation
+note over Client, FilecoinPay: Tx 7: Rail Creation
+    Client->> Validator: Trigger rail creation
+    activate Validator
+    Validator->> FilecoinPay: Rail creation
+    FilecoinPay-->>Validator: Raild ID
+    Validator ->> PoRepMarket: Update Rail ID 
+    deactivate Validator 
+
+note over Client,DataCap: Tx 8: Make DDO Allocation
     Client->>ClientSC: Make DDO Allocation with dealID and information if completed
     activate ClientSC
     ClientSC->>DataCap: Make DDO Allocation
@@ -132,45 +139,75 @@ sequenceDiagram
     deactivate Verifreg
     DataCap-->>ClientSC: Return Allocation IDs
     ClientSC->>ClientSC: Store client's AllocationIDs
-    ClientSC->>ClientSC: Store max term of allocation with the longest duration
-    ClientSC->>PoRepMarket: Update information about deal if completed
-    ClientSC->>PoRepMarket: Get validator address for lockup period update if the new value of max term exceeds the current maximum term
-    ClientSC->> Validator: Trigger update of the lockup period
-    activate Validator
-    Validator->>FilecoinPay: Update the lockup period
+    ClientSC->>ClientSC: Store max term of alloation with the longest duration
+    ClientSC->>PoRepMarket: Update information about deal if completed 
+    activate PoRepMarket
+    PoRepMarket->> SPRegistry: Commit capacity
+    deactivate PoRepMarket
     deactivate ClientSC
-    deactivate Validator
 
-  note over SP,DataCap: Tx 7: Start mining
-  SP->>Miner: Claim DC allocations
+  
+note over SP,DataCap: Tx 9: Start mining
+  SP->>Miner: Claim DC allocations 
 
-  loop
-  note over Client, FilecoinPay: Tx 8: Calculate withdrawal
-    SettlementBot->>FilecoinPay: Trigger settle rail
+note over PoRepMarketBot, Blockchain: Listen to Claim Event
+loop
+    PoRepMarketBot->>Blockchain: Listen to Claim Event
+    Blockchain-->>PoRepMarketBot: Claim Event detected
+end
+
+note over PoRepMarketBot, FilecoinPay: Tx 10: Modify Rail Payment
+PoRepMarketBot->>Validator: Trigger Modify Rail Payment
+activate Validator
+Validator->>FilecoinPay: Modify Rail Payment
+deactivate Validator
+
+note over PoRepMarketBot, Validator: Tx 11: Set Deal End Epoch
+PoRepMarketBot->>Validator: Trigger Setting Deal End Epoch
+activate Validator
+Validator->>Blockchain: Set Deal End Epoch
+deactivate Validator
+
+loop
+note over Client, FilecoinPay: Tx 12: Calculate withdrawal
+    PoRepMarketBot->>FilecoinPay: Trigger settle rail  
     FilecoinPay->>Validator: Validate payment
     activate Validator
-    Validator->>Validator: Check if minimum time has passed since the last payout
+    Validator->>Validator: Check if one month has passed since the last payout
     Validator->>SLIScorer: Get score
     activate SLIScorer
-    SLIScorer->>SLIOracle: Get attestations
+    SLIScorer->>OracleSLI: Get attestations
     SLIScorer-->>Validator: Return score
     deactivate SLIScorer
-    Validator ->>PoRepMarket: Get DealID
-    Validator->>ClientSC: Get info about total size of all deals
+    Validator->>ClientSC: Get info about actual size of the deal
     activate ClientSC
     ClientSC->>ClientSC: Check terminated sectors
     ClientSC-->>Validator: Return the actual total size of all deals
-    deactivate ClientSC
+    deactivate ClientSC 
     Validator->>Validator: Calculate modified amount to withdrawal
     Validator-->>FilecoinPay: Return modified amount to withdrawal
     deactivate Validator
   end
 
-  note over SP, FilecoinPay: Tx 9: Withdraw payments
+note over SP, FilecoinPay: Tx 13: Withdraw payments
   SP->>FilecoinPay: Withdraw funds to recipient
   activate FilecoinPay
   FilecoinPay-->>SP: Transfer funds to recipient
   deactivate FilecoinPay
+
+note over PoRepMarketBot, Validator: Tx 13: Rail termination
+    PoRepMarketBot->>Validator: Trigger rail termination
+    activate Validator
+    Validator->>FilecoinPay: Terminate Rail
+    activate FilecoinPay
+    FilecoinPay->>Validator: Notify about rail termination 
+    deactivate FilecoinPay
+    Validator->>PoRepMarket: Terminate deal
+    activate PoRepMarket
+    PoRepMarket->>SPRegistry: Release SP capacity
+    deactivate PoRepMarket
+    deactivate Validator
+    
 ```
 
 ## Development
