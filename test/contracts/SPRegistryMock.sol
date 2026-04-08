@@ -22,9 +22,11 @@ contract SPRegistryMock is ISPRegistry {
     function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
         external
         view
-        returns (CommonTypes.FilActorId, bool)
+        returns (CommonTypes.FilActorId, bool, address)
     {
-        return (nextProvider, nextAutoApprove);
+        CommonTypes.FilActorId provider = nextProvider;
+        address organization = _providerInfos[CommonTypes.FilActorId.unwrap(provider)].organization;
+        return (nextProvider, nextAutoApprove, organization);
     }
 
     function isAuthorizedForProvider(address owner, CommonTypes.FilActorId provider) external view returns (bool) {

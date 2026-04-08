@@ -96,4 +96,15 @@ interface IPoRepMarket {
      * @param newManifestLocation The new manifest location URL to be updated for the deal proposal
      */
     function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external;
+
+    /**
+     * @notice Gets deals for a specific organization by state
+     * @param organization The address of the organization
+     * @param state The state of the deals to retrieve
+     * @return deals Array of deal proposals for the organization in the specified state (from all providers associated with the organization)
+     */
+    function getDealsForOrganizationByState(address organization, PoRepTypes.DealState state)
+        external
+        view
+        returns (PoRepTypes.DealProposal[] memory deals);
 }

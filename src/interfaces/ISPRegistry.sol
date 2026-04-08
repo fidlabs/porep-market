@@ -67,10 +67,11 @@ interface ISPRegistry {
      * @param terms Commercial terms (size, price, duration)
      * @return provider The matched provider, or FilActorId(0) if none found
      * @return autoApprove True if the provider's price per sector is met by the deal terms
+     * @return organization The address of the matched provider
      */
     function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
-        returns (CommonTypes.FilActorId provider, bool autoApprove);
+        returns (CommonTypes.FilActorId provider, bool autoApprove, address organization);
 
     /**
      * @notice Release committed capacity (called on deal rejection)

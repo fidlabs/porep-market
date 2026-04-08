@@ -509,15 +509,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param terms Commercial terms (size, price, duration)
      * @return provider The matched provider, or FilActorId(0) if none found
      * @return autoApprove True if the provider's price per sector is met by the deal terms
+     * @return organization The address of the matched provider
      */
     function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
         onlyRole(MARKET_ROLE)
-        returns (CommonTypes.FilActorId, bool)
+        returns (CommonTypes.FilActorId, bool, address)
     {
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 length = $._providerIds.length();
-
         CommonTypes.FilActorId bestProvider;
         uint256 lowestPending = type(uint256).max;
         uint256 bestProviderPrice;
@@ -547,9 +547,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             }
         }
 
+        address organization;
+
         if (CommonTypes.FilActorId.unwrap(bestProvider) != 0) {
             uint64 bestId = CommonTypes.FilActorId.unwrap(bestProvider);
             $._providers[bestId].pendingBytes += terms.dealSizeBytes;
+            organization = $._providers[bestId].organization;
             emit PendingCapacityReserved(bestProvider, terms.dealSizeBytes);
         }
 
@@ -558,7 +561,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             && terms.pricePerSectorPerMonth >= bestProviderPrice;
         // solhint-enable gas-strict-inequalities
 
-        return (bestProvider, autoApprove);
+        return (bestProvider, autoApprove, organization);
     }
 
     /// @inheritdoc ISPRegistry
