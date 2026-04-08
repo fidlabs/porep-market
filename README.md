@@ -20,7 +20,7 @@ The system is organized into three pillars:
 
 **Quality Control (SLI)**
 * **[SLIScorer](src/interfaces/ISLIScorer.sol)** -- Computes a performance score for a provider by comparing deal requirements against oracle attestations.
-* **[SLIOracle](src/interfaces/ISLIOracle.sol)** -- Stores off-chain SLI attestation data ([retrievability, bandwidth, latency, indexing](src/types/SLITypes.sol)) pushed by an oracle service.
+* **[SLIOracle](src/interfaces/ISLIOracle.sol)** -- Stores off-chain [SLI attestation data](src/types/SLITypes.sol) pushed by an oracle service.
 
 **Financial Settlement**
 * **[Validator](src/interfaces/IValidator.sol)** -- One instance per deal (deployed via beacon proxy). Validates provider performance before approving payouts, manages lockup periods, and handles deal termination.
@@ -36,7 +36,7 @@ proposeDeal() --> [Proposed] --> acceptDeal() --> [Accepted] --> completeDeal() 
                       +-- rejectDeal() --> [Rejected]               terminateDeal() --+--> [Terminated]
 ```
 
-1. **Proposal** -- A Client proposes a deal (size, price per sector per month, duration, [SLI requirements](src/types/SLITypes.sol)). The PoRepMarket consults SPRegistry to reserve a suitable Provider.
+1. **Proposal** -- A Client proposes a deal ([terms and SLI requirements](src/types/SLITypes.sol)). The PoRepMarket consults SPRegistry to reserve a suitable Provider.
 2. **Acceptance** -- The matched SP accepts the deal.
 3. **Validator Setup** -- The Client creates a Validator contract for the deal, approves it as an operator on FilecoinPay, and the Validator creates a payment rail between the Client (payer) and SP (payee).
 4. **Data Transfer & Allocation** -- The Client transfers data to the SP, then makes DDO allocations via the Client contract. The Client contract requests DataCap from the MetaAllocator and tracks allocation sizes per deal.
