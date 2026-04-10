@@ -640,6 +640,14 @@ contract ValidatorTest is Test {
         validator.setDealEndEpoch(newEndEpoch);
     }
 
+    function testSetDealEndEpochRevertsWhenEndEpochIsInThePast() public {
+        vm.prank(porepService);
+        vm.roll(uint256(uint64(CHAIN_EPOCH)));
+
+        vm.expectRevert(Validator.EndEpochInThePast.selector);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH - 1)));
+    }
+
     function testDisableFutureRailPaymentsEmitsRailDisabled() public {
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.RailDisabled(railId);
