@@ -140,6 +140,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error NegativeEndEpoch();
 
     /**
+     * @notice Error indicating that the provided end epoch is not greater than the current end epoch
+     */
+    error EndEpochInThePast();
+
+    /**
      * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
      * @dev 0xdd484e70
      */
@@ -521,6 +526,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         int64 unwrappedEndEpoch = CommonTypes.ChainEpoch.unwrap(endEpoch);
         if (unwrappedEndEpoch < 0) {
             revert NegativeEndEpoch();
+        }
+
+        if (uint256(uint64(unwrappedEndEpoch)) < block.number) {
+            revert EndEpochInThePast();
         }
 
         $.dealEndEpoch = endEpoch;

@@ -610,6 +610,11 @@
   },
   {
     "type": "error",
+    "name": "EndEpochInThePast",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidAdminAddress",
     "inputs": []
   },
