@@ -6,9 +6,7 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
-import {
-    IFilecoinPayValidator
-} from "../src/interfaces/IFilecoinPayValidator.sol";
+import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
@@ -18,16 +16,10 @@ import {ClientSCMock} from "./contracts/ClientSCMock.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 
-import {
-    Initializable
-} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {
-    ERC1967Proxy
-} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {
-    IAccessControl
-} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
@@ -71,12 +63,8 @@ contract ValidatorTest is Test {
         railId = 1;
         expectedManifestLocation = "https://example.com/manifest";
 
-        defaultRequirements = SLITypes.SLIThresholds({
-            retrievabilityBps: 8000,
-            bandwidthMbps: 500,
-            latencyMs: 200,
-            indexingPct: 90
-        });
+        defaultRequirements =
+            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
         poRepMarketMock.setDealProposal(
             dealId,
@@ -84,11 +72,7 @@ contract ValidatorTest is Test {
                 dealId: dealId,
                 client: admin,
                 provider: providerFilActorId,
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: 1024,
-                    pricePerSectorPerMonth: 100,
-                    durationDays: 365
-                }),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 requirements: defaultRequirements,
                 validator: address(0),
                 state: PoRepTypes.DealState.Proposed,
@@ -122,17 +106,7 @@ contract ValidatorTest is Test {
             dealId
         );
 
-        filecoinPayMock.setOperatorApproval(
-            token,
-            admin,
-            address(validator),
-            true,
-            1_000_000,
-            1_000_000,
-            0,
-            0,
-            86_400
-        );
+        filecoinPayMock.setOperatorApproval(token, admin, address(validator), true, 1_000_000, 1_000_000, 0, 0, 86_400);
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(1);
@@ -142,9 +116,7 @@ contract ValidatorTest is Test {
         validator.createRail(token);
 
         vm.prank(porepService);
-        validator.setDealEndEpoch(
-            CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH))
-        );
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -157,15 +129,9 @@ contract ValidatorTest is Test {
 
     function testEIP7201StorageSlotIsCorrect() public pure {
         // solhint-disable-next-line gas-small-strings
-        bytes32 expected = keccak256(
-            abi.encode(
-                uint256(keccak256("porepmarket.storage.ValidatorStorage")) - 1
-            )
-        ) & ~bytes32(uint256(0xff));
-        assertEq(
-            expected,
-            0xf51cddbeb47ca42a561371db80eaffa401732269b8af46b255e3f43a7c044000
-        );
+        bytes32 expected = keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorStorage")) - 1))
+            & ~bytes32(uint256(0xff));
+        assertEq(expected, 0xf51cddbeb47ca42a561371db80eaffa401732269b8af46b255e3f43a7c044000);
     }
 
     function testRailTerminatedCallerIsNotFilecoinPayRevert() public {
@@ -179,17 +145,14 @@ contract ValidatorTest is Test {
         vm.prank(admin);
         validator.updateLockupPeriod(newLockup);
 
-        (uint256 lockupPeriod, uint256 lockupFixed) = filecoinPayMock
-            .getRailLockup(railId);
+        (uint256 lockupPeriod, uint256 lockupFixed) = filecoinPayMock.getRailLockup(railId);
         assertEq(lockupPeriod, newLockup);
         assertEq(lockupFixed, 0);
     }
 
     function testImplementationContractCannotBeInitialized() public {
         Validator impl = new Validator();
-        vm.expectRevert(
-            abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
         impl.initialize(
             admin,
             porepService,
@@ -203,9 +166,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatorCannotBeReinitialized() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(Initializable.InvalidInitialization.selector)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
         validator.initialize(
             admin,
             porepService,
@@ -220,8 +181,7 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentTooEarlyForNextPayout() public {
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(1, 100, 0, 0, 1);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 0, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 0);
@@ -230,8 +190,8 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentDatacapMismatch() public {
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(1, 100, 0, type(uint256).max, 1);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(1, 100, 0, type(uint256).max, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
@@ -244,17 +204,12 @@ contract ValidatorTest is Test {
         vm.prank(oracleUpdater);
         sliOracle.setSLI(
             providerFilActorId,
-            SLITypes.SLIThresholds({
-                retrievabilityBps: 0,
-                bandwidthMbps: 0,
-                latencyMs: 0,
-                indexingPct: 0
-            })
+            SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0})
         );
 
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(1, 100, 0, type(uint256).max, 1);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(1, 100, 0, type(uint256).max, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
@@ -268,8 +223,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(1, 100, 0, 86_400, 1);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 86_400, 1);
 
         assertEq(result.modifiedAmount, 100);
         assertEq(result.settleUpto, 86_400);
@@ -291,13 +245,7 @@ contract ValidatorTest is Test {
     function testValidatePaymentInvalidRailIdRevert() public {
         uint256 wrongRailId = railId + 1;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Validator.InvalidRailId.selector,
-                railId,
-                wrongRailId
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
         vm.prank(address(filecoinPayMock));
         validator.validatePayment(wrongRailId, 100, 0, type(uint256).max, 1);
     }
@@ -305,13 +253,7 @@ contract ValidatorTest is Test {
     function testRailTerminatedInvalidRailIdRevert() public {
         uint256 wrongRailId = railId + 1;
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                Validator.InvalidRailId.selector,
-                railId,
-                wrongRailId
-            )
-        );
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
         vm.prank(address(filecoinPayMock));
         validator.railTerminated(wrongRailId, address(this), 10);
     }
@@ -443,16 +385,12 @@ contract ValidatorTest is Test {
     }
 
     function testModifyRailPaymentEmitsRailPaymentModified() public {
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock
-            .getDealProposal(dealId);
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
         dealProposal.terms.pricePerSectorPerMonth = 2_000_000;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
-        uint256 sectorCount = clientSCMock
-            .getClientAllocationIdsPerDeal(dealId)
-            .length;
-        uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth *
-            sectorCount) / 86_400;
+        uint256 sectorCount = clientSCMock.getClientAllocationIdsPerDeal(dealId).length;
+        uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
 
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.RailPaymentModified(railId, expectedRate);
@@ -513,17 +451,14 @@ contract ValidatorTest is Test {
         validator.terminateRail();
     }
 
-    function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch()
-        public
-    {
+    function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch() public {
         vm.prank(porepService);
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(10)));
 
         clientSCMock.setDataSizeMatching(dealId, true);
 
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(railId, 100, 10, 86_410, 1);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, 10);
@@ -540,8 +475,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(railId, 10_000, 0, 86_400, 10);
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
 
         assertEq(result.modifiedAmount, 10 * 1000);
         assertEq(result.settleUpto, 1000);
@@ -553,16 +487,10 @@ contract ValidatorTest is Test {
         bytes32 expectedRole = validator.POREP_SERVICE_ROLE();
 
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                expectedRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, expectedRole)
         );
         vm.prank(unauthorized);
-        validator.setDealEndEpoch(
-            CommonTypes.ChainEpoch.wrap(int64(1_000_000))
-        );
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
     }
 
     function testCreateRailRevertsWhenOperatorNotApproved() public {
@@ -582,15 +510,7 @@ contract ValidatorTest is Test {
         );
 
         filecoinPayMock.setOperatorApproval(
-            token,
-            admin,
-            address(newValidator),
-            false,
-            1_000_000,
-            1_000_000,
-            0,
-            0,
-            86_400
+            token, admin, address(newValidator), false, 1_000_000, 1_000_000, 0, 0, 86_400
         );
 
         vm.expectRevert(Validator.OperatorNotApproved.selector);
@@ -614,15 +534,7 @@ contract ValidatorTest is Test {
         );
 
         filecoinPayMock.setOperatorApproval(
-            token,
-            admin,
-            address(newValidator),
-            true,
-            1_000_000,
-            1_000_000,
-            0,
-            0,
-            86_399
+            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_399
         );
 
         vm.expectRevert(Validator.MaxLockupPeriodLessThanMinimum.selector);
@@ -645,17 +557,7 @@ contract ValidatorTest is Test {
             dealId
         );
 
-        filecoinPayMock.setOperatorApproval(
-            token,
-            admin,
-            address(newValidator),
-            true,
-            1_000_000,
-            0,
-            0,
-            0,
-            86_400
-        );
+        filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, 86_400);
 
         vm.expectRevert(Validator.InvalidLockupAllowance.selector);
         newValidator.createRail(token);
@@ -677,26 +579,14 @@ contract ValidatorTest is Test {
             dealId
         );
 
-        filecoinPayMock.setOperatorApproval(
-            token,
-            admin,
-            address(newValidator),
-            true,
-            0,
-            1_000_000,
-            0,
-            0,
-            86_400
-        );
+        filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, 86_400);
 
         vm.expectRevert(Validator.InvalidRateAllowance.selector);
         newValidator.createRail(token);
     }
 
     function testModifyRailPaymentRevertsWhenSectorCountIsZero() public {
-        CommonTypes.FilActorId[] memory emptyIds = new CommonTypes.FilActorId[](
-            0
-        );
+        CommonTypes.FilActorId[] memory emptyIds = new CommonTypes.FilActorId[](0);
         clientSCMock.setAllocationIds(dealId, emptyIds);
 
         vm.expectRevert(Validator.InvalidSectorCount.selector);
@@ -709,9 +599,7 @@ contract ValidatorTest is Test {
         vm.roll(0);
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(0)));
 
-        vm.expectRevert(
-            abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId)
-        );
+        vm.expectRevert(abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId));
         vm.prank(address(filecoinPayMock));
         validator.validatePayment(railId, 100, 0, 86_400, 1);
     }
@@ -733,15 +621,7 @@ contract ValidatorTest is Test {
         );
 
         filecoinPayMock.setOperatorApproval(
-            token,
-            admin,
-            address(newValidator),
-            true,
-            1_000_000,
-            1_000_000,
-            0,
-            0,
-            86_400
+            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
         );
 
         vm.expectEmit(true, false, false, true, address(newValidator));
@@ -751,9 +631,7 @@ contract ValidatorTest is Test {
     }
 
     function testSetDealEndEpochEmitsDealEndEpochUpdated() public {
-        CommonTypes.ChainEpoch newEndEpoch = CommonTypes.ChainEpoch.wrap(
-            int64(123_456)
-        );
+        CommonTypes.ChainEpoch newEndEpoch = CommonTypes.ChainEpoch.wrap(int64(123_456));
 
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.DealEndEpochUpdated(dealId, newEndEpoch);
@@ -785,17 +663,15 @@ contract ValidatorTest is Test {
         validator.disableFutureRailPayments();
 
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(railId, 2_000_000, 0, 200_000, 10);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
 
         assertEq(result.modifiedAmount, 10);
         assertEq(result.settleUpto, 1);
         assertEq(result.note, "payment limited to deal endepoch");
     }
 
-    function testValidatePaymentUsesEarlyTerminatedEpochWhenEarlierThanDealEndEpoch()
-        public
-    {
+    function testValidatePaymentUsesEarlyTerminatedEpochWhenEarlierThanDealEndEpoch() public {
         clientSCMock.setDataSizeMatching(dealId, true);
 
         // forge-lint: disable-next-line(unsafe-typecast)
@@ -810,8 +686,8 @@ contract ValidatorTest is Test {
         validator.disableFutureRailPayments();
 
         vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator
-            .validatePayment(railId, 50000000, 0, chainEpochConversion, 10);
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(railId, 50000000, 0, chainEpochConversion, 10);
 
         assertEq(result.modifiedAmount, 10 * earlyTerminationEpoch);
         assertEq(result.settleUpto, earlyTerminationEpoch);
@@ -823,8 +699,7 @@ contract ValidatorTest is Test {
         ids[0] = CommonTypes.FilActorId.wrap(1);
         clientSCMock.setAllocationIds(dealId, ids);
 
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock
-            .getDealProposal(dealId);
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
         dealProposal.terms.pricePerSectorPerMonth = 1;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
@@ -839,9 +714,7 @@ contract ValidatorTest is Test {
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(-1)));
     }
 
-    function testSetMinEpochsBetweenSettlementsRevertsMinTimeNotReached()
-        public
-    {
+    function testSetMinEpochsBetweenSettlementsRevertsMinTimeNotReached() public {
         vm.expectRevert(Validator.InvalidMinEpochsBetweenSettlements.selector);
         vm.prank(admin);
         validator.setMinEpochsBetweenSettlements(0);
@@ -851,11 +724,7 @@ contract ValidatorTest is Test {
         address unauthorized = vm.addr(0x321);
         bytes32 expectedRole = validator.DEFAULT_ADMIN_ROLE();
         vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector,
-                unauthorized,
-                expectedRole
-            )
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, expectedRole)
         );
         vm.prank(unauthorized);
         validator.setMinEpochsBetweenSettlements(0);
