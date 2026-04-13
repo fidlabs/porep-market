@@ -550,6 +550,20 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
+     * @notice Gets all deals
+     * @return deals Array of all deal proposals
+     */
+    function getDeals() external view returns (PoRepTypes.DealProposal[] memory deals) {
+        DealProposalsStorage storage $ = s();
+        uint256 totalDeals = $._dealIdCounter;
+        deals = new PoRepTypes.DealProposal[](totalDeals);
+
+        for (uint256 deal = 0; deal < totalDeals; deal++) {
+            deals[deal] = $._dealProposals[deal + 1];
+        }
+    }
+
+    /**
      * @notice Retrieves the manifest location URL for a specific deal proposal
      * @param dealId The unique identifier of the deal proposal
      * @return manifestLocation The manifest location URL for a specific deal proposal
