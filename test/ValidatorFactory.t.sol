@@ -60,6 +60,7 @@ contract ValidatorFactoryTest is Test {
                 validator: vm.addr(10),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 200,
+                proposedAtBlock: block.number,
                 manifestLocation: "https://example.com/manifest"
             })
         );

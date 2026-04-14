@@ -125,6 +125,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -267,6 +268,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Completed,
                 railId: 1,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -398,6 +400,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -439,6 +442,7 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 validator: address(validatorMock),
                 railId: 1,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -472,6 +476,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -719,6 +724,7 @@ contract ClientTest is Test {
                 validator: address(0),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -847,6 +853,7 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );

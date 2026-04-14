@@ -78,6 +78,7 @@ contract ValidatorTest is Test {
                 validator: address(0),
                 state: PoRepTypes.DealState.Proposed,
                 railId: railId,
+                proposedAtBlock: block.number,
                 manifestLocation: expectedManifestLocation
             })
         );

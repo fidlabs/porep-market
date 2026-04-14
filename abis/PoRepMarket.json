@@ -177,6 +177,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "proposedAtBlock",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
@@ -282,6 +287,11 @@
             "internalType": "uint256"
           },
           {
+            "name": "proposedAtBlock",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
@@ -377,6 +387,11 @@
           },
           {
             "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "proposedAtBlock",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -487,6 +502,11 @@
           },
           {
             "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "proposedAtBlock",
             "type": "uint256",
             "internalType": "uint256"
           },
@@ -976,6 +996,12 @@
       },
       {
         "name": "totalDealSize",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "proposedAtBlock",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"

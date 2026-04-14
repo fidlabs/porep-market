@@ -86,6 +86,7 @@ contract PoRepMarketTest is Test {
             validator: validatorAddress,
             railId: railId,
             state: state,
+            proposedAtBlock: block.number,
             manifestLocation: expectedManifestLocation
         });
     }
@@ -94,13 +95,20 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealProposalCreated(
-            dealId, clientAddress, providerFilActorId, defaultRequirements, expectedManifestLocation, totalDealSize
+            dealId,
+            clientAddress,
+            providerFilActorId,
+            defaultRequirements,
+            expectedManifestLocation,
+            totalDealSize,
+            block.number
         );
 
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
     }
 
     function testProposeDealSetsDealProposal() public {
+        vm.roll(100);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
 
@@ -118,6 +126,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.terms.durationDays, defaultTerms.durationDays);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
+        assertEq(p.proposedAtBlock, 100);
         assertTrue(p.state == PoRepTypes.DealState.Proposed);
 
         p = poRepMarket.getDealProposal(0);
@@ -133,6 +142,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.terms.durationDays, 0);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
+        assertEq(p.proposedAtBlock, 0);
         assertEq(uint8(p.state), 0);
     }
 
@@ -531,7 +541,13 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealProposalCreated(
-            dealId, clientAddress, providerFilActorId, defaultRequirements, expectedManifestLocation, totalDealSize
+            dealId,
+            clientAddress,
+            providerFilActorId,
+            defaultRequirements,
+            expectedManifestLocation,
+            totalDealSize,
+            block.number
         );
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealAccepted(dealId, clientAddress, providerFilActorId);
