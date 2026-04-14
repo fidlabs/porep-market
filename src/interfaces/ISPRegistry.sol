@@ -91,7 +91,7 @@ interface ISPRegistry {
 
     /**
      * @notice Check if address is authorized to act on behalf of a provider
-     * @dev Admin always returns true. Otherwise checks MinerUtils.isControllingAddress.
+     * @dev Admin and OPERATOR_ROLE always return true. Otherwise checks MinerUtils.isControllingAddress.
      * @param caller Address to check
      * @param provider Provider to check against
      * @return True if caller is authorized for provider
