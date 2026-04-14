@@ -682,6 +682,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidRailId",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidResponseLength",
     "inputs": []
   },

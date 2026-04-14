@@ -173,6 +173,12 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      */
     error InvalidMetaAllocatorContractAddress();
 
+    /**
+     * @notice Error thrown when rail id is invalid
+     * @dev 0x9b721aad
+     */
+    error InvalidRailId();
+
     struct Deal {
         bool completed;
         address client;
@@ -420,6 +426,10 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         ClientStorage storage $ = s();
 
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
+
+        if (proposal.railId == 0) {
+            revert InvalidRailId();
+        }
 
         if (proposal.client != msg.sender) {
             revert InvalidClient();
