@@ -27,6 +27,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /**
+     * @notice Number of epochs in one month
+     * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
+     */
+    uint256 private constant EPOCHS_IN_MONTH = 86_400;
+
+    /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
      * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
@@ -192,10 +198,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error DealDoesNotExist();
 
     /**
-     * @notice Error thrown when caller is not the client or storage provider for the deal
-     * @dev 0x55a2c6ce
+     * @notice Error thrown when caller is not the client, admin or storage provider for the deal
+     * @dev 0x24801438
      */
-    error NotTheClientOrStorageProvider(uint256 dealId, address rejector);
+    error NotTheClientOrStorageProviderOrAdmin(uint256 dealId, address rejector);
 
     /**
      * @notice Error thrown when no provider is found for the deal
@@ -268,6 +274,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 0x98fd3e14
      */
     error InvalidOrganizationAddress();
+
+    /**
+     * @notice Error indicating that the deal price per sector per month is invalid
+     * @dev 0x55506911
+     */
+    error InvalidDealPricePerSectorPerMonth();
 
     /**
      * @notice Constructor
@@ -490,8 +502,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
 
-        if (msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)) {
-            revert NotTheClientOrStorageProvider(dealId, msg.sender);
+        if (
+            msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)
+                && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)
+        ) {
+            revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
         }
 
         $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
@@ -662,6 +677,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         if (terms.durationDays % 30 != 0) {
             revert InvalidDealDuration();
+        }
+        if (terms.pricePerSectorPerMonth < EPOCHS_IN_MONTH) {
+            revert InvalidDealPricePerSectorPerMonth();
         }
     }
 

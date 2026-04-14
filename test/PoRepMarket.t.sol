@@ -30,13 +30,16 @@ contract PoRepMarketTest is Test {
     uint256 public dealId;
     uint256 public totalDealSize;
 
+    uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
+
     CommonTypes.FilActorId public providerFilActorId;
 
     SLITypes.SLIThresholds internal defaultRequirements =
         SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
 
-    SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 360});
+    SLITypes.DealTerms internal defaultTerms = SLITypes.DealTerms({
+        dealSizeBytes: 1024, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
+    });
 
     string public expectedManifestLocation = "https://example.com/manifest";
 
@@ -478,7 +481,7 @@ contract PoRepMarketTest is Test {
         address notTheClientOrStorageProviderOwner = vm.addr(0x999);
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.NotTheClientOrStorageProvider.selector, dealId, notTheClientOrStorageProviderOwner
+                PoRepMarket.NotTheClientOrStorageProviderOrAdmin.selector, dealId, notTheClientOrStorageProviderOwner
             )
         );
         vm.prank(notTheClientOrStorageProviderOwner);
@@ -811,5 +814,15 @@ contract PoRepMarketTest is Test {
             assertEq(deals[i].dealId, i + 1);
             assertEq(deals[i].client, vm.addr(i + 1));
         }
+    }
+
+    function testProposeDealRevertsWhenPricePerSectorPerMonthIsLowerThanEpochsInMonth() public {
+        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+            durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH - 1
+        });
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealPricePerSectorPerMonth.selector));
+        poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 }

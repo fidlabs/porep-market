@@ -44,6 +44,7 @@ contract ValidatorTest is Test {
     string public expectedManifestLocation;
 
     SLITypes.SLIThresholds public defaultRequirements;
+    uint256 public constant EPOCHS_IN_MONTH = 86_400;
     uint256 public constant BLOCK_TIMESTAMP = 1_772_000_000;
     int64 public constant CHAIN_EPOCH = 5_800_000;
 
@@ -788,5 +789,60 @@ contract ValidatorTest is Test {
         vm.expectRevert(Validator.MinEpochsBetweenSettlementsExceeded.selector);
         vm.prank(admin);
         validator.setMinEpochsBetweenSettlements(11051200);
+    }
+
+    function testFuzzModifyRailPaymentZeroAmountWithNonZeroParams(uint256 sectorCount, uint256 pricePerSectorPerMonth)
+        public
+    {
+        sectorCount = bound(sectorCount, 1, 1_000);
+        uint256 maxPricePerSectorPerMonth = (EPOCHS_IN_MONTH - 1) / sectorCount;
+        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, 1, maxPricePerSectorPerMonth);
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](sectorCount);
+        for (uint256 i = 0; i < sectorCount; ++i) {
+            // forge-lint: disable-next-line(unsafe-typecast)
+            ids[i] = CommonTypes.FilActorId.wrap(uint64(i + 1));
+        }
+        clientSCMock.setAllocationIds(dealId, ids);
+
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
+        dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
+        poRepMarketMock.setDealProposal(dealId, dealProposal);
+
+        uint256 expectedAmount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
+        assertEq(expectedAmount, 0);
+
+        vm.expectRevert(Validator.InvalidZeroAmount.selector);
+        vm.prank(porepService);
+        validator.modifyRailPayment(railId);
+    }
+
+    function testFuzzModifyRailPaymentSucceedsWhenCalculatedAmountIsNonZero(
+        uint256 sectorCount,
+        uint256 pricePerSectorPerMonth
+    ) public {
+        sectorCount = bound(sectorCount, 1, 1_000);
+        uint256 minPricePerSectorPerMonth = (EPOCHS_IN_MONTH + sectorCount - 1) / sectorCount;
+        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, minPricePerSectorPerMonth, 1_000_000);
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](sectorCount);
+        for (uint256 i = 0; i < sectorCount; ++i) {
+            // forge-lint: disable-next-line(unsafe-typecast)
+            ids[i] = CommonTypes.FilActorId.wrap(uint64(i + 1));
+        }
+        clientSCMock.setAllocationIds(dealId, ids);
+
+        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
+        dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
+        poRepMarketMock.setDealProposal(dealId, dealProposal);
+
+        uint256 expectedAmount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
+        assertGt(expectedAmount, 0);
+
+        vm.expectEmit(true, false, false, true, address(validator));
+        emit Validator.RailPaymentModified(railId, expectedAmount);
+
+        vm.prank(porepService);
+        validator.modifyRailPayment(railId);
     }
 }

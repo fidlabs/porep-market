@@ -1303,6 +1303,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidDealPricePerSectorPerMonth",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidIndexingPct",
     "inputs": [
       {
@@ -1350,7 +1355,7 @@
   },
   {
     "type": "error",
-    "name": "NotTheClientOrStorageProvider",
+    "name": "NotTheClientOrStorageProviderOrAdmin",
     "inputs": [
       {
         "name": "dealId",
