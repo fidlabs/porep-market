@@ -768,4 +768,24 @@ contract PoRepMarketTest is Test {
             poRepMarket.getDealsForOrganizationByState(organization2, PoRepTypes.DealState.Proposed);
         assertEq(dealsOrg2.length, 0);
     }
+
+    function testGetDealsReturnsEmptyArrayWhenNoDeals() public view {
+        PoRepTypes.DealProposal[] memory deals = poRepMarket.getDeals();
+        assertEq(deals.length, 0);
+    }
+
+    function testGetDealsReturnsAllDeals() public {
+        uint256 count = 3;
+        for (uint256 i = 1; i < count + 1; i++) {
+            vm.prank(vm.addr(i));
+            poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        }
+
+        PoRepTypes.DealProposal[] memory deals = poRepMarket.getDeals();
+        assertEq(deals.length, count);
+        for (uint256 i = 0; i < count; i++) {
+            assertEq(deals[i].dealId, i + 1);
+            assertEq(deals[i].client, vm.addr(i + 1));
+        }
+    }
 }
