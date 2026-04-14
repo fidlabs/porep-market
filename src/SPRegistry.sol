@@ -496,7 +496,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function isAuthorizedForProvider(address caller, CommonTypes.FilActorId provider) external view returns (bool) {
-        if (hasRole(DEFAULT_ADMIN_ROLE, caller)) return true;
+        if (hasRole(DEFAULT_ADMIN_ROLE, caller) || hasRole(OPERATOR_ROLE, caller)) return true;
         return MinerUtils.isControllingAddress(provider, caller);
     }
 
@@ -756,12 +756,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @notice Ensures the caller is a miner controlling address or admin
+     * @notice Ensures the caller is a miner controlling address, operator, or admin
      * @dev Uses MinerUtils.isControllingAddress to verify on-chain miner ownership
      * @param provider The provider actor ID to check against
      */
     function _onlyProviderControllerOrAdmin(CommonTypes.FilActorId provider) internal view {
-        if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) return;
+        if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(OPERATOR_ROLE, msg.sender)) return;
         if (!MinerUtils.isControllingAddress(provider, msg.sender)) {
             revert NotProviderControllerOrAdmin(msg.sender, provider);
         }

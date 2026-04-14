@@ -24,6 +24,7 @@ contract PoRepMarketTest is Test {
     address public clientSmartContractAddress;
     address public clientAddress;
     address public providerOwnerAddress;
+    address public operatorAddress;
     address public adminAddress;
     uint256 public railId;
     uint256 public dealId;
@@ -47,6 +48,7 @@ contract PoRepMarketTest is Test {
         clientSmartContractAddress = vm.addr(0x002);
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
+        operatorAddress = vm.addr(0x005);
         adminAddress = vm.addr(0x006);
         dealId = 1;
         railId = 1;
@@ -63,6 +65,7 @@ contract PoRepMarketTest is Test {
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
+        spRegistry.setIsOwner(operatorAddress, providerFilActorId, true);
         validatorFactory.setValidator(validatorAddress, true);
     }
 
@@ -292,6 +295,17 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
     }
 
+    function testAcceptDealAllowsOperatorAuthorisedForProvider() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(operatorAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        PoRepTypes.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepTypes.DealState.Accepted);
+    }
+
     function testAcceptDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.acceptDeal(dealId);
@@ -439,6 +453,16 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealRejected(dealId, providerOwnerAddress);
+        poRepMarket.rejectDeal(dealId);
+    }
+
+    function testRejectAsOperatorAuthorisedForProviderEmitsDealRejectedEvent() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(operatorAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealRejected(dealId, operatorAddress);
         poRepMarket.rejectDeal(dealId);
     }
 
