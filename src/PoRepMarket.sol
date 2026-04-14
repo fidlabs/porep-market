@@ -27,19 +27,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /**
-     * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
-     * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      * @notice Number of epochs in one month
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
 
     /**
-     * @notice Maximum Filecoin storage deal duration: 1278 days (~3.5 years),
-     * per FIP-0052 (NV21 actor policy update).
-     * References:
-     * https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0052.md
-     * https://github.com/filecoin-project/core-devs/blob/master/Network%20Upgrades/v21.md
+     * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
+     * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
     uint32 public constant MAX_DEAL_DURATION_DAYS = PoRepTypes.MAX_DEAL_DURATION_DAYS;
 
