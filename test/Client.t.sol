@@ -124,7 +124,7 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
-                railId: 0,
+                railId: 1,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -266,7 +266,7 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Completed,
-                railId: 0,
+                railId: 1,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -397,7 +397,7 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
-                railId: 0,
+                railId: 1,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -413,7 +413,7 @@ contract ClientTest is Test {
         assertTrue(CommonTypes.FilActorId.unwrap(deal.provider) == CommonTypes.FilActorId.unwrap(SP1));
         assertEq(deal.dealId, dealId);
         assertEq(deal.validator, address(validatorMock));
-        assertEq(deal.railId, 0);
+        assertEq(deal.railId, 1);
         assertEq(deal.client, clientAddress);
     }
 
@@ -438,7 +438,7 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 state: PoRepTypes.DealState.Accepted,
                 validator: address(validatorMock),
-                railId: 0,
+                railId: 1,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -471,7 +471,7 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
-                railId: 0,
+                railId: 1,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -718,7 +718,7 @@ contract ClientTest is Test {
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(0),
                 state: PoRepTypes.DealState.Accepted,
-                railId: 0,
+                railId: 1,
                 manifestLocation: expectedManifestLocation
             })
         );
@@ -828,5 +828,31 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidDealStateForTransfer.selector));
         client.transfer(transferParams, dealId, false);
         vm.stopPrank();
+    }
+
+    function testRegisterDealRailIdNotSetReverts() public {
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
+
+        poRepMarketMock.setDealProposal(
+            dealId,
+            PoRepTypes.DealProposal({
+                dealId: dealId,
+                client: clientAddress,
+                provider: SP1,
+                requirements: SLITypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                }),
+                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                validator: address(validatorMock),
+                state: PoRepTypes.DealState.Accepted,
+                railId: 0,
+                manifestLocation: expectedManifestLocation
+            })
+        );
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidRailId.selector));
+        client.transfer(transferParams, dealId, false);
     }
 }
