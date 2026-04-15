@@ -42,6 +42,7 @@ library PoRepTypes {
      *      validator: Address of the validator responsible for validating the deal
      *      state: Current state of the deal (Proposed, Accepted, Completed, Rejected, Terminated)
      *      railId: ID of the payment rail associated with the deal
+     *      proposedAtBlock: Block number when the deal was proposed
      *      manifestLocation: Location of the deal manifest
      */
     struct DealProposal {
@@ -53,6 +54,7 @@ library PoRepTypes {
         address validator;
         DealState state;
         uint256 railId;
+        uint256 proposedAtBlock;
         string manifestLocation;
     }
 }

@@ -78,6 +78,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param requirements The SLI thresholds for the deal
      * @param manifestLocation The location of the manifest for the deal
      * @param totalDealSize The total size of the deal in bytes
+     * @param proposedAtBlock The block number when the deal was proposed
      */
     event DealProposalCreated(
         uint256 indexed dealId,
@@ -85,7 +86,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         CommonTypes.FilActorId indexed provider,
         SLITypes.SLIThresholds requirements,
         string manifestLocation,
-        uint256 totalDealSize
+        uint256 totalDealSize,
+        uint256 proposedAtBlock
     );
 
     /**
@@ -351,10 +353,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             validator: address(0),
             state: initialState,
             railId: 0,
+            proposedAtBlock: block.number,
             manifestLocation: manifestLocation
         });
 
-        emit DealProposalCreated(dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes);
+        emit DealProposalCreated(
+            dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes, block.number
+        );
 
         $._dealOrganization[dealId] = organization;
         $._dealIdsByStateByOrganization[initialState][organization].add(dealId);
