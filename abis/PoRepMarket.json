@@ -799,6 +799,13 @@
   },
   {
     "type": "function",
+    "name": "rejectExpiredDeals",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "renounceRole",
     "inputs": [
       {
@@ -852,6 +859,10 @@
     "inputs": [
       {
         "name": "padding",
+    "name": "setDealProposalExpiration",
+    "inputs": [
+      {
+        "name": "newDealProposalExpiration",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1122,6 +1133,19 @@
         "name": "proposedAtBlock",
         "type": "uint256",
         "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DealProposalExpired",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
         "internalType": "uint256"
       }
     ],
@@ -1496,6 +1520,11 @@
   {
     "type": "error",
     "name": "InvalidDealSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealProposalExpiration",
     "inputs": []
   },
   {

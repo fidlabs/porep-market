@@ -33,6 +33,10 @@ contract PoRepMarketTest is Test {
     uint256 public totalDealSize;
     SLITypes.SLIThresholds internal defaultRequirements;
     SLITypes.DealTerms internal defaultTerms;
+
+    uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
+    uint256 public constant DEFAULT_DEAL_PROPOSAL_EXPIRATION = 5_760;
+
     CommonTypes.FilActorId public providerFilActorId;
 
     uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
@@ -1024,6 +1028,89 @@ contract PoRepMarketTest is Test {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealNotRejectable.selector, dealId));
         vm.prank(adminAddress);
         poRepMarket.rejectAcceptedDeal(dealId);
+    
+    function testSetDealProposalExpirationRevertsWhenCalledByNonAdmin() public {
+        address caller = vm.addr(0x999);
+        bytes32 adminRole = poRepMarket.DEFAULT_ADMIN_ROLE();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, adminRole)
+        );
+        vm.prank(caller);
+        poRepMarket.setDealProposalExpiration(1000);
+    }
+
+    function testSetDealProposalExpirationRevertsWhenZero() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealProposalExpiration.selector));
+        vm.prank(adminAddress);
+        poRepMarket.setDealProposalExpiration(0);
+    }
+
+    function testSetDealProposalExpirationUpdatesExpiration() public {
+        uint256 newExpiration = 1000;
+
+        vm.prank(adminAddress);
+        poRepMarket.setDealProposalExpiration(newExpiration);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + newExpiration + 1);
+
+        vm.expectEmit(true, false, false, false);
+        emit PoRepMarket.DealProposalExpired(dealId);
+        poRepMarket.rejectExpiredDeals();
+
+        PoRepTypes.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepTypes.DealState.Rejected);
+    }
+
+    function testRejectExpiredDealsEmitsDealProposalExpiredEvent() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + DEFAULT_DEAL_PROPOSAL_EXPIRATION + 1);
+
+        vm.expectEmit(true, false, false, false);
+        emit PoRepMarket.DealProposalExpired(dealId);
+        poRepMarket.rejectExpiredDeals();
+    }
+
+    function testRejectExpiredDealsSetsStateToRejected() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + DEFAULT_DEAL_PROPOSAL_EXPIRATION + 1);
+        poRepMarket.rejectExpiredDeals();
+
+        PoRepTypes.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepTypes.DealState.Rejected);
+    }
+
+    function testRejectExpiredDealsDoesNotRejectNotExpiredDeal() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + DEFAULT_DEAL_PROPOSAL_EXPIRATION);
+        poRepMarket.rejectExpiredDeals();
+
+        PoRepTypes.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepTypes.DealState.Proposed);
+    }
+
+    function testRejectExpiredDealsHandlesMixedDeals() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + DEFAULT_DEAL_PROPOSAL_EXPIRATION + 1);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        poRepMarket.rejectExpiredDeals();
+
+        assertTrue(poRepMarket.getDealProposal(dealId).state == PoRepTypes.DealState.Rejected);
+        assertTrue(poRepMarket.getDealProposal(dealId + 1).state == PoRepTypes.DealState.Proposed);
     }
 
     function testSetPaddingShouldEmitEvent() public {

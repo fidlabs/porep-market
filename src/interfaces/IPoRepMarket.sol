@@ -132,4 +132,23 @@ interface IPoRepMarket {
      * @return IValidatorFactory The validator factory contract adddress
      */
     function getValidatorFactoryContract() external view returns (address);
+
+    /**
+     * @notice Gets all deals
+     * @return deals Array of all deal proposals
+     */
+    function getDeals() external view returns (PoRepTypes.DealProposal[] memory deals);
+
+    /**
+     * @notice Iterates through deals in proposed state and rejects those that have expired
+     * @dev A deal proposal is considered expired if it has been in the proposed state for more than the deal proposal expiration
+     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setDealProposalExpiration function
+     */
+    function rejectExpiredDeals() external;
+
+    /**
+     * @notice Sets the deal proposal expiration
+     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     */
+    function setDealProposalExpiration(uint256 newDealProposalExpiration) external;
 }
