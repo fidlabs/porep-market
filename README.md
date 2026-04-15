@@ -219,3 +219,9 @@ note over PoRepMarketBot, Validator: Tx 13: Rail termination
 | **Commands** | `just --list` for all available commands |
 | **Pre-push** | `just pre-push` (format check + lint + test) |
 | **Full CI check** | `just check` (format, lint, test, coverage, ABI verification) |
+
+### Developer documentation
+
+For a full developer-level guide (local dev, deploy/upgrade, and how the off-chain services fit together), see:
+
+- [`DEVELOPER.md`](DEVELOPER.md)
