@@ -46,14 +46,56 @@ devnet_deploy: clean build
 	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just deploy 
 
 calibnet_deploy: clean build
-    RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just deploy --slow
+    RPC_URL=$RPC_CALIBNET \
+    PRIVATE_KEY=$PRIVATE_KEY_CALIBNET \
+    FILECOIN_PAY=$FILECOIN_PAY_CALIBNET \
+    TERMINATION_ORACLE=$TERMINATION_ORACLE_CALIBNET \
+    ORACLE=$ORACLE_CALIBNET \
+    POREP_SERVICE=$POREP_SERVICE_CALIBNET \
+    META_ALLOCATOR=$META_ALLOCATOR_CALIBNET \
+    OPERATOR_ADDR=${OPERATOR_ADDR_CALIBNET:-} \
+    just deploy --slow
 
 devnet_upgrade: clean build
 	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just upgrade
 
 calibnet_upgrade: clean build
 	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade --slow
-   
+
+# Full mainnet (production) deploy with 5-gate safety check (requires CONFIRM_MAINNET=yes).
+mainnet_deploy: clean build
+    ./script/preflight-mainnet.sh deploy
+    RPC_URL=$RPC_MAINNET \
+    PRIVATE_KEY=$PRIVATE_KEY_MAINNET \
+    FILECOIN_PAY=$FILECOIN_PAY_MAINNET \
+    TERMINATION_ORACLE=$TERMINATION_ORACLE_MAINNET \
+    ORACLE=$ORACLE_MAINNET \
+    POREP_SERVICE=$POREP_SERVICE_MAINNET \
+    META_ALLOCATOR=$META_ALLOCATOR_MAINNET \
+    OPERATOR_ADDR=${OPERATOR_ADDR_MAINNET:-} \
+    just deploy --slow
+
+# Mainnet deploy dry-run — preview addresses + gas estimates, no broadcast.
+mainnet_deploy_dry: clean build
+    ./script/preflight-mainnet.sh dry
+    RPC_URL=$RPC_MAINNET \
+    PRIVATE_KEY=$PRIVATE_KEY_MAINNET \
+    FILECOIN_PAY=$FILECOIN_PAY_MAINNET \
+    TERMINATION_ORACLE=$TERMINATION_ORACLE_MAINNET \
+    ORACLE=$ORACLE_MAINNET \
+    POREP_SERVICE=$POREP_SERVICE_MAINNET \
+    META_ALLOCATOR=$META_ALLOCATOR_MAINNET \
+    OPERATOR_ADDR=${OPERATOR_ADDR_MAINNET:-} \
+    forge script script/Deploy.s.sol:Deploy \
+        --gas-estimate-multiplier 100000 \
+        --disable-block-gas-limit \
+        -vvvv \
+        --rpc-url $RPC_MAINNET
+
+# Mainnet proxy upgrade (requires existing deployments/mainnet/latest.json).
+mainnet_upgrade: clean build
+    ./script/preflight-mainnet.sh upgrade
+    RPC_URL=$RPC_MAINNET PRIVATE_KEY=$PRIVATE_KEY_MAINNET just upgrade --slow
 
 # Blockscout contract verification
 # Verify reads deployments/<net>/latest.json and works from any 
