@@ -54,6 +54,26 @@ devnet_upgrade: clean build
 calibnet_upgrade: clean build
 	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade --slow
    
+
+# Blockscout contract verification
+# Verify reads deployments/<net>/latest.json and works from any 
+# fresh checkout of the deployment commit (no broadcast/artifacts needed).
+
+verify-calibnet:
+    ./script/verify-blockscout.sh verify 314159
+
+verify-mainnet:
+    ./script/verify-blockscout.sh verify 314
+
+audit-calibnet:
+    ./script/verify-blockscout.sh audit 314159
+
+audit-mainnet:
+    ./script/verify-blockscout.sh audit 314
+
+verify-one chain addr name:
+    ./script/verify-blockscout.sh verify-one {{chain}} {{addr}} {{name}}
+
 # CI equivalent check
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."
