@@ -15,8 +15,6 @@
 #   0  all gates passed
 #   2  usage error
 #   3  gate failure
-#
-# Operator runbook: docs/howto/2026-04-15-mainnet-deploy.md
 
 set -euo pipefail
 IFS=$'\n\t'
@@ -45,7 +43,7 @@ readonly REQUIRED_UPGRADE_VARS=(
 )
 
 # ─────────────────────────────────────────────────────────────────────
-# Logging (mirrors script/verify-blockscout.sh for operator muscle memory)
+# Logging and utility functions
 # ─────────────────────────────────────────────────────────────────────
 
 COLOR_ENABLED=1
