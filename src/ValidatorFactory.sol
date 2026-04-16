@@ -158,6 +158,13 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     event UpgraderRoleChanged(address indexed newUpgraderRole);
 
     /**
+     * @notice Constructor
+     */
+    constructor() {
+        _disableInitializers();
+    }
+
+    /**
      * @notice Initializes the contract
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param admin The address of the admin responsible for the contract

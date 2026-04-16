@@ -205,45 +205,47 @@ contract ValidatorFactoryTest is Test {
     }
 
     function testInitializeRevertsWhenAdminIsZero() public {
-        address zeroAddress = address(0);
-        address validImplementation = address(0x1234);
         ValidatorFactory factoryImplementation = new ValidatorFactory();
+        bytes memory initData = abi.encodeCall(ValidatorFactory.initialize, (address(0), address(0x1234)));
         vm.expectRevert(ValidatorFactory.InvalidAdminAddress.selector);
-        factoryImplementation.initialize(zeroAddress, validImplementation);
+        new ERC1967Proxy(address(factoryImplementation), initData);
     }
 
     function testInitializeRevertsWhenImplementationIsZero() public {
-        address validAdmin = address(0x1234);
-        address zeroAddress = address(0);
         ValidatorFactory factoryImplementation = new ValidatorFactory();
+        bytes memory initData = abi.encodeCall(ValidatorFactory.initialize, (address(0x1234), address(0)));
         vm.expectRevert(ValidatorFactory.InvalidImplementationAddress.selector);
-        factoryImplementation.initialize(validAdmin, zeroAddress);
+        new ERC1967Proxy(address(factoryImplementation), initData);
     }
 
     function testSetAdminRevertsWhenNewAdminIsZero() public {
         Validator validatorImplementation = new Validator();
-        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
 
-        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+        bytes memory initData =
+            abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.prank(validAdmin);
         vm.expectRevert(ValidatorFactory.InvalidNewAdminAddress.selector);
-        factoryImplementation.setAdmin(address(0));
+        f.setAdmin(address(0));
     }
 
     function testSetsNewAdminCorrectly() public {
         Validator validatorImplementation = new Validator();
-        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
         address newValidAdmin = address(0xDCBA);
 
-        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+        bytes memory initData =
+            abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.prank(validAdmin);
-        factoryImplementation.setAdmin(newValidAdmin);
+        f.setAdmin(newValidAdmin);
 
-        assertTrue(factoryImplementation.hasRole(factoryImplementation.DEFAULT_ADMIN_ROLE(), newValidAdmin));
+        assertTrue(f.hasRole(f.DEFAULT_ADMIN_ROLE(), newValidAdmin));
     }
 
     function testGrantRoleReverts() public {
@@ -269,55 +271,63 @@ contract ValidatorFactoryTest is Test {
 
     function testSetUpgraderRoleRevertsWhenNewUpgraderRoleIsZero() public {
         Validator validatorImplementation = new Validator();
-        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
 
-        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+        bytes memory initData =
+            abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.prank(validAdmin);
         vm.expectRevert(ValidatorFactory.InvalidNewUpgraderRoleAddress.selector);
-        factoryImplementation.setUpgraderRole(address(0));
+        f.setUpgraderRole(address(0));
     }
 
     function testSetsNewUpgraderRoleCorrectly() public {
         Validator validatorImplementation = new Validator();
-        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
         address newUpgrader = address(0xDCBA);
 
-        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+        bytes memory initData =
+            abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.prank(validAdmin);
-        factoryImplementation.setUpgraderRole(newUpgrader);
+        f.setUpgraderRole(newUpgrader);
 
-        assertTrue(factoryImplementation.hasRole(factoryImplementation.UPGRADER_ROLE(), newUpgrader));
+        assertTrue(f.hasRole(f.UPGRADER_ROLE(), newUpgrader));
     }
 
     function testSetAdminEmitsAdminChangedEvent() public {
         Validator validatorImplementation = new Validator();
-        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
         address newValidAdmin = address(0xDCBA);
 
-        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+        bytes memory initData =
+            abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.expectEmit(true, false, false, false);
         emit ValidatorFactory.AdminChanged(newValidAdmin);
         vm.prank(validAdmin);
-        factoryImplementation.setAdmin(newValidAdmin);
+        f.setAdmin(newValidAdmin);
     }
 
     function testSetUpgraderRoleEmitsUpgraderRoleChangedEvent() public {
         Validator validatorImplementation = new Validator();
-        ValidatorFactory factoryImplementation = new ValidatorFactory();
+        ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
         address newUpgrader = address(0xDCBA);
 
-        factoryImplementation.initialize(validAdmin, address(validatorImplementation));
+        bytes memory initData =
+            abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
+        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
         vm.expectEmit(true, false, false, false);
         emit ValidatorFactory.UpgraderRoleChanged(newUpgrader);
         vm.prank(validAdmin);
-        factoryImplementation.setUpgraderRole(newUpgrader);
+        f.setUpgraderRole(newUpgrader);
     }
 }
