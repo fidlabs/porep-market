@@ -57,7 +57,7 @@ contract Deploy is Script, DeployUtils {
         (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
         (clientSmartContract, clientSmartContractImpl) =
-            _deployClientSmartContract(admin, terminationOracle, poRepMarket, metaAllocator);
+            _deployClientSmartContract(admin, terminationOracle, poRepMarket, metaAllocator, filecoinPay);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
 
@@ -107,11 +107,12 @@ contract Deploy is Script, DeployUtils {
         address _admin,
         address _terminationOracle,
         address _porepMarket,
-        address _metaAllocator
+        address _metaAllocator,
+        address _filecoinPay
     ) internal returns (address proxy, address impl) {
         Client _impl = new Client();
         bytes memory init =
-            abi.encodeCall(Client.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator));
+            abi.encodeCall(Client.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator, _filecoinPay));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }

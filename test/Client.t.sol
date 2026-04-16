@@ -31,6 +31,8 @@ import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
+import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // solhint-disable max-states-count
 contract ClientTest is Test {
@@ -44,6 +46,7 @@ contract ClientTest is Test {
     bytes public transferTo = abi.encodePacked(vm.addr(2));
     uint256 public dealId;
     uint256 public totalDealSize;
+    IERC20 public token;
 
     CommonTypes.FilActorId public providerFilActorId;
     // solhint-disable var-name-mixedcase
@@ -67,6 +70,7 @@ contract ClientTest is Test {
     PoRepMarketMock public poRepMarketMock;
     ValidatorMock public validatorMock;
     MetaAllocatorMock public metaAllocatorMock;
+    FilecoinPayV1Mock public filecoinPayMock;
 
     ResolveAddressPrecompileMock public resolveAddress =
         ResolveAddressPrecompileMock(payable(0xFE00000000000000000000000000000000000001));
@@ -83,6 +87,8 @@ contract ClientTest is Test {
         poRepMarketMock = new PoRepMarketMock();
         validatorMock = new ValidatorMock();
         metaAllocatorMock = new MetaAllocatorMock();
+        filecoinPayMock = new FilecoinPayV1Mock();
+        token = IERC20(vm.addr(0x5));
         terminationOracle = vm.addr(3);
         totalDealSize = 1024;
         client = Client(setupProxy(address(impl)));
@@ -95,6 +101,8 @@ contract ClientTest is Test {
         failingMockAddVerifiedClient = new FailingMockAddVerifiedClient();
         resolveAddressPrecompileMock = new ResolveAddressPrecompileMock();
         builtInActorForTransferFunctionMock = new BuiltInActorForTransferFunctionMock();
+        filecoinPayMock.createRail(token, clientAddress, address(this), address(validatorMock), 0, address(0));
+        filecoinPayMock.setAccount(token, clientAddress, 1000, 0, 0, 0);
         earlyTerminatedClaims.push(1);
         address actorIdProxy = address(new MockProxy(address(5555)));
         vm.etch(CALL_ACTOR_ID, address(actorIdProxy).code);
@@ -138,7 +146,14 @@ contract ClientTest is Test {
 
     function setupProxy(address impl) public returns (address) {
         bytes memory initData = abi.encodeCall(
-            Client.initialize, (address(this), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
+            Client.initialize,
+            (
+                address(this),
+                terminationOracle,
+                address(poRepMarketMock),
+                address(metaAllocatorMock),
+                address(filecoinPayMock)
+            )
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return address(proxy);
@@ -806,7 +821,13 @@ contract ClientTest is Test {
         address impl = address(new Client());
         bytes memory initData = abi.encodeCall(
             Client.initialize,
-            (address(this), terminationOracle, address(poRepMarketMock), address(reentrantMetaAllocatorMock))
+            (
+                address(this),
+                terminationOracle,
+                address(poRepMarketMock),
+                address(reentrantMetaAllocatorMock),
+                address(filecoinPayMock)
+            )
         );
         Client clientWithReentrancy = Client(address(new ERC1967Proxy(address(impl), initData)));
 
@@ -1157,7 +1178,13 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAdminAddress.selector));
-        c.initialize(address(0), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock));
+        c.initialize(
+            address(0),
+            terminationOracle,
+            address(poRepMarketMock),
+            address(metaAllocatorMock),
+            address(filecoinPayMock)
+        );
     }
 
     function testInitializeRevertsWhenTerminationOracleIsZero() public {
@@ -1166,7 +1193,13 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidTerminationOracleAddress.selector));
-        c.initialize(address(clientAddress), address(0), address(poRepMarketMock), address(metaAllocatorMock));
+        c.initialize(
+            address(clientAddress),
+            address(0),
+            address(poRepMarketMock),
+            address(metaAllocatorMock),
+            address(filecoinPayMock)
+        );
     }
 
     function testInitializeRevertsWhenPoRepMarketIsZero() public {
@@ -1175,7 +1208,9 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidPoRepMarketContractAddress.selector));
-        c.initialize(address(clientAddress), terminationOracle, address(0), address(metaAllocatorMock));
+        c.initialize(
+            address(clientAddress), terminationOracle, address(0), address(metaAllocatorMock), address(filecoinPayMock)
+        );
     }
 
     function testInitializeRevertsWhenMetaAllocatorIsZero() public {
@@ -1184,7 +1219,20 @@ contract ClientTest is Test {
         Client c = Client(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidMetaAllocatorContractAddress.selector));
-        c.initialize(address(clientAddress), terminationOracle, address(poRepMarketMock), address(0));
+        c.initialize(
+            address(clientAddress), terminationOracle, address(poRepMarketMock), address(0), address(filecoinPayMock)
+        );
+    }
+
+    function testInitializeRevertsWhenFilecoinPayIsZero() public {
+        Client impl = new Client();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Client c = Client(address(proxy));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidFilecoinPayContractAddress.selector));
+        c.initialize(
+            address(clientAddress), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock), address(0)
+        );
     }
 
     function testShouldRevertWhenAlreadyRegisteredDealTransferIsCalledByNotTheClient() public {
@@ -1242,5 +1290,34 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidRailId.selector));
         client.transfer(transferParams, dealId, false);
+    }
+
+    function testVerifyClientFundsRevertsWhenNotEnoughFunds() public {
+        filecoinPayMock.setAccount(token, clientAddress, 0, 0, 0, 0);
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InsufficientFundsForRail.selector, 300, 0));
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testVerifyClientFundsPassesWhenFundsExactlyRequired() public {
+        filecoinPayMock.setAccount(token, clientAddress, 300, 0, 0, 0);
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testVerifyClientFundsRevertsOnSecondTransferWhenInsufficientFundsForAccumulatedSectors() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(100000));
+        filecoinPayMock.setAccount(token, clientAddress, 300, 0, 0, 0);
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+
+        Client.Deal memory deal = clientMock.getDeal(dealId);
+        assertEq(deal.allocationIds.length, 2);
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InsufficientFundsForRail.selector, 500, 300));
+        clientMock.transfer(transferParams, dealId, false);
     }
 }

@@ -115,4 +115,54 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
         Rail storage r = rails[railId];
         return (r.lockupPeriod, r.lockupFixed);
     }
+
+    struct AccountState {
+        uint256 funds;
+        uint256 lockupCurrent;
+        uint256 lockupRate;
+        uint256 lockupLastSettledAt;
+    }
+
+    mapping(IERC20 => mapping(address => AccountState)) internal _accounts;
+
+    function setAccount(
+        IERC20 token,
+        address owner,
+        uint256 funds,
+        uint256 lockupCurrent,
+        uint256 lockupRate,
+        uint256 lockupLastSettledAt
+    ) external {
+        _accounts[token][owner] = AccountState({
+            funds: funds, lockupCurrent: lockupCurrent, lockupRate: lockupRate, lockupLastSettledAt: lockupLastSettledAt
+        });
+    }
+
+    function accounts(IERC20 token, address owner)
+        external
+        view
+        override
+        returns (uint256 funds, uint256 lockupCurrent, uint256 lockupRate, uint256 lockupLastSettledAt)
+    {
+        AccountState storage a = _accounts[token][owner];
+        return (a.funds, a.lockupCurrent, a.lockupRate, a.lockupLastSettledAt);
+    }
+
+    function getRail(uint256 railId) external view override returns (RailView memory) {
+        Rail storage r = rails[railId];
+        return RailView({
+            token: r.token,
+            from: r.payer,
+            to: r.payee,
+            operator: r.operator,
+            validator: address(0),
+            paymentRate: 0,
+            lockupPeriod: r.lockupPeriod,
+            lockupFixed: r.lockupFixed,
+            settledUpTo: 0,
+            endEpoch: 0,
+            commissionRateBps: r.commissionRateBps,
+            serviceFeeRecipient: r.serviceFeeRecipient
+        });
+    }
 }

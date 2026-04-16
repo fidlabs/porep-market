@@ -224,6 +224,11 @@
         "name": "_metaAllocatorContract",
         "type": "address",
         "internalType": "address"
+      },
+      {
+        "name": "_filecoinPayContract",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -681,6 +686,22 @@
   },
   {
     "type": "error",
+    "name": "InsufficientFundsForRail",
+    "inputs": [
+      {
+        "name": "required",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidAdminAddress",
     "inputs": []
   },
@@ -756,6 +777,11 @@
   {
     "type": "error",
     "name": "InvalidDealStateForTransfer",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidFilecoinPayContractAddress",
     "inputs": []
   },
   {

@@ -18,6 +18,7 @@ import {IClient} from "./interfaces/IClient.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
+import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 
 /**
  * @title Client
@@ -32,6 +33,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
+        IFilecoinPayV1 _filecoinPayContract;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ClientStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -201,10 +203,22 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     error InvalidMetaAllocatorContractAddress();
 
     /**
+     * @notice Error indicating that the FilecoinPay address provided during initialization is the zero address
+     * @dev 0x231d0df1
+     */
+    error InvalidFilecoinPayContractAddress();
+
+    /**
      * @notice Error thrown when rail id is invalid
      * @dev 0x9b721aad
      */
     error InvalidRailId();
+
+    /**
+     * @notice Error thrown when client has insufficient funds for the rail
+     * @dev 0x2b2fa9a4
+     */
+    error InsufficientFundsForRail(uint256 required, uint256 actual);
 
     struct Deal {
         bool completed;
@@ -243,14 +257,18 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @param terminationOracle Address of the Termination Oracle
      * @param _poRepMarketContract Address of the PoRepMarket contract
      * @param _metaAllocatorContract Address of the MetaAllocator contract
+     * @param _filecoinPayContract Address of the FilecoinPay contract
      */
     function initialize(
         address admin,
         address terminationOracle,
         address _poRepMarketContract,
-        address _metaAllocatorContract
+        address _metaAllocatorContract,
+        address _filecoinPayContract
     ) public initializer {
-        _validateInitializeAddresses(admin, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
+        _validateInitializeAddresses(
+            admin, terminationOracle, _poRepMarketContract, _metaAllocatorContract, _filecoinPayContract
+        );
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
@@ -261,6 +279,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         ClientStorage storage $ = s();
         $._poRepMarketContract = IPoRepMarket(_poRepMarketContract);
         $._metaAllocatorContract = IMetaAllocator(_metaAllocatorContract);
+        $._filecoinPayContract = IFilecoinPayV1(_filecoinPayContract);
     }
 
     /**
@@ -269,12 +288,14 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @param terminationOracle Address of the Termination Oracle
      * @param poRepMarketContract Address of the PoRepMarket contract
      * @param metaAllocatorContract Address of the MetaAllocator contract
+     * @param filecoinPayContract Address of the FilecoinPay contract
      */
     function _validateInitializeAddresses(
         address admin,
         address terminationOracle,
         address poRepMarketContract,
-        address metaAllocatorContract
+        address metaAllocatorContract,
+        address filecoinPayContract
     ) internal pure {
         if (admin == address(0)) {
             revert InvalidAdminAddress();
@@ -287,6 +308,9 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         }
         if (metaAllocatorContract == address(0)) {
             revert InvalidMetaAllocatorContractAddress();
+        }
+        if (filecoinPayContract == address(0)) {
+            revert InvalidFilecoinPayContractAddress();
         }
     }
 
@@ -318,6 +342,8 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         uint256 sizeOfAllocations = _verifyAndRegisterAllocations(dealId, allocations);
         uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
         uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
+
+        _verifyClientFunds(deal, allocations.length);
 
         $._metaAllocatorContract
             .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
@@ -418,6 +444,28 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     }
 
     // solhint-enable function-max-lines
+
+    /**
+     * @notice Ensures the client has deposited enough funds on FilecoinPay to cover
+     *         all sectors that will be allocated after the current transfer.
+     * @dev Required = pricePerSectorPerMonth * (alreadyAllocated + newAllocationsCount)
+     * @param deal Storage reference to the deal being allocated against
+     * @param newAllocationsCount Number of allocations included in the current transfer
+     */
+    function _verifyClientFunds(Deal storage deal, uint256 newAllocationsCount) internal view {
+        ClientStorage storage $ = s();
+        PoRepTypes.DealProposal memory dealProposal = $._poRepMarketContract.getDealProposal(deal.dealId);
+
+        uint256 totalSectorCount = deal.allocationIds.length + newAllocationsCount;
+        uint256 required = dealProposal.terms.pricePerSectorPerMonth * totalSectorCount;
+
+        IFilecoinPayV1.RailView memory rail = $._filecoinPayContract.getRail(deal.railId);
+        (uint256 funds,,,) = $._filecoinPayContract.accounts(rail.token, deal.client);
+
+        if (funds < required) {
+            revert InsufficientFundsForRail(required, funds);
+        }
+    }
 
     // solhint-disable func-name-mixedcase
     /**

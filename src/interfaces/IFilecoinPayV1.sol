@@ -9,6 +9,57 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 interface IFilecoinPayV1 {
     /**
+     * @notice RailView struct represents a read-only view of a payment rail, including all relevant details for operators and validators
+     *  token: The ERC20 token to use for the payment rail
+     *  from: The address paying the tokens
+     *  to: The address receiving the tokens
+     *  operator: The operator address for the payment rail
+     *  validator: Rail validator address
+     *  paymentRate: Current payment rate per epoch
+     *  lockupPeriod: Lockup period in epochs
+     *  lockupFixed: Fixed lockup amount
+     *  settledUpTo: Epoch up to which the rail has been settled
+     *  endEpoch: Epoch at which the rail ends
+     *  commissionRateBps: The commission rate in basis points for the payment rail
+     *  serviceFeeRecipient: The recipient of service fees for the payment rail
+     */
+    struct RailView {
+        IERC20 token;
+        address from;
+        address to;
+        address operator;
+        address validator;
+        uint256 paymentRate;
+        uint256 lockupPeriod;
+        uint256 lockupFixed;
+        uint256 settledUpTo;
+        uint256 endEpoch;
+        uint256 commissionRateBps;
+        address serviceFeeRecipient;
+    }
+
+    /**
+     * @notice Custom getter for a client account on FilecoinPay.
+     * @param token The ERC20 token to read the account for.
+     * @param owner The account owner.
+     * @return funds Total deposited funds for the account.
+     * @return lockupCurrent Currently locked funds across all rails of the account.
+     * @return lockupRate Aggregate lockup accrual rate per epoch across the account's rails.
+     * @return lockupLastSettledAt Epoch up to and including which lockup has been settled.
+     */
+    function accounts(IERC20 token, address owner)
+        external
+        view
+        returns (uint256 funds, uint256 lockupCurrent, uint256 lockupRate, uint256 lockupLastSettledAt);
+
+    /**
+     * @notice Gets the current state of the target rail or reverts if the rail isn't active
+     * @param railId The ID of the rail to read
+     * @return rail Read-only view of the rail
+     */
+    function getRail(uint256 railId) external view returns (RailView memory rail);
+
+    /**
      * @notice Creates a payment rail
      * @param token The ERC20 token to use for the payment rail
      * @param payer The address paying the tokens
