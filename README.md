@@ -225,3 +225,9 @@ note over PoRepMarketBot, Validator: Tx 13: Rail termination
 For a full developer-level guide (local dev, deploy/upgrade, and how the off-chain services fit together), see:
 
 - [`DEVELOPER.md`](DEVELOPER.md)
+
+### Client documentation
+
+For a tech-savvy, implementation-oriented guide for clients (deal proposal → validator/rail → DataCap allocations → settlement), see:
+
+- [`CLIENT_GUIDE.md`](CLIENT_GUIDE.md)
