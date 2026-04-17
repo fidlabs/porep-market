@@ -13,6 +13,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PoRepMarket contract
@@ -281,6 +282,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 0x98fd3e14
      */
     error InvalidOrganizationAddress();
+
+    /**
+     * @notice Error thrown when deal size is zero
+     */
+    error InvalidDealSize();
 
     /**
      * @notice Error indicating that the deal price would result in zero per-epoch payment
@@ -689,11 +695,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (terms.durationDays % 30 != 0) {
             revert InvalidDealDuration();
         }
-        uint256 minSectorCount = (terms.dealSizeBytes + SECTOR_SIZE - 1) / SECTOR_SIZE;
-        if (minSectorCount == 0) {
-            minSectorCount = 1;
+        if (terms.dealSizeBytes == 0) {
+            revert InvalidDealSize();
         }
-        uint256 totalPerMonth = terms.pricePerSectorPerMonth * minSectorCount;
+        uint256 minSectors = Math.ceilDiv(terms.dealSizeBytes, SECTOR_SIZE);
+        uint256 totalPerMonth = terms.pricePerSectorPerMonth * minSectors;
         if (totalPerMonth < EPOCHS_IN_MONTH) {
             revert InvalidDealPricePerSectorPerMonth(totalPerMonth, EPOCHS_IN_MONTH);
         }

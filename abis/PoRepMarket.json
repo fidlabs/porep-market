@@ -1345,6 +1345,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidDealSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidIndexingPct",
     "inputs": [
       {
