@@ -33,6 +33,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
 
     /**
+     * @notice Size of a single Filecoin sector in bytes (32 GiB)
+     */
+    uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
+
+    /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
      * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
@@ -278,10 +283,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidOrganizationAddress();
 
     /**
-     * @notice Error indicating that the deal price per sector per month is invalid
-     * @dev 0x55506911
+     * @notice Error indicating that the deal price would result in zero per-epoch payment
+     * @param totalPerMonth pricePerSectorPerMonth * estimated sector count
+     * @param epochsInMonth the divisor that would produce zero
      */
-    error InvalidDealPricePerSectorPerMonth();
+    error InvalidDealPricePerSectorPerMonth(uint256 totalPerMonth, uint256 epochsInMonth);
 
     /**
      * @notice Constructor
@@ -683,8 +689,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (terms.durationDays % 30 != 0) {
             revert InvalidDealDuration();
         }
-        if (terms.pricePerSectorPerMonth < EPOCHS_IN_MONTH) {
-            revert InvalidDealPricePerSectorPerMonth();
+        uint256 minSectorCount = (terms.dealSizeBytes + SECTOR_SIZE - 1) / SECTOR_SIZE;
+        if (minSectorCount == 0) {
+            minSectorCount = 1;
+        }
+        uint256 totalPerMonth = terms.pricePerSectorPerMonth * minSectorCount;
+        if (totalPerMonth < EPOCHS_IN_MONTH) {
+            revert InvalidDealPricePerSectorPerMonth(totalPerMonth, EPOCHS_IN_MONTH);
         }
     }
 

@@ -832,13 +832,25 @@ contract PoRepMarketTest is Test {
         }
     }
 
-    function testProposeDealRevertsWhenPricePerSectorPerMonthIsLowerThanEpochsInMonth() public {
+    function testProposeDealRevertsWhenPriceTimeSectorsIsBelowEpochsInMonth() public {
         SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
             durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH - 1
         });
 
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealPricePerSectorPerMonth.selector));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealPricePerSectorPerMonth.selector, 86_399, 86_400));
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
+    }
+
+    function testProposeDealSucceedsWhenLowPriceButManySectors() public {
+        uint256 oneTebibyteInBytes = 1024 * 1024 * 1024 * 1024;
+        uint256 pricePerSector = 62_500;
+
+        SLITypes.DealTerms memory terms = SLITypes.DealTerms({
+            durationDays: 360, dealSizeBytes: oneTebibyteInBytes, pricePerSectorPerMonth: pricePerSector
+        });
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, terms, expectedManifestLocation);
     }
 }

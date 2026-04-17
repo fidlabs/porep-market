@@ -1330,7 +1330,18 @@
   {
     "type": "error",
     "name": "InvalidDealPricePerSectorPerMonth",
-    "inputs": []
+    "inputs": [
+      {
+        "name": "totalPerMonth",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "epochsInMonth",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
