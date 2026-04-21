@@ -13,6 +13,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
+import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PoRepMarket contract
@@ -31,6 +32,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
     uint256 private constant EPOCHS_IN_MONTH = 86_400;
+
+    /**
+     * @notice Size of a single Filecoin sector in bytes (32 GiB)
+     */
+    uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
@@ -278,10 +284,18 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidOrganizationAddress();
 
     /**
-     * @notice Error indicating that the deal price per sector per month is invalid
-     * @dev 0x55506911
+     * @notice Error thrown when deal size is zero
+     * @dev 0xdbe015a7
      */
-    error InvalidDealPricePerSectorPerMonth();
+    error InvalidDealSize();
+
+    /**
+     * @notice Error indicating that the deal price would result in zero per-epoch payment
+     * @dev 0x1fbc910d
+     * @param totalPerMonth pricePerSectorPerMonth * estimated sector count
+     * @param epochsInMonth the divisor that would produce zero
+     */
+    error InvalidDealPricePerSectorPerMonth(uint256 totalPerMonth, uint256 epochsInMonth);
 
     /**
      * @notice Constructor
@@ -683,8 +697,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (terms.durationDays % 30 != 0) {
             revert InvalidDealDuration();
         }
-        if (terms.pricePerSectorPerMonth < EPOCHS_IN_MONTH) {
-            revert InvalidDealPricePerSectorPerMonth();
+        if (terms.dealSizeBytes == 0) {
+            revert InvalidDealSize();
+        }
+        uint256 minSectors = Math.ceilDiv(terms.dealSizeBytes, SECTOR_SIZE);
+        uint256 totalPerMonth = terms.pricePerSectorPerMonth * minSectors;
+        if (totalPerMonth < EPOCHS_IN_MONTH) {
+            revert InvalidDealPricePerSectorPerMonth(totalPerMonth, EPOCHS_IN_MONTH);
         }
     }
 
