@@ -285,11 +285,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Error thrown when deal size is zero
+     * @dev 0xdbe015a7
      */
     error InvalidDealSize();
 
     /**
      * @notice Error indicating that the deal price would result in zero per-epoch payment
+     * @dev 0x1fbc910d
      * @param totalPerMonth pricePerSectorPerMonth * estimated sector count
      * @param epochsInMonth the divisor that would produce zero
      */
