@@ -1519,12 +1519,12 @@
   },
   {
     "type": "error",
-    "name": "InvalidDealSize",
+    "name": "InvalidDealProposalExpiration",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidDealProposalExpiration",
+    "name": "InvalidDealSize",
     "inputs": []
   },
   {
