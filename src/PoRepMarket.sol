@@ -48,7 +48,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Default number of epochs after which a deal proposal expires if not accepted
      * @dev 2 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 5_760 epochs
      */
-    uint256 private constant DEFAULT_DEAL_PROPOSAL_EXPIRATION = 5_760;
+    uint256 private constant EPOCHS_IN_TO_DAYS = 5_760;
 
     /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
@@ -191,6 +191,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal proposal
      */
     event DealProposalExpired(uint256 indexed dealId);
+
+    /**
+     * @notice DealProposalExpirationUpdated event
+     * @dev DealProposalExpirationUpdated event is emitted when the deal proposal expiration is updated
+     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     */
+    event DealProposalExpirationUpdated(uint256 indexed newDealProposalExpiration);
 
     /**
      * @notice Error thrown when caller is not the registered validator for the deal
@@ -366,7 +373,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         DealProposalsStorage storage $ = s();
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
-        $._dealProposalExpiration = DEFAULT_DEAL_PROPOSAL_EXPIRATION;
+        $._dealProposalExpiration = EPOCHS_IN_TO_DAYS;
     }
 
     /**
@@ -609,35 +616,37 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Iterates through deals in proposed state and rejects those that have expired
      * @dev A deal proposal is considered expired if it has been in the proposed state for more than the deal proposal expiration
-     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setDealProposalExpiration function
+     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setDefaultDealProposalExpiration function
      */
     function rejectExpiredDeals() external {
         DealProposalsStorage storage $ = s();
         uint256 totalDeals = $._dealIdCounter;
 
-        for (uint256 dealId = 0; dealId < totalDeals; dealId++) {
-            PoRepTypes.DealProposal storage dp = $._dealProposals[dealId + 1];
+        for (uint256 dealId = 1; dealId < totalDeals + 1; dealId++) {
+            PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
             if (
                 dp.state == PoRepTypes.DealState.Proposed
                     && block.number > dp.proposedAtBlock + $._dealProposalExpiration
             ) {
                 $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
-                _changeDealState(dealId + 1, PoRepTypes.DealState.Rejected);
-                emit DealProposalExpired(dealId + 1);
+                _changeDealState(dealId, PoRepTypes.DealState.Rejected);
+                emit DealProposalExpired(dealId);
             }
         }
     }
 
     /**
-     * @notice Sets the deal proposal expiration
-     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     * @notice Sets default deal proposal expiration
+     * @param newDealProposalExpiration The new default deal proposal expiration in epochs
      */
-    function setDealProposalExpiration(uint256 newDealProposalExpiration) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setDefaultDealProposalExpiration(uint256 newDealProposalExpiration) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newDealProposalExpiration == 0) {
             revert InvalidDealProposalExpiration();
         }
         DealProposalsStorage storage $ = s();
         $._dealProposalExpiration = newDealProposalExpiration;
+
+        emit DealProposalExpirationUpdated(newDealProposalExpiration);
     }
 
     /**
@@ -741,6 +750,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
         _ensureDealExists(dealProposal);
         return dealProposal.manifestLocation;
+    }
+
+    /**
+     * @notice Retrieves the deal proposal expiration
+     * @return dealProposalExpiration The deal proposal expiration in epochs
+     */
+    function getDealProposalExpiration() external view returns (uint256) {
+        DealProposalsStorage storage $ = s();
+        return $._dealProposalExpiration;
     }
 
     /**

@@ -147,8 +147,14 @@ interface IPoRepMarket {
     function rejectExpiredDeals() external;
 
     /**
-     * @notice Sets the deal proposal expiration
-     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     * @notice Sets default deal proposal expiration
+     * @param newDealProposalExpiration The new default deal proposal expiration in epochs
      */
-    function setDealProposalExpiration(uint256 newDealProposalExpiration) external;
+    function setDefaultDealProposalExpiration(uint256 newDealProposalExpiration) external;
+
+    /**
+     * @notice Retrieves the deal proposal expiration
+     * @return dealProposalExpiration The deal proposal expiration in epochs
+     */
+    function getDealProposalExpiration() external view returns (uint256);
 }

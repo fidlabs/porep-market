@@ -350,6 +350,19 @@
   },
   {
     "type": "function",
+    "name": "getDealProposalExpiration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getDeals",
     "inputs": [],
     "outputs": [
@@ -860,6 +873,7 @@
       {
         "name": "padding",
     "name": "setDealProposalExpiration",
+    "name": "setDefaultDealProposalExpiration",
     "inputs": [
       {
         "name": "newDealProposalExpiration",
@@ -1133,6 +1147,19 @@
         "name": "proposedAtBlock",
         "type": "uint256",
         "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DealProposalExpirationUpdated",
+    "inputs": [
+      {
+        "name": "newDealProposalExpiration",
+        "type": "uint256",
+        "indexed": true,
         "internalType": "uint256"
       }
     ],
