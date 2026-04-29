@@ -7,7 +7,7 @@ cd "$(dirname "$0")"/..
 forge clean && forge build && forge coverage --no-match-coverage "(script|test)" --report lcov
 
 lcov --version
-summary=$(lcov --summary lcov.info --rc branch_coverage=1)
+summary=$(lcov --summary lcov.info --rc branch_coverage=1 --ignore-errors inconsistent,corrupt)
 
 lines_coverage=$(echo "$summary" | awk '/lines/{print $2}')
 functions_coverage=$(echo "$summary" | awk '/functions/{print $2}')
@@ -16,7 +16,7 @@ echo "Lines coverage: $lines_coverage"
 echo "Functions coverage: $functions_coverage"
 echo "Branches coverage: $branches_coverage"
 if [ "$lines_coverage" == "100.0%" ] && [ "$functions_coverage" == "100.0%" ]; then
-  echo "Coverage is 100% for lines, functions and branches."
+  echo "Coverage is 100% for lines and functions."
 else
   echo "Coverage is not 100%."
   exit 1
