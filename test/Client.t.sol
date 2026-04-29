@@ -1308,7 +1308,8 @@ contract ClientTest is Test {
     function testVerifyClientFundsRevertsOnSecondTransferWhenInsufficientFundsForAccumulatedSectors() public {
         ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
         metaAllocatorMock.setAllowance(address(clientMock), uint256(100000));
-        filecoinPayMock.setAccount(token, clientAddress, 300, 0, 0, 0);
+
+        filecoinPayMock.setAccount(token, clientAddress, 500, 0, 0, 0);
 
         vm.prank(clientAddress);
         clientMock.transfer(transferParams, dealId, false);
@@ -1316,8 +1317,10 @@ contract ClientTest is Test {
         Client.Deal memory deal = clientMock.getDeal(dealId);
         assertEq(deal.allocationIds.length, 2);
 
+        filecoinPayMock.setAccount(token, clientAddress, 500, 300, 0, 0);
+
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(Client.InsufficientFundsForRail.selector, 500, 300));
+        vm.expectRevert(abi.encodeWithSelector(Client.InsufficientFundsForRail.selector, 300, 200));
         clientMock.transfer(transferParams, dealId, false);
     }
 }

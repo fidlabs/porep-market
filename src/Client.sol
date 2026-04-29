@@ -343,7 +343,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
         uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
 
-        _verifyClientFunds(deal, allocations.length);
+        _verifyClientFunds(deal, allocations.length + claimExtensions.length);
 
         $._metaAllocatorContract
             .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
@@ -447,23 +447,22 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
 
     /**
      * @notice Ensures the client has deposited enough funds on FilecoinPay to cover
-     *         all sectors that will be allocated after the current transfer.
-     * @dev Required = pricePerSectorPerMonth * (alreadyAllocated + newAllocationsCount)
+     *         new sectors that will be allocated after the current transfer.
      * @param deal Storage reference to the deal being allocated against
-     * @param newAllocationsCount Number of allocations included in the current transfer
+     * @param newAllocationsCount Number of new allocations included in the current transfer
      */
     function _verifyClientFunds(Deal storage deal, uint256 newAllocationsCount) internal view {
         ClientStorage storage $ = s();
         PoRepTypes.DealProposal memory dealProposal = $._poRepMarketContract.getDealProposal(deal.dealId);
 
-        uint256 totalSectorCount = deal.allocationIds.length + newAllocationsCount;
-        uint256 required = dealProposal.terms.pricePerSectorPerMonth * totalSectorCount;
+        uint256 requiredFunds = dealProposal.terms.pricePerSectorPerMonth * newAllocationsCount;
 
         IFilecoinPayV1.RailView memory rail = $._filecoinPayContract.getRail(deal.railId);
-        (uint256 funds,,,) = $._filecoinPayContract.accounts(rail.token, deal.client);
+        (uint256 funds, uint256 lockupCurrent,,) = $._filecoinPayContract.accounts(rail.token, deal.client);
 
-        if (funds < required) {
-            revert InsufficientFundsForRail(required, funds);
+        uint256 availableFunds = funds - lockupCurrent;
+        if (availableFunds < requiredFunds) {
+            revert InsufficientFundsForRail(requiredFunds, availableFunds);
         }
     }
 
