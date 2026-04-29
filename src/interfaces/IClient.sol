@@ -21,6 +21,14 @@ interface IClient {
     function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId, bool dealCompleted) external;
 
     /**
+     * @notice Replaces all broken tracked allocations for a completed existing deal.
+     * @dev Only callable by RESCUE_ROLE.
+     * @param dealId The id of the deal to rescue.
+     * @param params The DataCap transfer parameters that create replacement allocations.
+     */
+    function rescueDealAllocations(uint256 dealId, DataCapTypes.TransferParams calldata params) external;
+
+    /**
      * @notice The handle_filecoin_method function is a universal entry point for calls
      * coming from built-in Filecoin actors. Datacap is an FRC-46 Token. Receiving FRC46
      * tokens requires implementing a Receiver Hook:

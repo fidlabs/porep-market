@@ -7,6 +7,7 @@ import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 
 contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepTypes.DealProposal deal) public deals;
+    uint256 public completeDealCallCount;
 
     function setDealProposal(uint256 dealId, PoRepTypes.DealProposal calldata dealProposal) external {
         deals[dealId] = dealProposal;
@@ -18,7 +19,11 @@ contract PoRepMarketMock {
 
     // solhint-disable-next-line no-empty-blocks
     function completeDeal(uint256, uint256) external {
-        //noop
+        completeDealCallCount++;
+    }
+
+    function setDealState(uint256 dealId, PoRepTypes.DealState state) external {
+        deals[dealId].state = state;
     }
 
     function updateValidator(uint256 dealId) external {
@@ -33,4 +38,3 @@ contract PoRepMarketMock {
         deals[dealId].state = PoRepTypes.DealState.Terminated;
     }
 }
-

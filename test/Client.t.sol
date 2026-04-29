@@ -30,9 +30,13 @@ import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
+import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 
 // solhint-disable max-states-count
 contract ClientTest is Test {
+    error MissingAllocationId();
+    error UnexpectedAllocationId();
+
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
     address public datacapContract = address(0xfF00000000000000000000000000000000000007);
     address public clientAddress;
@@ -140,6 +144,83 @@ contract ClientTest is Test {
         return address(proxy);
     }
 
+    function _registerDealWithOneAllocation(ClientContractMock clientMock) internal {
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+    }
+
+    function _registerDealWithTwoAllocations(ClientContractMock clientMock) internal {
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(20000));
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"83410041004A83820180820080820102");
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334086192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221910001A0007E9001A000816001A0050334080";
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId, false);
+        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+    }
+
+    function _grantRescueRole(ClientContractMock clientMock, address account) internal {
+        vm.prank(address(this));
+        clientMock.grantRole(clientMock.RESCUE_ROLE(), account);
+    }
+
+    function _rescueParams(bytes memory operatorData, uint256 amount)
+        internal
+        pure
+        returns (DataCapTypes.TransferParams memory params)
+    {
+        params = DataCapTypes.TransferParams({
+            to: FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)),
+            amount: CommonTypes.BigInt({val: abi.encodePacked(amount * 1 ether), neg: false}),
+            operator_data: operatorData
+        });
+    }
+
+    function _oneAllocationRescueParams() internal pure returns (DataCapTypes.TransferParams memory params) {
+        params = _rescueParams(
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080",
+            2048
+        );
+    }
+
+    function _twoAllocationRescueParams() internal pure returns (DataCapTypes.TransferParams memory params) {
+        params = _rescueParams(
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334086192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221910001A0007E9001A000816001A0050334080",
+            6144
+        );
+    }
+
+    function _assertContainsAllocationId(CommonTypes.FilActorId[] memory ids, uint64 expectedId) internal pure {
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (CommonTypes.FilActorId.unwrap(ids[i]) == expectedId) return;
+        }
+        revert MissingAllocationId();
+    }
+
+    function _assertDoesNotContainAllocationId(CommonTypes.FilActorId[] memory ids, uint64 unexpectedId) internal pure {
+        for (uint256 i = 0; i < ids.length; i++) {
+            if (CommonTypes.FilActorId.unwrap(ids[i]) == unexpectedId) revert UnexpectedAllocationId();
+        }
+    }
+
+    function _assertOneAllocationDealUnchanged(ClientContractMock clientMock) internal view {
+        CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
+
+        Client.Deal memory deal = clientMock.getDeal(dealId);
+        assertEq(deal.sizeOfAllocations, 2048);
+    }
+
     function testIsAdminSet() public view {
         bytes32 adminRole = client.DEFAULT_ADMIN_ROLE();
         assertTrue(client.hasRole(adminRole, address(this)));
@@ -148,6 +229,240 @@ contract ClientTest is Test {
     function testIsTerminationOracleSet() public view {
         bytes32 terminationOracleRole = client.TERMINATION_ORACLE();
         assertTrue(client.hasRole(terminationOracleRole, terminationOracle));
+    }
+
+    function testIsRescueRoleSet() public view {
+        bytes32 rescueRole = client.RESCUE_ROLE();
+        assertTrue(client.hasRole(rescueRole, address(this)));
+    }
+
+    function testRescueDealAllocationsRevertsWithoutRescueRole() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+
+        address unauthorized = vm.addr(0x523);
+        bytes32 rescueRole = clientMock.RESCUE_ROLE();
+
+        vm.prank(unauthorized);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, rescueRole)
+        );
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+    }
+
+    function testRescueDealAllocationsRejectsNonCompletedMarketDeal() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        PoRepTypes.DealState[3] memory states =
+            [PoRepTypes.DealState.Accepted, PoRepTypes.DealState.Rejected, PoRepTypes.DealState.Terminated];
+        for (uint256 i = 0; i < states.length; ++i) {
+            poRepMarketMock.setDealState(dealId, states[i]);
+            vm.expectRevert(abi.encodeWithSelector(Client.InvalidDealStateForTransfer.selector));
+            clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+        }
+    }
+
+    function testRescueDealAllocationsRejectsUnregisteredLocalDeal() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _grantRescueRole(clientMock, address(this));
+        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidDealStateForTransfer.selector));
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+    }
+
+    function testRescueDealAllocationsRejectsZeroReplacementSize() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _rescueParams(
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22001A0007E9001A000816001A0050334080",
+            0
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRejectsTooTightReplacementWindow() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _rescueParams(
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000815FF1A0050334080",
+            2048
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidClaimWindow.selector, int64(518400), int64(529919)));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRejectsExpiredReplacementAllocation() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _rescueParams(
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001903E780",
+            2048
+        );
+        vm.roll(1000);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRejectsPartialReplacement() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithTwoAllocations(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+    }
+
+    function testRescueDealAllocationsRejectsMismatchedAmount() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _oneAllocationRescueParams();
+        params.amount.val = abi.encodePacked(uint256(2049) * 1 ether);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRejectsWrongReceiver() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _oneAllocationRescueParams();
+        params.to = FilAddresses.fromActorID(12345);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRejectsDifferentReplacementProvider() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _rescueParams(
+            hex"828186194E20D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080",
+            2048
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidProvider.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRejectsClaimExtensions() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        DataCapTypes.TransferParams memory params = _rescueParams(
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC",
+            2048
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testRescueDealAllocationsRollsBackWhenDataCapTransferFails() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+        actorIdMock.setDataCapTransferExitCode(16);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.TransferFailed.selector, int256(16)));
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+
+        _assertOneAllocationDealUnchanged(clientMock);
+    }
+
+    function testRescueDealAllocationsRollsBackWhenReturnedAllocationCountIsTooSmall() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+        actorIdMock.setDataCapTransferResult(hex"8341004100488382018082008080");
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+
+        _assertOneAllocationDealUnchanged(clientMock);
+    }
+
+    function testRescueDealAllocationsRollsBackWhenReturnedAllocationCountIsTooLarge() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+        actorIdMock.setDataCapTransferResult(hex"83410041004C8382018082008082182A182B");
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+
+        _assertOneAllocationDealUnchanged(clientMock);
+    }
+
+    function testRescueDealAllocationsReplacesTrackedIdsAndPreservesDealIdentity() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+        actorIdMock.setDataCapTransferResult(hex"83410041004A8382018082008081182A");
+
+        clientMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
+
+        CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 42);
+
+        Client.Deal memory deal = clientMock.getDeal(dealId);
+        assertEq(deal.sizeOfAllocations, 2048);
+        assertEq(deal.dealId, dealId);
+        assertEq(deal.client, clientAddress);
+        assertEq(CommonTypes.FilActorId.unwrap(deal.provider), CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(deal.validator, address(validatorMock));
+        assertEq(deal.railId, 1);
+
+        (uint64 provider, bytes memory data,,,,) = actorIdMock.lastDataCapTransferAllocation(0);
+        assertEq(provider, CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(data, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
+    }
+
+    function testRescueDealAllocationsReplacesMultipleTrackedIdsAndPreservesAggregateSize() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithTwoAllocations(clientMock);
+        _grantRescueRole(clientMock, address(this));
+        actorIdMock.setDataCapTransferResult(hex"83410041004C8382018082008082182A182B");
+
+        clientMock.rescueDealAllocations(dealId, _twoAllocationRescueParams());
+
+        CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 2);
+        _assertDoesNotContainAllocationId(ids, 1);
+        _assertDoesNotContainAllocationId(ids, 2);
+        _assertContainsAllocationId(ids, 42);
+        _assertContainsAllocationId(ids, 43);
+
+        Client.Deal memory deal = clientMock.getDeal(dealId);
+        assertEq(deal.sizeOfAllocations, 6144);
+
+        (uint64 firstProvider, bytes memory firstData,,,,) = actorIdMock.lastDataCapTransferAllocation(0);
+        (uint64 secondProvider, bytes memory secondData,,,,) = actorIdMock.lastDataCapTransferAllocation(1);
+        assertEq(firstProvider, CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(secondProvider, CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(firstData, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
+        assertEq(secondData, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
+        assertEq(poRepMarketMock.completeDealCallCount(), 0);
     }
 
     function testAuthorizeUpgradeRevert() public {
@@ -247,6 +562,72 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
         client.transfer(transferParams, dealId, false);
+    }
+
+    function testTransferRevertsWhenAllocationClaimWindowIsTooSmall() public {
+        // Allocation request:
+        // provider = 10000
+        // data = existing test CID
+        // size = 2048
+        // termMin = 518400
+        // termMax = 518400 + 11519 (one epoch below the required four-day window)
+        // expiration = 5256000
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000815FF1A0050334080";
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidClaimWindow.selector, int64(518400), int64(529919)));
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testTransferRevertsWithInvalidClaimWindowWhenTermMinCannotFitWindow() public {
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001B7FFFFFFFFFFFFFFF1B7FFFFFFFFFFFFFFF1A0050334080";
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidClaimWindow.selector, type(int64).max, type(int64).max));
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testTransferAcceptsAllocationClaimWindowAtMinimum() public {
+        // Same allocation as above, but termMax = termMin + 11520.
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        CommonTypes.FilActorId[] memory ids = client.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 1);
+    }
+
+    function testTransferRevertsWhenAllocationExpirationIsBeforeCurrentBlock() public {
+        // Same valid term window as above, but expiration = 999.
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001903E780";
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        vm.roll(1000);
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testTransferAcceptsAllocationExpirationAtCurrentBlock() public {
+        // Same valid term window as above, but expiration = 1000.
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001903E880";
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        vm.roll(1000);
+
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId, false);
+
+        CommonTypes.FilActorId[] memory ids = client.getClientAllocationIdsPerDeal(dealId);
+        assertEq(ids.length, 1);
     }
 
     function testClientCanCallTransfer() public {
@@ -651,7 +1032,7 @@ contract ClientTest is Test {
         assertTrue(!isFourthClaimTerminated);
     }
 
-    function testDeleteDealAllocationIdByValue() public {
+    function testDeleteDealAllocationIdByIndex() public {
         ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
         metaAllocatorMock.setAllowance(address(mock), uint256(10000));
         transferParams.operator_data =
@@ -665,7 +1046,7 @@ contract ClientTest is Test {
         assertEq(CommonTypes.FilActorId.unwrap(beforeIds[0]), 3);
         assertEq(CommonTypes.FilActorId.unwrap(beforeIds[1]), 1);
 
-        mock.deleteDealAllocationIdByValue(dealId, 0);
+        mock.deleteDealAllocationIdByIndex(dealId, 0);
 
         CommonTypes.FilActorId[] memory afterIds = mock.getClientAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
@@ -754,7 +1135,7 @@ contract ClientTest is Test {
             hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C7638001A003815911A005034D60000"
         );
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(IMetaAllocator.AmountEqualZero.selector));
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
         clientMock.transfer(transferParams, dealId, false);
     }
 
