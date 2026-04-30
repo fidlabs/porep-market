@@ -64,9 +64,19 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /**
+     * @notice Role allowed to rescue broken allocation tracking for existing deals.
+     */
+    bytes32 public constant RESCUE_ROLE = keccak256("RESCUE_ROLE");
+
+    /**
      * @notice The role to set terminated claims.
      */
     bytes32 public constant TERMINATION_ORACLE = keccak256("TERMINATION_ORACLE");
+
+    /**
+     * @notice Minimum allowed allocation claim window in epochs.
+     */
+    uint64 internal constant MIN_CLAIM_WINDOW_EPOCHS = 11_520;
 
     // solhint-disable gas-indexed-events
     /**
@@ -75,6 +85,14 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @param amount The amount of DataCap allocated.
      */
     event DatacapSpent(address indexed client, uint256 amount);
+
+    /**
+     * @notice Emitted when tracked allocations are rescued for a deal.
+     * @param dealId The rescued deal id.
+     * @param rescuer The account that executed the rescue.
+     * @param totalSize The total rescued allocation size.
+     */
+    event DealAllocationsRescued(uint256 indexed dealId, address indexed rescuer, uint256 totalSize);
     // solhint-enable gas-indexed-events
 
     /**
@@ -106,6 +124,13 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @dev 0x46ac3f35
      */
     error InvalidAllocationRequest();
+
+    /**
+     * @notice Error thrown when an allocation claim window is too small.
+     * @param termMin The requested minimum claim term.
+     * @param termMax The requested maximum claim term.
+     */
+    error InvalidClaimWindow(int64 termMin, int64 termMax);
 
     /**
      * @notice GetClaims call to VerifReg failed
@@ -193,6 +218,9 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     struct ProviderAllocation {
         CommonTypes.FilActorId provider;
         uint64 size;
+        int64 termMin;
+        int64 termMax;
+        int64 expiration;
     }
 
     struct ProviderClaim {
@@ -225,6 +253,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
+        _grantRole(RESCUE_ROLE, admin);
         _grantRole(TERMINATION_ORACLE, terminationOracle);
 
         ClientStorage storage $ = s();
@@ -312,6 +341,82 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         }
     }
 
+    // solhint-disable function-max-lines
+    /**
+     * @notice Replaces all broken tracked allocations for a completed existing deal.
+     * @param dealId The id of the deal to rescue.
+     * @param params The DataCap transfer parameters that create replacement allocations.
+     */
+    function rescueDealAllocations(uint256 dealId, DataCapTypes.TransferParams calldata params)
+        external
+        nonReentrant
+        onlyRole(RESCUE_ROLE)
+    {
+        ClientStorage storage $ = s();
+        PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
+        if (proposal.state != PoRepTypes.DealState.Completed || $._deals[dealId].dealId == 0) {
+            revert InvalidDealStateForTransfer();
+        }
+
+        Deal storage deal = $._deals[dealId];
+        CommonTypes.FilActorId[] memory oldAllocationIds = deal.allocationIds;
+        if (oldAllocationIds.length == 0 || params.amount.neg) revert InvalidAllocationRequest();
+
+        if (
+            keccak256(params.to.data)
+                != keccak256(FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)).data)
+        ) {
+            revert InvalidAllocationRequest();
+        }
+
+        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
+            _deserializeVerifregOperatorData(params.operator_data);
+        if (allocations.length != oldAllocationIds.length || claimExtensions.length != 0) {
+            revert InvalidAllocationRequest();
+        }
+
+        uint256 totalSize;
+        for (uint256 i = 0; i < allocations.length; i++) {
+            ProviderAllocation memory alloc = allocations[i];
+            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
+                revert InvalidProvider();
+            }
+            _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
+            if (alloc.size == 0) revert InvalidAllocationRequest();
+            totalSize += alloc.size;
+        }
+
+        if (
+            totalSize != deal.sizeOfAllocations
+                || keccak256(params.amount.val) != keccak256(abi.encodePacked(totalSize * 1 ether))
+        ) {
+            revert InvalidAllocationRequest();
+        }
+
+        $._metaAllocatorContract
+            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, deal.sizeOfAllocations);
+        emit DatacapSpent(deal.client, deal.sizeOfAllocations);
+
+        /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
+        (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
+        if (exitCode != 0) {
+            revert TransferFailed(exitCode);
+        }
+
+        CommonTypes.FilActorId[] memory newAllocationIds = transferReturn.decodeAllocationResponse();
+        if (newAllocationIds.length != oldAllocationIds.length) {
+            revert InvalidAllocationRequest();
+        }
+        delete deal.allocationIds;
+        for (uint256 i = 0; i < newAllocationIds.length; ++i) {
+            deal.allocationIds.push(newAllocationIds[i]);
+        }
+
+        emit DealAllocationsRescued(dealId, msg.sender, totalSize);
+    }
+
+    // solhint-enable function-max-lines
+
     // solhint-disable func-name-mixedcase
     /**
      * @notice The handle_filecoin_method function is a universal entry point for calls
@@ -388,9 +493,9 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
                     (size, byteIdx) = CBORDecoder.readUInt64(cborData, byteIdx);
                     allocations[i].size = size;
                 }
-                (, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx); // termMin
-                (, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx); // termMax
-                (, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx); // expiration
+                (allocations[i].termMin, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
+                (allocations[i].termMax, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
+                (allocations[i].expiration, byteIdx) = CBORDecoder.readInt64(cborData, byteIdx);
                 // slither-disable-end unused-return
             }
         }
@@ -466,7 +571,27 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
                 revert InvalidProvider();
             }
 
+            _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
+            if (alloc.size == 0) {
+                revert InvalidAllocationRequest();
+            }
+
             sizeOfAllocations += alloc.size;
+        }
+    }
+
+    /**
+     * @notice Validates allocation term bounds.
+     * @param termMin The requested minimum claim term.
+     * @param termMax The requested maximum claim term.
+     * @param expiration The allocation expiration epoch.
+     */
+    function _ensureValidAllocationTerms(int64 termMin, int64 termMax, int64 expiration) internal view {
+        if (int256(termMax) < int256(termMin) + int256(uint256(MIN_CLAIM_WINDOW_EPOCHS))) {
+            revert InvalidClaimWindow(termMin, termMax);
+        }
+        if (expiration < int64(uint64(block.number))) {
+            revert InvalidAllocationRequest();
         }
     }
 

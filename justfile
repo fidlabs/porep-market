@@ -97,6 +97,15 @@ mainnet_upgrade: clean build
     ./script/preflight-mainnet.sh upgrade
     RPC_URL=$RPC_MAINNET PRIVATE_KEY=$PRIVATE_KEY_MAINNET just upgrade --slow
 
+rescue_prepare deal_ids term_min term_max:
+    ./script/rescue-allocations.sh prepare --deal-ids {{deal_ids}} --term-min {{term_min}} --term-max {{term_max}}
+
+rescue_dry_run plan:
+    ./script/rescue-allocations.sh execute --plan {{plan}} --dry-run
+
+rescue_execute plan:
+    PRIVATE_KEY=$RESCUE_PRIVATE_KEY_MAINNET ./script/rescue-allocations.sh execute --plan {{plan}} --broadcast
+
 # Blockscout contract verification
 # Verify reads deployments/<net>/latest.json and works from any 
 # fresh checkout of the deployment commit (no broadcast/artifacts needed).
@@ -120,7 +129,7 @@ verify-one chain addr name:
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."
 
-pre-push: fmt-check lint test check-abis
+pre-push: fmt-check lint test check-coverage check-abis
     @echo "Ready to push."
 
 fix: fmt lint test
