@@ -1,8 +1,8 @@
 {
   "Client": {
-    "codeHash": "0x9a9f72987dd93cedf041485ca7caf135525e0a9e51c55a9dad08ce8938793e2c",
-    "deployedCodeHash": "0x45bd0eda8dfa7409f3a506cb827aca3ccd0518601b7b9b785bf2574a5ca02fbf",
-    "impl": "0x29687627fFCb20Dd494f16a4a46Fe200763a57b7",
+    "codeHash": "0xde09614e74d7a16c877c8586e2a2329d841b568f0c107545954ebafdf60048d6",
+    "deployedCodeHash": "0x7d48367343a339c53a52277e65cdcae4d8cee79a8e4ad89a11fcbf6eb459d4df",
+    "impl": "0xd9374A9D6B5D24D27b2B8087AB93839BED9a58AF",
     "proxy": "0x4B099b9eCa7d3872Fa8F9B72b913119B4F08c5ED"
   },
   "FilecoinPay": "0x23b1e018F08BB982348b15a86ee926eEBf7F4DAa",
