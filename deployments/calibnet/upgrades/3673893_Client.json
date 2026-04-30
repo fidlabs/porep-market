@@ -1,0 +1,11 @@
+{
+  "chainId": 314159,
+  "deployedCodeHash": "0x7d48367343a339c53a52277e65cdcae4d8cee79a8e4ad89a11fcbf6eb459d4df",
+  "deployer": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
+  "newCodeHash": "0xd42543b5802b1e5d7879bd79f83160207f9c81aa72c4c32f574c7c711187d995",
+  "newImpl": "0x014b5589b1BE374D1621ac8645CcEd208e4aCAa6",
+  "prevCodeHash": "0x7c87463538b4e9fa691ae32a5a77fc9c7d3120b30a28af4df38b4af0904113c2",
+  "prevImpl": "0x6b89d9Ab775f422CdadEe2C2F47b31F7FF7fd3cf",
+  "proxy": "0x1926de8ce11a7527413Dcd0a384652D9548f36c9",
+  "upgradedAt": 1777543170
+}
