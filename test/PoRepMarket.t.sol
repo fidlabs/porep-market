@@ -862,4 +862,37 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, terms, expectedManifestLocation);
     }
+
+    function testRejectDealRevertsWhenAcceptedDealHasValidatorSet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.DealNotRejectable.selector, dealId, PoRepTypes.DealState.Accepted)
+        );
+        vm.prank(clientAddress);
+        poRepMarket.rejectDeal(dealId);
+    }
+
+    function testRejectAcceptedDealWithoutValidatorAndRailId() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(clientAddress);
+        vm.expectEmit(true, true, false, false);
+        emit PoRepMarket.DealRejected(dealId, clientAddress);
+        poRepMarket.rejectDeal(dealId);
+
+        PoRepTypes.DealProposal memory dealProposal = poRepMarket.getDealProposal(dealId);
+        assertTrue(dealProposal.state == PoRepTypes.DealState.Rejected);
+    }
 }

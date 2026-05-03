@@ -290,6 +290,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidDealSize();
 
     /**
+     * @notice Error thrown when a deal is not in a state that allows it to be rejected
+     * @param dealId The id of the deal proposal
+     * @param state The current state of the deal proposal
+     * @dev 0x9ae0f9db
+     */
+    error DealNotRejectable(uint256 dealId, PoRepTypes.DealState state);
+
+    /**
      * @notice Error indicating that the deal price would result in zero per-epoch payment
      * @dev 0x1fbc910d
      * @param totalPerMonth pricePerSectorPerMonth * estimated sector count
@@ -512,6 +520,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Rejects a deal
+     * @dev Rejects a deal in Proposed state, or in Accepted state before validator and rail id are set
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external {
@@ -519,7 +528,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
+
+        bool isProposed = dp.state == PoRepTypes.DealState.Proposed;
+        bool isAcceptedNotStarted =
+            dp.state == PoRepTypes.DealState.Accepted && dp.validator == address(0) && dp.railId == 0;
+
+        if (!isProposed && !isAcceptedNotStarted) {
+            revert DealNotRejectable(dealId, dp.state);
+        }
 
         if (
             msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)
