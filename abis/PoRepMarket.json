@@ -700,6 +700,19 @@
   },
   {
     "type": "function",
+    "name": "rejectAcceptedDeal",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "rejectDeal",
     "inputs": [
       {
@@ -1299,11 +1312,6 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "state",
-        "type": "uint8",
-        "internalType": "enum PoRepTypes.DealState"
       }
     ]
   },

@@ -73,10 +73,16 @@ interface IPoRepMarket {
 
     /**
      * @notice Rejects a deal
-     * @dev Rejects a deal in Proposed state, or in Accepted state before validator and rail id are set
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external;
+
+    /**
+     * @notice Rejects a deal in Accepted state before rail is set
+     * @dev Only callable by the admin
+     * @param dealId The id of the deal proposal
+     */
+    function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
      * @notice Gets all completed deals

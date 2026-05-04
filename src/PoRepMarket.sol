@@ -292,10 +292,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Error thrown when a deal is not in a state that allows it to be rejected
      * @param dealId The id of the deal proposal
-     * @param state The current state of the deal proposal
-     * @dev 0x9ae0f9db
+     * @dev 0x507b3029
      */
-    error DealNotRejectable(uint256 dealId, PoRepTypes.DealState state);
+    error DealNotRejectable(uint256 dealId);
 
     /**
      * @notice Error indicating that the deal price would result in zero per-epoch payment
@@ -520,7 +519,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Rejects a deal
-     * @dev Rejects a deal in Proposed state, or in Accepted state before validator and rail id are set
      * @param dealId The id of the deal proposal
      */
     function rejectDeal(uint256 dealId) external {
@@ -528,20 +526,34 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
-
-        bool isProposed = dp.state == PoRepTypes.DealState.Proposed;
-        bool isAcceptedNotStarted =
-            dp.state == PoRepTypes.DealState.Accepted && dp.validator == address(0) && dp.railId == 0;
-
-        if (!isProposed && !isAcceptedNotStarted) {
-            revert DealNotRejectable(dealId, dp.state);
-        }
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
 
         if (
             msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)
                 && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)
         ) {
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
+        }
+
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        _changeDealState(dealId, PoRepTypes.DealState.Rejected);
+        emit DealRejected(dealId, msg.sender);
+    }
+
+    /**
+     * @notice Rejects a deal in Accepted state before rail is set
+     * @dev Only callable by the admin
+     * @param dealId The id of the deal proposal
+     */
+    function rejectAcceptedDeal(uint256 dealId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        DealProposalsStorage storage $ = s();
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
+
+        if (dp.railId != 0) {
+            revert DealNotRejectable(dealId);
         }
 
         $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);

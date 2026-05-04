@@ -863,7 +863,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, terms, expectedManifestLocation);
     }
 
-    function testRejectDealRevertsWhenAcceptedDealHasValidatorSet() public {
+    function testRejectAcceptedDealByAdmin() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
 
@@ -873,26 +873,30 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(PoRepMarket.DealNotRejectable.selector, dealId, PoRepTypes.DealState.Accepted)
-        );
-        vm.prank(clientAddress);
-        poRepMarket.rejectDeal(dealId);
+        vm.expectEmit(true, false, false, false);
+        emit PoRepMarket.DealRejected(dealId, adminAddress);
+        vm.prank(adminAddress);
+        poRepMarket.rejectAcceptedDeal(dealId);
+
+        PoRepTypes.DealProposal memory dealProposal = poRepMarket.getDealProposal(dealId);
+        assertTrue(dealProposal.state == PoRepTypes.DealState.Rejected);
     }
 
-    function testRejectAcceptedDealWithoutValidatorAndRailId() public {
+    function testRejectAcceptedDealRevertsWhenRailIdIsSet() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
 
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        vm.prank(clientAddress);
-        vm.expectEmit(true, true, false, false);
-        emit PoRepMarket.DealRejected(dealId, clientAddress);
-        poRepMarket.rejectDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
 
-        PoRepTypes.DealProposal memory dealProposal = poRepMarket.getDealProposal(dealId);
-        assertTrue(dealProposal.state == PoRepTypes.DealState.Rejected);
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealNotRejectable.selector, dealId));
+        vm.prank(adminAddress);
+        poRepMarket.rejectAcceptedDeal(dealId);
     }
 }
