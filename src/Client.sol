@@ -75,6 +75,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
 
     /**
      * @notice Minimum allowed allocation claim window in epochs.
+     * @dev 4 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 11_520 epochs
      */
     uint64 internal constant MIN_CLAIM_WINDOW_EPOCHS = 11_520;
 
@@ -129,6 +130,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @notice Error thrown when an allocation claim window is too small.
      * @param termMin The requested minimum claim term.
      * @param termMax The requested maximum claim term.
+     * @dev 0x5e1fe755
      */
     error InvalidClaimWindow(int64 termMin, int64 termMax);
 

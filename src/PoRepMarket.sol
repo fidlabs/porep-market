@@ -290,6 +290,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidDealSize();
 
     /**
+     * @notice Error thrown when a deal is not in a state that allows it to be rejected
+     * @param dealId The id of the deal proposal
+     * @dev 0x507b3029
+     */
+    error DealNotRejectable(uint256 dealId);
+
+    /**
      * @notice Error indicating that the deal price would result in zero per-epoch payment
      * @dev 0x1fbc910d
      * @param totalPerMonth pricePerSectorPerMonth * estimated sector count
@@ -526,6 +533,27 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
                 && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)
         ) {
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
+        }
+
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        _changeDealState(dealId, PoRepTypes.DealState.Rejected);
+        emit DealRejected(dealId, msg.sender);
+    }
+
+    /**
+     * @notice Rejects a deal in Accepted state before rail is set
+     * @dev Only callable by the admin
+     * @param dealId The id of the deal proposal
+     */
+    function rejectAcceptedDeal(uint256 dealId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        DealProposalsStorage storage $ = s();
+        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+
+        _ensureDealExists(dp);
+        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
+
+        if (dp.railId != 0) {
+            revert DealNotRejectable(dealId);
         }
 
         $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);

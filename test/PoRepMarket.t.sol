@@ -862,4 +862,41 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, terms, expectedManifestLocation);
     }
+
+    function testRejectAcceptedDealByAdmin() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectEmit(true, false, false, false);
+        emit PoRepMarket.DealRejected(dealId, adminAddress);
+        vm.prank(adminAddress);
+        poRepMarket.rejectAcceptedDeal(dealId);
+
+        PoRepTypes.DealProposal memory dealProposal = poRepMarket.getDealProposal(dealId);
+        assertTrue(dealProposal.state == PoRepTypes.DealState.Rejected);
+    }
+
+    function testRejectAcceptedDealRevertsWhenRailIdIsSet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateRailId(dealId, 1);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealNotRejectable.selector, dealId));
+        vm.prank(adminAddress);
+        poRepMarket.rejectAcceptedDeal(dealId);
+    }
 }
