@@ -140,17 +140,19 @@ interface IPoRepMarket {
     function getDeals() external view returns (PoRepTypes.DealProposal[] memory deals);
 
     /**
-     * @notice Iterates through deals in proposed state and rejects those that have expired
-     * @dev A deal proposal is considered expired if it has been in the proposed state for more than the deal proposal expiration
-     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setDealProposalExpiration function
+     * @notice Rejects expired deal
+     * @param dealId The id of the deal proposal
+     * @dev A deal proposal is considered expired if it has been in the proposed state for more than the dealProposalExpiration
+     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setNewDealProposalExpiration function
      */
-    function rejectExpiredDeals() external;
+    function rejectExpiredDeal(uint256 dealId) external;
 
     /**
-     * @notice Sets default deal proposal expiration
-     * @param newDealProposalExpiration The new default deal proposal expiration in epochs
+     * @notice Sets new deal proposal expiration
+     * @dev Only callable by the admin
+     * @param newDealProposalExpiration The new deal proposal expiration in epochs
      */
-    function setDefaultDealProposalExpiration(uint256 newDealProposalExpiration) external;
+    function setNewDealProposalExpiration(uint256 newDealProposalExpiration) external;
 
     /**
      * @notice Retrieves the deal proposal expiration

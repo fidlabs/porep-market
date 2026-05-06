@@ -812,8 +812,14 @@
   },
   {
     "type": "function",
-    "name": "rejectExpiredDeals",
-    "inputs": [],
+    "name": "rejectExpiredDeal",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -872,8 +878,16 @@
     "inputs": [
       {
         "name": "padding",
-    "name": "setDealProposalExpiration",
-    "name": "setDefaultDealProposalExpiration",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setNewDealProposalExpiration",
     "inputs": [
       {
         "name": "newDealProposalExpiration",
@@ -1174,6 +1188,12 @@
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
+      },
+      {
+        "name": "expiredAtBlock",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1454,6 +1474,27 @@
     "type": "error",
     "name": "DealDoesNotExist",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "DealNotExpiredYet",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentBlock",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "expirationBlock",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
