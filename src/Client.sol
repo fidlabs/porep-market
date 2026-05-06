@@ -458,9 +458,8 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         uint256 requiredFunds = dealProposal.terms.pricePerSectorPerMonth * newAllocationsCount;
 
         IFilecoinPayV1.RailView memory rail = $._filecoinPayContract.getRail(deal.railId);
-        (uint256 funds, uint256 lockupCurrent,,) = $._filecoinPayContract.accounts(rail.token, deal.client);
+        (,, uint256 availableFunds,) = $._filecoinPayContract.getAccountInfoIfSettled(rail.token, deal.client);
 
-        uint256 availableFunds = funds - lockupCurrent;
         if (availableFunds < requiredFunds) {
             revert InsufficientFundsForRail(requiredFunds, availableFunds);
         }
@@ -809,5 +808,20 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         for (uint256 i = 0; i < claims.length; ++i) {
             $._terminatedClaims[claims[i]] = true;
         }
+    }
+
+    /**
+     * @notice Sets the FilecoinPay contract address
+     * @dev This function is temporary and will be removed later.
+     *      It allows the admin to set the FilecoinPay contract address after deployment,
+     *      which is necessary for the Client contract to interact with FilecoinPay.
+     * @dev Only callable by the admin
+     * @param filecoinPayContract The address of the FilecoinPay contract
+     */
+    function setFilecoinPayContract(address filecoinPayContract) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (filecoinPayContract == address(0)) {
+            revert InvalidFilecoinPayContractAddress();
+        }
+        s()._filecoinPayContract = IFilecoinPayV1(filecoinPayContract);
     }
 }

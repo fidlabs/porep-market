@@ -144,8 +144,8 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
         override
         returns (uint256 funds, uint256 lockupCurrent, uint256 lockupRate, uint256 lockupLastSettledAt)
     {
-        AccountState storage a = _accounts[token][owner];
-        return (a.funds, a.lockupCurrent, a.lockupRate, a.lockupLastSettledAt);
+        AccountState storage account = _accounts[token][owner];
+        return (account.funds, account.lockupCurrent, account.lockupRate, account.lockupLastSettledAt);
     }
 
     function getRail(uint256 railId) external view override returns (RailView memory) {
@@ -164,5 +164,20 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
             commissionRateBps: r.commissionRateBps,
             serviceFeeRecipient: r.serviceFeeRecipient
         });
+    }
+
+    function getAccountInfoIfSettled(IERC20 token, address owner)
+        external
+        view
+        override
+        returns (uint256 fundedUntilEpoch, uint256 currentFunds, uint256 availableFunds, uint256 currentLockupRate)
+    {
+        AccountState storage account = _accounts[token][owner];
+        currentFunds = account.funds;
+        currentLockupRate = account.lockupRate;
+        availableFunds = account.funds - account.lockupCurrent;
+        fundedUntilEpoch = account.lockupRate == 0
+            ? type(uint256).max
+            : account.lockupLastSettledAt + availableFunds / account.lockupRate;
     }
 }

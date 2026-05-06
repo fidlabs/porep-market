@@ -77,4 +77,14 @@ interface IClient {
      * @param claims An array of claim IDs to mark as terminated.
      */
     function claimsTerminatedEarly(uint64[] calldata claims) external;
+
+    /**
+     * @notice Sets the FilecoinPay contract address
+     * @dev This function is temporary and will be removed later.
+     *      It allows the admin to set the FilecoinPay contract address after deployment,
+     *      which is necessary for the Client contract to interact with FilecoinPay.
+     * @dev Only callable by the admin
+     * @param filecoinPayContract The address of the FilecoinPay contract
+     */
+    function setFilecoinPayContract(address filecoinPayContract) external;
 }

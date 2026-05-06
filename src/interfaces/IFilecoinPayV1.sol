@@ -137,4 +137,18 @@ interface IFilecoinPayV1 {
      * @custom:constraint If called by the operator, the payer's funding status isn't checked.
      */
     function terminateRail(uint256 railId) external;
+
+    /**
+     * @notice Gets information about an account - when it would go into debt, total balance, available balance, and lockup rate.
+     * @param token The token address to get account info for.
+     * @param owner The address of the account owner.
+     * @return fundedUntilEpoch The epoch at which the account would go into debt given current lockup rate and balance.
+     * @return currentFunds The current funds in the account.
+     * @return availableFunds The funds available after accounting for simulated lockup.
+     * @return currentLockupRate The current lockup rate per epoch.
+     */
+    function getAccountInfoIfSettled(IERC20 token, address owner)
+        external
+        view
+        returns (uint256 fundedUntilEpoch, uint256 currentFunds, uint256 availableFunds, uint256 currentLockupRate);
 }

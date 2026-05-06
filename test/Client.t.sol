@@ -1323,4 +1323,15 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Client.InsufficientFundsForRail.selector, 300, 200));
         clientMock.transfer(transferParams, dealId, false);
     }
+
+    function testSetFilecoinPayContract() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        address newFilecoinPay = address(0x999);
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidFilecoinPayContractAddress.selector));
+        clientMock.setFilecoinPayContract(address(0));
+
+        clientMock.setFilecoinPayContract(newFilecoinPay);
+        assertEq(address(clientMock.getfilecoinPayAddress()), newFilecoinPay);
+    }
 }
