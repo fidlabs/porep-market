@@ -257,12 +257,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error RailIdAlreadySet();
 
     /**
-     * @notice Error thrown when trying to update manifest location by an unauthorised caller
-     * @dev 0x6138b40f
-     */
-    error UnauthorisedCaller(uint256 dealId, address caller, address expectedCaller);
-
-    /**
      * @notice Error thrown when empty manifest location is provided
      * @dev 0x323de5da
      */
@@ -666,7 +660,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Gets the client smart contract address from storage
-     * @return address The client smart contract address
+     * @return IClient The client smart contract address
      */
     function getClientSmartContract() external view returns (address) {
         DealProposalsStorage storage $ = s();
@@ -696,16 +690,17 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Updates the manifest location for a specific deal proposal
+     * @dev Only callable by the admin
      * @param dealId The unique identifier of the deal proposal
      * @param newManifestLocation The new manifest location URL to be updated for the deal proposal
      */
-    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external {
+    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation)
+        external
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         DealProposalsStorage storage $ = s();
         PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
         _ensureDealExists(dealProposal);
-        if (msg.sender != dealProposal.client) {
-            revert UnauthorisedCaller(dealId, msg.sender, dealProposal.client);
-        }
 
         if (bytes(newManifestLocation).length == 0) {
             revert EmptyManifestLocation();

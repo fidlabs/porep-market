@@ -731,7 +731,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
 
-        vm.prank(clientAddress);
+        vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EmptyManifestLocation.selector, ""));
         poRepMarket.updateManifestLocation(dealId, "");
     }
@@ -761,17 +761,6 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 
-    function testUpdateManifestLocationRevertsUnauthorisedCaller() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
-        address unauthorisedCaller = vm.addr(0x007);
-        vm.prank(unauthorisedCaller);
-        vm.expectRevert(
-            abi.encodeWithSelector(PoRepMarket.UnauthorisedCaller.selector, dealId, unauthorisedCaller, clientAddress)
-        );
-        poRepMarket.updateManifestLocation(dealId, expectedManifestLocation);
-    }
-
     function testManifestLocationIsSetCorrectly() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
@@ -785,7 +774,7 @@ contract PoRepMarketTest is Test {
         string memory manifestLocation = poRepMarket.getManifestLocation(dealId);
         assertEq(manifestLocation, expectedManifestLocation);
         string memory updatedManifestLocation = "updatedManifestLocation";
-        vm.prank(clientAddress);
+        vm.prank(adminAddress);
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
         manifestLocation = poRepMarket.getManifestLocation(dealId);
         assertEq(manifestLocation, updatedManifestLocation);
@@ -795,7 +784,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         string memory updatedManifestLocation = "updatedManifestLocation";
-        vm.prank(clientAddress);
+        vm.prank(adminAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.ManifestLocationUpdated(dealId, expectedManifestLocation, updatedManifestLocation);
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
@@ -805,7 +794,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         string memory updatedManifestLocation = TestUtils.generateLongString(2049);
-        vm.prank(clientAddress);
+        vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.TooLongManifestLocation.selector, updatedManifestLocation));
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
     }
@@ -1087,5 +1076,20 @@ contract PoRepMarketTest is Test {
 
     function testGetValidatorFactoryContract() public view {
         assertEq(poRepMarket.getValidatorFactoryContract(), address(validatorFactory));
+    }
+
+    function testManifestLocationUpdateRevertsWhenCallerIsNotAdmin() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        string memory updatedManifestLocation = "updatedManifestLocation";
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector,
+                clientAddress,
+                poRepMarket.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(clientAddress);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
     }
 }
