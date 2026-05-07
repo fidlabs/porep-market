@@ -74,6 +74,12 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     bytes32 public constant TERMINATION_ORACLE = keccak256("TERMINATION_ORACLE");
 
     /**
+     * @notice Size of 32GiB sector in bytes
+     * @dev 32 GiB = 32 * 1024 * 1024 * 1024 bytes
+     */
+    uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
+
+    /**
      * @notice Minimum allowed allocation claim window in epochs.
      * @dev 4 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 11_520 epochs
      */
@@ -384,7 +390,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
                 revert InvalidProvider();
             }
             _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
-            if (alloc.size == 0) revert InvalidAllocationRequest();
+            if (alloc.size == 0 || alloc.size > SECTOR_SIZE) revert InvalidAllocationRequest();
             totalSize += alloc.size;
         }
 
@@ -574,7 +580,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
             }
 
             _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
-            if (alloc.size == 0) {
+            if (alloc.size == 0 || alloc.size > SECTOR_SIZE) {
                 revert InvalidAllocationRequest();
             }
 

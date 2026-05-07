@@ -1243,4 +1243,30 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidRailId.selector));
         client.transfer(transferParams, dealId, false);
     }
+
+    function testTransferRevertsWhenAllocationSizeExceedsSector() public {
+        // alloc.size = 32GiB + 1 byte = 34359738369 bytes
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221B00000008000000011A0007E9001A000816001A0050334080";
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        client.transfer(transferParams, dealId, false);
+    }
+
+    function testRescueDealAllocationsRejectsAllocationSizeExceedingSector() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        _registerDealWithOneAllocation(clientMock);
+        _grantRescueRole(clientMock, address(this));
+
+        // alloc.size = 32GiB + 1 byte = 34359738369 bytes
+        DataCapTypes.TransferParams memory params = _rescueParams(
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221B00000008000000011A0007E9001A000816001A0050334080",
+            2048
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        clientMock.rescueDealAllocations(dealId, params);
+    }
 }
