@@ -9,6 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {IClient} from "./interfaces/IClient.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -39,6 +40,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
+     * @notice Padding allowed to make deal completed = 10%
+     */
+    uint256 private constant DEAL_COMPLETION_PADDING = 10;
+
+    /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
      * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
@@ -53,7 +59,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
-        address _clientSmartContract;
+        IClient _clientSmartContract;
         uint256 _dealIdCounter;
     }
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DealProposalsStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -174,12 +180,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 0xbfbc5a6b
      */
     error NotTheDealValidator(uint256 dealId, address validator);
-
-    /**
-     * @notice Error thrown when caller is not the client smart contract
-     * @dev 0xe3186bfd
-     */
-    error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
 
     /**
      * @notice Error thrown when caller is not the controlling address for the provider
@@ -305,6 +305,16 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidDealPricePerSectorPerMonth(uint256 totalPerMonth, uint256 epochsInMonth);
 
     /**
+     * @notice Error indicating that the allocated size for a deal is too small to change its state to complete
+     */
+    error InvalidAllocationSizeForDealCompletion();
+
+    /**
+     * @notice Error thrown when trying to use an invalid client address
+     */
+    error NotTheClientAddress();
+
+    /**
      * @notice Constructor
      */
     constructor() {
@@ -335,7 +345,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     function setClientSmartContract(address _clientSmartContract) public onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
         DealProposalsStorage storage $ = _getDealProposalsStorage();
-        $._clientSmartContract = _clientSmartContract;
+        $._clientSmartContract = IClient(_clientSmartContract);
         emit ClientSmartContractUpdated(_clientSmartContract);
     }
 
@@ -474,22 +484,25 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Completes a deal
      * @param dealId The id of the deal proposal
-     * @param actualSizeBytes The actual size of the deal in bytes
      */
-    function completeDeal(uint256 dealId, uint256 actualSizeBytes) external {
+    function completeDeal(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
         PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
-        if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
+        if (msg.sender != dp.client) revert NotTheClientAddress();
+        uint256 allocatedSize = $._clientSmartContract.getDealSizeOfAllocations(dealId);
+        uint256 proposedSize = dp.terms.dealSizeBytes;
+
+        _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
 
         $._dealIdsReadyForPayment.add(dealId);
-        $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, actualSizeBytes);
+        $._SPRegistryContract.commitCapacity(dp.provider, proposedSize, allocatedSize);
 
         _changeDealState(dealId, PoRepTypes.DealState.Completed);
-        emit DealCompleted(dealId, msg.sender, actualSizeBytes, dp.provider);
+        emit DealCompleted(dealId, msg.sender, allocatedSize, dp.provider);
     }
 
     /**
@@ -745,6 +758,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         if (bytes(manifestLocation).length > 2048) {
             revert TooLongManifestLocation();
+        }
+    }
+
+    function _ensureAllocationSizeWithinTolerance(uint256 value, uint256 target) internal pure {
+        uint256 delta = value > target ? value - target : target - value;
+
+        if (delta * 100 > target * DEAL_COMPLETION_PADDING) {
+            revert InvalidAllocationSizeForDealCompletion();
         }
     }
 

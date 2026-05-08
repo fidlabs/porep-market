@@ -44,6 +44,7 @@ contract ClientTest is Test {
     bytes public transferTo = abi.encodePacked(vm.addr(2));
     uint256 public dealId;
     uint256 public totalDealSize;
+    uint256 public pricePerSectorPerMonth;
 
     CommonTypes.FilActorId public providerFilActorId;
     // solhint-disable var-name-mixedcase
@@ -84,7 +85,8 @@ contract ClientTest is Test {
         validatorMock = new ValidatorMock();
         metaAllocatorMock = new MetaAllocatorMock();
         terminationOracle = vm.addr(3);
-        totalDealSize = 1024;
+        totalDealSize = 103_079_215_104; // 102 GiB
+        pricePerSectorPerMonth = 86_400;
         client = Client(setupProxy(address(impl)));
         actorIdMock = new ActorIdMock();
         failingMockInvalidTopLevelArray = new FailingMockInvalidTopLevelArray();
@@ -116,6 +118,7 @@ contract ClientTest is Test {
         resolveAddress.setId(address(this), uint64(10000));
         resolveAddress.setAddress(hex"00C2A101", uint64(10000));
         dealId = 1;
+
         poRepMarketMock.setDealProposal(
             dealId,
             PoRepTypes.DealProposal({
@@ -125,7 +128,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
@@ -152,7 +157,7 @@ contract ClientTest is Test {
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
         poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
     }
 
@@ -164,7 +169,7 @@ contract ClientTest is Test {
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334086192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221910001A0007E9001A000816001A0050334080";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
         poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
     }
 
@@ -486,7 +491,7 @@ contract ClientTest is Test {
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710021A005034AC";
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory clientAllocationIdsAfter = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(clientAllocationIdsAfter.length, 2);
@@ -499,7 +504,7 @@ contract ClientTest is Test {
         transferParams.operator_data = hex"828081821904B001";
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidClaimExtensionRequest.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testHandleFilecoinMethodExpectRevertInvalidCaller() public {
@@ -551,7 +556,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidOperatorData.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testInvalidAllocationRequest() public {
@@ -561,7 +566,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferRevertsWhenAllocationClaimWindowIsTooSmall() public {
@@ -578,7 +583,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidClaimWindow.selector, int64(518400), int64(529919)));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferRevertsWithInvalidClaimWindowWhenTermMinCannotFitWindow() public {
@@ -588,7 +593,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidClaimWindow.selector, type(int64).max, type(int64).max));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferAcceptsAllocationClaimWindowAtMinimum() public {
@@ -598,7 +603,7 @@ contract ClientTest is Test {
         actorIdMock.setGetClaimsResult(hex"8282008080");
 
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory ids = client.getClientAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
@@ -613,7 +618,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferAcceptsAllocationExpirationAtCurrentBlock() public {
@@ -624,7 +629,7 @@ contract ClientTest is Test {
         vm.roll(1000);
 
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory ids = client.getClientAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
@@ -632,7 +637,7 @@ contract ClientTest is Test {
 
     function testClientCanCallTransfer() public {
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, true);
+        client.transfer(transferParams, dealId);
     }
 
     function testShouldRevertTransferWhenDealIsNotInCorrectState() public {
@@ -645,7 +650,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Completed,
                 railId: 1,
@@ -656,14 +663,14 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidDealStateForTransfer.selector));
-        client.transfer(transferParams, dealId, true);
+        client.transfer(transferParams, dealId);
     }
 
     function testVerifregFailIsDetected() public {
         vm.etch(CALL_ACTOR_ID, address(builtInActorForTransferFunctionMock).code);
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.TransferFailed.selector, 1));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testClaimExtensionNonExistent() public {
@@ -672,16 +679,16 @@ contract ClientTest is Test {
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
         vm.expectRevert(Client.GetClaimsCallFailed.selector);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
-    function testClaimExtensionn() public {
+    function testClaimExtension() public {
         // params taken directly from `boost extend-deal` message
         // no allocations
         // 1 extension for provider 20000 and claim id 1
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testClaimExtensionGetClaimsFail() public {
@@ -689,7 +696,7 @@ contract ClientTest is Test {
         transferParams.operator_data = hex"82808283192710011A005034AC83192710011A005034AC";
         vm.prank(clientAddress);
         vm.expectRevert(Client.GetClaimsCallFailed.selector);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferDoubleClaimExtension() public {
@@ -698,42 +705,42 @@ contract ClientTest is Test {
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidTopLevelArray() public {
         vm.etch(CALL_ACTOR_ID, address(failingMockInvalidTopLevelArray).code);
         vm.expectRevert(abi.encodeWithSelector(AllocationResponseCbor.InvalidTopLevelArray.selector));
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidFirstElementLength() public {
         vm.etch(CALL_ACTOR_ID, address(failingMockInvalidFirstElementLength).code);
         vm.expectRevert(abi.encodeWithSelector(AllocationResponseCbor.InvalidFirstElement.selector));
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidFirstElementInnerLength() public {
         vm.etch(CALL_ACTOR_ID, address(failingMockInvalidFirstElementInnerLength).code);
         vm.expectRevert(abi.encodeWithSelector(AllocationResponseCbor.InvalidFirstElement.selector));
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidSecondElementLength() public {
         vm.etch(CALL_ACTOR_ID, address(failingMockInvalidSecondElementLength).code);
         vm.expectRevert(abi.encodeWithSelector(AllocationResponseCbor.InvalidSecondElement.selector));
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidSecondElementInnerLength() public {
         vm.etch(CALL_ACTOR_ID, address(failingMockInvalidSecondElementInnerLength).code);
         vm.expectRevert(abi.encodeWithSelector(AllocationResponseCbor.InvalidSecondElement.selector));
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testShouldRevertWhenAllocationsContainsDifferentAllocatorIds() public {
@@ -741,21 +748,21 @@ contract ClientTest is Test {
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186194E20D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013180";
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidProvider.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testShouldRevertWhenClaimExtensionsContainsDifferentAllocatorIds() public {
         transferParams.operator_data = hex"82808283192710011A005034AC83194E20011A005034AC";
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidProvider.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testShouldRevertWhenTransferIsCalledByNotTheClient() public {
         address notTheClient = vm.addr(0x523);
         vm.prank(notTheClient);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidClient.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testShouldNotOverrideDealWhileReplayingIfAlreadyRegistered() public {
@@ -766,7 +773,7 @@ contract ClientTest is Test {
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         poRepMarketMock.setDealProposal(
             dealId,
@@ -777,7 +784,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
@@ -791,7 +800,7 @@ contract ClientTest is Test {
             hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710011A005034AC";
         vm.expectEmit(true, true, true, true);
         emit Client.DatacapSpent(clientAddress, 24576);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         Client.Deal memory deal = clientMock.getDeal(dealId);
         assertTrue(CommonTypes.FilActorId.unwrap(deal.provider) == CommonTypes.FilActorId.unwrap(SP1));
@@ -819,7 +828,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 state: PoRepTypes.DealState.Accepted,
                 validator: address(validatorMock),
                 railId: 1,
@@ -829,9 +840,9 @@ contract ClientTest is Test {
         );
         reentrantMetaAllocatorMock.setAttackParams(address(clientWithReentrancy), transferParams, dealId);
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, true);
+        client.transfer(transferParams, dealId);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidClient.selector));
-        clientWithReentrancy.transfer(transferParams, dealId, false);
+        clientWithReentrancy.transfer(transferParams, dealId);
     }
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
@@ -842,7 +853,7 @@ contract ClientTest is Test {
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         poRepMarketMock.setDealProposal(
             dealId,
@@ -853,7 +864,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
@@ -869,7 +882,7 @@ contract ClientTest is Test {
         emit Client.DatacapSpent(clientAddress, 24576);
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         Client.Deal memory deal = clientMock.getDeal(dealId);
         assertEq(deal.allocationIds.length, 4);
@@ -886,7 +899,7 @@ contract ClientTest is Test {
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
@@ -903,7 +916,7 @@ contract ClientTest is Test {
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         uint64[] memory claims = new uint64[](1);
         claims[0] = 1;
@@ -928,7 +941,7 @@ contract ClientTest is Test {
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         vm.roll(5256407);
 
@@ -946,7 +959,7 @@ contract ClientTest is Test {
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         actorIdMock.setGetClaimsResult(
             hex"8282008182001081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
@@ -970,7 +983,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(Client.GetClaimsCallFailed.selector);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testIsDataSizeMatchingRemovesTerminatedClaimId() public {
@@ -983,7 +996,7 @@ contract ClientTest is Test {
 
         transferParams.operator_data = hex"82808283192710011A005034AC83192710021A005034AC";
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory beforeIds = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 2);
@@ -1039,7 +1052,7 @@ contract ClientTest is Test {
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
 
         vm.prank(clientAddress);
-        mock.transfer(transferParams, dealId, false);
+        mock.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory beforeIds = mock.getClientAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 2);
@@ -1059,7 +1072,7 @@ contract ClientTest is Test {
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         CommonTypes.FilActorId[] memory ids = clientMock.getClientAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
@@ -1079,7 +1092,7 @@ contract ClientTest is Test {
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         vm.prank(clientAddress);
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
 
         vm.prank(address(0x123));
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidCaller.selector, address(0x123), address(validatorMock)));
@@ -1101,7 +1114,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 validator: address(0),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
@@ -1122,7 +1137,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(IMetaAllocator.InsufficientAllowance.selector));
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
     }
 
     function testShouldThrowAmountEqualZero() public {
@@ -1136,7 +1151,7 @@ contract ClientTest is Test {
         );
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
     }
 
     function testShouldEmitMetaAllocatorDatacapAllocatedEvent() public {
@@ -1148,7 +1163,7 @@ contract ClientTest is Test {
         emit IMetaAllocator.DatacapAllocated(
             address(clientMock), FilAddresses.fromEthAddress(address(clientMock)).data, uint256(6144)
         );
-        clientMock.transfer(transferParams, dealId, false);
+        clientMock.transfer(transferParams, dealId);
     }
 
     function testInitializeRevertsWhenAdminAddressIsZero() public {
@@ -1189,12 +1204,12 @@ contract ClientTest is Test {
 
     function testShouldRevertWhenAlreadyRegisteredDealTransferIsCalledByNotTheClient() public {
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
 
         address notTheClient = vm.addr(0x523);
         vm.prank(notTheClient);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidClient.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferEmitsDatacapSpent() public {
@@ -1205,15 +1220,15 @@ contract ClientTest is Test {
         emit Client.DatacapSpent(clientAddress, 4096);
 
         vm.prank(clientAddress);
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testTransferRevertsWhenDealAlreadyCompleted() public {
         vm.startPrank(clientAddress);
-        client.transfer(transferParams, dealId, true);
+        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
 
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidDealStateForTransfer.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
         vm.stopPrank();
     }
 
@@ -1230,7 +1245,9 @@ contract ClientTest is Test {
                 requirements: SLITypes.SLIThresholds({
                     retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
                 }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                terms: SLITypes.DealTerms({
+                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
+                }),
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
@@ -1241,6 +1258,31 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidRailId.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
+    }
+
+    function testShouldReturnDealAllocatedSize() public {
+        ClientContractMock clientMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+
+        uint256 sizeOfTransfer = 6144;
+        metaAllocatorMock.setAllowance(address(clientMock), uint256(sizeOfTransfer * 3));
+
+        // 2 * 2048 from allocations and 2048 from claims
+        uint256 sizeOfAllocations;
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId);
+        sizeOfAllocations = clientMock.getDealSizeOfAllocations(dealId);
+        assertEq(sizeOfAllocations, sizeOfTransfer);
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId);
+        sizeOfAllocations = clientMock.getDealSizeOfAllocations(dealId);
+        assertEq(sizeOfAllocations, sizeOfTransfer * 2);
+
+        vm.prank(clientAddress);
+        clientMock.transfer(transferParams, dealId);
+        sizeOfAllocations = clientMock.getDealSizeOfAllocations(dealId);
+        assertEq(sizeOfAllocations, sizeOfTransfer * 3);
     }
 }

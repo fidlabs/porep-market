@@ -77,11 +77,6 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "actualSizeBytes",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -1343,6 +1338,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidAllocationSizeForDealCompletion",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidClientSmartContractAddress",
     "inputs": []
   },
@@ -1421,6 +1421,11 @@
   },
   {
     "type": "error",
+    "name": "NotTheClientAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "NotTheClientOrStorageProviderOrAdmin",
     "inputs": [
       {
@@ -1430,22 +1435,6 @@
       },
       {
         "name": "rejector",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "NotTheClientSmartContract",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "clientSmartContract",
         "type": "address",
         "internalType": "address"
       }
