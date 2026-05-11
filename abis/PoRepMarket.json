@@ -613,7 +613,7 @@
       {
         "name": "",
         "type": "address",
-        "internalType": "contract ISPRegistry"
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -626,7 +626,7 @@
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IValidatorFactory"
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"

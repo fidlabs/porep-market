@@ -3,8 +3,6 @@ pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SLITypes} from "../types/SLITypes.sol";
-import {ISPRegistry} from "./ISPRegistry.sol";
-import {IValidatorFactory} from "./IValidatorFactory.sol";
 
 /**
  * @title IPoRepMarket interface
@@ -118,19 +116,19 @@ interface IPoRepMarket {
 
     /**
      * @notice Gets the SPRegistry contract address from storage
-     * @return ISPRegistry The SPRegistry contract
+     * @return ISPRegistry The SPRegistry contract address
      */
-    function getSPRegistryContract() external view returns (ISPRegistry);
+    function getSPRegistryContract() external view returns (address);
 
     /**
      * @notice Gets the client smart contract address from storage
-     * @return address The client smart contract address
+     * @return IClient The client smart contract address
      */
     function getClientSmartContract() external view returns (address);
 
     /**
      * @notice Gets the validator factory contract address from storage
-     * @return IValidatorFactory The validator factory contract
+     * @return IValidatorFactory The validator factory contract adddress
      */
-    function getValidatorFactoryContract() external view returns (IValidatorFactory);
+    function getValidatorFactoryContract() external view returns (address);
 }

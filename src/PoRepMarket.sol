@@ -659,9 +659,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Gets the SPRegistry contract address from storage
      * @return ISPRegistry The SPRegistry contract address
      */
-    function getSPRegistryContract() external view returns (ISPRegistry) {
+    function getSPRegistryContract() external view returns (address) {
         DealProposalsStorage storage $ = s();
-        return $._SPRegistryContract;
+        return address($._SPRegistryContract);
     }
 
     /**
@@ -670,16 +670,16 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     function getClientSmartContract() external view returns (address) {
         DealProposalsStorage storage $ = s();
-        return $._clientSmartContract;
+        return address($._clientSmartContract);
     }
 
     /**
      * @notice Gets the validator factory contract address from storage
      * @return IValidatorFactory The validator factory contract address
      */
-    function getValidatorFactoryContract() external view returns (IValidatorFactory) {
+    function getValidatorFactoryContract() external view returns (address) {
         DealProposalsStorage storage $ = s();
-        return $._validatorFactoryContract;
+        return address($._validatorFactoryContract);
     }
 
     /**
