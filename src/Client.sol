@@ -212,6 +212,12 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      */
     error InvalidRailId();
 
+    /**
+     * @notice Error thrown when allocation size exceeds sector size
+     * @dev 0x5f804a88
+     */
+    error InvalidAllocationSize();
+
     struct Deal {
         bool completed;
         address client;
@@ -390,7 +396,9 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
                 revert InvalidProvider();
             }
             _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
-            if (alloc.size == 0 || alloc.size > SECTOR_SIZE) revert InvalidAllocationRequest();
+            if (alloc.size == 0) revert InvalidAllocationRequest();
+            if (alloc.size > SECTOR_SIZE) revert InvalidAllocationSize();
+
             totalSize += alloc.size;
         }
 
@@ -580,8 +588,12 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
             }
 
             _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
-            if (alloc.size == 0 || alloc.size > SECTOR_SIZE) {
+            if (alloc.size == 0) {
                 revert InvalidAllocationRequest();
+            }
+
+            if (alloc.size > SECTOR_SIZE) {
+                revert InvalidAllocationSize();
             }
 
             sizeOfAllocations += alloc.size;

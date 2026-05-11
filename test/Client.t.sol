@@ -1251,7 +1251,7 @@ contract ClientTest is Test {
         actorIdMock.setGetClaimsResult(hex"8282008080");
 
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationSize.selector));
         client.transfer(transferParams, dealId, false);
     }
 
@@ -1266,7 +1266,7 @@ contract ClientTest is Test {
             2048
         );
 
-        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationRequest.selector));
+        vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationSize.selector));
         clientMock.rescueDealAllocations(dealId, params);
     }
 }

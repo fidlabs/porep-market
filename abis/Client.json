@@ -691,6 +691,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidAllocationSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidCaller",
     "inputs": [
       {
