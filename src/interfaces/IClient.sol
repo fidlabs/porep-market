@@ -82,5 +82,5 @@ interface IClient {
      * @param dealId The id of the deal
      * @return sizeOfAllocations size of allocations for the selected deal
      */
-    function getDealSizeOfAllocations(uint256 dealId) external view returns (uint256);
+    function getSizeOfAllocations(uint256 dealId) external view returns (uint256);
 }

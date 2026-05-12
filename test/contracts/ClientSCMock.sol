@@ -43,7 +43,7 @@ contract ClientSCMock {
         deals[deal.dealId] = deal;
     }
 
-    function getDealSizeOfAllocations(uint256 dealId) external view returns (uint256) {
+    function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
         return deals[dealId].sizeOfAllocations;
     }
 }

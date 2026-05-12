@@ -529,10 +529,6 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
             revert InvalidRailId();
         }
 
-        if (proposal.client != msg.sender) {
-            revert InvalidClient();
-        }
-
         Deal storage deal = $._deals[proposal.dealId];
         deal.client = proposal.client;
         deal.provider = proposal.provider;
@@ -648,7 +644,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @param dealId The id of the deal
      * @return sizeOfAllocations size of allocations for the selected deal
      */
-    function getDealSizeOfAllocations(uint256 dealId) external view returns (uint256) {
+    function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
         return s()._deals[dealId].sizeOfAllocations;
     }
 

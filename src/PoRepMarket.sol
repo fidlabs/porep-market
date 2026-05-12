@@ -40,9 +40,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
-     * @notice Padding allowed to make deal completed = 10%
+     * @notice The maximum value allowed for deal completion padding.
      */
-    uint256 private constant DEAL_COMPLETION_PADDING = 10;
+    uint256 private constant MAX_DEAL_COMPLETION_PADDING = 100;
 
     /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
@@ -61,6 +61,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         IValidatorFactory _validatorFactoryContract;
         IClient _clientSmartContract;
         uint256 _dealIdCounter;
+        uint256 _dealCompletionPadding;
     }
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DealProposalsStorage")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant DEAL_PROPOSALS_STORAGE_LOCATION =
@@ -168,6 +169,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param clientSmartContract The address of the client smart contract
      */
     event ClientSmartContractUpdated(address indexed clientSmartContract);
+
+    /**
+     * @notice DealCompletionPaddingUpdated event
+     * @dev DealCompletionPaddingUpdated event is emitted when the deal completion padding is updated
+     * @param oldPadding old padding for the deal completion
+     * @param newPadding new padding for the deal completion
+     */
+    event DealCompletionPaddingUpdated(uint256 indexed oldPadding, uint256 indexed newPadding);
 
     /**
      * @notice Error thrown when caller is not the registered validator for the deal
@@ -313,6 +322,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Error thrown when trying to use an invalid client address
      */
     error NotTheClientAddress();
+
+    /**
+     * @notice Error thrown when trying to set the padding value higher than maximum
+     */
+    error DealCompletionPaddingTooHigh(uint256 padding, uint256 maxPadding);
 
     /**
      * @notice Constructor
@@ -493,7 +507,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (msg.sender != dp.client) revert NotTheClientAddress();
-        uint256 allocatedSize = $._clientSmartContract.getDealSizeOfAllocations(dealId);
+        uint256 allocatedSize = $._clientSmartContract.getSizeOfAllocations(dealId);
         uint256 proposedSize = dp.terms.dealSizeBytes;
 
         _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
@@ -677,6 +691,31 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
+     * @notice Updates the deal completion padding
+     * @param padding The new padding value
+     */
+    function setDealCompletionPadding(uint256 padding) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (padding > MAX_DEAL_COMPLETION_PADDING) {
+            revert DealCompletionPaddingTooHigh(padding, MAX_DEAL_COMPLETION_PADDING);
+        }
+
+        DealProposalsStorage storage $ = s();
+        uint256 oldPadding = $._dealCompletionPadding;
+        $._dealCompletionPadding = padding;
+
+        emit DealCompletionPaddingUpdated(oldPadding, padding);
+    }
+
+    /**
+     * @notice Getter for deal completion padding
+     * @return padding Current padding value
+     */
+    function getDealCompletionPadding() external view returns (uint256) {
+        DealProposalsStorage storage $ = s();
+        return $._dealCompletionPadding;
+    }
+
+    /**
      * @notice Changes the state of a deal
      * @param dealId The id of the deal
      * @param toState The new state of the deal
@@ -761,10 +800,17 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
     }
 
-    function _ensureAllocationSizeWithinTolerance(uint256 value, uint256 target) internal pure {
-        uint256 delta = value > target ? value - target : target - value;
+    /**
+     * @notice Ensures if allocations size is within padding
+     * @param actualDealSize size of the deal
+     * @param expectedDealSize expecetd size from proposal
+     */
+    function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal {
+        uint256 padding = s()._dealCompletionPadding;
+        uint256 delta =
+            actualDealSize > expectedDealSize ? actualDealSize - expectedDealSize : expectedDealSize - actualDealSize;
 
-        if (delta * 100 > target * DEAL_COMPLETION_PADDING) {
+        if (delta * 100 > expectedDealSize * padding) {
             revert InvalidAllocationSizeForDealCompletion();
         }
     }

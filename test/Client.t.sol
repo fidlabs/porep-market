@@ -1272,17 +1272,17 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         clientMock.transfer(transferParams, dealId);
-        sizeOfAllocations = clientMock.getDealSizeOfAllocations(dealId);
+        sizeOfAllocations = clientMock.getSizeOfAllocations(dealId);
         assertEq(sizeOfAllocations, sizeOfTransfer);
 
         vm.prank(clientAddress);
         clientMock.transfer(transferParams, dealId);
-        sizeOfAllocations = clientMock.getDealSizeOfAllocations(dealId);
+        sizeOfAllocations = clientMock.getSizeOfAllocations(dealId);
         assertEq(sizeOfAllocations, sizeOfTransfer * 2);
 
         vm.prank(clientAddress);
         clientMock.transfer(transferParams, dealId);
-        sizeOfAllocations = clientMock.getDealSizeOfAllocations(dealId);
+        sizeOfAllocations = clientMock.getSizeOfAllocations(dealId);
         assertEq(sizeOfAllocations, sizeOfTransfer * 3);
     }
 }
