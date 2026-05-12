@@ -738,17 +738,19 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateManifestLocation(dealId, "");
     }
 
-    function testProposeDealRevertsWhenDealDurationIsZero() public {
-        SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 0, dealSizeBytes: 1024, pricePerSectorPerMonth: 100});
+    function testProposeDealRevertsWhenDealDurationIsBelowMinimum() public {
+        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+            durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() - 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
+        });
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);
     }
 
     function testProposeDealRevertsWhenDealDurationIsNotMultiplicatioveOf30() public {
-        SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 31, dealSizeBytes: 1024, pricePerSectorPerMonth: 100});
+        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+            durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() + 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
+        });
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealDuration.selector));
         poRepMarket.proposeDeal(defaultRequirements, badTerms, expectedManifestLocation);

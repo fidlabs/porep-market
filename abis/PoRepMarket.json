@@ -45,6 +45,19 @@
   },
   {
     "type": "function",
+    "name": "MIN_DEAL_DURATION_DAYS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "SECTOR_SIZE",
     "inputs": [],
     "outputs": [
