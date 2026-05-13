@@ -50,7 +50,7 @@ contract PoRepMarketTest is Test {
         adminAddress = vm.addr(0x006);
         dealId = 1;
         railId = 1;
-        totalDealSize = 103_079_215_104; // 102 GiB
+        totalDealSize = 103_079_215_104; // 96 GiB
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 

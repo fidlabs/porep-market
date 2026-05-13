@@ -315,16 +315,19 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Error indicating that the allocated size for a deal is too small to change its state to complete
+     * @dev 0x39d70eaf
      */
     error InvalidAllocationSizeForDealCompletion();
 
     /**
      * @notice Error thrown when trying to use an invalid client address
+     * @dev 0xa75bd1dd
      */
     error NotTheClientAddress();
 
     /**
      * @notice Error thrown when trying to set the padding value higher than maximum
+     * @dev 0x6e8e586a
      */
     error DealCompletionPaddingTooHigh(uint256 padding, uint256 maxPadding);
 

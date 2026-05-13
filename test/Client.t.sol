@@ -85,7 +85,7 @@ contract ClientTest is Test {
         validatorMock = new ValidatorMock();
         metaAllocatorMock = new MetaAllocatorMock();
         terminationOracle = vm.addr(3);
-        totalDealSize = 103_079_215_104; // 102 GiB
+        totalDealSize = 103_079_215_104; // 96 GiB
         pricePerSectorPerMonth = 86_400;
         client = Client(setupProxy(address(impl)));
         actorIdMock = new ActorIdMock();

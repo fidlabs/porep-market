@@ -303,13 +303,16 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
             revert InvalidDealStateForTransfer();
         }
 
+        if (msg.sender != proposal.client) {
+            revert InvalidClient();
+        }
+
         if ($._deals[dealId].dealId == 0) {
             _registerDeal(proposal);
         }
 
         Deal storage deal = $._deals[dealId];
 
-        if (msg.sender != deal.client) revert InvalidClient();
         (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
             _deserializeVerifregOperatorData(params.operator_data);
 
