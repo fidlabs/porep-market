@@ -1,0 +1,253 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_clientContract",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_poRepMarketContract",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "CLIENT_CONTRACT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IClient"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "POREPMARKET_CONTRACT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPoRepMarket"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getClaims",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct VerifRegTypes.GetClaimsReturn",
+        "components": [
+          {
+            "name": "batch_info",
+            "type": "tuple",
+            "internalType": "struct CommonTypes.BatchReturn",
+            "components": [
+              {
+                "name": "success_count",
+                "type": "uint32",
+                "internalType": "uint32"
+              },
+              {
+                "name": "fail_codes",
+                "type": "tuple[]",
+                "internalType": "struct CommonTypes.FailCode[]",
+                "components": [
+                  {
+                    "name": "idx",
+                    "type": "uint32",
+                    "internalType": "uint32"
+                  },
+                  {
+                    "name": "code",
+                    "type": "uint32",
+                    "internalType": "uint32"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "name": "claims",
+            "type": "tuple[]",
+            "internalType": "struct VerifRegTypes.Claim[]",
+            "components": [
+              {
+                "name": "provider",
+                "type": "uint64",
+                "internalType": "CommonTypes.FilActorId"
+              },
+              {
+                "name": "client",
+                "type": "uint64",
+                "internalType": "CommonTypes.FilActorId"
+              },
+              {
+                "name": "data",
+                "type": "bytes",
+                "internalType": "bytes"
+              },
+              {
+                "name": "size",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "term_min",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "term_max",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "term_start",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "sector",
+                "type": "uint64",
+                "internalType": "CommonTypes.FilActorId"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "validateSectorStatus",
+    "inputs": [
+      {
+        "name": "minerId",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "sector",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "enum SectorStatus"
+      },
+      {
+        "name": "deadline",
+        "type": "int64",
+        "internalType": "int64"
+      },
+      {
+        "name": "partition",
+        "type": "int64",
+        "internalType": "int64"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "valid",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "error",
+    "name": "ActorNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "FailToCallActor",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "GetClaimsCallFailed",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidClientAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidCodec",
+    "inputs": [
+      {
+        "name": "",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepMarketAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidResponseLength",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "NotEnoughBalance",
+    "inputs": [
+      {
+        "name": "balance",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "value",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ValidateSectorStatusFailed",
+    "inputs": [
+      {
+        "name": "exitCode",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ]
+  }
+]
