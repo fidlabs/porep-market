@@ -69,4 +69,14 @@ abstract contract AOperator is IOperator {
     function _terminateRail(IFilecoinPayV1 filecoinPay, uint256 railId) internal {
         filecoinPay.terminateRail(railId);
     }
+
+    /**
+     * @notice Internal function to settle a payment rail.
+     * @param filecoinPay The FilecoinPayV1 interface
+     * @param railId The ID of the rail to settle.
+     * @param untilEpoch The epoch up to which to settle.
+     */
+    function _settleRail(IFilecoinPayV1 filecoinPay, uint256 railId, uint256 untilEpoch) internal {
+        filecoinPay.settleRail(railId, untilEpoch);
+    }
 }

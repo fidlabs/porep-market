@@ -254,7 +254,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "priceForRetrival",
+        "name": "priceForRetrieval",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -370,6 +370,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidFixedLockupAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidInitialization",
     "inputs": []
   },
@@ -385,17 +390,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidRateAllowance",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidTokenAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "MaxLockupPeriodLessThanMinimum",
     "inputs": []
   },
   {

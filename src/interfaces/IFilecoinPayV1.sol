@@ -9,6 +9,24 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
  */
 interface IFilecoinPayV1 {
     /**
+     * @notice Rail data returned by Filecoin Pay.
+     */
+    struct RailView {
+        IERC20 token;
+        address from;
+        address to;
+        address operator;
+        address validator;
+        uint256 paymentRate;
+        uint256 lockupPeriod;
+        uint256 lockupFixed;
+        uint256 settledUpTo;
+        uint256 endEpoch;
+        uint256 commissionRateBps;
+        address serviceFeeRecipient;
+    }
+
+    /**
      * @notice Creates a payment rail
      * @param token The ERC20 token to use for the payment rail
      * @param payer The address paying the tokens
@@ -53,6 +71,13 @@ interface IFilecoinPayV1 {
         );
 
     /**
+     * @notice Gets the current state of an active rail.
+     * @param railId The ID of the rail.
+     * @return rail The active rail data.
+     */
+    function getRail(uint256 railId) external view returns (RailView memory rail);
+
+    /**
      * @notice Modifies the fixed lockup and lockup period of a rail.
      * @dev - If the rail has already been terminated, the lockup period may not be altered and the fixed lockup may only be reduced.
      * @dev - If the rail is active, the lockup may only be modified if the payer's account is fully funded and will remain fully funded after the operation.
@@ -86,4 +111,26 @@ interface IFilecoinPayV1 {
      * @custom:constraint If called by the operator, the payer's funding status isn't checked.
      */
     function terminateRail(uint256 railId) external;
+
+    /**
+     * @notice Settles payments for a rail up to the requested epoch.
+     * @param railId The ID of the rail to settle.
+     * @param untilEpoch The epoch up to which to settle.
+     * @return totalSettledAmount The total amount settled and transferred.
+     * @return totalNetPayeeAmount The net amount credited to the payee after fees.
+     * @return totalOperatorCommission The commission credited to the operator.
+     * @return totalNetworkFee The fee accrued to Filecoin Pay.
+     * @return finalSettledEpoch The epoch up to which settlement completed.
+     * @return note Additional settlement information.
+     */
+    function settleRail(uint256 railId, uint256 untilEpoch)
+        external
+        returns (
+            uint256 totalSettledAmount,
+            uint256 totalNetPayeeAmount,
+            uint256 totalOperatorCommission,
+            uint256 totalNetworkFee,
+            uint256 finalSettledEpoch,
+            string memory note
+        );
 }

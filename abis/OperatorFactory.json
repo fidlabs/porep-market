@@ -139,6 +139,11 @@
         "internalType": "address"
       },
       {
+        "name": "filecoinPay",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "token",
         "type": "address",
         "internalType": "contract IERC20"
@@ -230,6 +235,24 @@
   },
   {
     "type": "function",
+    "name": "setFilecoinPayConfig",
+    "inputs": [
+      {
+        "name": "filecoinPay",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "contract IERC20"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "setUpgraderRole",
     "inputs": [
       {
@@ -259,6 +282,19 @@
       }
     ],
     "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "upgradeOperatorImplementation",
+    "inputs": [
+      {
+        "name": "newImplementation",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -293,6 +329,25 @@
   },
   {
     "type": "event",
+    "name": "FilecoinPayConfigChanged",
+    "inputs": [
+      {
+        "name": "filecoinPay",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "contract IERC20"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Initialized",
     "inputs": [
       {
@@ -300,6 +355,19 @@
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OperatorImplementationUpgraded",
+    "inputs": [
+      {
+        "name": "newImplementation",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
       }
     ],
     "anonymous": false
@@ -509,16 +577,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidClientAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidClientSmartContractAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidFilecoinPayAddress",
     "inputs": []
   },
@@ -539,27 +597,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidNewFilecoinPayAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidNewTokenAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidNewUpgraderRoleAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidPoRepMarketAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidPoRepServiceAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSPRegistryAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSliScorerAddress",
     "inputs": []
   },
   {
