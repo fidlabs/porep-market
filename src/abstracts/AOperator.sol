@@ -10,7 +10,7 @@ import {IOperator} from "../interfaces/IOperator.sol";
  * @notice Abstract contract defining operator functions for creating and managing payment rails in the FilecoinPayV1 system.
  * This contract provides internal helper functions for interacting with the FilecoinPayV1 interface, while leaving the implementation of the external functions to derived contracts.
  */
-abstract contract Operator is IOperator {
+abstract contract AOperator is IOperator {
     /**
      * @notice Internal function to create a payment rail
      * @param filecoinPay The FilecoinPayV1 interface
@@ -29,7 +29,7 @@ abstract contract Operator is IOperator {
         uint256 commissionRateBps,
         address serviceFeeRecipient
     ) internal returns (uint256 railId) {
-        railId = filecoinPay.createRail(token, payer, payee, address(this), commissionRateBps, serviceFeeRecipient);
+        railId = filecoinPay.createRail(token, payer, payee, address(0), commissionRateBps, serviceFeeRecipient);
     }
 
     /**

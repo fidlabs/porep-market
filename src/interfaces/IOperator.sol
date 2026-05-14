@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-
 /**
  * @title IOperator
  * @notice Interface for operator functions to create and manage payment rails in the FilecoinPayV1 system
@@ -10,16 +8,11 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IOperator {
     /**
      * @notice Creates a payment rail
-     * @param token The ERC20 token to use for the payment rail
+     * @param payer The address of the payer
+     * @param payee The address of the payee
+     * @param fixedLockupAmount The fixed lockup amount for the payment rail
      */
-    function createRail(IERC20 token) external;
-
-    /**
-     * @notice Updates the lockup period of a payment rail
-     * @param railId ID of the payment rail
-     * @param newLockupPeriod New lockup period to set
-     */
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external;
+    function createRail(address payer, address payee, uint256 fixedLockupAmount) external;
 
     /**
      * @notice Modifies the payment rate and optionally makes a one-time payment.
