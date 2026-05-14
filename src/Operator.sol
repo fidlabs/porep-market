@@ -147,7 +147,7 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
         OperatorStorage storage $ = _getOperatorStorage();
 
         (bool isApproved, uint256 rateAllowance, uint256 lockupAllowance,,, uint256 maxLockupPeriod) =
-            IFilecoinPayV1($.filecoinPay).operatorApprovals($.token, payer, payee);
+            IFilecoinPayV1($.filecoinPay).operatorApprovals($.token, payer, address(this));
 
         if (!isApproved) {
             revert OperatorNotApproved();
