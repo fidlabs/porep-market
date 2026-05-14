@@ -66,45 +66,45 @@ contract OperatorTest is Test {
         _deployOperatorProxy(address(implementation), admin, address(filecoinPay), IERC20(address(0)));
     }
 
-    function testCreateRailRevertsWhenOperatorNotApproved() public {
+    function testReserveRetrievalPaymentRevertsWhenOperatorNotApproved() public {
         vm.prank(payer);
         filecoinPay.setOperatorApproval(IERC20(address(token)), address(operator), false, 0, RETRIEVAL_PRICE, 0);
 
         vm.prank(admin);
         vm.expectRevert(Operator.OperatorNotApproved.selector);
-        operator.createRail(payer, payee, RETRIEVAL_PRICE);
+        operator.reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
     }
 
-    function testCreateRailRevertsForZeroFixedLockup() public {
+    function testReserveRetrievalPaymentRevertsForZeroFixedLockup() public {
         vm.prank(admin);
         vm.expectRevert(Operator.InvalidFixedLockupAmount.selector);
-        operator.createRail(payer, payee, 0);
+        operator.reserveRetrievalPayment(payer, payee, 0);
     }
 
-    function testCreateRailRevertsForInsufficientLockupAllowance() public {
+    function testReserveRetrievalPaymentRevertsForInsufficientLockupAllowance() public {
         vm.prank(payer);
         filecoinPay.setOperatorApproval(IERC20(address(token)), address(operator), true, 0, RETRIEVAL_PRICE - 1, 0);
 
         vm.prank(admin);
         vm.expectRevert(Operator.InvalidLockupAllowance.selector);
-        operator.createRail(payer, payee, RETRIEVAL_PRICE);
+        operator.reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
     }
 
-    function testModifyRailPaymentRevertsForUnknownRail() public {
+    function testPayRetrievalRevertsForUnknownRail() public {
         vm.prank(admin);
         vm.expectRevert(Operator.InvalidRailId.selector);
-        operator.modifyRailPayment(999);
+        operator.payRetrieval(999);
     }
 
-    function testTerminateRailRevertsForUnknownRail() public {
+    function testCancelRetrievalRevertsForUnknownRail() public {
         vm.prank(admin);
         vm.expectRevert(Operator.InvalidRailId.selector);
-        operator.terminateRail(999);
+        operator.cancelRetrieval(999);
     }
 
-    function testCreateRailWorksWithFixedLockupOnlyApproval() public {
+    function testReserveRetrievalPaymentWorksWithFixedLockupOnlyApproval() public {
         vm.prank(admin);
-        operator.createRail(payer, payee, RETRIEVAL_PRICE);
+        operator.reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
 
         FilecoinPayV1.RailView memory rail = filecoinPay.getRail(1);
         assertEq(rail.from, payer);
@@ -120,12 +120,12 @@ contract OperatorTest is Test {
         assertEq(maxLockupPeriod, 0);
     }
 
-    function testModifyRailPaymentPaysAndFinalizesRail() public {
+    function testPayRetrievalPaysAndFinalizesRail() public {
         vm.prank(admin);
-        operator.createRail(payer, payee, RETRIEVAL_PRICE);
+        operator.reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
 
         vm.prank(admin);
-        operator.modifyRailPayment(1);
+        operator.payRetrieval(1);
 
         (uint256 payerFunds,,,) = filecoinPay.accounts(IERC20(address(token)), payer);
         (uint256 payeeFunds,,,) = filecoinPay.accounts(IERC20(address(token)), payee);
@@ -139,12 +139,12 @@ contract OperatorTest is Test {
         filecoinPay.getRail(1);
     }
 
-    function testTerminateRailReleasesLockupAndFinalizesRail() public {
+    function testCancelRetrievalReleasesLockupAndFinalizesRail() public {
         vm.prank(admin);
-        operator.createRail(payer, payee, RETRIEVAL_PRICE);
+        operator.reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
 
         vm.prank(admin);
-        operator.terminateRail(1);
+        operator.cancelRetrieval(1);
 
         (uint256 payerFunds,,,) = filecoinPay.accounts(IERC20(address(token)), payer);
         (uint256 payeeFunds,,,) = filecoinPay.accounts(IERC20(address(token)), payee);
@@ -158,15 +158,15 @@ contract OperatorTest is Test {
         filecoinPay.getRail(1);
     }
 
-    function testTerminateRailFinalizesRailAlreadyTerminatedByPayer() public {
+    function testCancelRetrievalFinalizesRailAlreadyTerminatedByPayer() public {
         vm.prank(admin);
-        operator.createRail(payer, payee, RETRIEVAL_PRICE);
+        operator.reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
 
         vm.prank(payer);
         filecoinPay.terminateRail(1);
 
         vm.prank(admin);
-        operator.terminateRail(1);
+        operator.cancelRetrieval(1);
 
         (uint256 payerFunds,,,) = filecoinPay.accounts(IERC20(address(token)), payer);
         (uint256 payeeFunds,,,) = filecoinPay.accounts(IERC20(address(token)), payee);

@@ -100,7 +100,7 @@ contract OperatorFactoryTest is Test {
         vm.stopPrank();
 
         vm.prank(admin);
-        Operator(operatorProxy).createRail(payer, payee, RETRIEVAL_PRICE);
+        Operator(operatorProxy).reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
 
         FilecoinPayV1.RailView memory rail = filecoinPay.getRail(1);
         assertEq(rail.from, payer);
@@ -194,7 +194,7 @@ contract OperatorFactoryTest is Test {
         vm.stopPrank();
 
         vm.prank(admin);
-        Operator(operatorProxy).createRail(payer, payee, RETRIEVAL_PRICE);
+        Operator(operatorProxy).reserveRetrievalPayment(payer, payee, RETRIEVAL_PRICE);
 
         FilecoinPayV1.RailView memory rail = newFilecoinPay.getRail(1);
         assertEq(rail.operator, operatorProxy);

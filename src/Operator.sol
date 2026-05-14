@@ -119,14 +119,14 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     // solhint-enable function-max-lines, gas-strict-inequalities
 
     /**
-     * @notice Creates a payment rail with the specified parameters and set initial lockup period
-     * @dev Only callable by the client
+     * @notice Reserves a fixed Filecoin Pay lockup for a retrieval.
+     * @dev Only callable by the admin.
      * @dev Stores the rail ID locally so the admin can finalize or cancel the retrieval payment.
      * @param payer The address paying the tokens
      * @param payee The address receiving the tokens
-     * @param fixedLockupAmount The fixed amount of tokens to lock up for the payment rail
+     * @param fixedLockupAmount The fixed amount of tokens to reserve for the retrieval
      */
-    function createRail(address payer, address payee, uint256 fixedLockupAmount)
+    function reserveRetrievalPayment(address payer, address payee, uint256 fixedLockupAmount)
         external
         override
         onlyRole(DEFAULT_ADMIN_ROLE)
@@ -155,11 +155,11 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     }
 
     /**
-     * @notice Modifies the payment rate
-     * @dev Only callable by POREP_SERVICE bot
-     * @param railId The ID of the rail to modify
+     * @notice Pays the reserved retrieval amount and finalizes the Filecoin Pay rail.
+     * @dev Only callable by the admin.
+     * @param railId The ID of the rail to pay
      */
-    function modifyRailPayment(uint256 railId) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function payRetrieval(uint256 railId) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         OperatorStorage storage $ = _getOperatorStorage();
         address payer = $.railIdToPayer[railId];
         if (payer == address(0)) {
@@ -169,16 +169,16 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
         IFilecoinPayV1 filecoinPay = IFilecoinPayV1($.filecoinPay);
 
         _modifyRailPayment(filecoinPay, railId, 0, priceForRetrieval);
-        _closeRail(filecoinPay, railId);
-        _clearRailState($, railId);
+        _finalizeFilecoinPayRail(filecoinPay, railId);
+        _clearRetrievalBookkeeping($, railId);
         emit RailPaymentModified(railId, priceForRetrieval);
     }
 
     /**
-     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
-     * @param railId The ID of the rail to terminate.
+     * @notice Cancels a retrieval payment and releases the reserved lockup.
+     * @param railId The ID of the rail to cancel.
      */
-    function terminateRail(uint256 railId) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function cancelRetrieval(uint256 railId) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         OperatorStorage storage $ = _getOperatorStorage();
         address payer = $.railIdToPayer[railId];
         if (payer == address(0)) {
@@ -186,8 +186,8 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
         }
         IFilecoinPayV1 filecoinPay = IFilecoinPayV1($.filecoinPay);
         _updateLockupPeriod(filecoinPay, railId, 0, 0);
-        _closeRail(filecoinPay, railId);
-        _clearRailState($, railId);
+        _finalizeFilecoinPayRail(filecoinPay, railId);
+        _clearRetrievalBookkeeping($, railId);
     }
 
     /**
@@ -207,7 +207,7 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
      * @param filecoinPay The FilecoinPay contract.
      * @param railId The ID of the rail to close.
      */
-    function _closeRail(IFilecoinPayV1 filecoinPay, uint256 railId) internal {
+    function _finalizeFilecoinPayRail(IFilecoinPayV1 filecoinPay, uint256 railId) internal {
         IFilecoinPayV1.RailView memory rail = filecoinPay.getRail(railId);
         if (rail.endEpoch == 0) {
             _terminateRail(filecoinPay, railId);
@@ -220,7 +220,7 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
      * @param operatorStorage Operator storage.
      * @param railId The ID of the rail to clear.
      */
-    function _clearRailState(OperatorStorage storage operatorStorage, uint256 railId) internal {
+    function _clearRetrievalBookkeeping(OperatorStorage storage operatorStorage, uint256 railId) internal {
         delete operatorStorage.railIdToPayer[railId];
         delete operatorStorage.priceForRetrieval[railId];
     }

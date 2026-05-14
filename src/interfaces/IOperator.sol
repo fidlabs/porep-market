@@ -3,26 +3,26 @@ pragma solidity =0.8.30;
 
 /**
  * @title IOperator
- * @notice Interface for operator functions to create and manage payment rails in the FilecoinPayV1 system
+ * @notice Interface for fixed-price retrieval payment operations.
  */
 interface IOperator {
     /**
-     * @notice Creates a payment rail
+     * @notice Reserves a fixed payment for a retrieval.
      * @param payer The address of the payer
      * @param payee The address of the payee
      * @param fixedLockupAmount The fixed lockup amount for the payment rail
      */
-    function createRail(address payer, address payee, uint256 fixedLockupAmount) external;
+    function reserveRetrievalPayment(address payer, address payee, uint256 fixedLockupAmount) external;
 
     /**
-     * @notice Modifies the payment rate and optionally makes a one-time payment.
-     * @param railId The ID of the rail to modify.
+     * @notice Pays the reserved retrieval amount and finalizes the Filecoin Pay rail.
+     * @param railId The ID of the rail to pay.
      */
-    function modifyRailPayment(uint256 railId) external;
+    function payRetrieval(uint256 railId) external;
 
     /**
-     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
-     * @param railId The ID of the rail to terminate.
+     * @notice Cancels a retrieval payment and releases the reserved lockup.
+     * @param railId The ID of the rail to cancel.
      */
-    function terminateRail(uint256 railId) external;
+    function cancelRetrieval(uint256 railId) external;
 }

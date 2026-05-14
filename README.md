@@ -8,8 +8,8 @@ The contract creates a Filecoin Pay rail for a payer/payee pair, locks a fixed U
 
 1. Payer deposits funds into Filecoin Pay.
 2. Payer approves this operator for the payment token with fixed lockup allowance.
-3. Admin calls `createRail(payer, payee, fixedLockupAmount)`.
-4. Admin calls `modifyRailPayment(railId)` to pay the fixed amount and finalize the rail, or `terminateRail(railId)` to cancel and release the lockup.
+3. Admin calls `reserveRetrievalPayment(payer, payee, fixedLockupAmount)`.
+4. Admin calls `payRetrieval(railId)` to pay the fixed amount and finalize the rail, or `cancelRetrieval(railId)` to cancel and release the lockup.
 
 The operator uses zero payment rate and zero lockup period. Only fixed lockup allowance is required.
 

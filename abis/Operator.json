@@ -19,20 +19,10 @@
   },
   {
     "type": "function",
-    "name": "createRail",
+    "name": "cancelRetrieval",
     "inputs": [
       {
-        "name": "payer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "payee",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "fixedLockupAmount",
+        "name": "railId",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -126,7 +116,7 @@
   },
   {
     "type": "function",
-    "name": "modifyRailPayment",
+    "name": "payRetrieval",
     "inputs": [
       {
         "name": "railId",
@@ -150,6 +140,29 @@
         "name": "callerConfirmation",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "reserveRetrievalPayment",
+    "inputs": [
+      {
+        "name": "payer",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "payee",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "fixedLockupAmount",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -191,19 +204,6 @@
       }
     ],
     "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "terminateRail",
-    "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
   },
   {
     "type": "event",
