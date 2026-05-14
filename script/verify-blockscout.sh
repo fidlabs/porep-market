@@ -1,15 +1,16 @@
 #!/bin/bash
 #
-# PoRep Market — production Blockscout contract verification.
+# Filecoin Pay Retrieval Operator — Blockscout contract verification.
 #
 # Subcommands:
 #   verify     <chain_id>
-#       Verify every address in deployments/<network>/latest.json on
+#       Verify every address in deployments/<network>/retrieval-operator-latest.json on
 #       Blockscout, then audit the result.
 #
 #   audit      <chain_id>
-#       Read-only: confirm every address in deployments/<network>/latest.json
-#       is already verified on Blockscout with matching compiler settings.
+#       Read-only: confirm every address in
+#       deployments/<network>/retrieval-operator-latest.json is already verified
+#       on Blockscout with matching compiler settings.
 #       Requires no RPC; safe to run in CI without secrets.
 #
 #   verify-one <chain_id> <address> <contract_name>
@@ -19,7 +20,7 @@
 #   0  all targets verified
 #   1  one or more targets failed
 #   2  usage or unsupported chain
-#   3  preflight failure (missing tool, wrong chain, missing manifest,
+#   3  environment check failure (missing tool, wrong chain, missing manifest,
 #      mainnet without CONFIRM_MAINNET=yes)
 #
 set -euo pipefail
@@ -37,23 +38,13 @@ readonly CHAIN_META_314="mainnet RPC_MAINNET https://filecoin.blockscout.com htt
 readonly CHAIN_META_314159="calibnet RPC_CALIBNET https://filecoin-testnet.blockscout.com https://filecoin-testnet.blockscout.com"
 
 # Allowlist of deployed targets. Each row: manifest_jq_path | kind | contract_name
-# Kept in sync with script/Deploy.s.sol:_serializeAndSaveArtifact (lines 148-161).
+# Kept in sync with script/Deploy.s.sol and script/utils/DeployUtils.sol.
 # Changing Deploy.s.sol WITHOUT updating this list will fail the count invariant.
 readonly ALLOWLIST=(
-  "PoRepMarket.proxy|PROXY|ERC1967Proxy"
-  "PoRepMarket.impl|IMPL|PoRepMarket"
-  "Client.proxy|PROXY|ERC1967Proxy"
-  "Client.impl|IMPL|Client"
-  "ValidatorFactory.proxy|PROXY|ERC1967Proxy"
-  "ValidatorFactory.impl|IMPL|ValidatorFactory"
-  "SLIOracle.proxy|PROXY|ERC1967Proxy"
-  "SLIOracle.impl|IMPL|SLIOracle"
-  "SLIScorer.proxy|PROXY|ERC1967Proxy"
-  "SLIScorer.impl|IMPL|SLIScorer"
-  "SPRegistry.proxy|PROXY|ERC1967Proxy"
-  "SPRegistry.impl|IMPL|SPRegistry"
-  "ValidatorImpl|IMPL|Validator"
-  "ValidatorBeacon|BEACON|UpgradeableBeacon"
+  "OperatorFactory.proxy|PROXY|ERC1967Proxy"
+  "OperatorFactory.impl|IMPL|OperatorFactory"
+  "Operator.beacon|BEACON|UpgradeableBeacon"
+  "Operator.impl|IMPL|Operator"
 )
 
 readonly EXPECTED_COMPILER_PREFIX="v0.8.30"
@@ -158,7 +149,7 @@ _retry() {
 }
 
 # ─────────────────────────────────────────────────────────────────────
-# Chain + preflight
+# Chain + environment checks
 # ─────────────────────────────────────────────────────────────────────
 
 # Echoes: network rpc_env api_root web_root
@@ -175,17 +166,17 @@ _require_tool() {
   command -v "$1" >/dev/null 2>&1 || _die "Missing required tool: $1" 3
 }
 
-_preflight_common() {
+_check_common() {
   [[ -f foundry.toml ]] || _die "Must be run from repo root (foundry.toml not found in $(pwd))" 3
   _require_tool jq
   _require_tool curl
 }
 
-# Preflight for subcommands that need an RPC (verify, verify-one).
+# Checks for subcommands that need an RPC (verify, verify-one).
 # Echoes: network rpc api web
-_preflight_rpc() {
+_check_rpc() {
   local chain="$1"
-  _preflight_common
+  _check_common
   _require_tool forge
   _require_tool cast
 
@@ -210,11 +201,11 @@ _preflight_rpc() {
   echo "$network $rpc $api $web"
 }
 
-# Preflight for audit (no RPC, no forge, no cast needed).
+# Checks for audit (no RPC, no forge, no cast needed).
 # Echoes: network api web
-_preflight_audit() {
+_check_audit() {
   local chain="$1"
-  _preflight_common
+  _check_common
 
   local meta
   meta="$(_chain_meta "$chain")" || exit $?
@@ -234,7 +225,7 @@ _preflight_audit() {
 
 _manifest_path() {
   local network="$1"
-  echo "deployments/${network}/latest.json"
+  echo "deployments/${network}/retrieval-operator-latest.json"
 }
 
 # Asserts manifest exists and its chainId matches the target.
@@ -401,7 +392,7 @@ _audit_one() {
 # Deterministic extraction:
 #   1. Query Blockscout's smart-contracts/<addr>.creation_bytecode, which
 #      works uniformly for top-level deploys AND inner CREATE (e.g. the
-#      UpgradeableBeacon produced by ValidatorFactory.initialize). For
+#      UpgradeableBeacon produced by OperatorFactory.initialize). For
 #      inner creates, the tx-based path would return the PARENT tx's
 #      input, which does not start with the child contract's bytecode.
 #   2. Fall back to addresses/<addr>.creation_transaction_hash →
@@ -466,7 +457,7 @@ _extract_constructor_args() {
     _log ERROR "  On-chain:      ${raw_hex:0:40}...${raw_hex: -40} (${#raw_hex} hex chars)"
     _log ERROR "HEAD source does not compile to the deployed bytecode."
     _log ERROR "Likely cause: HEAD has drifted since the deployment."
-    _log ERROR "Fix: checkout the commit that wrote deployments/<network>/latest.json"
+    _log ERROR "Fix: checkout the commit that wrote deployments/<network>/retrieval-operator-latest.json"
     _log ERROR "     (hint: git log -- deployments/)"
     return 1
   fi
@@ -612,10 +603,10 @@ cmd_audit() {
   local chain="${1:-}"
   [[ -n "$chain" ]] || _die "usage: verify-blockscout.sh audit <chain_id>" 2
 
-  local preflight
-  preflight="$(_preflight_audit "$chain")" || exit $?
+  local env_check
+  env_check="$(_check_audit "$chain")" || exit $?
   local network api web
-  IFS=' ' read -r network api web <<<"$preflight"
+  IFS=' ' read -r network api web <<<"$env_check"
 
   _init_log_file audit "$network"
   local out_json="${LOG_FILE%.log}.json"
@@ -664,10 +655,10 @@ cmd_verify() {
   local chain="${1:-}"
   [[ -n "$chain" ]] || _die "usage: verify-blockscout.sh verify <chain_id>" 2
 
-  local preflight
-  preflight="$(_preflight_rpc "$chain")" || exit $?
+  local env_check
+  env_check="$(_check_rpc "$chain")" || exit $?
   local network rpc api web
-  IFS=' ' read -r network rpc api web <<<"$preflight"
+  IFS=' ' read -r network rpc api web <<<"$env_check"
 
   _init_log_file verify "$network"
   local out_json="${LOG_FILE%.log}.json"
@@ -749,10 +740,10 @@ cmd_verify_one() {
   [[ -n "$chain" && -n "$addr" && -n "$name" ]] \
     || _die "usage: verify-blockscout.sh verify-one <chain_id> <address> <contract_name>" 2
 
-  local preflight
-  preflight="$(_preflight_rpc "$chain")" || exit $?
+  local env_check
+  env_check="$(_check_rpc "$chain")" || exit $?
   local network rpc api web
-  IFS=' ' read -r network rpc api web <<<"$preflight"
+  IFS=' ' read -r network rpc api web <<<"$env_check"
 
   _init_log_file verify-one "$network"
 
@@ -794,7 +785,7 @@ main() {
 usage: verify-blockscout.sh <subcommand> <args...>
 
 Subcommands:
-  verify     <chain_id>                         Full verification of deployments/<net>/latest.json
+  verify     <chain_id>                         Full verification of deployments/<net>/retrieval-operator-latest.json
   audit      <chain_id>                         Read-only Blockscout audit (safe for CI, no RPC)
   verify-one <chain_id> <address> <ContractName> Manual single-address fallback
 
@@ -807,7 +798,7 @@ Environment:
   NO_COLOR=1                  Disable ANSI colour codes
 
 Exit codes:
-  0 success  1 verification failure  2 usage  3 preflight failure
+  0 success  1 verification failure  2 usage  3 environment check failure
 USAGE
       [[ "$sub" == "" ]] && exit 2 || exit 0
       ;;

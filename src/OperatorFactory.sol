@@ -21,7 +21,7 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      */
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
-    // @custom:storage-location erc7201:porepmarket.storage.OperatorFactoryStorage
+    // @custom:storage-location erc7201:filecoinpayretrieval.storage.OperatorFactoryStorage
     struct OperatorFactoryStorage {
         mapping(address => bool) _isOperatorContract;
         address _filecoinPay;
@@ -29,18 +29,21 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         address _admin;
         address _upgraderRole;
         IERC20 _token;
+        uint256 _operatorNonce;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.OperatorFactoryStorage")) - 1)) & ~bytes32(uint256(0xff))
+    // keccak256(abi.encode(uint256(keccak256("filecoinpayretrieval.storage.OperatorFactoryStorage")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant OPERATOR_FACTORY_STORAGE_LOCATION =
-        0x7aee5fed1c1bd28675f209a0fba1ff993d27370a28858d7e37b8d0d98f85da00;
+        0xa36ebd6736ccf813d5b71f35e2faf82f32283ba050a7462ec691a62713d63c00;
 
     // solhint-disable-next-line use-natspec
     function _getOperatorFactoryStorage() private pure returns (OperatorFactoryStorage storage $) {
+        // LCOV_EXCL_START
         // solhint-disable-next-line no-inline-assembly
         assembly {
             $.slot := OPERATOR_FACTORY_STORAGE_LOCATION
         }
+        // LCOV_EXCL_STOP
     }
 
     /**
@@ -70,46 +73,10 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     error InvalidAdminAddress();
 
     /**
-     * @notice Error indicating that the provided implementation address is invalid
-     * @dev 0x4d9c0a3f
-     */
-    error InvalidClientAddress();
-
-    /**
-     * @notice Error indicating that the provided PoRepMarket address is invalid
-     * @dev 0xc9cc4a06
-     */
-    error InvalidPoRepMarketAddress();
-
-    /**
-     * @notice Error indicating that the provided ClientSmartContract address is invalid
-     * @dev 0x39ee49ba
-     */
-    error InvalidClientSmartContractAddress();
-
-    /**
      * @notice Error indicating that the provided FilecoinPay address is invalid
      * @dev 0x5419d62f
      */
     error InvalidFilecoinPayAddress();
-
-    /**
-     * @notice Error indicating that the provided SLIScorer address is invalid
-     * @dev 0x7725d473
-     */
-    error InvalidPoRepServiceAddress();
-
-    /**
-     * @notice Error indicating that the provided SLIScorer address is invalid
-     * @dev 0xf234bc02
-     */
-    error InvalidSliScorerAddress();
-
-    /**
-     * @notice Error indicating that the provided SPRegistry address is invalid
-     * @dev 0xe6e262d1
-     */
-    error InvalidSPRegistryAddress();
 
     /**
      * @notice Error indicating that the provided implementation address is invalid
@@ -128,6 +95,16 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @dev 0xe7124f5b
      */
     error InvalidNewUpgraderRoleAddress();
+
+    /**
+     * @notice Error indicating that the provided new Filecoin Pay address is invalid
+     */
+    error InvalidNewFilecoinPayAddress();
+
+    /**
+     * @notice Error indicating that the provided new token address is invalid
+     */
+    error InvalidNewTokenAddress();
 
     /**
      * @notice Error indicating that role management functions are disabled
@@ -155,10 +132,23 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
     event UpgraderRoleChanged(address indexed newUpgraderRole);
 
     /**
+     * @notice Emitted when the operator beacon implementation is upgraded
+     * @param newImplementation The new operator implementation address
+     */
+    event OperatorImplementationUpgraded(address indexed newImplementation);
+
+    /**
+     * @notice Emitted when the Filecoin Pay and token configuration is changed.
+     * @param filecoinPay The new Filecoin Pay contract.
+     * @param token The new payment token.
+     */
+    event FilecoinPayConfigChanged(address indexed filecoinPay, IERC20 indexed token);
+
+    /**
      * @notice Constructor
      */
     constructor() {
-        _disableInitializers();
+        _disableInitializers(); // LCOV_EXCL_LINE
     }
 
     /**
@@ -166,28 +156,33 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
      * @param admin The address of the admin responsible for the contract
      * @param implementation The address of the implementation contract
+     * @param filecoinPay The Filecoin Pay contract used by created operators
      * @param token The ERC20 token used for payments
      */
-    function initialize(address admin, address implementation, IERC20 token) public initializer {
+    function initialize(address admin, address implementation, address filecoinPay, IERC20 token) public initializer {
         if (admin == address(0)) {
             revert InvalidAdminAddress();
         }
         if (implementation == address(0)) {
             revert InvalidImplementationAddress();
         }
+        if (filecoinPay == address(0)) {
+            revert InvalidFilecoinPayAddress();
+        }
 
         if (token == IERC20(address(0))) {
             revert InvalidTokenAddress();
         }
 
-        __AccessControl_init();
+        __AccessControl_init(); // LCOV_EXCL_LINE
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
 
         OperatorFactoryStorage storage $ = s();
-        $._beacon = address(new UpgradeableBeacon(implementation, admin));
+        $._beacon = address(new UpgradeableBeacon(implementation, address(this)));
         $._admin = admin;
         $._upgraderRole = admin;
+        $._filecoinPay = filecoinPay;
         $._token = token;
     }
 
@@ -196,7 +191,7 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      * @dev Uses BeaconProxy to create a new proxy instance, pointing to the Beacon for the logic contract.
      * @dev Reverts if an instance for the given dealId already exists.
      */
-    function create() external {
+    function create() external onlyRole(DEFAULT_ADMIN_ROLE) {
         OperatorFactoryStorage storage $ = s();
 
         bytes memory initCode = abi.encodePacked(
@@ -204,7 +199,8 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
             abi.encode($._beacon, abi.encodeCall(Operator.initialize, ($._admin, $._filecoinPay, $._token)))
         );
         // forge-lint: disable-next-line(asm-keccak256)
-        bytes32 salt = keccak256(abi.encode($._admin, block.timestamp));
+        bytes32 salt = keccak256(abi.encode($._admin, $._operatorNonce));
+        $._operatorNonce++;
         address proxy = Create2.computeAddress(salt, keccak256(initCode), address(this));
         $._isOperatorContract[proxy] = true;
 
@@ -222,10 +218,15 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
             revert InvalidNewAdminAddress();
         }
         OperatorFactoryStorage storage $ = s();
+        address oldAdmin = $._admin;
 
-        _revokeRole(DEFAULT_ADMIN_ROLE, $._admin);
+        _revokeRole(DEFAULT_ADMIN_ROLE, oldAdmin);
         _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
         $._admin = newAdmin;
+
+        if ($._upgraderRole == oldAdmin) {
+            _setUpgraderRole($, newAdmin);
+        }
 
         emit AdminChanged(newAdmin);
     }
@@ -241,12 +242,41 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
         }
         OperatorFactoryStorage storage $ = s();
 
-        _revokeRole(UPGRADER_ROLE, $._upgraderRole);
-        _grantRole(UPGRADER_ROLE, newUpgraderRole);
+        _setUpgraderRole($, newUpgraderRole);
+    }
 
-        $._upgraderRole = newUpgraderRole;
+    /**
+     * @notice Sets Filecoin Pay and payment token configuration for newly created operators.
+     * @dev Useful when upgrading an older factory proxy that did not yet store Filecoin Pay configuration.
+     * @param filecoinPay The Filecoin Pay contract.
+     * @param token The ERC20 token used for payments.
+     */
+    function setFilecoinPayConfig(address filecoinPay, IERC20 token) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (filecoinPay == address(0)) {
+            revert InvalidNewFilecoinPayAddress();
+        }
+        if (token == IERC20(address(0))) {
+            revert InvalidNewTokenAddress();
+        }
 
-        emit UpgraderRoleChanged(newUpgraderRole);
+        OperatorFactoryStorage storage $ = s();
+        $._filecoinPay = filecoinPay;
+        $._token = token;
+
+        emit FilecoinPayConfigChanged(filecoinPay, token);
+    }
+
+    /**
+     * @notice Upgrades the beacon implementation used by newly and previously created Operator proxies.
+     * @param newImplementation The new Operator implementation.
+     */
+    function upgradeOperatorImplementation(address newImplementation) external onlyRole(UPGRADER_ROLE) {
+        if (newImplementation == address(0)) {
+            revert InvalidImplementationAddress();
+        }
+
+        UpgradeableBeacon(s()._beacon).upgradeTo(newImplementation);
+        emit OperatorImplementationUpgraded(newImplementation);
     }
 
     // solhint-disable use-natspec
@@ -291,6 +321,15 @@ contract OperatorFactory is UUPSUpgradeable, AccessControlUpgradeable {
      */
     function getBeacon() external view returns (address) {
         return s()._beacon;
+    }
+
+    function _setUpgraderRole(OperatorFactoryStorage storage $, address newUpgraderRole) private {
+        _revokeRole(UPGRADER_ROLE, $._upgraderRole);
+        _grantRole(UPGRADER_ROLE, newUpgraderRole);
+
+        $._upgraderRole = newUpgraderRole;
+
+        emit UpgraderRoleChanged(newUpgraderRole);
     }
 
     // solhint-disable no-empty-blocks

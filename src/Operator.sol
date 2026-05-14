@@ -10,9 +10,9 @@ import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {AOperator} from "./abstracts/AOperator.sol";
 
 /**
- * @title Validator
- * @dev Implements validator and operator logic for managing Filecoin Pay rails
- * @notice Validator contract for Filecoin Pay
+ * @title Operator
+ * @dev Implements operator logic for managing Filecoin Pay rails
+ * @notice Retrieval payment operator for Filecoin Pay
  */
 contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     /**
@@ -46,22 +46,15 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     error OperatorNotApproved();
 
     /**
-     * @notice Error indicating that the maximum lockup period is less than the minimum required lockup period
-     * @dev 0x1f27f313
-     */
-    error MaxLockupPeriodLessThanMinimum();
-
-    /**
      * @notice Error indicating that the lockup allowance is not set properly
      * @dev 0xae339be9
      */
     error InvalidLockupAllowance();
 
     /**
-     * @notice Error indicating that the rate allowance is not set properly
-     * @dev 0xf55adfc6
+     * @notice Error indicating that the fixed lockup amount is invalid
      */
-    error InvalidRateAllowance();
+    error InvalidFixedLockupAmount();
 
     // solhint-disable gas-indexed-events
 
@@ -76,39 +69,33 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     /**
      * @notice Event emitted when the payment rate of a rail is modified
      * @param railId The ID of the rail
-     * @param priceForRetrival The new price for retrieval for the rail
+     * @param priceForRetrieval The new price for retrieval for the rail
      */
-    event RailPaymentModified(uint256 indexed railId, uint256 priceForRetrival);
+    event RailPaymentModified(uint256 indexed railId, uint256 priceForRetrieval);
 
     // solhint-enable gas-indexed-events
 
-    /// @custom:storage-location erc7201:porepmarket.storage.OperatorStorage
+    /// @custom:storage-location erc7201:filecoinpayretrieval.storage.OperatorStorage
     struct OperatorStorage {
         address filecoinPay;
         IERC20 token;
         mapping(uint256 railId => address payer) railIdToPayer;
-        mapping(uint256 railId => uint256 price) priceForRetrival;
+        mapping(uint256 railId => uint256 price) priceForRetrieval;
     }
 
     /**
-     * @notice Number of epochs in one
-     * @dev 24 hours/day * 60 minutes/hour * 2 epochs/minute = 2_880 epochs
-     */
-    uint256 private constant EPOCHS_IN_DAY = 2_880;
-
-    /**
      * @notice Storage location for OperatorStorage struct
-     * @dev keccak256(abi.encode(uint256(keccak256("porepmarket.storage.OperatorStorage")) - 1)) & ~bytes32(uint256(0xff))
+     * @dev keccak256(abi.encode(uint256(keccak256("filecoinpayretrieval.storage.OperatorStorage")) - 1)) & ~bytes32(uint256(0xff))
      */
     bytes32 private constant OPERATOR_STORAGE_LOCATION =
-        0xe922c3c22813db7aee128c05c239641d2c84b2d3dc8bd2279741cb4b92ee3100;
+        0xc4e3a428136a90500760888642a5b13bddc45b7055c1ebff56928e6ae6937700;
 
     /**
      * @notice Constructor
      * @dev Constructor disables initializers
      */
     constructor() {
-        _disableInitializers();
+        _disableInitializers(); // LCOV_EXCL_LINE
     }
 
     // solhint-disable func-param-name-mixedcase
@@ -121,7 +108,7 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     function initialize(address _admin, address _filecoinPay, IERC20 token) external initializer {
         _validateInitializeAddresses(_admin, _filecoinPay, token);
 
-        __AccessControl_init();
+        __AccessControl_init(); // LCOV_EXCL_LINE
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
 
         OperatorStorage storage $ = _getOperatorStorage();
@@ -134,7 +121,7 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     /**
      * @notice Creates a payment rail with the specified parameters and set initial lockup period
      * @dev Only callable by the client
-     * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
+     * @dev Stores the rail ID locally so the admin can finalize or cancel the retrieval payment.
      * @param payer The address paying the tokens
      * @param payee The address receiving the tokens
      * @param fixedLockupAmount The fixed amount of tokens to lock up for the payment rail
@@ -146,29 +133,25 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
     {
         OperatorStorage storage $ = _getOperatorStorage();
 
-        (bool isApproved, uint256 rateAllowance, uint256 lockupAllowance,,, uint256 maxLockupPeriod) =
+        (bool isApproved,, uint256 lockupAllowance,, uint256 lockupUsage,) =
             IFilecoinPayV1($.filecoinPay).operatorApprovals($.token, payer, address(this));
 
         if (!isApproved) {
             revert OperatorNotApproved();
         }
 
-        if (maxLockupPeriod < EPOCHS_IN_DAY) {
-            revert MaxLockupPeriodLessThanMinimum();
+        if (fixedLockupAmount == 0) {
+            revert InvalidFixedLockupAmount();
         }
 
-        if (lockupAllowance == 0) {
+        if (lockupAllowance < lockupUsage + fixedLockupAmount) {
             revert InvalidLockupAllowance();
-        }
-
-        if (rateAllowance == 0) {
-            revert InvalidRateAllowance();
         }
 
         uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), $.token, payer, payee, 0, address(0));
         $.railIdToPayer[railId] = payer;
-        $.priceForRetrival[railId] = fixedLockupAmount;
-        _setInitialLockup(railId, EPOCHS_IN_DAY, fixedLockupAmount);
+        $.priceForRetrieval[railId] = fixedLockupAmount;
+        _setInitialLockup(railId, 0, fixedLockupAmount);
     }
 
     /**
@@ -182,10 +165,13 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
         if (payer == address(0)) {
             revert InvalidRailId();
         }
-        uint256 priceForRetrival = $.priceForRetrival[railId];
+        uint256 priceForRetrieval = $.priceForRetrieval[railId];
+        IFilecoinPayV1 filecoinPay = IFilecoinPayV1($.filecoinPay);
 
-        _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, 0, priceForRetrival);
-        emit RailPaymentModified(railId, priceForRetrival);
+        _modifyRailPayment(filecoinPay, railId, 0, priceForRetrieval);
+        _closeRail(filecoinPay, railId);
+        _clearRailState($, railId);
+        emit RailPaymentModified(railId, priceForRetrieval);
     }
 
     /**
@@ -198,7 +184,10 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
         if (payer == address(0)) {
             revert InvalidRailId();
         }
-        _terminateRail(IFilecoinPayV1($.filecoinPay), railId);
+        IFilecoinPayV1 filecoinPay = IFilecoinPayV1($.filecoinPay);
+        _updateLockupPeriod(filecoinPay, railId, 0, 0);
+        _closeRail(filecoinPay, railId);
+        _clearRailState($, railId);
     }
 
     /**
@@ -211,6 +200,29 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
         OperatorStorage storage $ = _getOperatorStorage();
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, lockupPeriod, fixedLockupAmount);
         emit LockupPeriodUpdated(railId, lockupPeriod, fixedLockupAmount);
+    }
+
+    /**
+     * @notice Terminates and finalizes a rail with Filecoin Pay.
+     * @param filecoinPay The FilecoinPay contract.
+     * @param railId The ID of the rail to close.
+     */
+    function _closeRail(IFilecoinPayV1 filecoinPay, uint256 railId) internal {
+        IFilecoinPayV1.RailView memory rail = filecoinPay.getRail(railId);
+        if (rail.endEpoch == 0) {
+            _terminateRail(filecoinPay, railId);
+        }
+        _settleRail(filecoinPay, railId, block.number);
+    }
+
+    /**
+     * @notice Clears local bookkeeping for a completed or cancelled rail.
+     * @param operatorStorage Operator storage.
+     * @param railId The ID of the rail to clear.
+     */
+    function _clearRailState(OperatorStorage storage operatorStorage, uint256 railId) internal {
+        delete operatorStorage.railIdToPayer[railId];
+        delete operatorStorage.priceForRetrieval[railId];
     }
 
     /**
@@ -237,9 +249,11 @@ contract Operator is Initializable, AccessControlUpgradeable, AOperator {
      * @return $ Reference to the OperatorStorage struct
      */
     function _getOperatorStorage() private pure returns (OperatorStorage storage $) {
+        // LCOV_EXCL_START
         assembly {
             $.slot := OPERATOR_STORAGE_LOCATION
         }
+        // LCOV_EXCL_STOP
     }
     // solhint-enable
 }
