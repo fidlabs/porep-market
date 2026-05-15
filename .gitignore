@@ -6,7 +6,9 @@ out/
 /broadcast
 
 # Docs
-docs/
+docs/*
+!docs/specs/
+!docs/specs/**
 
 # Dotenv file
 .env
