@@ -2,84 +2,119 @@
 
 Status: draft for PR review.
 
-This folder is the code-review surface for the initial V2 contract shape. It is intentionally code-heavy so reviewers can comment on specific fields, structs, and function boundaries.
-
-The files here are not deployed source. They are proposal artifacts for converging on the V2 storage and interface shape before implementation.
+This folder is the repo review surface for the V2 starting shape. The goal is to
+make the contract split commentable without turning the spec into a full
+implementation plan.
 
 ## Files
 
-- `porep-v2-shared-types.sol` sketches the structs shared across V2 contracts.
-- `porep-v2-spregistry-storage.sol` sketches the state owned by `SPRegistry`.
-- `porep-v2-market-storage.sol` sketches the state owned by `PoRepMarket`.
-- `porep-v2-validator-storage.sol` sketches the state owned by `Validator`.
-- `porep-v2-interfaces.sol` sketches the external and cross-contract API surface.
-- `porep-v2-open-questions.md` lists decisions that should be closed before implementation begins.
+| File | Purpose |
+| --- | --- |
+| `porep-v2-overview.md` | short client/SP view |
+| `porep-v2-shared-types.sol` | request, selection, and SLI vocabulary |
+| `porep-v2-spregistry-storage.sol` | living provider, offer, token, and capacity storage |
+| `porep-v2-market-storage.sol` | frozen deal snapshot and lifecycle storage |
+| `porep-v2-validator-storage.sol` | per-deal rail identity and settlement guard storage |
+| `porep-v2-architecture-diagrams.md` | offer freeze and lifecycle/payment diagrams |
+| `porep-v2-propositions.md` | proposed shape and review points |
 
-The storage files are split by intended end location so reviewers can see what lands in each contract, what is shared, and what should not cross contract boundaries.
+## Starting Point
 
-## Starting Position
+V2 starts from:
 
-V2 should start with token-bound, offer-selected deal creation:
+- provider-owned offers
+- SP-defined offer names for client/UI discovery
+- multiple payment tokens per offer
+- provider-level shared capacity
+- frozen deal snapshots
+- token-bound FilecoinPay rails
+- auto-match and direct offer selection over the same storage model
 
-- providers maintain living offers
-- every offer payment row is bound to one ERC-20 token
-- every deal freezes token, payee, price, duration, and SLI terms at proposal time
-- provider capacity stays shared at provider level, not split per offer or token
-- FilecoinPay rails use the frozen deal payment token
-- offer discovery and ranking can stay off-chain until on-chain matching proves necessary
+## Contract Split
 
-This preserves the important V1 boundary: mutable provider configuration can affect future proposals, but must not affect already proposed or accepted deals.
+`SPRegistry` owns living provider configuration. Providers can change offers,
+payment rows, and availability for future proposals.
 
-## Main V1 Deltas
+`PoRepMarket` owns deals. A deal freezes the selected offer terms, payment token,
+payee, duration, capacity, and SLI terms. Later offer/provider edits do not
+change existing deals.
 
-V1 has one provider registration row with one tokenless price in `SPRegistry.ProviderData`, one `PoRepTypes.DealProposal` carrying mutable-looking commercial terms, and rail setup that can drift from deal terms through external inputs.
+`Validator` owns rail identity and settlement guard state. It should read frozen
+deal/payment data from `PoRepMarket`, not keep a second copy unless gas forces a
+write-once cache later.
 
-V2 should split those concerns:
+## External Interface Shape
 
-- `Provider` stores identity, owner/payee, pause/block state, and shared capacity.
-- `Offer` stores provider-owned eligibility terms.
-- `OfferPayment` stores token-specific price rows for an offer.
-- `Deal` stores lifecycle and provenance.
-- `DealTerms` stores frozen size and service window.
-- `DealPayment` stores frozen token, payee, agreed monthly amount, and rail ceiling.
-- `SLITerms` stays typed and separately stored so future SLI fields append cleanly.
+The external API should stay small.
+
+- command functions show how deals/offers move
+- read functions return composed views (`DealView`, `OfferView`, `ProviderView`)
+- storage mappings stay inside storage sketches
+- full event/error/pagination design is not part of this starting pass
 
 ## Payment Rule
 
-Keep the commercial price monthly. Derive a ceil-based FilecoinPay rail ceiling:
+Commercial price stays monthly:
 
 ```text
-railMaxRatePerEpoch = ceil(pricePer32GiBPerMonth * billed32GiBUnits / 86_400)
+monthlyTotal = pricePer32GiBPerMonth * billed32GiBUnits
 ```
 
-Validator settlement should pay exact cumulative deltas:
+FilecoinPay gets a ceiling rate:
 
 ```text
-dueAt(epoch) = floor(agreedMonthlyTotal * (epoch - paymentStartEpoch) / 86_400)
-settlement = dueAt(toEpoch) - dueAt(fromEpoch)
+railMaxRatePerEpoch = ceil(monthlyTotal / EPOCHS_IN_MONTH)
 ```
 
-This keeps the FilecoinPay rate invariant while preventing per-settlement truncation drift.
+Validator settlement uses the exact cumulative amount for the window:
+
+```text
+dueAt(epoch) = floor(monthlyTotal * (epoch - serviceStartEpoch) / EPOCHS_IN_MONTH)
+settlementAmount = dueAt(toEpoch) - dueAt(fromEpoch)
+```
+
+The rail rate is the FilecoinPay ceiling, not the commercial payment rate.
 
 ## Duration Rule
 
-Keep `durationDays` as the external UX unit. Freeze `durationEpochs` on chain and derive the paid service end from the payment start:
+`durationDays` is the request unit. The market stores `durationEpochs` as the
+frozen paid service duration.
+
+Service starts on completion. Payment ends at:
 
 ```text
-durationEpochs = durationDays * 2_880
-serviceEndEpoch = paymentStartEpoch + durationEpochs
+serviceEndEpoch = serviceStartEpoch + durationEpochs
 ```
 
-`termMax` remains Filecoin claimability slack, not paid service duration.
+`termMax` is Filecoin claimability slack. It is not paid service duration.
+
+Current tooling will use 40 days of `termMax` slack. This can create extra
+sector time the SP may need to maintain, so it should be documented for
+providers. The alternative path is manual sector preparation with SnapDeals where
+that fits the provider workflow.
+
+## Rules
+
+- matching never compares prices across tokens
+- active offer payment requires a nonzero price
+- offer name is a capped service/offer label for clients and UI (`MAX_OFFER_NAME_BYTES = 64`)
+- provider capacity is shared across offers and payment tokens
+- proposal creation reserves pending capacity
+- reject/expire releases pending capacity
+- complete freezes committed capacity, billed 32GiB units, service start, and rail ceiling
+- payment and validation read frozen deal state, not living offer state
+- strict SLI slashing/checking is deferred from the first pilot deals
+- events are the offer/deal history source
 
 ## Deferred / Out Of Starting Scope
 
-- native FIL or `address(0)` payment token
+- native FIL
 - token fallback lists
 - cross-token price comparison
 - token-specific payees
+- immutable offer versions
 - offer-level capacity
 - service-class enum
-- generic constraint language
-- collateral, bonds, quotas, or client allowlists
-- FilecoinPay source changes unless implementation proves they are unavoidable
+- generic constraints
+- collateral or proposal bonds
+- full implementation-level events, errors, pagination, or test matrix
