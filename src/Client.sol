@@ -207,7 +207,6 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     error InvalidRailId();
 
     struct Deal {
-        bool completed;
         address client;
         address validator;
         CommonTypes.FilActorId provider;
@@ -295,23 +294,25 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @dev This function can only be called by the client
      * @param params The parameters for the transfer
      * @param dealId The id of the deal
-     * @param dealCompleted Whether the deal is completed
      */
-    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId, bool dealCompleted)
-        external
-        nonReentrant
-    {
+    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId) external nonReentrant {
         ClientStorage storage $ = s();
-        if ($._deals[dealId].dealId == 0) {
-            _registerDeal(dealId);
-        }
+        PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
-        Deal storage deal = $._deals[dealId];
-        if (deal.completed) {
+        if (proposal.state != PoRepTypes.DealState.Accepted) {
             revert InvalidDealStateForTransfer();
         }
 
-        if (msg.sender != deal.client) revert InvalidClient();
+        if (msg.sender != proposal.client) {
+            revert InvalidClient();
+        }
+
+        if ($._deals[dealId].dealId == 0) {
+            _registerDeal(proposal);
+        }
+
+        Deal storage deal = $._deals[dealId];
+
         (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
             _deserializeVerifregOperatorData(params.operator_data);
 
@@ -336,11 +337,6 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
             }
         }
         deal.sizeOfAllocations += allocationsAndClaimsSize;
-
-        if (dealCompleted) {
-            deal.completed = true;
-            $._poRepMarketContract.completeDeal(dealId, deal.sizeOfAllocations);
-        }
     }
 
     // solhint-disable function-max-lines
@@ -527,32 +523,21 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
 
     /**
      * @notice Verifies and registers a deal.
-     * @param dealId The deal id.
+     * @param proposal The deal proposal.
      */
-    function _registerDeal(uint256 dealId) internal {
+    function _registerDeal(PoRepTypes.DealProposal memory proposal) internal {
         ClientStorage storage $ = s();
-
-        PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
         if (proposal.railId == 0) {
             revert InvalidRailId();
         }
 
-        if (proposal.client != msg.sender) {
-            revert InvalidClient();
-        }
-
-        if (proposal.state != PoRepTypes.DealState.Accepted) {
-            revert InvalidDealStateForTransfer();
-        }
-
-        Deal storage deal = $._deals[dealId];
+        Deal storage deal = $._deals[proposal.dealId];
         deal.client = proposal.client;
         deal.provider = proposal.provider;
         deal.dealId = proposal.dealId;
         deal.validator = proposal.validator;
         deal.railId = proposal.railId;
-        deal.completed = false;
     }
 
     /**
@@ -655,6 +640,15 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      */
     function terminatedClaims(uint64 claimId) external view returns (bool) {
         return s()._terminatedClaims[claimId];
+    }
+
+    /**
+     * @notice custom getter to retrieve allocated size in deal
+     * @param dealId The id of the deal
+     * @return sizeOfAllocations size of allocations for the selected deal
+     */
+    function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
+        return s()._deals[dealId].sizeOfAllocations;
     }
 
     /**

@@ -9,6 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {IClient} from "./interfaces/IClient.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -39,6 +40,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
+     * @notice The maximum value allowed for deal completion padding.
+     */
+    uint256 private constant MAX_DEAL_COMPLETION_PADDING = 100;
+
+    /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
      * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
@@ -53,8 +59,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
-        address _clientSmartContract;
+        IClient _clientSmartContract;
         uint256 _dealIdCounter;
+        uint256 _dealCompletionPadding;
     }
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DealProposalsStorage")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant DEAL_PROPOSALS_STORAGE_LOCATION =
@@ -164,6 +171,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     event ClientSmartContractUpdated(address indexed clientSmartContract);
 
     /**
+     * @notice DealCompletionPaddingUpdated event
+     * @dev DealCompletionPaddingUpdated event is emitted when the deal completion padding is updated
+     * @param oldPadding old padding for the deal completion
+     * @param newPadding new padding for the deal completion
+     */
+    event DealCompletionPaddingUpdated(uint256 indexed oldPadding, uint256 indexed newPadding);
+
+    /**
      * @notice Error thrown when caller is not the registered validator for the deal
      * @dev 0x64544c54
      */
@@ -174,12 +189,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 0xbfbc5a6b
      */
     error NotTheDealValidator(uint256 dealId, address validator);
-
-    /**
-     * @notice Error thrown when caller is not the client smart contract
-     * @dev 0xe3186bfd
-     */
-    error NotTheClientSmartContract(uint256 dealId, address clientSmartContract);
 
     /**
      * @notice Error thrown when caller is not the controlling address for the provider
@@ -305,6 +314,24 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidDealPricePerSectorPerMonth(uint256 totalPerMonth, uint256 epochsInMonth);
 
     /**
+     * @notice Error indicating that the allocated size for a deal is too small to change its state to complete
+     * @dev 0x39d70eaf
+     */
+    error InvalidAllocationSizeForDealCompletion();
+
+    /**
+     * @notice Error thrown when trying to use an invalid client address
+     * @dev 0xa75bd1dd
+     */
+    error NotTheClientAddress();
+
+    /**
+     * @notice Error thrown when trying to set the padding value higher than maximum
+     * @dev 0x6e8e586a
+     */
+    error DealCompletionPaddingTooHigh(uint256 padding, uint256 maxPadding);
+
+    /**
      * @notice Constructor
      */
     constructor() {
@@ -335,7 +362,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     function setClientSmartContract(address _clientSmartContract) public onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
         DealProposalsStorage storage $ = _getDealProposalsStorage();
-        $._clientSmartContract = _clientSmartContract;
+        $._clientSmartContract = IClient(_clientSmartContract);
         emit ClientSmartContractUpdated(_clientSmartContract);
     }
 
@@ -474,22 +501,25 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Completes a deal
      * @param dealId The id of the deal proposal
-     * @param actualSizeBytes The actual size of the deal in bytes
      */
-    function completeDeal(uint256 dealId, uint256 actualSizeBytes) external {
+    function completeDeal(uint256 dealId) external {
         DealProposalsStorage storage $ = s();
         PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
 
         _ensureDealExists(dp);
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
-        if (msg.sender != $._clientSmartContract) revert NotTheClientSmartContract(dealId, msg.sender);
+        if (msg.sender != dp.client) revert NotTheClientAddress();
+        uint256 allocatedSize = $._clientSmartContract.getSizeOfAllocations(dealId);
+        uint256 proposedSize = dp.terms.dealSizeBytes;
+
+        _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
 
         $._dealIdsReadyForPayment.add(dealId);
-        $._SPRegistryContract.commitCapacity(dp.provider, dp.terms.dealSizeBytes, actualSizeBytes);
+        $._SPRegistryContract.commitCapacity(dp.provider, proposedSize, allocatedSize);
 
         _changeDealState(dealId, PoRepTypes.DealState.Completed);
-        emit DealCompleted(dealId, msg.sender, actualSizeBytes, dp.provider);
+        emit DealCompleted(dealId, msg.sender, allocatedSize, dp.provider);
     }
 
     /**
@@ -664,6 +694,31 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
+     * @notice Updates the deal completion padding
+     * @param padding The new padding value
+     */
+    function setDealCompletionPadding(uint256 padding) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (padding > MAX_DEAL_COMPLETION_PADDING) {
+            revert DealCompletionPaddingTooHigh(padding, MAX_DEAL_COMPLETION_PADDING);
+        }
+
+        DealProposalsStorage storage $ = s();
+        uint256 oldPadding = $._dealCompletionPadding;
+        $._dealCompletionPadding = padding;
+
+        emit DealCompletionPaddingUpdated(oldPadding, padding);
+    }
+
+    /**
+     * @notice Getter for deal completion padding
+     * @return padding Current padding value
+     */
+    function getDealCompletionPadding() external view returns (uint256) {
+        DealProposalsStorage storage $ = s();
+        return $._dealCompletionPadding;
+    }
+
+    /**
      * @notice Changes the state of a deal
      * @param dealId The id of the deal
      * @param toState The new state of the deal
@@ -745,6 +800,21 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         if (bytes(manifestLocation).length > 2048) {
             revert TooLongManifestLocation();
+        }
+    }
+
+    /**
+     * @notice Ensures if allocations size is within padding
+     * @param actualDealSize size of the deal
+     * @param expectedDealSize expecetd size from proposal
+     */
+    function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal {
+        uint256 padding = s()._dealCompletionPadding;
+        uint256 delta =
+            actualDealSize > expectedDealSize ? actualDealSize - expectedDealSize : expectedDealSize - actualDealSize;
+
+        if (delta * 100 > expectedDealSize * padding) {
+            revert InvalidAllocationSizeForDealCompletion();
         }
     }
 

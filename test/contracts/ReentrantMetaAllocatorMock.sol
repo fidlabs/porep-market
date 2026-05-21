@@ -22,7 +22,7 @@ contract ReentrantMetaAllocatorMock is IMetaAllocator {
     function addVerifiedClient(bytes calldata, uint256) external override {
         if (shouldAttack) {
             shouldAttack = false;
-            client.transfer(attackParams, attackDealId, false);
+            client.transfer(attackParams, attackDealId);
         }
     }
 }

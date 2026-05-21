@@ -38,4 +38,12 @@ contract ClientSCMock {
     function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory) {
         return allocationIds[dealId];
     }
+
+    function setDeal(Client.Deal memory deal) external {
+        deals[deal.dealId] = deal;
+    }
+
+    function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
+        return deals[dealId].sizeOfAllocations;
+    }
 }

@@ -58,9 +58,8 @@ interface IPoRepMarket {
     /**
      * @notice Completes a deal
      * @param dealId The id of the deal proposal
-     * @param actualSizeBytes The actual size of the deal in bytes
      */
-    function completeDeal(uint256 dealId, uint256 actualSizeBytes) external;
+    function completeDeal(uint256 dealId) external;
 
     /**
      * @notice Terminate a deal

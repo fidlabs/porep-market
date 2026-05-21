@@ -16,9 +16,8 @@ interface IClient {
      * @dev This function can only be called by the client
      * @param params The parameters for the transfer
      * @param dealId The id of the deal
-     * @param dealCompleted Whether the deal is completed
      */
-    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId, bool dealCompleted) external;
+    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId) external;
 
     /**
      * @notice Replaces all broken tracked allocations for a completed existing deal.
@@ -77,4 +76,11 @@ interface IClient {
      * @param claims An array of claim IDs to mark as terminated.
      */
     function claimsTerminatedEarly(uint64[] calldata claims) external;
+
+    /**
+     * @notice custom getter to retrieve allocated size in deal
+     * @param dealId The id of the deal
+     * @return sizeOfAllocations size of allocations for the selected deal
+     */
+    function getSizeOfAllocations(uint256 dealId) external view returns (uint256);
 }

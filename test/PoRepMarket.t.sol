@@ -14,6 +14,8 @@ import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
+import {ClientSCMock} from "./contracts/ClientSCMock.sol";
+import {Client} from "../src/Client.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -21,7 +23,7 @@ contract PoRepMarketTest is Test {
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
-    address public clientSmartContractAddress;
+    ClientSCMock public clientSmartContractAddress;
     address public clientAddress;
     address public providerOwnerAddress;
     address public operatorAddress;
@@ -29,18 +31,11 @@ contract PoRepMarketTest is Test {
     uint256 public railId;
     uint256 public dealId;
     uint256 public totalDealSize;
-
-    uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
-
+    SLITypes.SLIThresholds internal defaultRequirements;
+    SLITypes.DealTerms internal defaultTerms;
     CommonTypes.FilActorId public providerFilActorId;
 
-    SLITypes.SLIThresholds internal defaultRequirements =
-        SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
-
-    SLITypes.DealTerms internal defaultTerms = SLITypes.DealTerms({
-        dealSizeBytes: 1024, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
-    });
-
+    uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
     string public expectedManifestLocation = "https://example.com/manifest";
 
     function setUp() public {
@@ -48,23 +43,29 @@ contract PoRepMarketTest is Test {
         spRegistry = new SPRegistryMock();
         validatorFactory = new ValidatorFactoryMock();
         validatorAddress = vm.addr(0x001);
-        clientSmartContractAddress = vm.addr(0x002);
+        clientSmartContractAddress = new ClientSCMock();
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
         operatorAddress = vm.addr(0x005);
         adminAddress = vm.addr(0x006);
         dealId = 1;
         railId = 1;
-        totalDealSize = 1024;
+        totalDealSize = 103_079_215_104; // 96 GiB
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
+
+        defaultRequirements =
+            SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        defaultTerms = SLITypes.DealTerms({
+            dealSizeBytes: totalDealSize, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
+        });
 
         bytes memory initData =
             abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
         vm.prank(adminAddress);
-        poRepMarket.setClientSmartContract(clientSmartContractAddress);
+        poRepMarket.setClientSmartContract(address(clientSmartContractAddress));
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
@@ -88,6 +89,22 @@ contract PoRepMarketTest is Test {
             state: state,
             proposedAtBlock: block.number,
             manifestLocation: expectedManifestLocation
+        });
+    }
+
+    function createClientDealWithAllocationSize(uint256 _dealId, uint256 _allocationSize)
+        public
+        view
+        returns (Client.Deal memory)
+    {
+        return Client.Deal({
+            client: clientAddress,
+            validator: validatorAddress,
+            provider: providerFilActorId,
+            dealId: _dealId,
+            railId: railId,
+            sizeOfAllocations: _allocationSize,
+            allocationIds: new CommonTypes.FilActorId[](0)
         });
     }
 
@@ -362,13 +379,90 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        vm.prank(clientSmartContractAddress);
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.DealCompleted(
-            dealId, clientSmartContractAddress, defaultTerms.dealSizeBytes, providerFilActorId
-        );
+        emit PoRepMarket.DealCompleted(dealId, clientAddress, defaultTerms.dealSizeBytes, providerFilActorId);
 
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealEmitsDealCompletedEventWhenAtBottomPaddingValue() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(10);
+
+        uint256 dealAllocationSizeAtTheBottomLimit =
+            defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100;
+
+        clientSmartContractAddress.setDeal(
+            createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheBottomLimit)
+        );
+        vm.prank(clientAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealCompleted(dealId, clientAddress, dealAllocationSizeAtTheBottomLimit, providerFilActorId);
+
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealEmitsDealCompletedEventWhenAtTopPaddingValue() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(10);
+
+        uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100;
+
+        clientSmartContractAddress.setDeal(
+            createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheUpperLimit)
+        );
+        vm.prank(clientAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealCompleted(dealId, clientAddress, dealAllocationSizeAtTheUpperLimit, providerFilActorId);
+
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenAllocationIsUnderTheCustomPadding() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(10);
+
+        uint256 dealAllocationSizeAtTheBottomLimit =
+            defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100 - 1;
+
+        clientSmartContractAddress.setDeal(
+            createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheBottomLimit)
+        );
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenAllocationIsOverTheCustomPadding() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(10);
+
+        uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100 + 1;
+
+        clientSmartContractAddress.setDeal(
+            createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheUpperLimit)
+        );
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
+        poRepMarket.completeDeal(dealId);
     }
 
     function testShouldAddDealIdToCompletedDealsIdsSet() public {
@@ -380,14 +474,15 @@ contract PoRepMarketTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
         vm.prank(adminAddress);
-        porepMarekMock.setClientSmartContract(clientSmartContractAddress);
+        porepMarekMock.setClientSmartContract(address(clientSmartContractAddress));
         vm.prank(clientAddress);
         porepMarekMock.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         porepMarekMock.acceptDeal(dealId);
 
-        vm.prank(clientSmartContractAddress);
-        porepMarekMock.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
+        porepMarekMock.completeDeal(dealId);
 
         uint256[] memory completedDealsIds = porepMarekMock.getCompletedDealsIds();
         assertEq(completedDealsIds.length, 1);
@@ -396,7 +491,31 @@ contract PoRepMarketTest is Test {
 
     function testCompleteDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenAllocationIsUnderTheDefaultPadding() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1));
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenAllocationIsOverTheDefaultPadding() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1));
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
+        poRepMarket.completeDeal(dealId);
     }
 
     function testCompleteDealRevertsWhenNotTheSPClient() public {
@@ -405,12 +524,10 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        address notTheClientSmartContract = vm.addr(0x999);
-        vm.expectRevert(
-            abi.encodeWithSelector(PoRepMarket.NotTheClientSmartContract.selector, dealId, notTheClientSmartContract)
-        );
-        vm.prank(notTheClientSmartContract);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        address notTheClientAddress = vm.addr(0x999);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheClientAddress.selector));
+        vm.prank(notTheClientAddress);
+        poRepMarket.completeDeal(dealId);
     }
 
     function testCompleteDealRevertsWhenDealNotAcceptedByStorageProvider() public {
@@ -425,8 +542,8 @@ contract PoRepMarketTest is Test {
                 PoRepTypes.DealState.Accepted
             )
         );
-        vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
     }
 
     function testCompleteDealRevertsWhenDealAlreadyCompleted() public {
@@ -434,8 +551,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
-        vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -445,8 +564,8 @@ contract PoRepMarketTest is Test {
                 PoRepTypes.DealState.Accepted
             )
         );
-        vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
     }
 
     function testRejectAsClientDealEmitsDealRejectedEvent() public {
@@ -704,8 +823,9 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateRailId(dealId, railId);
         vm.stopPrank();
 
-        vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
 
         vm.expectEmit(true, true, true, true);
 
@@ -745,8 +865,9 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
 
         address caller = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
@@ -764,8 +885,9 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
-        vm.prank(clientSmartContractAddress);
-        poRepMarket.completeDeal(dealId, defaultTerms.dealSizeBytes);
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
 
         address caller = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
@@ -898,5 +1020,45 @@ contract PoRepMarketTest is Test {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealNotRejectable.selector, dealId));
         vm.prank(adminAddress);
         poRepMarket.rejectAcceptedDeal(dealId);
+    }
+
+    function testSetPaddingShouldEmitEvent() public {
+        uint256 newPadding = 15;
+
+        vm.expectEmit(true, false, false, false);
+        emit PoRepMarket.DealCompletionPaddingUpdated(0, newPadding);
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(newPadding);
+    }
+
+    function testShouldRevertWhenNewPaddingValueIsTooLarge() public {
+        uint256 newPadding = 101;
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealCompletionPaddingTooHigh.selector, newPadding, 100));
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(newPadding);
+    }
+
+    function testShouldRevertWhenPaddingSetterIsNotTheAdmin() public {
+        uint256 newPadding = 15;
+        address notTheAdmin = vm.addr(0x999);
+        bytes32 defaultAdminRole = poRepMarket.DEFAULT_ADMIN_ROLE();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, notTheAdmin, defaultAdminRole
+            )
+        );
+        vm.prank(notTheAdmin);
+        poRepMarket.setDealCompletionPadding(newPadding);
+    }
+
+    function testShouldReturnDealCompletionPadding() public {
+        assertEq(poRepMarket.getDealCompletionPadding(), 0);
+
+        uint256 newPadding = 15;
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(newPadding);
+        assertEq(poRepMarket.getDealCompletionPadding(), newPadding);
     }
 }
