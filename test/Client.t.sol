@@ -149,6 +149,12 @@ contract ClientTest is Test {
         return address(proxy);
     }
 
+    function testDealStructRetainsDeprecatedCompletedCompatibilitySlot() public pure {
+        Client.Deal memory deal;
+
+        assertFalse(deal.completed);
+    }
+
     function _registerDealWithOneAllocation(ClientContractMock clientMock) internal {
         metaAllocatorMock.setAllowance(address(clientMock), uint256(10000));
         actorIdMock.setGetClaimsResult(hex"8282008080");

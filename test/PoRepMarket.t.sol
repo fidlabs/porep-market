@@ -98,6 +98,7 @@ contract PoRepMarketTest is Test {
         returns (Client.Deal memory)
     {
         return Client.Deal({
+            completed: false,
             client: clientAddress,
             validator: validatorAddress,
             provider: providerFilActorId,
@@ -425,6 +426,20 @@ contract PoRepMarketTest is Test {
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealCompleted(dealId, clientAddress, dealAllocationSizeAtTheUpperLimit, providerFilActorId);
 
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenAllocationIsZeroAtMaxPadding() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(100);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
         poRepMarket.completeDeal(dealId);
     }
 

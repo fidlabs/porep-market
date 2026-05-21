@@ -809,6 +809,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param expectedDealSize expecetd size from proposal
      */
     function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal {
+        if (actualDealSize == 0) {
+            revert InvalidAllocationSizeForDealCompletion();
+        }
+
         uint256 padding = s()._dealCompletionPadding;
         uint256 delta =
             actualDealSize > expectedDealSize ? actualDealSize - expectedDealSize : expectedDealSize - actualDealSize;
