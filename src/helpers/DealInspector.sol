@@ -7,7 +7,8 @@ import {VerifRegAPI} from "filecoin-solidity/v0.8/VerifRegAPI.sol";
 import {IClient} from "../interfaces/IClient.sol";
 import {IPoRepMarket} from "../interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../types/PoRepTypes.sol";
-import {FVMSector, SectorStatus} from "../../lib/fvm-solidity/src/FVMSector.sol";
+
+//import {FVMSector, SectorStatus} from "../../lib/fvm-solidity/src/FVMSector.sol";
 
 /**
  * @title DealInspector
@@ -39,6 +40,12 @@ contract DealInspector {
     error InvalidClientAddress();
 
     /**
+     * @notice Error indicating a mismatch between the number of claims returned and the number of claim IDs processed
+     * @dev 0xe38fdaac
+     */
+    error ClaimIdsMismatch(uint256 claimsLength, uint256 claimIdsLength);
+
+    /**
      * @notice Client smart contract address used to fetch allocation IDs for a given deal ID
      */
     IClient public immutable CLIENT_CONTRACT;
@@ -60,11 +67,18 @@ contract DealInspector {
     }
 
     /**
-     * @notice Fetches claims for a given deal ID
+     * @notice Fetches claims for a given deal ID along with their matching claim IDs
+     * @dev VerifReg returns claims without IDs, in input order, skipping failures.
+     *      We re-attach the IDs so claimIds[i] matches claims[i].
      * @param dealId The ID of the deal for which to fetch claims
-     * @return VerifRegTypes.GetClaimsReturn The claims associated with the deal ID
+     * @return claimIds The IDs of successfully fetched claims, aligned with claims
+     * @return claims The claims associated with the deal ID
      */
-    function getClaims(uint256 dealId) external view returns (VerifRegTypes.GetClaimsReturn memory) {
+    function getClaims(uint256 dealId)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims)
+    {
         if (dealId == 0) {
             revert InvalidDealId();
         }
@@ -77,44 +91,53 @@ contract DealInspector {
         if (exitCode != 0) {
             revert GetClaimsCallFailed();
         }
-        return result;
-    }
 
-    /**
-     * @notice Validates that a sector's actual status matches the claimed status.
-     *         Resolves the miner actor ID from the deal's provider, then calls the
-     *         miner actor's ValidateSectorStatus.
-     * @param dealId The id of the deal whose provider's sector is being validated
-     * @param sector The sector number
-     * @param status The claimed sector status
-     * @param deadline Claimed deadline index, or NO_DEADLINE if sector is absent from the AMT
-     * @param partition Claimed partition index, or NO_PARTITION if sector is absent from the AMT
-     * @return valid Whether the claimed status matches the actual status
-     */
-    function validateSectorStatus(uint256 dealId, uint64 sector, SectorStatus status, int64 deadline, int64 partition)
-        external
-        returns (bool valid)
-    {
-        if (dealId == 0) {
-            revert InvalidDealId();
+        claims = result.claims;
+        claimIds = new CommonTypes.FilActorId[](claims.length);
+
+        uint256 failIterator = 0;
+        uint256 outIdx = 0;
+        for (uint256 i = 0; i < ids.length; ++i) {
+            if (
+                result.batch_info.fail_codes.length > failIterator
+                    && i == result.batch_info.fail_codes[failIterator].idx
+            ) {
+                ++failIterator;
+                continue;
+            }
+            claimIds[outIdx++] = ids[i];
         }
-        PoRepTypes.DealProposal memory deal = POREPMARKET_CONTRACT.getDealProposal(dealId);
-        uint64 minerId = CommonTypes.FilActorId.unwrap(deal.provider);
-        return FVMSector.validateSectorStatus(minerId, sector, status, deadline, partition);
+
+        if (outIdx != claims.length) {
+            revert ClaimIdsMismatch(claims.length, outIdx);
+        }
     }
 
-    /**
-     * @notice Checks if a sector is fully dead (terminated or never committed)
-     *         Works without knowing deadline/partition - uses NO_DEADLINE/NO_PARTITION sentinels (-1, -1)
-     *         Returns false for sectors still tracked in the miner's sectors AMT/
-     * @param minerId The miner actor ID
-     * @param sector The sector number
-     * @return Whether the sector is absent from the miner's sectors AMT, and is fully dead
-     */
-    function isSectorDead(uint64 minerId, uint64 sector) external returns (bool) {
-        (bool ok, bool valid) = FVMSector.tryValidateSectorStatus(minerId, sector, SectorStatus.Dead, -1, -1);
-        return ok && valid;
-    }
+    /// NOTE: This functionality is currently not implemented at mainnet, and is expected to be available in the future.
+    ///       Export Sector Status to FEVM (FIP-0112)
+    ///       https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0112.md
+    // /**
+    //  * @notice Validates that a sector's actual status matches the claimed status.
+    //  *         Resolves the miner actor ID from the deal's provider, then calls the
+    //  *         miner actor's ValidateSectorStatus.
+    //  * @param dealId The id of the deal whose provider's sector is being validated
+    //  * @param sector The sector number
+    //  * @param status The claimed sector status
+    //  * @param deadline Claimed deadline index, or NO_DEADLINE if sector is absent from the AMT
+    //  * @param partition Claimed partition index, or NO_PARTITION if sector is absent from the AMT
+    //  * @return valid Whether the claimed status matches the actual status
+    //  */
+    // function validateSectorStatus(uint256 dealId, uint64 sector, SectorStatus status, int64 deadline, int64 partition)
+    //     external
+    //     returns (bool valid)
+    // {
+    //     if (dealId == 0) {
+    //         revert InvalidDealId();
+    //     }
+    //     PoRepTypes.DealProposal memory deal = POREPMARKET_CONTRACT.getDealProposal(dealId);
+    //     uint64 minerId = CommonTypes.FilActorId.unwrap(deal.provider);
+    //     return FVMSector.validateSectorStatus(minerId, sector, status, deadline, partition);
+    // }
 
     /**
      * @notice Ensures that the provided addresses are non-zero
