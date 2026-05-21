@@ -15,14 +15,15 @@ implementation plan is locked.
 
 2. Service duration is enforced by the market
 
-   Service starts on completion. `serviceEndEpoch` is derived from
-   `serviceStartEpoch + durationEpochs` and stored with the deal. It should not
+   Service starts when storage evidence is accepted.
+   `serviceEndEpoch` is derived from
+   `serviceStartEpoch + durationEpochs` and stored with the deal. It must not
    be supplied later by an off-chain bot.
 
 3. `termMax` is claimability slack, not paid service duration
 
-   Current tooling will use 40 days of slack. That creates extra sector time the
-   SP may need to maintain, so this should be documented for providers. The
+   Current tooling will use 40 days of slack. That can require extra sector time
+   for the SP, so provider-facing docs must call it out. The
    alternative is to prepare sectors manually and use SnapDeals where that
    operational path makes sense.
 
@@ -37,8 +38,9 @@ implementation plan is locked.
 6. Offers are living configuration; deals are frozen snapshots
 
    Offer edits affect future proposals only. Existing deals keep the provider,
-   offer id, payment token, payee, price, duration, capacity, and SLI terms that
-   were frozen at proposal/completion time.
+   offer id, piece-set commitment, payment token, payee, price, duration,
+   capacity, evidence adapter, and SLI terms that were frozen at
+   proposal/activation time.
 
 7. Offer token enumeration is current state
 
@@ -58,38 +60,110 @@ implementation plan is locked.
 
 10. `railMaxRatePerEpoch` is frozen when payment starts
 
-    The final value depends on `billed32GiBUnits`, so it belongs at completion /
+    The final value depends on `billed32GiBUnits`, so it belongs at activation /
     rail creation time, not proposal time.
 
-11. Direct offer selection is the first useful path
+11. Stored states use expandable numeric constants
 
-    `proposeDealForOffer` should work first. `proposeDealAuto` can stay in the
-    interface as the same flow with offer selection resolved by `SPRegistry`.
+    Deal lifecycle, evidence type, evidence result, and rail status are stored as
+    `uint8` constants in small libraries instead of Solidity enums. Values are
+    append-only, intentionally gapped, and transition-checked explicitly.
+    Clients must not sort or compare state codes as ranks.
 
-12. Strict SLI enforcement is deferred
+12. Storage evidence checks are adapter-owned
+
+    DataCap / VerifReg validation lives behind `IStorageEvidenceAdapter`. The
+    `DataCapEvidenceAdapter` is the adapter for the current claim path. The
+    market owns activation and stores the payment activation fields: deal state,
+    committed bytes, billed units, service start/end, and rail ceiling.
+    Allocation IDs, claim IDs, and DataCap-specific evidence stay in the adapter.
+    PoRepMarket is the activation caller. DataCap posting is direct
+    client-to-adapter guarded by adapter checks. Validator goes through
+    PoRepMarket's settlement path instead of calling adapters itself.
+
+13. Market derives payment activation fields
+
+    The adapter returns whether evidence is accepted and how many bytes are
+    covered. PoRepMarket validates that output against the frozen deal, then
+    derives committed bytes, billed units, service start/end, and rail ceiling.
+
+14. Huge deals are supported by batched evidence
+
+    There is no product-level cap on pieces or claims per deal. Adapters can
+    accept evidence over multiple calls before activation. Normal settlement
+    reads aggregate counts and byte totals; it does not loop over every stored
+    allocation or claim ID.
+
+15. Piece identity is checked at allocation and claim time
+
+    DataCap allocation `Data` CIDs and VerifReg claim `Data` CIDs must be
+    checked when they are submitted or returned by Filecoin actors. Claimed bytes
+    alone are not enough to activate payment. `pieceSetCommitment` is
+    `keccak256(manifest file bytes)`. Whole-set on-chain equality proofs are
+    deferred.
+
+16. Payment must be prepared before activation
+
+    Accepted storage evidence can move a deal to `Active` only when the
+    FilecoinPay payment path is authorized for the frozen token, payee,
+    validator, operator path, and market-derived rail ceiling. DataCap claim
+    termMin/termMax checks must be performed, but `claim.term_max` is not the
+    paid service end.
+
+17. `Finalized` closes successful service
+
+    A deal must not live in `Active` forever. Once the paid service window has
+    ended and required settlement has caught up, the market can move it to
+    `Finalized`. This is a terminal deal lifecycle state, not a DataCap or
+    evidence readiness state.
+
+18. DataCap posting is explicit and separate from activation
+
+    DataCap-backed deals use guarded contract calls for allocation batches. The
+    adapter enforces selected deal, accepted state, frozen client, provider,
+    recipient, amount, termMin/termMax, posting-open, and returned-ID checks. The
+    client finishes posting with a separate method once posted allocation bytes
+    cover at least the frozen requested size. Finishing emits `DealEvidenceReady`
+    for SP and client tooling, but it does not change the core deal state and
+    does not start payment.
+
+19. DataCap allocation and claim IDs stay out of PoRepMarket
+
+    `DataCapEvidenceAdapter` stores exact allocation and claim IDs for tooling,
+    retry logic, and review. Normal activation and settlement use aggregate
+    counts and byte totals, not loops over every stored ID. PoRepMarket stores
+    the selected adapter and payment activation fields, not VerifReg-specific
+    IDs. The adapter exposes whether posting is finished and paginated
+    allocation/claim ID getters for tooling.
+
+20. Direct offer selection is the first useful path
+
+    `proposeDealForOffer` is the first path to implement. `proposeDealAuto` can
+    stay in the interface as the same flow with offer selection resolved by
+    `SPRegistry`.
+
+21. Strict SLI enforcement is deferred
 
     First deals can run with simpler pilot SLI tooling. Strict SLI checking,
-    slashing, and penalty math should be specified separately before becoming
+    slashing, and penalty math must be specified separately before becoming
     payment-affecting contract logic.
 
 ## Still Worth Reviewing
 
 1. Release shape
 
-   Should V2 ship as fresh canonical contracts or as an in-place upgrade /
-   migration?
+   V2 starts as fresh canonical contracts. Existing V1 deals are not migrated
+   into V2 state in the starting scope; they continue on V1 until closed or
+   terminated.
 
-   Current recommendation: design the spec as fresh V2 canonical contracts.
-   Treat migration as a release-plan question unless it changes the storage
-   shape.
+2. Billing input for `billed32GiBUnits`
 
-2. Billing source for `billed32GiBUnits`
+   PoRepMarket derives billing from adapter-returned covered bytes after
+   clamping it against the frozen requested size:
 
-   Should it be rounded from actual completed bytes, Filecoin claim size, or
-   another authoritative completion value?
-
-   Current recommendation: use the value closest to what is actually claimed /
-   committed on Filecoin, then round up to 32GiB units.
+   ```text
+   billed32GiBUnits = ceilDiv(min(coveredBytes, requestedSizeBytes), 32 GiB)
+   ```
 
 3. Stable event surface
 
@@ -114,6 +188,6 @@ implementation plan is locked.
 
 3. Rescue allocation terms
 
-   Replacement allocation `termMin` should use remaining paid service duration,
+   Replacement allocation `termMin` must use remaining paid service duration,
    not the original full duration. The exact rescue helper behavior belongs in
    tooling docs.

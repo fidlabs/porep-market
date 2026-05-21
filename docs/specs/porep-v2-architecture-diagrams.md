@@ -2,8 +2,13 @@
 
 Status: draft for PR review.
 
-Mermaid is the source of truth here. Export PNGs only when moving the diagrams
-to a surface that does not render Mermaid cleanly.
+Storage layout uses Excalidraw because the Mermaid version was not readable on
+the page. The flow diagrams stay in Mermaid. Keep generated renders out of the
+starting spec unless they are regenerated from the current source.
+
+## Storage Layout
+
+Source: [`porep-v2-storage-layout.excalidraw`](./porep-v2-storage-layout.excalidraw)
 
 ## Offer To Frozen Deal
 
@@ -15,7 +20,8 @@ flowchart LR
     tokens["Token payment rows<br/>token + monthly 32GiB price"]
     client["Client picks offer + token<br/>or uses auto-match"]
     freeze{{"Deal snapshot freezes terms"}}
-    service["Completion starts service<br/>and FilecoinPay settlement"]
+    rail["FilecoinPay rail prepared"]
+    service["Storage evidence + prepared rail<br/>start payable service"]
 
     subgraph registry["SPRegistry: current offer catalog"]
         direction TB
@@ -25,7 +31,7 @@ flowchart LR
 
     subgraph market["PoRepMarket: frozen agreement"]
         direction TB
-        freeze --> service
+        freeze --> rail --> service
     end
 
     tokens --> client --> freeze
@@ -49,25 +55,38 @@ flowchart TB
     proposed(["Proposed"])
     acceptAction["acceptDeal"]
     accepted(["Accepted"])
-    completeAction["completeDeal(actualSizeBytes)<br/>commit capacity<br/>freeze billed32GiBUnits"]
-    completed(["Completed"])
+    railPrep["prepareRail<br/>RailStatus.PREPARED"]
+    datacapBatch["submitDataCapBatch<br/>repeat while posting"]
+    datacapReady["finishDataCapPosting<br/>DealEvidenceReady"]
+    evidenceBatch["submitEvidenceBatch<br/>claim IDs + piece data"]
+    adapter["IStorageEvidenceAdapter<br/>DataCap or later adapter"]
+    evidenceAction["activateEvidence<br/>market derives billed units + service window"]
+    activationGate{{"accepted evidence + payment authorization"}}
+    active(["Active"])
+    finalizeAction["finalizeDeal<br/>after service window is settled"]
+    finalized(["Finalized"])
     expireAction["releaseExpiredProposal<br/>release pending capacity"]
     expired(["Expired"])
     rejectAction["rejectDeal<br/>release pending capacity"]
     rejected(["Rejected"])
     terminateFromAccepted["terminateDeal"]
-    terminateFromCompleted["terminateDeal"]
+    terminateFromActive["terminateDeal"]
     terminated(["Terminated"])
 
     proposed --> acceptAction --> accepted
     proposed --> expireAction --> expired
     proposed --> rejectAction --> rejected
 
-    accepted --> completeAction --> completed
+    accepted --> railPrep
+    accepted --> datacapBatch --> datacapReady --> evidenceBatch --> adapter --> evidenceAction
+    railPrep --> activationGate
+    evidenceAction --> activationGate
+    activationGate --> active
     accepted --> terminateFromAccepted --> terminated
-    completed --> terminateFromCompleted --> terminated
+    active --> terminateFromActive --> terminated
+    active --> finalizeAction --> finalized
 
-    completed --> service["Payment service window<br/>serviceEndEpoch = serviceStartEpoch + durationEpochs"]
+    active --> service["Payment service window<br/>serviceEndEpoch = serviceStartEpoch + durationEpochs"]
     service --> validator["Validator settlement<br/>dueAt(toEpoch) - dueAt(fromEpoch)"]
     validator --> filecoinPay["FilecoinPay rail<br/>token = frozen DealPayment.paymentToken"]
 
@@ -77,9 +96,9 @@ flowchart TB
     classDef payment fill:#312e81,stroke:#a78bfa,color:#ede9fe
     classDef action fill:#1e3a8a,stroke:#38bdf8,color:#eff6ff
 
-    class proposed,accepted state
-    class completed,service,filecoinPay final
+    class proposed,accepted,active state
+    class finalized,service,filecoinPay final
     class expired,rejected,terminated stop
-    class acceptAction,completeAction,expireAction,rejectAction,terminateFromAccepted,terminateFromCompleted action
+    class acceptAction,railPrep,datacapBatch,datacapReady,evidenceBatch,adapter,evidenceAction,activationGate,finalizeAction,expireAction,rejectAction,terminateFromAccepted,terminateFromActive action
     class validator payment
 ```

@@ -7,16 +7,16 @@ pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
-library PoRepV2ValidatorStorageSpec {
+library ValidatorStorageLayout {
     /// @custom:storage-location erc7201:porepmarket.storage.Validator
     struct ValidatorStorage {
         address market;
         address filecoinPay;
         address sliScorer;
-        address clientContract;
 
         uint256 dealId;
         uint256 railId;
+        uint8 railStatus;
         CommonTypes.ChainEpoch earlyTerminatedEpoch;
         uint256 minSettlementEpochs;
     }

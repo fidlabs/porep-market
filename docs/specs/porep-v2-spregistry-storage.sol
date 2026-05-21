@@ -7,9 +7,9 @@ pragma solidity =0.8.30;
 
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {PoRepV2TypesSpec as V2} from "./porep-v2-shared-types.sol";
+import {SharedTypes as Types} from "./porep-v2-shared-types.sol";
 
-library PoRepV2SPRegistryStorageSpec {
+library SPRegistryStorageLayout {
     // Offer names are short service labels for clients and UI, not free-form descriptions
     uint256 internal constant MAX_OFFER_NAME_BYTES = 64;
 
@@ -69,7 +69,7 @@ library PoRepV2SPRegistryStorageSpec {
 
         mapping(uint256 offerId => Offer) offers;
         mapping(uint256 offerId => OfferTerms) offerTerms;
-        mapping(uint256 offerId => V2.SLITerms) offerSLIs;
+        mapping(uint256 offerId => Types.SLITerms) offerSLIs;
 
         mapping(uint256 offerId => mapping(address token => OfferPayment)) offerPayments;
         mapping(uint256 offerId => EnumerableSet.AddressSet tokens) offerPaymentTokens; // Current tokens; history is events
