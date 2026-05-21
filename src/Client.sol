@@ -207,6 +207,8 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     error InvalidRailId();
 
     struct Deal {
+        // Deprecated; retained to preserve the deployed storage layout.
+        bool completed;
         address client;
         address validator;
         CommonTypes.FilActorId provider;
