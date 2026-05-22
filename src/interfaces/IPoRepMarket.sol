@@ -98,6 +98,7 @@ interface IPoRepMarket {
 
     /**
      * @notice Updates the manifest location for a specific deal proposal
+     * @dev Only callable by the admin
      * @param dealId The unique identifier of the deal proposal
      * @param newManifestLocation The new manifest location URL to be updated for the deal proposal
      */

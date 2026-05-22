@@ -1647,27 +1647,6 @@
   },
   {
     "type": "error",
-    "name": "UnauthorisedCaller",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "caller",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "expectedCaller",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ValidatorAlreadySet",
     "inputs": [
       {
