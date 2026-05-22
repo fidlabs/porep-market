@@ -64,6 +64,17 @@ proposeDeal() --> [Proposed] --> acceptDeal() --> [Accepted] --> completeDeal() 
 | **[FilecoinPay](https://github.com/FilOzone/filecoin-pay)** | Smart contract enabling streaming payment channels between payers and recipients |
 | **Miner** | Instance of the [Miner Actor](https://github.com/filecoin-project/builtin-actors/tree/master/actors/miner) |
 
+### Provider Capacity States
+
+A Storage Provider's storage capacity moves through four states across the deal lifecycle.
+
+| State | Description |
+|-------|-------------|
+| **Available** | The total amount of storage a Storage Provider has declared and made available for taking on new deals. |
+| **Pending** | Storage that has been reserved for a deal that was proposed but not yet finalized - held aside so it cannot be offered to another client, but not yet locked in. |
+| **Committed** | Storage that is firmly allocated to a deal which has been accepted and finalized. The provider is obligated to store this data for the agreed duration. |
+| **Sealed** | The portion of committed storage that the provider has already physically processed and stored on disk in cryptographically protected form, ready to be proven on the Filecoin network. |
+
 ## System Flow
 
 ```mermaid
