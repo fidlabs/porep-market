@@ -119,14 +119,22 @@ without VerifReg claims?
 
 ### Relevant network changes and proposals
 
-Two in-progress Filecoin changes are directly relevant to the post-DataCap
-evidence path:
+Three Filecoin changes are directly relevant to the post-DataCap evidence path:
 
 **NV28 (network upgrade)**: Exposes sector status to smart contracts. After
 NV28, an FEVM contract can check whether a sector is active, its expiration,
 and its power. This is necessary but not sufficient: sector status tells you
 the sector exists, but not which pieces are in it. The data-to-sector mapping
 is still missing from sector status alone.
+
+**FIP-0112 (`GenerateSectorLocation`)**: Provides a method to derive the
+`deadline` and `partition` for a given sector number. These are required inputs
+for querying sector status from FEVM. Without FIP-0112, NV28's sector status
+exposure is not practically usable from smart contracts -- the caller would need
+off-chain knowledge of the sector's deadline/partition. FIP-0112 is not yet
+Final; the V1 `DealInspector` helper (PR #64) is blocked on this. V2's
+replacement adapter depends on FIP-0112 shipping alongside or before NV28 for
+sector status queries to be viable.
 
 **FIP-0109 (DDO sector content notifications)**: A finalized FIP that enables
 sector content notifications to smart contracts. When a miner activates a sector
@@ -146,13 +154,15 @@ These changes affect the replacement adapter design:
 | Mechanism | What it provides | What it lacks |
 | --- | --- | --- |
 | NV28 sector status | Sector liveness, expiration, power | Piece-level data; no mapping from CID to sector |
+| FIP-0112 `GenerateSectorLocation` | Deadline/partition derivation for sector queries | Not yet Final; blocks practical use of NV28 from FEVM |
 | FIP-0109 notifications (Final) | Piece-to-sector binding at sector activation | Provider-chosen notifees (not global); no persistent queryable state; no removal notification |
 | Future piece-membership or pinning primitive | Queryable piece-to-sector state | Timeline and design not finalized; no confirmed API |
 
 The ideal post-DataCap evidence path combines NV28 sector status (is the sector
 alive?) with either persistent FIP-0109-derived state or a future queryable
 piece-membership primitive (is piece X in that sector?). Neither alone is
-sufficient.
+sufficient. FIP-0112 is a prerequisite for the sector status half of this
+combination.
 
 These mechanisms are not final. The timeline, exact scope, and trust properties
 are still being designed. V2's adapter abstraction is positioned to consume
@@ -432,6 +442,7 @@ the plan.
 
 - FIP-1249 (DataCap removal): https://github.com/filecoin-project/builtin-actors/pull/1744
 - FIP-0109 (DDO sector content notifications, Final): https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0109.md
+- FIP-0112 (GenerateSectorLocation, not yet Final): https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0112.md
 - Built-in market `SectorContentChanged` implementation: https://github.com/filecoin-project/builtin-actors/blob/b3eacd8ae71554148790a5caa4869bff51de1f4f/actors/market/src/lib.rs#L599-L708
 - Built-in market `provider_sectors` state: https://github.com/filecoin-project/builtin-actors/blob/b3eacd8ae71554148790a5caa4869bff51de1f4f/actors/market/src/state.rs#L82-L88
 - Miner notifications (notifee dispatch): https://github.com/filecoin-project/builtin-actors/blob/b3eacd8ae71554148790a5caa4869bff51de1f4f/actors/miner/src/notifications.rs#L23-L29
