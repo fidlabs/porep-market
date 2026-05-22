@@ -1300,7 +1300,7 @@ contract ClientTest is Test {
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationSize.selector));
-        client.transfer(transferParams, dealId, false);
+        client.transfer(transferParams, dealId);
     }
 
     function testRescueDealAllocationsRejectsAllocationSizeExceedingSector() public {
