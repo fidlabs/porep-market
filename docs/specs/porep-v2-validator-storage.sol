@@ -18,6 +18,7 @@ library ValidatorStorageLayout {
         uint256 railId;
         uint8 railStatus;
         CommonTypes.ChainEpoch earlyTerminatedEpoch;
+        CommonTypes.ChainEpoch lastSettledEpoch;
         uint256 minSettlementEpochs;
     }
 }

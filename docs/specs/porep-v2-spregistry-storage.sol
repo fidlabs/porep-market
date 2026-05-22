@@ -19,8 +19,8 @@ library SPRegistryStorageLayout {
     }
 
     struct Provider {
-        address organization;
-        address payee;
+        address organization; // Management/ownership address; may be shared across multiple providers under one entity
+        address payee; // Payment destination for deal settlement; may differ for loan, beneficiary, or treasury arrangements
         bool paused;
         bool blocked;
     }

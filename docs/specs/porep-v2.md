@@ -21,6 +21,7 @@ implementation plan.
 | `porep-v2-architecture-diagrams.md` | storage layout, offer freeze, and lifecycle/payment diagrams |
 | `porep-v2-storage-layout.excalidraw` | editable storage-layout diagram source |
 | `porep-v2-propositions.md` | proposed shape and review points |
+| `porep-v2-datacap-sunset.md` | DataCap removal transition plan and on-chain evidence requirements |
 
 ## Starting Point
 
@@ -139,6 +140,19 @@ committedBytes = min(coveredBytes, requestedSizeBytes)
 billed32GiBUnits = ceil(committedBytes / 32GiB)
 ```
 
+Activation requires covered bytes to be within a tolerance band of the frozen
+requested size. The starting threshold is configurable:
+
+```text
+coveredBytes >= requestedSizeBytes * activationToleranceBps / 10_000
+```
+
+Deals that fall below the tolerance are not activated. The tolerance applies at
+activation only; it does not constrain the billing clamp above. The tolerance
+percentage, whether it should be adaptive, per-deal, or per-offer, and whether
+a stricter mode (exact match) should be available are implementation decisions
+that can evolve separately from the billing math.
+
 FilecoinPay gets a ceiling rate:
 
 ```text
@@ -153,6 +167,15 @@ settlementAmount = dueAt(toEpoch) - dueAt(fromEpoch)
 ```
 
 The rail rate is the FilecoinPay ceiling, not the commercial payment rate.
+
+The deal freezes the offer's `pricePer32GiBPerMonth` at proposal time. The
+client's `maxPricePer32GiBPerMonth` is a proposal-time guard only; it is not
+stored with the deal.
+
+Cumulative floor-based settlement underpays by at most 1 base token unit over
+the entire deal lifetime. Per-window settlements may fluctuate by +/−1 base
+unit due to independent floor truncation, but the cumulative total always
+converges. This is inherent to integer division and is accepted.
 
 ## Duration Rule
 
@@ -172,6 +195,11 @@ Current tooling will use 40 days of `termMax` slack. This can require extra
 sector time for the SP, so provider-facing docs must call it out. The
 alternative path is manual sector preparation with SnapDeals where
 that fits the provider workflow.
+
+Conversion from `durationDays` (uint32) to `durationEpochs` (uint64) is
+overflow-safe for all uint32 values (`uint32_max * 2880 < uint64_max`).
+Implementation must validate against the offer's `maxDurationEpochs` before
+storing.
 
 ## Piece Set Identity Rule
 
@@ -239,11 +267,21 @@ retry logic, and review. Normal activation and settlement read aggregate counts
 and byte totals; they do not iterate every stored ID. PoRepMarket does not store
 VerifReg allocation or claim IDs.
 
+`activateEvidence` does not re-verify individual claims. It reads the adapter's
+accumulated totals from prior `submitEvidenceBatch` calls and checks whether
+those totals satisfy the frozen deal requirements. This keeps activation cheap
+even for huge deals.
+
 For DataCap-backed deals, `DataCapEvidenceAdapter` is also the guarded DataCap
 gateway; it is not a separate V2 `Client` contract.
 
 The deal is the paid agreement. Sector placement is evidence and can change over
 time.
+
+`DataCapEvidenceAdapter` has a finite operational lifetime bound to Filecoin Plus
+/ VerifReg availability. The adapter abstraction is designed for this transition.
+See `porep-v2-datacap-sunset.md` for the full transition plan, on-chain evidence
+requirements, and replacement adapter paths.
 
 ## DataCap Posting Boundary
 
@@ -262,6 +300,14 @@ cover at least the frozen requested size, closes posting, and emits
 `DealEvidenceReady(dealId, adapter)`. Later batches must revert. Duplicate
 finish behavior must be explicit in implementation; the starting preference is
 to emit readiness once and make later finish calls revert.
+
+`finishDataCapPosting` is a separate transaction to prevent batch submission
+from atomically closing the deal. In V1, the `dealCompleted` flag on transfer
+could trigger deal completion before the SP had an opportunity to begin claim
+work. Separating the finish call ensures: (a) the client explicitly confirms all
+allocation batches are submitted, (b) `DealEvidenceReady` fires as a clean
+signal for SP tooling, (c) no deal state transition or payment activation occurs
+at this point.
 
 `DealEvidenceReady` is an event consumed by SP/client tools, not a deal
 lifecycle state. SP tooling can use it as the concrete hook to start
@@ -320,6 +366,83 @@ current DataCap rules. The market must not model `claim.term_max` as the
 DataCap end or the paid service end. Paid service duration remains
 `serviceEndEpoch`.
 
+## Activation Permissions
+
+`activateEvidence` is permissionless. The caller is not checked because
+activation authority comes from prior steps: the client authorized the payment
+rail, the client posted and finished allocations, the SP claimed data, and
+evidence batches verified claims. Any account can call activation for any deal;
+the market validates all preconditions from stored state.
+
+The adapter must reject activation when aggregate covered bytes are below the
+deal's frozen requested size, which prevents premature activation even without
+caller restrictions.
+
+## Termination Authority
+
+Termination authority is split at rail creation:
+
+Pre-rail (PROPOSED or ACCEPTED without rail): PoRepMarket methods terminate the
+deal. `rejectDeal` (by provider), `releaseExpiredProposal` (by anyone after
+expiry), and `terminateDeal` (by admin/authorized role) are market-initiated
+transitions that release pending capacity.
+
+Post-rail (ACCEPTED with rail, or ACTIVE): Termination flows from FilecoinPay.
+When a rail is terminated in FilecoinPay, the FilecoinPay contract calls the
+Validator's termination callback, and the Validator calls PoRepMarket to
+transition the deal to `DealState.TERMINATED`. The market does not independently
+terminate post-rail deals; termination is rail-driven.
+
+The Validator records `earlyTerminatedEpoch` to cap settlement at the
+termination point. Settlement after termination uses `earlyTerminatedEpoch` as
+the final `toEpoch`.
+
+## Duplicate Deal Guard
+
+The auto-match picker must not assign the same provider to the same data twice.
+When `proposeDealAuto` selects a provider, it must check whether the provider
+already has a non-terminal deal (PROPOSED, ACCEPTED, or ACTIVE) for the same
+`pieceSetCommitment`. If so, the picker skips that provider and tries the next
+candidate.
+
+Terminal deal states (REJECTED, TERMINATED, FINALIZED) do not block future
+assignment. A provider whose prior deal for the same data was rejected or
+terminated can be re-picked. Whether a previously-failed provider should be
+deprioritized or cooled down is a picker policy question, not a hard constraint.
+
+This guard is per-provider, not per-market. Two different providers holding the
+same data is intentional (replicas). The starting implementation is a simple
+uniqueness check. Future extensions may include explicit replica count requests
+(assign N providers for the same data in one pass) and cross-deal replica
+tracking; the starting uniqueness check does not block these.
+
+The check uses `pieceSetCommitment` as the data identity. Two deals with the same
+`pieceSetCommitment` are assumed to contain the same data. If a client needs the
+same data stored differently (different terms, different adapter), they produce
+a different manifest and thus a different commitment.
+
+## FilecoinPay Constraints
+
+V2 depends on FilecoinPay for payment rails. Known constraints that affect deal
+flow:
+
+- **Operator approval must precede rail creation.** The client must approve the
+  operator (Validator) on FilecoinPay before the rail can be created. The
+  `preparePayment` step in the deal flow must enforce this ordering.
+- **Token decimals affect minimum viable price.** FilecoinPay computes
+  `ratePerEpoch` from the total amount and duration. Tokens with few decimals
+  (e.g., 6) can truncate small per-epoch rates to zero, breaking settlement.
+  This is why `minPricePer32GiBPerMonth` exists per token in SPRegistry: it
+  prevents offers whose per-epoch rate would truncate to zero.
+- **Lockup period updates have ordering constraints.** When DataCap allocations
+  extend beyond the initial lockup period, the Validator must update the
+  FilecoinPay lockup before claim work begins. The current flow handles this via
+  the allocation posting path.
+
+These constraints are FilecoinPay's interface contract. V2 must respect them but
+does not attempt to abstract over them. If FilecoinPay changes its operator or
+lockup model, the Validator and deal flow adapt accordingly.
+
 ## Settlement Rule
 
 Normal settlement must be deterministic from frozen deal state, active rail
@@ -347,27 +470,113 @@ does not add another evidence status.
 - proposal creation reserves pending capacity
 - reject/expire releases pending capacity
 - accepted storage evidence freezes committed capacity, billed 32GiB units, service start, and rail ceiling
+- activation requires covered bytes within a configurable tolerance of requested size
+- if committed bytes are less than reserved bytes at activation, the difference is
+  released back to provider available capacity
 - finalize closes an active deal only after the paid service window and required settlement are complete
 - adapter selection is allow-listed and frozen for the deal before activation
+- adapters expose `isOperational()` so the market can detect a non-functional adapter
+  and allow admin rejection of stuck deals
 - payment and validation read frozen deal state, not living offer state
 - strict SLI slashing/checking is deferred from the first pilot deals
 - events are the offer/deal history source
 
 ## Deferred / Out Of Starting Scope
 
-- native FIL
-- token fallback lists
-- cross-token price comparison
-- token-specific payees
-- immutable offer versions
-- offer-level capacity
-- service-class codes
-- extra matching constraints
-- collateral or proposal bonds
-- whole-manifest on-chain equality proofs
-- Merkle or accumulator proofs for piece membership
-- per-piece permanent market storage
-- normal-settlement VerifReg refreshes
-- V1 import or migration tooling
-- upper allocation tolerance
-- full implementation-level events, errors, pagination, or test matrix
+### Token and pricing
+
+- **Native FIL**: requires WFIL wrapping or native value handling; not needed for
+  pilot tokens
+- **Token fallback lists**: auto-selecting an alternative token when the primary
+  is unavailable
+- **Cross-token price comparison**: matching never compares prices across tokens
+  by design; cross-token equivalence would require an oracle
+- **Token-specific payees**: payee is provider-level; per-token routing adds
+  complexity without current demand
+- **Short-deal economics**: deals shorter than one settlement period (one month)
+  create edge cases in the commercial framing and first-partial-month settlement.
+  The pilot uses 6-month minimum deals (DataCap duration floor). When shorter
+  deals become possible post-DataCap, the settlement math still works (per-epoch
+  cumulative), but the commercial UX and pricing presentation need attention
+
+### Offer and matching
+
+- **Immutable offer versions**: offer edits affect future proposals only; version
+  snapshots add storage with no current consumer
+- **Offer-level capacity**: capacity is provider-level; per-offer capacity splits
+  add accounting overhead
+- **Service-class codes**: a categorical `uint8 offerType` on offers could label
+  cold/warm/hot tiers for SLI scoring and matching. Currently the offer's SLI
+  terms and name implicitly define the service tier. Adding a type constant that
+  no contract logic reads is pure overhead. Can be added to the Offer struct via
+  upgrade when contract logic needs it
+- **Extra matching constraints**: geo-preferences, SP reputation scores, client
+  allow/deny lists
+- **Explicit replica requests**: assigning N providers for the same data in one
+  pass. The starting duplicate guard prevents accidental double-assignment; future
+  replica support builds on the same `pieceSetCommitment` uniqueness check but
+  adds an explicit replica count parameter
+
+### Evidence and proofs
+
+- **Whole-manifest on-chain equality proofs**: proving the full piece set matches
+  the commitment, beyond individual piece checks
+- **Merkle or accumulator proofs for piece membership**: cryptographic proof that
+  a piece is in the committed set
+- **Per-piece permanent market storage**: storing individual piece CIDs in
+  PoRepMarket (they stay in the adapter)
+- **Normal-settlement VerifReg refreshes**: live claim re-verification during
+  settlement; belongs in separate maintenance/challenge functions
+
+### Client and payment policy
+
+- **Non-paying client handling**: when a client's payment rail drains or the
+  client disputes, deal termination flows through FilecoinPay's rail termination
+  callback into the Validator and then PoRepMarket (proposition 23). The
+  mechanical path exists. What is deferred is the policy layer: grace periods
+  before termination, notification events to the SP during grace, client
+  re-proposal paths after termination, and dispute resolution flows. The pilot
+  operates with a trusted client where this is not a launch concern. The upgrade
+  path: add a configurable grace period to the Validator, add pre-termination
+  notification events, and optionally add a `SUSPENDED` deal state between
+  `ACTIVE` and `TERMINATED`. None of these require storage layout changes to
+  PoRepMarket; they are Validator-side and event-surface additions
+- **Collateral or proposal bonds**: client-side deposits against abandonment or
+  SP-side bonds against rejection
+
+### Adapter interface
+
+- **Normalized status queries**: high-level boolean queries on the adapter
+  (`isDealSecured`, `isDataProving`, `isSectorAlive`) that abstract over the
+  evidence model. Useful for monitoring and UI but not needed for the contract
+  flow. `isOperational()` covers the adapter-health case. Additional status
+  queries can be added to the interface via adapter upgrade without changing
+  PoRepMarket
+- **Piece change notifications / hooks**: adapter callbacks when piece membership
+  changes (pin/unpin/sector termination). Depends on post-DataCap evidence
+  primitives
+
+### Monitoring and observability
+
+- **Per-deal monitoring events**: specific events for deal health checks,
+  evidence progress tracking, and settlement anomaly detection. Basic lifecycle
+  events (proposal, acceptance, activation, termination, finalization) are in
+  scope. Detailed monitoring events can be added without storage changes
+- **Anti-gaming observability**: detecting patterns like SPs accepting but never
+  sealing, clients proposing then abandoning, or evidence submission anomalies.
+  Requires analysis of real pilot data before designing detection heuristics
+- **Provider tier/status field**: a quality or tier indicator on the Provider
+  struct beyond `paused`/`blocked`. Can be added to the Provider struct via
+  upgrade when matching logic or governance needs it
+
+### Operations
+
+- **V1 import or migration tooling**: V1 deals continue on V1 until closed
+- **Upper allocation tolerance**: for when prepared data routinely differs from
+  requested size
+- **Client tooling and retrieval**: retrieval verification, manifest protection,
+  and client portal are separate projects. V2 contracts should expose clean read
+  interfaces that make tooling straightforward, but the tooling itself is not
+  contract scope
+- **Full implementation-level events, errors, pagination, or test matrix**: these
+  are implementation details, not starting-spec decisions

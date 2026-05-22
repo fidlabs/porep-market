@@ -136,17 +136,105 @@ implementation plan is locked.
     IDs. The adapter exposes whether posting is finished and paginated
     allocation/claim ID getters for tooling.
 
-20. Direct offer selection is the first useful path
+20. Auto-match is the default proposal entry point
 
-    `proposeDealForOffer` is the first path to implement. `proposeDealAuto` can
-    stay in the interface as the same flow with offer selection resolved by
-    `SPRegistry`.
+    `proposeDealAuto` is the primary path. SPRegistry resolves the provider and
+    offer from the client's request criteria. `proposeDealForOffer` (direct offer
+    selection) may be added behind a role gate (e.g., `DIRECT_PROPOSER_ROLE`) so
+    the SP picker algorithm remains the standard market entry point and direct
+    selection does not bypass matching policy. `DEFAULT_ADMIN_ROLE` is reserved
+    for upgrades; operational authorization uses dedicated roles.
+
+    Internal deal creation logic must be shared between both paths without
+    duplication. The SP picker algorithm lives in SPRegistry in the starting
+    scope. If the algorithm needs to change independently of SPRegistry, it can
+    be extracted to a separate `IOfferMatcher` contract behind an SPRegistry
+    reference, without changing the PoRepMarket interface. This extraction is an
+    option, not a starting requirement.
 
 21. Strict SLI enforcement is deferred
 
     First deals can run with simpler pilot SLI tooling. Strict SLI checking,
     slashing, and penalty math must be specified separately before becoming
     payment-affecting contract logic.
+
+22. Activation is permissionless
+
+    `activateEvidence` does not check the caller. Authorization was already
+    expressed in prior steps: client authorized the payment rail, client posted
+    and finished allocations, SP claimed data, evidence batches verified claims.
+    The market validates all preconditions from stored state. The adapter rejects
+    activation when aggregate covered bytes are below the deal's frozen requested
+    size.
+
+23. Termination authority splits at rail creation
+
+    Pre-rail: PoRepMarket methods terminate (`rejectDeal`, `releaseExpiredProposal`,
+    `terminateDeal`). Post-rail: termination flows from FilecoinPay through the
+    Validator's termination callback into PoRepMarket. The market does not
+    independently terminate post-rail deals.
+
+24. `finishDataCapPosting` is a separate transaction by design
+
+    Prevents batch submission from atomically closing the deal. In V1, the
+    `dealCompleted` flag on transfer could trigger deal completion before the SP
+    had an opportunity to begin claim work. The separation gives the SP a clean
+    signal (`DealEvidenceReady`) without triggering any state change or payment
+    activation.
+
+25. Validator tracks settlement progress
+
+    `lastSettledEpoch` lives in Validator storage. Settlement `fromEpoch` must be
+    the previous settlement's `toEpoch` (or `serviceStartEpoch` for the first
+    settlement). This prevents double-settlement and ensures cumulative math stays
+    correct.
+
+26. Adapters report operational status
+
+    `IStorageEvidenceAdapter.isOperational()` returns false when the adapter can
+    no longer process new evidence. The market uses this to allow admin rejection
+    of deals stuck on a non-functional adapter without breaking the
+    frozen-snapshot invariant by re-assigning adapters.
+
+27. DataCap adapter has a finite operational lifetime
+
+    `DataCapEvidenceAdapter` becomes non-functional when FIP-1249 (or equivalent)
+    blocks new DataCap allocations and claims. The adapter abstraction is
+    designed for this transition. See `porep-v2-datacap-sunset.md` for the full
+    transition plan.
+
+28. Activation uses a configurable coverage tolerance
+
+    Activation requires `coveredBytes >= requestedSizeBytes * tolerance / 10_000`.
+    Clients may not know exact deal size at proposal time, and prepared data may
+    differ from the initial estimate. The tolerance percentage is configurable.
+    Whether it should be adaptive, per-deal, per-offer, or whether a strict mode
+    (exact match) should be available are decisions that can evolve post-pilot.
+
+29. Auto-match prevents duplicate provider assignment
+
+    `proposeDealAuto` must not assign the same provider to the same data twice.
+    The picker checks for non-terminal deals with the same `pieceSetCommitment`
+    per provider before selection. Terminal states (REJECTED, TERMINATED,
+    FINALIZED) do not block re-assignment. Intentional replicas (same data to
+    different providers) are allowed and expected. Explicit multi-replica
+    assignment (picking N providers in one pass) is deferred.
+
+30. FilecoinPay constraints are acknowledged, not abstracted
+
+    V2 respects FilecoinPay's interface constraints: operator approval before
+    rail creation, token decimal floors that motivate `minPricePer32GiBPerMonth`,
+    and lockup period update ordering. These are documented in the spec but not
+    wrapped in additional abstraction layers. If FilecoinPay evolves its
+    operator or lockup model, the Validator and deal flow adapt directly.
+
+31. Deal status names describe state, not action
+
+    Deal states are named as nouns describing what the deal IS: Proposed,
+    Accepted, Active, Finalized, Rejected, Terminated. Not gerunds describing
+    what is happening (Proposing, Accepting, Activating). Nouns are unambiguous
+    in events, UI, and API responses. "Active" means the deal IS active, not
+    that activation is in progress.
 
 ## Still Worth Reviewing
 

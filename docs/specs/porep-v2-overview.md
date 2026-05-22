@@ -22,8 +22,10 @@ flowchart LR
 
 ## What Changes For Clients
 
-Clients choose from offers instead of asking the market to interpret one
-provider-wide registration.
+Clients submit deal requests with criteria (size, duration, token, SLIs).
+Auto-match resolves the provider and offer from SPRegistry. Direct offer
+selection may exist as an authorized alternative, but auto-match is the default
+market entry point.
 
 The deal freezes:
 
@@ -35,8 +37,9 @@ The deal freezes:
 - paid duration
 - SLI terms
 
-Auto-match can still exist, but it must resolve to the same offer-based deal
-shape as direct offer selection.
+Both auto-match and direct offer selection produce the same frozen deal shape.
+The SP picker algorithm in SPRegistry is a separate, replaceable concern from
+deal creation in PoRepMarket.
 
 ## What Changes For Storage Providers
 
@@ -54,7 +57,7 @@ deals.
 ## Deal Flow
 
 1. Provider publishes an offer
-2. Client proposes a deal against an offer/token
+2. Client proposes a deal (auto-match resolves provider/offer, or direct selection if authorized)
 3. Market freezes the deal snapshot
 4. Provider accepts
 5. Client authorizes the payment path
