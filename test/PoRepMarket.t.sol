@@ -33,9 +33,11 @@ contract PoRepMarketTest is Test {
     uint256 public totalDealSize;
     SLITypes.SLIThresholds internal defaultRequirements;
     SLITypes.DealTerms internal defaultTerms;
-    CommonTypes.FilActorId public providerFilActorId;
 
     uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
+    uint256 public constant EPOCHS_IN_TWO_DAYS = 5_760;
+
+    CommonTypes.FilActorId public providerFilActorId;
     string public expectedManifestLocation = "https://example.com/manifest";
 
     function setUp() public {
@@ -1026,6 +1028,119 @@ contract PoRepMarketTest is Test {
         poRepMarket.rejectAcceptedDeal(dealId);
     }
 
+    function testSetNewDealProposalExpirationRevertsWhenCalledByNonAdmin() public {
+        address caller = vm.addr(0x999);
+        bytes32 adminRole = poRepMarket.DEFAULT_ADMIN_ROLE();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, adminRole)
+        );
+        vm.prank(caller);
+        poRepMarket.setNewDealProposalExpiration(1000);
+    }
+
+    function testSetNewDealProposalExpirationRevertsWhenZero() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealProposalExpiration.selector));
+        vm.prank(adminAddress);
+        poRepMarket.setNewDealProposalExpiration(0);
+    }
+
+    function testSetNewDealProposalExpirationUpdatesExpiration() public {
+        uint256 newExpiration = 1000;
+
+        vm.prank(adminAddress);
+        poRepMarket.setNewDealProposalExpiration(newExpiration);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + newExpiration + 1);
+
+        vm.expectEmit(true, true, false, false);
+        emit PoRepMarket.DealProposalExpired(dealId, block.number);
+        poRepMarket.rejectExpiredDeal(dealId);
+
+        PoRepTypes.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepTypes.DealState.Rejected);
+    }
+
+    function testRejectExpiredDealEmitsDealProposalExpiredEvent() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
+
+        vm.expectEmit(true, true, false, false);
+        emit PoRepMarket.DealProposalExpired(dealId, block.number);
+        poRepMarket.rejectExpiredDeal(dealId);
+    }
+
+    function testRejectExpiredDealSetsStateToRejected() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
+        poRepMarket.rejectExpiredDeal(dealId);
+
+        PoRepTypes.DealProposal memory p = poRepMarket.getDealProposal(dealId);
+        assertTrue(p.state == PoRepTypes.DealState.Rejected);
+    }
+
+    function testRejectExpiredDealRevertsWhenDealNotExpiredYet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        uint256 proposedAt = block.number;
+        vm.roll(block.number + EPOCHS_IN_TWO_DAYS);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.DealNotExpiredYet.selector, dealId, block.number, proposedAt + EPOCHS_IN_TWO_DAYS
+            )
+        );
+        poRepMarket.rejectExpiredDeal(dealId);
+    }
+
+    function testRejectExpiredDealRevertsWhenDealDoesNotExist() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
+        poRepMarket.rejectExpiredDeal(999);
+    }
+
+    function testRejectExpiredDealRevertsWhenDealNotProposed() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.DealNotInExpectedState.selector,
+                dealId,
+                PoRepTypes.DealState.Accepted,
+                PoRepTypes.DealState.Proposed
+            )
+        );
+        poRepMarket.rejectExpiredDeal(dealId);
+    }
+
+    function testRejectExpiredDealOnlyAffectsTargetDeal() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        poRepMarket.rejectExpiredDeal(dealId);
+
+        assertTrue(poRepMarket.getDealProposal(dealId).state == PoRepTypes.DealState.Rejected);
+        assertTrue(poRepMarket.getDealProposal(dealId + 1).state == PoRepTypes.DealState.Proposed);
+    }
+
     function testSetPaddingShouldEmitEvent() public {
         uint256 newPadding = 15;
 
@@ -1091,5 +1206,28 @@ contract PoRepMarketTest is Test {
         );
         vm.prank(clientAddress);
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
+    }
+
+    function testGetDealProposalExpirationReturnsDefault() public view {
+        assertEq(poRepMarket.getDealProposalExpiration(), EPOCHS_IN_TWO_DAYS);
+    }
+
+    function testGetDealProposalExpirationReturnsUpdatedValue() public {
+        uint256 newDealExpiration = 1000;
+
+        vm.prank(adminAddress);
+        poRepMarket.setNewDealProposalExpiration(newDealExpiration);
+
+        assertEq(poRepMarket.getDealProposalExpiration(), newDealExpiration);
+    }
+
+    function testSetNewDealProposalExpirationEmitsEvent() public {
+        uint256 newExpiration = 1000;
+
+        vm.expectEmit(true, false, false, false);
+        emit PoRepMarket.DealProposalExpirationUpdated(newExpiration);
+
+        vm.prank(adminAddress);
+        poRepMarket.setNewDealProposalExpiration(newExpiration);
     }
 }
