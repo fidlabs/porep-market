@@ -219,8 +219,8 @@ Filecoin actors.
 For DataCap / VerifReg, the adapter validates concrete evidence: decoded
 allocation `Data` CIDs and sizes before DataCap transfer, returned allocation
 IDs, VerifReg claim existence, `claim.data`, `claim.size`, provider, sector, and
-the required termMin/termMax checks. Accepted claim bytes must cover at least
-the frozen requested size.
+the required termMin/termMax checks. Accepted claim bytes must satisfy the
+activation tolerance threshold (see Payment Rule).
 
 Claimed byte count alone is not enough, but whole-manifest equality proofs are
 deferred. Do not add Merkle proof verification, per-piece permanent market
@@ -296,7 +296,7 @@ mismatches.
 
 When the client has posted all intended allocation batches, the client calls a
 separate finish method. The finish method requires posted allocation bytes to
-cover at least the frozen requested size, closes posting, and emits
+satisfy the activation tolerance threshold, closes posting, and emits
 `DealEvidenceReady(dealId, adapter)`. Later batches must revert. Duplicate
 finish behavior must be explicit in implementation; the starting preference is
 to emit readiness once and make later finish calls revert.
@@ -375,7 +375,7 @@ evidence batches verified claims. Any account can call activation for any deal;
 the market validates all preconditions from stored state.
 
 The adapter must reject activation when aggregate covered bytes are below the
-deal's frozen requested size, which prevents premature activation even without
+activation tolerance threshold, which prevents premature activation even without
 caller restrictions.
 
 ## Termination Authority
@@ -405,7 +405,7 @@ already has a non-terminal deal (PROPOSED, ACCEPTED, or ACTIVE) for the same
 `pieceSetCommitment`. If so, the picker skips that provider and tries the next
 candidate.
 
-Terminal deal states (REJECTED, TERMINATED, FINALIZED) do not block future
+Terminal deal states (REJECTED, TERMINATED, FINALIZED, EXPIRED) do not block future
 assignment. A provider whose prior deal for the same data was rejected or
 terminated can be re-picked. Whether a previously-failed provider should be
 deprioritized or cooled down is a picker policy question, not a hard constraint.
@@ -434,10 +434,12 @@ flow:
   (e.g., 6) can truncate small per-epoch rates to zero, breaking settlement.
   This is why `minPricePer32GiBPerMonth` exists per token in SPRegistry: it
   prevents offers whose per-epoch rate would truncate to zero.
-- **Lockup period updates have ordering constraints.** When DataCap allocations
-  extend beyond the initial lockup period, the Validator must update the
-  FilecoinPay lockup before claim work begins. The current flow handles this via
-  the allocation posting path.
+- **Lockup period updates have ordering constraints.** The FilecoinPay lockup
+  period is a payment-safety mechanism (how long funds are committed to the rail),
+  not a DataCap allocation lifetime. When the required lockup changes (e.g., due
+  to term extensions), the Validator must update the FilecoinPay lockup before
+  further deal progress. The current flow handles this via the allocation posting
+  path.
 
 These constraints are FilecoinPay's interface contract. V2 must respect them but
 does not attempt to abstract over them. If FilecoinPay changes its operator or

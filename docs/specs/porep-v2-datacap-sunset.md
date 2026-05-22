@@ -1,17 +1,19 @@
-# PoRep V2 DataCap Sunset and Storage Evidence Transition
+# PoRep V2 DataCap Sunset — Storage Evidence Transition
 
 Status: draft for review.
 
-`DataCapEvidenceAdapter` has a finite operational lifetime. This document
-covers the transition plan, on-chain evidence requirements, and replacement
-adapter paths.
+This document covers the storage evidence transition: how V2 deals prove
+"provider X stores data Y" before, during, and after DataCap removal. It does
+not cover DataCap's non-evidence functions (incentive economics, coordination,
+governance/policing, trust signaling) which are separate concerns outside V2
+contract scope.
 
 ## Table of Contents
 
 - [Context](#context)
 - [FIP-1249 Impact By Deal State](#fip-1249-impact-by-deal-state)
 - [On-Chain Evidence After DataCap](#on-chain-evidence-after-datacap)
-- [Sector Data Pinning](#sector-data-pinning)
+- [Future Piece-Membership or Pinning Primitive](#future-piece-membership-or-pinning-primitive)
 - [Recommended On-Chain Requirements](#recommended-on-chain-requirements)
 - [Replacement Adapter: PieceEvidenceAdapter](#replacement-adapter-pieceevidenceadapter)
 - [Fallback: OracleEvidenceAdapter](#fallback-oracleevidenceadapter)
@@ -41,7 +43,7 @@ When FIP-1249 activates:
 | `ExtendClaimTerms` | Blocked (`USR_FORBIDDEN`) |
 | `GetClaims` (read existing claims) | Still works |
 | `RemoveExpiredAllocations/Claims` | Still works |
-| Market `SectorContentChanged` | Still works (events only) |
+| Market `SectorContentChanged` | Still works (persists deal-keyed bindings in built-in market state; not a general piece query) |
 | Market `GetDealSector` | Still works |
 
 ### What FIP-1249 does not block
@@ -126,30 +128,31 @@ and its power. This is necessary but not sufficient: sector status tells you
 the sector exists, but not which pieces are in it. The data-to-sector mapping
 is still missing from sector status alone.
 
-**FIP-0109 (DDO sector content notifications)**: Proposes a smart-contract-based
-sector content notification mechanism. When a miner activates a sector containing
-pieces, a notification can be sent to a registered smart contract. This is
-conceptually similar to `SectorContentChanged` but designed for FEVM contracts
-rather than exclusively for the built-in market actor.
+**FIP-0109 (DDO sector content notifications)**: A finalized FIP that enables
+sector content notifications to smart contracts. When a miner activates a sector
+containing pieces, a notification can be sent to a designated FEVM contract. This
+extends the `SectorContentChanged` concept beyond the built-in market actor.
 
-The trust model for FIP-0109 notifications is not fully resolved: whether they
-are protocol-enforced (miner must call), tool-enforced (tooling triggers the
-call), or SP-claimable (the provider decides to notify) affects how much the
-adapter can rely on them as evidence. If notifications are not protocol-enforced,
-a provider could seal data and never notify, leaving the adapter with no
-evidence.
+The key limitation: providers choose their notifees. The notification is
+provider-directed, not globally broadcast. If a provider does not configure
+PoRepMarket (or an adapter) as a notifee, the adapter receives no notification.
+Additionally, FIP-0109 notifications do not create persistent global queryable
+state -- they are delivery events, not a state query API. An FEVM contract
+receiving a notification must persist the binding itself if it needs queryable
+state later.
 
 These changes affect the replacement adapter design:
 
 | Mechanism | What it provides | What it lacks |
 | --- | --- | --- |
 | NV28 sector status | Sector liveness, expiration, power | Piece-level data; no mapping from CID to sector |
-| FIP-0109 notifications | Piece-to-sector binding at activation time | Uncertain trust model; no persistent queryable state (event-only); no unpin/removal notification |
-| Data pinning (planned) | Pin/unpin as on-chain state changes | Timeline uncertain; design not finalized |
+| FIP-0109 notifications (Final) | Piece-to-sector binding at sector activation | Provider-chosen notifees (not global); no persistent queryable state; no removal notification |
+| Future piece-membership or pinning primitive | Queryable piece-to-sector state | Timeline and design not finalized; no confirmed API |
 
 The ideal post-DataCap evidence path combines NV28 sector status (is the sector
-alive?) with either persistent FIP-0109-derived state or data pinning state (is
-piece X in that sector?). Neither alone is sufficient.
+alive?) with either persistent FIP-0109-derived state or a future queryable
+piece-membership primitive (is piece X in that sector?). Neither alone is
+sufficient.
 
 These mechanisms are not final. The timeline, exact scope, and trust properties
 are still being designed. V2's adapter abstraction is positioned to consume
@@ -181,54 +184,51 @@ independently of built-in market deals. This gap must be addressed either by:
 
 This is a key requirement for the FIP proposal (see separate FIP document).
 
-## Sector Data Pinning
+## Future Piece-Membership or Pinning Primitive
 
-A planned Filecoin feature will allow sectors and data to become independent
-entities. Miners will be able to create sectors and then pin/unpin data
-independently, similar to SnapDeals but bidirectional. Data can be pinned into a
-sector and later unpinned (removed) without terminating the sector.
+Filecoin core development has discussed separating sectors and data as
+independent entities, potentially allowing data to be attached and detached from
+sectors independently. The exact form (a "data pinning" feature, an extension
+to the miner actor, or a new piece-membership actor) is not finalized. No
+confirmed API, timeline, or FIP exists for this as of this writing.
 
-This feature is planned but not finalized. It is expected to arrive around or
-after DataCap removal.
-
-### Why this matters for V2
-
-If pinning is an explicit on-chain action with queryable state, it becomes the
-natural replacement for VerifReg claims as storage evidence. A pin event proves
-the provider committed to storing specific data in a specific sector.
+If such a primitive ships, it could become the natural replacement for VerifReg
+claims as storage evidence. The V2 adapter abstraction is designed to consume
+whatever form it takes.
 
 ### Requirements for V2 compatibility
 
-For data pinning to work as V2 storage evidence, the following must be true:
+For any future piece-membership or pinning primitive to work as V2 storage
+evidence, the following properties are needed:
 
-1. **Pin state must be queryable**: a smart contract must be able to call
-   something like `isPinned(provider, pieceCID) returns (bool, sectorId)` or
-   enumerate pinned pieces for a provider. Without this, the adapter cannot
-   verify storage.
+1. **Queryable state**: a smart contract must be able to check whether a
+   specific piece CID is currently in an active sector of a specific provider.
+   Without queryable state, the adapter cannot verify storage.
 
-2. **Unpin must be detectable**: if a provider silently unpins data, the market
-   continues paying for unstored data. Either unpinning must emit a queryable
-   state change, or periodic verification must be possible.
+2. **Removal must be detectable**: if a provider can silently remove data from
+   a sector without on-chain state change, the market continues paying for
+   unstored data. Removal must produce a queryable state change, or periodic
+   verification must be possible.
 
-3. **Pin must be provider-committed**: pinning should involve provider-side
-   proof of data inclusion (PoRep or equivalent). If pinning is a cheap metadata
-   operation without proof, the evidence model weakens.
+3. **Storage commitment**: the mechanism should involve actual data commitment
+   (sealing or equivalent), not just metadata registration. If attachment is
+   cheap, the incentive to actually store data weakens.
 
-4. **Pin history should not be required for settlement**: normal settlement
-   must work from current pin state (or aggregated state), not by iterating pin
-   history. This matches V2's settlement design.
+4. **No history iteration for settlement**: normal settlement must work from
+   current state (or aggregated state), not by iterating historical events.
+   This matches V2's settlement design.
 
 ### Risks
 
-- If unpin is silent (no on-chain state change), the market cannot detect data
-  removal during settlement. The adapter would need an external challenge
-  mechanism or periodic verification.
-- If pinning is cheap (no sealing cost), the incentive to actually store data
-  weakens. A provider could pin, collect payment, and unpin after each check.
-- If the market relies on pin state and a provider temporarily unpins to
-  reorganize sectors, it could trigger false termination.
-- If pin/unpin state is per-sector (not per-piece), the adapter needs to map
-  pieces to sectors, adding complexity.
+- If data removal is silent (no on-chain state change), the market cannot
+  detect unstored data during settlement. The adapter would need an external
+  challenge mechanism or periodic verification.
+- If attachment is cheap (no sealing cost), a provider could attach data,
+  collect payment, and detach after each check.
+- If the market relies on attachment state and a provider temporarily detaches
+  data to reorganize sectors, it could trigger false termination.
+- If the state is per-sector (not per-piece), the adapter needs to map pieces
+  to sectors, adding complexity.
 
 ## Recommended On-Chain Requirements
 
@@ -241,13 +241,13 @@ Foundation.
 1. **Piece membership query**: an on-chain method to check whether a specific
    piece CID is currently stored by a specific provider. This could be:
    - A new actor method: `hasPiece(provider, pieceCID) returns (bool)`
-   - Queryable pin state from the data pinning feature
+   - Queryable state from a future piece-membership or pinning primitive
    - A persistent, queryable form of `SectorContentChanged` data
 
-2. **Piece lifecycle events with on-chain state**: `SectorContentChanged`
-   currently produces events, but the piece-to-sector bindings must persist as
-   queryable state (not just historical events). A smart contract cannot read
-   historical events.
+2. **Piece lifecycle with on-chain state**: piece-to-sector bindings must persist
+   as queryable state, not only as historical events or `SectorContentChanged`
+   callbacks. A smart contract cannot read historical events; it can only call
+   actor methods that read state.
 
 3. **Provider-scoped piece enumeration** (optional but useful): the ability to
    enumerate or count pieces stored by a provider, or at minimum to query total
@@ -257,19 +257,19 @@ Foundation.
 ### Nice-to-have
 
 4. **Piece change notifications**: a hook or callback when piece membership
-   changes (pin/unpin/sector termination). This would let the adapter react to
-   storage changes rather than poll.
+   changes (attachment/removal/sector termination). This would let the adapter
+   react to storage changes rather than poll.
 
 5. **Batch piece query**: check multiple piece CIDs in one call for gas
    efficiency on large deals.
 
 ### What exists that is close
 
-- `SectorContentChanged` in the market actor already tracks piece activation.
-  Making this data persist as queryable state (not just events) would satisfy
-  requirements 1 and 2.
-- The data pinning feature, if it includes queryable pin state, would satisfy
-  requirements 1 and 2 directly.
+- The built-in market actor persists deal-keyed piece-to-sector bindings via
+  `SectorContentChanged`, but only for built-in market deals. Making equivalent
+  state available for FEVM contracts would satisfy requirements 1 and 2.
+- A future piece-membership or pinning primitive, if it includes queryable
+  state, would satisfy requirements 1 and 2 directly.
 - VerifReg `GetClaims` satisfies all requirements for existing claims, but only
   for pre-sunset allocations.
 
@@ -371,8 +371,8 @@ queries are available.
 1. Deploy V2 with `DataCapEvidenceAdapter` for initial deals
 2. Propose on-chain piece membership requirements to Filecoin Foundation (FIP or
    formal request)
-3. When piece membership queries ship (via data pinning or persistent
-   `SectorContentChanged` state), deploy `PieceEvidenceAdapter` and allowlist it
+3. When piece membership queries ship (via a future primitive or persistent
+   FIP-0109-derived state), deploy `PieceEvidenceAdapter` and allowlist it
 4. New deals use `PieceEvidenceAdapter`; existing DataCap deals continue on
    their frozen adapter
 5. When FIP-1249 activates, `DataCapEvidenceAdapter.isOperational()` returns
@@ -414,9 +414,10 @@ the plan.
    re-verification (check that data is still stored), or is initial activation
    evidence sufficient for the paid service duration?
 
-3. **Data pinning timing**: if data pinning arrives after DataCap removal, there
-   is a gap where neither VerifReg claims nor pin state is available. The oracle
-   fallback covers this gap, but the gap duration matters for planning.
+3. **Piece-membership primitive timing**: if the replacement primitive arrives
+   after DataCap removal, there is a gap where neither VerifReg claims nor
+   queryable piece state is available. The oracle fallback covers this gap, but
+   the gap duration matters for planning.
 
 4. **Existing claims post-sunset**: should the `PieceEvidenceAdapter` also
    accept existing VerifReg claims as evidence (via `GetClaims`, which survives
@@ -424,8 +425,16 @@ the plan.
    without needing the DataCap adapter.
 
 5. **FIP proposal scope**: should the piece membership requirement be a
-   standalone FIP, or part of the data pinning FIP, or a formal request to the
-   Filecoin Foundation outside the FIP process?
+   standalone FIP, part of a broader sector/data reform FIP, or a formal request
+   to the Filecoin Foundation outside the FIP process?
+
+## Sources
+
+- FIP-1249 (DataCap removal): https://github.com/filecoin-project/builtin-actors/pull/1744
+- FIP-0109 (DDO sector content notifications, Final): https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0109.md
+- Built-in market `SectorContentChanged` implementation: https://github.com/filecoin-project/builtin-actors/blob/b3eacd8ae71554148790a5caa4869bff51de1f4f/actors/market/src/lib.rs#L599-L708
+- Built-in market `provider_sectors` state: https://github.com/filecoin-project/builtin-actors/blob/b3eacd8ae71554148790a5caa4869bff51de1f4f/actors/market/src/state.rs#L82-L88
+- Miner notifications (notifee dispatch): https://github.com/filecoin-project/builtin-actors/blob/b3eacd8ae71554148790a5caa4869bff51de1f4f/actors/miner/src/notifications.rs#L23-L29
 
 ## Related Documents
 

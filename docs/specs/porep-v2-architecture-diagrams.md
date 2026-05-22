@@ -69,8 +69,8 @@ flowchart TB
     expired(["Expired"])
     rejectAction["rejectDeal<br/>release pending capacity"]
     rejected(["Rejected"])
-    terminateFromAccepted["terminateDeal"]
-    terminateFromActive["terminateDeal"]
+    terminateFromAccepted["terminateDeal<br/>(pre-rail: market-initiated)"]
+    railTermination["FilecoinPay rail termination<br/>→ Validator callback<br/>→ PoRepMarket"]
     terminated(["Terminated"])
 
     proposed --> acceptAction --> accepted
@@ -83,7 +83,7 @@ flowchart TB
     evidenceAction --> activationGate
     activationGate --> active
     accepted --> terminateFromAccepted --> terminated
-    active --> terminateFromActive --> terminated
+    active --> railTermination --> terminated
     active --> finalizeAction --> finalized
 
     active --> service["Payment service window<br/>serviceEndEpoch = serviceStartEpoch + durationEpochs"]
