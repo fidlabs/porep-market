@@ -32,12 +32,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Number of epochs in one month
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
-    uint256 private constant EPOCHS_IN_MONTH = 86_400;
+    uint256 public constant EPOCHS_IN_MONTH = 86_400;
 
     /**
      * @notice Size of a single Filecoin sector in bytes (32 GiB)
      */
-    uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
+    uint256 public constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
      * @notice The maximum value allowed for deal completion padding.
@@ -653,6 +653,33 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         for (uint256 deal = 0; deal < totalDeals; deal++) {
             deals[deal] = $._dealProposals[deal + 1];
         }
+    }
+
+    /**
+     * @notice Gets the SPRegistry contract address from storage
+     * @return ISPRegistry The SPRegistry contract address
+     */
+    function getSPRegistryContract() external view returns (address) {
+        DealProposalsStorage storage $ = s();
+        return address($._SPRegistryContract);
+    }
+
+    /**
+     * @notice Gets the client smart contract address from storage
+     * @return address The client smart contract address
+     */
+    function getClientSmartContract() external view returns (address) {
+        DealProposalsStorage storage $ = s();
+        return address($._clientSmartContract);
+    }
+
+    /**
+     * @notice Gets the validator factory contract address from storage
+     * @return IValidatorFactory The validator factory contract address
+     */
+    function getValidatorFactoryContract() external view returns (address) {
+        DealProposalsStorage storage $ = s();
+        return address($._validatorFactoryContract);
     }
 
     /**

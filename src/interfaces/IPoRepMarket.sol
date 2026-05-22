@@ -113,4 +113,22 @@ interface IPoRepMarket {
         external
         view
         returns (PoRepTypes.DealProposal[] memory deals);
+
+    /**
+     * @notice Gets the SPRegistry contract address from storage
+     * @return ISPRegistry The SPRegistry contract address
+     */
+    function getSPRegistryContract() external view returns (address);
+
+    /**
+     * @notice Gets the client smart contract address from storage
+     * @return IClient The client smart contract address
+     */
+    function getClientSmartContract() external view returns (address);
+
+    /**
+     * @notice Gets the validator factory contract address from storage
+     * @return IValidatorFactory The validator factory contract adddress
+     */
+    function getValidatorFactoryContract() external view returns (address);
 }

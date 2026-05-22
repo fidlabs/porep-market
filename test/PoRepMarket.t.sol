@@ -1076,4 +1076,16 @@ contract PoRepMarketTest is Test {
         poRepMarket.setDealCompletionPadding(newPadding);
         assertEq(poRepMarket.getDealCompletionPadding(), newPadding);
     }
+
+    function testGetSPRegistryContract() public view {
+        assertEq(poRepMarket.getSPRegistryContract(), address(spRegistry));
+    }
+
+    function testGetClientSmartContract() public view {
+        assertEq(poRepMarket.getClientSmartContract(), address(clientSmartContractAddress));
+    }
+
+    function testGetValidatorFactoryContract() public view {
+        assertEq(poRepMarket.getValidatorFactoryContract(), address(validatorFactory));
+    }
 }
