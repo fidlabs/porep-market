@@ -644,6 +644,7 @@ contract ValidatorTest is Test {
 
     function testSetDealEndEpochRevertsWhenEndEpochIsInThePast() public {
         vm.prank(porepService);
+        // forge-lint: disable-next-line(unsafe-typecast)
         vm.roll(uint256(uint64(CHAIN_EPOCH)));
 
         vm.expectRevert(Validator.EndEpochInThePast.selector);

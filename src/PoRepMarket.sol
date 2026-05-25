@@ -51,6 +51,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 private constant DEFAULT_DEAL_PROPOSAL_EXPIRATION = 5_760;
 
     /**
+     * @notice Minimum Filecoin deal duration equals 180 days (6 months)
+     */
+    uint32 public constant MIN_DEAL_DURATION_DAYS = 180;
+
+    /**
      * @notice Maximum deal duration in days. See PoRepTypes.MAX_DEAL_DURATION_DAYS.
      * @dev Any provider limit above this is unreachable: PoRepMarket rejects deals with durationDays > 1278.
      */
@@ -891,7 +896,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param terms The terms for the deal
      */
     function _ensureCorrectTerms(SLITypes.DealTerms calldata terms) internal pure {
-        if (terms.durationDays == 0) {
+        if (terms.durationDays < MIN_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
         if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {

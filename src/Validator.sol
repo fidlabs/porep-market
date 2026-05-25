@@ -527,7 +527,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         if (unwrappedEndEpoch < 0) {
             revert NegativeEndEpoch();
         }
-
+        // forge-lint: disable-next-line(unsafe-typecast)
         if (uint256(uint64(unwrappedEndEpoch)) < block.number) {
             revert EndEpochInThePast();
         }
