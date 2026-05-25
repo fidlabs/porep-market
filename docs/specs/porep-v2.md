@@ -125,6 +125,25 @@ against known constants and view helpers, not assumptions like
 Implementation must expose stable read helpers for these codes so indexers and
 clients do not have to scrape internal library constants from source.
 
+### State And Progress Surfaces
+
+Deal state, rail status, and adapter progress answer different questions.
+
+| Surface | Contract owner | Examples | What it means |
+| --- | --- | --- | --- |
+| `DealState` | PoRepMarket | `PROPOSED`, `ACCEPTED`, `ACTIVE`, `FINALIZED`, `REJECTED`, `EXPIRED`, `TERMINATED` | Legal lifecycle of the paid storage agreement. |
+| `RailStatus` | Validator | `PREPARED`, `ACTIVE`, `TERMINATED` | FilecoinPay rail authorization, accrual, or termination observed by Validator. |
+| DataCap posting progress | DataCapEvidenceAdapter | `postingFinished`, allocation IDs, claim IDs, allocation status | DataCap-specific work needed before evidence can activate payment. |
+| External UI/tool labels | CLI, UI, indexer | "waiting for client", "waiting for claims", "ready to activate" | Derived labels for humans and tools. These are not permanent lifecycle states. |
+
+`ACCEPTED` can contain several operational sub-steps. For example, a DataCap
+deal can be accepted while the client is still posting allocations, after
+posting is finished but before the SP claims, or after claims exist but before
+activation. Those sub-steps live in adapter state and events, not in
+`DealState`. This keeps DataCap-specific progress out of the permanent market
+lifecycle and lets a later non-DataCap adapter expose different progress without
+renumbering deal states.
+
 ## Payment Rule
 
 Commercial price stays monthly:
@@ -243,6 +262,16 @@ client, accepted state, provider, DataCap recipient, amount, size,
 termMin/termMax rules, and posting-open flag before DataCap is transferred.
 Posting allocations does not activate payment.
 
+V1 `Client` behavior maps to V2 as follows:
+
+| V1 responsibility | V2 owner | Notes |
+| --- | --- | --- |
+| DataCap transfer gateway | `DataCapEvidenceAdapter.submitDataCapBatch` | Adapter validates the frozen deal fields before forwarding/posting DataCap allocation batches. |
+| Transfer completion flag | `DataCapEvidenceAdapter.finishDataCapPosting` | Separate finish transaction closes posting and emits `DealEvidenceReady`; it does not activate payment. |
+| DataCap allocation and claim IDs | `DataCapEvidenceAdapter` storage | PoRepMarket stores only the selected adapter and activation/payment fields. |
+| Deal completion/payment activation | `PoRepMarket.activateEvidence` plus selected adapter | PoRepMarket calls the adapter, consumes covered bytes, derives billing fields, and moves the deal to `ACTIVE`. |
+| Validator settlement checks | `Validator -> PoRepMarket.validateDealSettlement` | Validator does not call DataCap / VerifReg adapters directly. |
+
 The adapter interface is the contract boundary:
 
 - PoRepMarket calls the adapter for activation checks
@@ -256,16 +285,36 @@ The adapter interface is the contract boundary:
 - adapter keeps allocation IDs, claim IDs, and aggregate byte counts needed by
   tooling and activation
 
+`evidenceData` is opaque to PoRepMarket. PoRepMarket passes it only to the
+deal's selected adapter together with the frozen `ActivationContext`; it must not
+decode adapter-specific evidence. Each adapter owns its payload format and
+validation logic.
+
+Examples:
+
+- `DataCapEvidenceAdapter`: `evidenceData = abi.encode(uint64[] allocationIds)`
+- `PieceEvidenceAdapter`: `evidenceData = abi.encode(piece CIDs / sector inputs)`
+- `OracleEvidenceAdapter`: `evidenceData = abi.encode(attestation + signature)`
+
 Validator must not call DataCap / VerifReg adapters directly. It asks
 PoRepMarket for the deal's settlement decision so DataCap details remain inside
 the adapter.
 
 `DataCapEvidenceAdapter` is the concrete sketch for the current VerifReg claim
 path. It can accept claim evidence in multiple batches and track aggregate claim
-count / claimed bytes. It stores exact allocation and claim IDs for tooling,
-retry logic, and review. Normal activation and settlement read aggregate counts
-and byte totals; they do not iterate every stored ID. PoRepMarket does not store
-VerifReg allocation or claim IDs.
+count / claimed bytes. It stores allocation IDs, verified claim IDs, and an
+allocation-status mapping for tooling, retry logic, duplicate checks, and review.
+Normal activation and settlement read aggregate counts and byte totals; they do
+not iterate every stored ID. PoRepMarket does not store VerifReg allocation or
+claim IDs.
+
+VerifReg claims are looked up by the same numeric ID originally returned as the
+allocation ID. `submitEvidenceBatch` should process a bounded slice of allocation
+IDs whose status is not yet claimed, call `GetClaims(provider, ids)`, verify each
+returned claim against the frozen deal provider, data CID, size, sector, and term
+fields, then mark each id as claimed and append it once to `claimIds`. This gives
+large deals a contract-owned work queue and avoids comparing unbounded allocation
+and claim ID arrays.
 
 `activateEvidence` does not re-verify individual claims. It reads the adapter's
 accumulated totals from prior `submitEvidenceBatch` calls and checks whether
@@ -319,12 +368,12 @@ activation.
 Events are notification, not the only source of truth. The adapter exposes read
 helpers for late-starting or retrying tools: whether posting is finished and
 paginated allocation/claim ID getters. These getters return adapter-owned
-allocation and claim IDs; they are not settlement authority and must not refresh
-Filecoin state.
+allocation IDs and verified claim IDs; they are not settlement authority and must
+not refresh Filecoin state.
 
-An upper allocation tolerance can be added later if prepared data and requested
-deal size routinely differ. The starting rule is only that posted allocation
-bytes must not be below the frozen requested size.
+An upper allocation tolerance can be added later if prepared data is routinely
+larger than requested deal size. The starting lower-bound rule is the same
+configured coverage threshold used for activation.
 
 ## Large Deal Evidence
 
@@ -390,8 +439,9 @@ transitions that release pending capacity.
 Post-rail (ACCEPTED with rail, or ACTIVE): Termination flows from FilecoinPay.
 When a rail is terminated in FilecoinPay, the FilecoinPay contract calls the
 Validator's termination callback, and the Validator calls PoRepMarket to
-transition the deal to `DealState.TERMINATED`. The market does not independently
-terminate post-rail deals; termination is rail-driven.
+transition the deal to `DealState.TERMINATED`. Validator records
+`RailStatus.TERMINATED` and `earlyTerminatedEpoch`. The market does not
+independently terminate post-rail deals; termination is rail-driven.
 
 The Validator records `earlyTerminatedEpoch` to cap settlement at the
 termination point. Settlement after termination uses `earlyTerminatedEpoch` as

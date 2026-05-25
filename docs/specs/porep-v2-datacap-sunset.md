@@ -295,7 +295,8 @@ interface. What changes is the evidence format and validation logic.
 
 ### Evidence flow
 
-1. Client proposes deal with `PieceEvidenceAdapter` as selected adapter
+1. Client proposes a storage deal; the market resolves the currently allowed
+   replacement adapter to `PieceEvidenceAdapter`
 2. Client submits piece manifest off-chain to the SP
 3. SP stores data in sectors (pin operation or standard sealing)
 4. Tooling calls `submitEvidenceBatch` with piece CIDs from the manifest
@@ -388,7 +389,7 @@ queries are available.
 5. When FIP-1249 activates, `DataCapEvidenceAdapter.isOperational()` returns
    false
 6. Admin rejects any stuck ACCEPTED deals on the dead adapter; clients
-   re-propose with `PieceEvidenceAdapter`
+   re-propose and the market routes new deals to `PieceEvidenceAdapter`
 7. ACTIVE DataCap deals run to completion on frozen settlement math
 
 ### Fallback path (DataCap removed before on-chain evidence is ready)

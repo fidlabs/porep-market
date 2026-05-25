@@ -70,6 +70,11 @@ implementation plan is locked.
     append-only, intentionally gapped, and transition-checked explicitly.
     Clients must not sort or compare state codes as ranks.
 
+    Deal lifecycle, rail progress, adapter progress, and UI/tool labels are
+    separate surfaces. DataCap-only steps such as allocation posting, claim
+    collection, or "ready for SP claim work" must not become permanent
+    `DealState` values.
+
 12. Storage evidence checks are adapter-owned
 
     DataCap / VerifReg validation lives behind `IStorageEvidenceAdapter`. The
@@ -123,18 +128,27 @@ implementation plan is locked.
     adapter enforces selected deal, accepted state, frozen client, provider,
     recipient, amount, termMin/termMax, posting-open, and returned-ID checks. The
     client finishes posting with a separate method once posted allocation bytes
-    cover at least the frozen requested size. Finishing emits `DealEvidenceReady`
-    for SP and client tooling, but it does not change the core deal state and
-    does not start payment.
+    satisfy the configured coverage threshold. Finishing emits
+    `DealEvidenceReady` for SP and client tooling, but it does not change the
+    core deal state and does not start payment.
 
 19. DataCap allocation and claim IDs stay out of PoRepMarket
 
-    `DataCapEvidenceAdapter` stores exact allocation and claim IDs for tooling,
-    retry logic, and review. Normal activation and settlement use aggregate
-    counts and byte totals, not loops over every stored ID. PoRepMarket stores
-    the selected adapter and payment activation fields, not VerifReg-specific
-    IDs. The adapter exposes whether posting is finished and paginated
-    allocation/claim ID getters for tooling.
+    `DataCapEvidenceAdapter` stores allocation IDs, verified claim IDs, and an
+    allocation-status mapping for tooling, retry logic, duplicate checks, and
+    review. Normal activation and settlement use aggregate counts and byte
+    totals, not loops over every stored ID. PoRepMarket stores the selected
+    adapter and payment activation fields, not VerifReg-specific IDs. The
+    adapter exposes whether posting is finished and paginated allocation/claim ID
+    getters for tooling.
+
+    VerifReg claims are looked up by the same numeric ID originally returned as
+    the allocation ID, so evidence batching can process allocation IDs directly.
+    For each id that is not yet claimed, the adapter calls
+    `GetClaims(provider, ids)`, verifies provider, data CID, size, sector, and
+    term fields, then marks id as claimed and appends it once to `claimIds`. This
+    keeps large-deal evidence processing bounded without comparing two unbounded
+    ID arrays.
 
 20. Auto-match is the default proposal entry point
 
@@ -164,15 +178,16 @@ implementation plan is locked.
     expressed in prior steps: client authorized the payment rail, client posted
     and finished allocations, SP claimed data, evidence batches verified claims.
     The market validates all preconditions from stored state. The adapter rejects
-    activation when aggregate covered bytes are below the deal's frozen requested
-    size.
+    activation when aggregate covered bytes are below the configured coverage
+    threshold for the deal.
 
 23. Termination authority splits at rail creation
 
     Pre-rail: PoRepMarket methods terminate (`rejectDeal`, `releaseExpiredProposal`,
     `terminateDeal`). Post-rail: termination flows from FilecoinPay through the
     Validator's termination callback into PoRepMarket. The market does not
-    independently terminate post-rail deals.
+    independently terminate post-rail deals. Validator records
+    `RailStatus.TERMINATED` and caps settlement at `earlyTerminatedEpoch`.
 
 24. `finishDataCapPosting` is a separate transaction by design
 
@@ -231,10 +246,10 @@ implementation plan is locked.
 31. Deal status names describe state, not action
 
     Deal states are named as nouns describing what the deal IS: Proposed,
-    Accepted, Active, Finalized, Rejected, Terminated. Not gerunds describing
-    what is happening (Proposing, Accepting, Activating). Nouns are unambiguous
-    in events, UI, and API responses. "Active" means the deal IS active, not
-    that activation is in progress.
+    Accepted, Active, Finalized, Rejected, Expired, Terminated. Not gerunds
+    describing what is happening (Proposing, Accepting, Activating). Nouns are
+    unambiguous in events, UI, and API responses. "Active" means the deal IS
+    active, not that activation is in progress.
 
 ## Still Worth Reviewing
 

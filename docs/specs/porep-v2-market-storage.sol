@@ -10,6 +10,8 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SharedTypes as Types} from "./porep-v2-shared-types.sol";
 
 library DealState {
+    // Deal lifecycle states. Adapter progress and rail progress are separate
+    // status surfaces; do not add DataCap-only waiting states here.
     uint8 internal constant NONE = 0;
     uint8 internal constant PROPOSED = 10;
     uint8 internal constant ACCEPTED = 20;

@@ -10,6 +10,12 @@ import {EvidenceType} from "./porep-v2-shared-types.sol";
 import {SharedTypes as Types} from "./porep-v2-shared-types.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
+library DataCapAllocationStatus {
+    uint8 internal constant NONE = 0;
+    uint8 internal constant ALLOCATED = 10;
+    uint8 internal constant CLAIMED = 20;
+}
+
 abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
     error OnlyMarket();
 
@@ -23,11 +29,18 @@ abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
         uint256 claimCount;
         uint256 claimedBytes;
         bool postingFinished;
+        // VerifReg claims are looked up by the same numeric ID returned as the
+        // allocation ID. Keep append-only arrays for tooling/history and use
+        // allocationStatus for O(1) duplicate and state checks.
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
+        mapping(CommonTypes.FilActorId id => uint8 status) allocationStatus;
     }
 
-    mapping(uint256 dealId => DataCapDealEvidence) internal dealEvidence;
+    /// @custom:storage-location erc7201:porepmarket.storage.DataCapEvidenceAdapter
+    struct DataCapEvidenceAdapterStorage {
+        mapping(uint256 dealId => DataCapDealEvidence) dealEvidence;
+    }
 
     function _onlyMarket() internal view {
         if (msg.sender != market()) revert OnlyMarket();
@@ -84,9 +97,12 @@ abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
         return _activateEvidence(context, evidenceData);
     }
 
-    // Evidence batches validate known claim IDs through VerifReg getClaims and
-    // check claim.data, claim.size, claim.provider, claim.sector, and term
-    // fields. Normal settlement reads stored aggregate bytes, not getClaims.
+    // Evidence batches iterate over allocated IDs that have not reached CLAIMED
+    // status and call VerifReg GetClaims(provider, ids). When each returned
+    // claim matches the frozen deal provider, data CID, size, sector, and term
+    // fields, the adapter marks id as CLAIMED, appends it to claimIds once, and
+    // updates claimed bytes. Normal settlement reads stored aggregate bytes, not
+    // GetClaims.
     function _submitEvidenceBatch(Types.ActivationContext calldata context, bytes calldata evidenceData)
         internal
         virtual
