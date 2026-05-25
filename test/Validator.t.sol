@@ -785,7 +785,7 @@ contract ValidatorTest is Test {
 
         vm.expectRevert(Validator.InvalidZeroAmount.selector);
         vm.prank(porepService);
-        validator.modifyRailPayment(railId);
+        validator.modifyRailPayment();
     }
 
     function testFuzzModifyRailPaymentSucceedsWhenCalculatedAmountIsNonZero(
@@ -814,6 +814,6 @@ contract ValidatorTest is Test {
         emit Validator.RailPaymentModified(railId, expectedAmount);
 
         vm.prank(porepService);
-        validator.modifyRailPayment(railId);
+        validator.modifyRailPayment();
     }
 }
