@@ -4,6 +4,7 @@ pragma solidity =0.8.30;
 
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {stdJson} from "forge-std/StdJson.sol";
+import {IValidatorFactory} from "../src/interfaces/IValidatorFactory.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 
 contract UpgradeValidatorBeacon is DeployUtils {
@@ -11,6 +12,7 @@ contract UpgradeValidatorBeacon is DeployUtils {
 
     address internal admin;
     address internal beacon;
+    address internal validatorFactory;
     address internal prevImpl;
     address internal prevManifestImpl;
     address internal impl;
@@ -18,7 +20,9 @@ contract UpgradeValidatorBeacon is DeployUtils {
 
     error ContractAlreadyDeployed();
     error MissingValidatorBeacon();
+    error MissingValidatorFactory();
     error MissingValidatorImpl();
+    error StaleValidatorBeacon(address manifestBeacon, address factoryBeacon);
     error StaleValidatorImpl(address manifestImpl, address beaconImpl);
 
     function run() external {
@@ -26,8 +30,14 @@ contract UpgradeValidatorBeacon is DeployUtils {
 
         string memory json = readLatestDeploymentArtifact();
         beacon = _readRequiredAddress(json, ".ValidatorBeacon", true);
+        validatorFactory = _readRequiredValidatorFactory(json);
         prevManifestImpl = _readRequiredAddress(json, ".ValidatorImpl", false);
+        address factoryBeacon = IValidatorFactory(validatorFactory).getBeacon();
         prevImpl = UpgradeableBeacon(beacon).implementation();
+
+        if (beacon != factoryBeacon) {
+            revert StaleValidatorBeacon(beacon, factoryBeacon);
+        }
 
         if (prevManifestImpl != prevImpl) {
             revert StaleValidatorImpl(prevManifestImpl, prevImpl);
@@ -66,10 +76,25 @@ contract UpgradeValidatorBeacon is DeployUtils {
         }
     }
 
+    function _readRequiredValidatorFactory(string memory json) internal view returns (address value) {
+        string memory key = ".ValidatorFactory.proxy";
+
+        if (!json.keyExists(key)) {
+            revert MissingValidatorFactory();
+        }
+
+        value = json.readAddress(key);
+
+        if (value == address(0)) {
+            revert MissingValidatorFactory();
+        }
+    }
+
     function _serializeAndSaveArtifact() internal {
         string memory json = "ValidatorBeacon";
 
         json.serialize("beacon", beacon);
+        json.serialize("validatorFactory", validatorFactory);
         json.serialize("prevImpl", prevImpl);
         json.serialize("prevManifestImpl", prevManifestImpl);
         json.serialize("newImpl", impl);
