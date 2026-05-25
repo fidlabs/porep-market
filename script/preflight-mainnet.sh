@@ -9,6 +9,8 @@
 # Modes:
 #   deploy     Full gate package for `just mainnet_deploy`
 #   upgrade    Gates for `just mainnet_upgrade`
+#   validator-beacon-upgrade
+#              Gates for `just mainnet_upgrade_validator_beacon`
 #   dry        Minimal gates for `just mainnet_deploy_dry`
 #
 # Exit codes:
@@ -40,6 +42,10 @@ readonly REQUIRED_DEPLOY_VARS=(
 readonly REQUIRED_UPGRADE_VARS=(
   PRIVATE_KEY_MAINNET
   UPGRADE_CONTRACT_NAME
+)
+
+readonly REQUIRED_VALIDATOR_BEACON_UPGRADE_VARS=(
+  PRIVATE_KEY_MAINNET
 )
 
 # ─────────────────────────────────────────────────────────────────────
@@ -173,6 +179,13 @@ _print_upgrade_summary() {
   printf '              %-27s = %s\n' "RPC_MAINNET"           "$RPC_MAINNET" >&2
 }
 
+_print_validator_beacon_upgrade_summary() {
+  _log OK "preflight passed (mode=validator-beacon-upgrade chain=$EXPECTED_CHAIN_ID)"
+  printf '              %-27s = %s\n' "VALIDATOR_BEACON" "$(jq -r '.ValidatorBeacon' "$MAINNET_MANIFEST")" >&2
+  printf '              %-27s = %s\n' "VALIDATOR_IMPL"   "$(jq -r '.ValidatorImpl' "$MAINNET_MANIFEST")" >&2
+  printf '              %-27s = %s\n' "RPC_MAINNET"      "$RPC_MAINNET" >&2
+}
+
 # ─────────────────────────────────────────────────────────────────────
 # Mode commands
 # ─────────────────────────────────────────────────────────────────────
@@ -194,6 +207,20 @@ cmd_upgrade() {
   _print_upgrade_summary
 }
 
+cmd_validator_beacon_upgrade() {
+  _gate_confirm_mainnet
+  _gate_chain_id
+  _gate_clean_tree
+  [[ -f "$MAINNET_MANIFEST" ]] || _die "$MAINNET_MANIFEST is missing"
+  command -v jq >/dev/null 2>&1 || _die "jq is not in PATH"
+  [[ "$(jq -r '.ValidatorBeacon // empty' "$MAINNET_MANIFEST")" != "" ]] \
+    || _die "ValidatorBeacon is missing from $MAINNET_MANIFEST"
+  [[ "$(jq -r '.ValidatorImpl // empty' "$MAINNET_MANIFEST")" != "" ]] \
+    || _die "ValidatorImpl is missing from $MAINNET_MANIFEST"
+  _gate_required_vars "${REQUIRED_VALIDATOR_BEACON_UPGRADE_VARS[@]}"
+  _print_validator_beacon_upgrade_summary
+}
+
 cmd_dry() {
   _gate_chain_id
   _gate_required_vars "${REQUIRED_DEPLOY_VARS[@]}"
@@ -207,9 +234,10 @@ cmd_dry() {
 main() {
   local mode="${1:-}"
   case "$mode" in
-    deploy)  cmd_deploy ;;
-    upgrade) cmd_upgrade ;;
-    dry)     cmd_dry ;;
+    deploy)                     cmd_deploy ;;
+    upgrade)                    cmd_upgrade ;;
+    validator-beacon-upgrade)   cmd_validator_beacon_upgrade ;;
+    dry)                        cmd_dry ;;
     -h|--help|help)
       _print_usage
       exit 0
@@ -219,7 +247,7 @@ main() {
       exit 2
       ;;
     *)
-      _log ERROR "unknown mode: $mode (use 'deploy', 'upgrade', or 'dry')"
+      _log ERROR "unknown mode: $mode (use 'deploy', 'upgrade', 'validator-beacon-upgrade', or 'dry')"
       _print_usage
       exit 2
       ;;
@@ -233,6 +261,8 @@ usage: preflight-mainnet.sh <mode>
 Modes:
   deploy    Full gate package for `just mainnet_deploy`
   upgrade   Gates for `just mainnet_upgrade`
+  validator-beacon-upgrade
+            Gates for `just mainnet_upgrade_validator_beacon`
   dry       Minimal gates for `just mainnet_deploy_dry`
 
 Exit codes:
