@@ -15,26 +15,14 @@
   {
     "type": "function",
     "name": "modifyRailPayment",
-    "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
     "type": "function",
     "name": "terminateRail",
-    "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -42,11 +30,6 @@
     "type": "function",
     "name": "updateLockupPeriod",
     "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
       {
         "name": "newLockupPeriod",
         "type": "uint256",

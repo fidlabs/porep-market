@@ -118,7 +118,7 @@ contract ValidatorTest is Test {
         validator.createRail(token);
 
         vm.prank(porepService);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -145,7 +145,7 @@ contract ValidatorTest is Test {
         uint256 newLockup = 123;
 
         vm.prank(admin);
-        validator.updateLockupPeriod(railId, newLockup);
+        validator.updateLockupPeriod(newLockup);
 
         (uint256 lockupPeriod, uint256 lockupFixed) = filecoinPayMock.getRailLockup(railId);
         assertEq(lockupPeriod, newLockup);
@@ -250,14 +250,6 @@ contract ValidatorTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
         vm.prank(address(filecoinPayMock));
         validator.validatePayment(wrongRailId, 100, 0, type(uint256).max, 1);
-    }
-
-    function testUpdateLockupPeriodInvalidRailIdRevert() public {
-        uint256 wrongRailId = railId + 1;
-
-        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
-        vm.prank(admin);
-        validator.updateLockupPeriod(wrongRailId, 123);
     }
 
     function testRailTerminatedInvalidRailIdRevert() public {
@@ -406,7 +398,7 @@ contract ValidatorTest is Test {
         emit Validator.RailPaymentModified(railId, expectedRate);
 
         vm.prank(porepService);
-        validator.modifyRailPayment(railId);
+        validator.modifyRailPayment();
     }
 
     function testUpdateLockupPeriodEmitsLockupPeriodUpdated() public {
@@ -415,7 +407,7 @@ contract ValidatorTest is Test {
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.LockupPeriodUpdated(railId, newLockupPeriod);
 
-        validator.updateLockupPeriod(railId, newLockupPeriod);
+        validator.updateLockupPeriod(newLockupPeriod);
     }
 
     function testRailTerminatedEmitsRailTerminated() public {
@@ -438,32 +430,32 @@ contract ValidatorTest is Test {
     function testTerminateRailTerminatesFilecoinPayRailAsAnAdmin() public {
         assertFalse(filecoinPayMock.terminated(railId));
         vm.prank(admin);
-        validator.terminateRail(railId);
+        validator.terminateRail();
         assertTrue(filecoinPayMock.terminated(railId));
     }
 
     function testTerminateRailTerminatesFilecoinPayRailAsPoRepService() public {
         assertFalse(filecoinPayMock.terminated(railId));
         vm.prank(porepService);
-        validator.terminateRail(railId);
+        validator.terminateRail();
         assertTrue(filecoinPayMock.terminated(railId));
     }
 
     function testTerminateRailRevertsWhenCallerHasPoRepServiceRole() public {
         vm.expectRevert(Validator.UnauthorizedCaller.selector);
         vm.prank(address(123));
-        validator.terminateRail(railId);
+        validator.terminateRail();
     }
 
     function testTerminateRailRevertsWhenCallerHasAdminRole() public {
         vm.expectRevert(Validator.UnauthorizedCaller.selector);
         vm.prank(address(123));
-        validator.terminateRail(railId);
+        validator.terminateRail();
     }
 
     function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch() public {
         vm.prank(porepService);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(10)));
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(10)));
 
         clientSCMock.setDataSizeMatching(dealId, true);
 
@@ -479,7 +471,7 @@ contract ValidatorTest is Test {
         clientSCMock.setDataSizeMatching(dealId, true);
 
         vm.prank(porepService);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1000)));
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -500,15 +492,7 @@ contract ValidatorTest is Test {
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, expectedRole)
         );
         vm.prank(unauthorized);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
-    }
-
-    function testSetDealEndEpochInvalidDealIdRevert() public {
-        uint256 wrongDealId = dealId + 1;
-
-        vm.expectRevert(Validator.InvalidDealId.selector);
-        vm.prank(porepService);
-        validator.setDealEndEpoch(wrongDealId, CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
     }
 
     function testCreateRailRevertsWhenOperatorNotApproved() public {
@@ -609,39 +593,17 @@ contract ValidatorTest is Test {
 
         vm.expectRevert(Validator.InvalidSectorCount.selector);
         vm.prank(porepService);
-        validator.modifyRailPayment(railId);
+        validator.modifyRailPayment();
     }
 
     function testValidatePaymentRevertsWhenDealNotCompleted() public {
         vm.prank(porepService);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(0)));
+        vm.roll(0);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(0)));
 
         vm.expectRevert(abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId));
         vm.prank(address(filecoinPayMock));
         validator.validatePayment(railId, 100, 0, 86_400, 1);
-    }
-
-    function testDisableFutureRailPaymentsInvalidRailIdRevert() public {
-        uint256 wrongRailId = railId + 1;
-
-        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
-        vm.prank(porepService);
-        validator.disableFutureRailPayments(wrongRailId);
-    }
-
-    function testModifyRailPaymentInvalidRailIdRevert() public {
-        uint256 wrongRailId = railId + 1;
-
-        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
-        vm.prank(porepService);
-        validator.modifyRailPayment(wrongRailId);
-    }
-
-    function testTerminateRailInvalidRailIdRevert() public {
-        uint256 wrongRailId = railId + 1;
-
-        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailId.selector, railId, wrongRailId));
-        validator.terminateRail(wrongRailId);
     }
 
     function testCreateRailEmitsInitialLockupPeriodUpdated() public {
@@ -677,7 +639,15 @@ contract ValidatorTest is Test {
         emit Validator.DealEndEpochUpdated(dealId, newEndEpoch);
 
         vm.prank(porepService);
-        validator.setDealEndEpoch(dealId, newEndEpoch);
+        validator.setDealEndEpoch(newEndEpoch);
+    }
+
+    function testSetDealEndEpochRevertsWhenEndEpochIsInThePast() public {
+        vm.prank(porepService);
+        vm.roll(uint256(uint64(CHAIN_EPOCH)));
+
+        vm.expectRevert(Validator.EndEpochInThePast.selector);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH - 1)));
     }
 
     function testDisableFutureRailPaymentsEmitsRailDisabled() public {
@@ -685,7 +655,7 @@ contract ValidatorTest is Test {
         emit Validator.RailDisabled(railId);
 
         vm.prank(porepService);
-        validator.disableFutureRailPayments(railId);
+        validator.disableFutureRailPayments();
     }
 
     function testValidatePaymentCapsSettlementToEarlyTerminatedEpoch() public {
@@ -700,7 +670,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(porepService);
-        validator.disableFutureRailPayments(railId);
+        validator.disableFutureRailPayments();
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result =
@@ -723,7 +693,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
 
         vm.prank(porepService);
-        validator.disableFutureRailPayments(railId);
+        validator.disableFutureRailPayments();
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result =
@@ -745,13 +715,13 @@ contract ValidatorTest is Test {
 
         vm.expectRevert(Validator.InvalidZeroAmount.selector);
         vm.prank(porepService);
-        validator.modifyRailPayment(railId);
+        validator.modifyRailPayment();
     }
 
     function testSetDealEndEpochNegativeEndEpochRevert() public {
         vm.expectRevert(Validator.NegativeEndEpoch.selector);
         vm.prank(porepService);
-        validator.setDealEndEpoch(dealId, CommonTypes.ChainEpoch.wrap(int64(-1)));
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(-1)));
     }
 
     function testSetMinEpochsBetweenSettlementsRevertsMinTimeNotReached() public {

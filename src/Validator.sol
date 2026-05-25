@@ -140,6 +140,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error NegativeEndEpoch();
 
     /**
+     * @notice Error indicating that the provided end epoch is not greater than the current end epoch
+     */
+    error EndEpochInThePast();
+
+    /**
      * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
      * @dev 0xdd484e70
      */
@@ -438,64 +443,55 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         $.railId = railId;
 
         IPoRepMarket($.poRepMarket).updateRailId($.dealId, railId);
-        _setInitialLockup(railId, EPOCHS_IN_MONTH);
+        _setInitialLockup(EPOCHS_IN_MONTH);
     }
 
     /**
      * @notice Modifies the payment rate
      * @dev Only callable by POREP_SERVICE bot
-     * @param railId The ID of the rail to modify
      */
-    function modifyRailPayment(uint256 railId) external override onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
+    function modifyRailPayment() external override onlyRole(POREP_SERVICE_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
 
         uint256 newRate = _calculateAmountPerEpoch();
         $.amountPerEpoch = newRate;
 
-        _modifyRailPayment(IFilecoinPayV1($.filecoinPay), railId, newRate, 0);
-        emit RailPaymentModified(railId, newRate);
+        _modifyRailPayment(IFilecoinPayV1($.filecoinPay), $.railId, newRate, 0);
+        emit RailPaymentModified($.railId, newRate);
     }
 
     /**
      * @notice Disables future payments for a payment rail by terminating the rail
      * @dev Only callable by POREP_SERVICE bot
      * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
-     * @param railId The ID of the rail to terminate
      */
-    function disableFutureRailPayments(uint256 railId) external onlyRole(POREP_SERVICE_ROLE) isRailIdValid(railId) {
+    function disableFutureRailPayments() external override onlyRole(POREP_SERVICE_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
         $.earlyTerminatedEpoch = block.number;
-        _terminateRail(IFilecoinPayV1($.filecoinPay), railId);
-        emit RailDisabled(railId);
+        _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
+        emit RailDisabled($.railId);
     }
 
     /**
      * @notice Updates the lockup period of a payment rail
      * @dev Only callable by the admin
-     * @param railId The ID of the rail to modify
      * @param newLockupPeriod New lockup period to set
      */
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
-        isRailIdValid(railId)
-    {
+    function updateLockupPeriod(uint256 newLockupPeriod) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
-        _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, newLockupPeriod, 0);
-        emit LockupPeriodUpdated(railId, newLockupPeriod);
+        _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), $.railId, newLockupPeriod, 0);
+        emit LockupPeriodUpdated($.railId, newLockupPeriod);
     }
 
     /**
      * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
-     * @param railId The ID of the rail to terminate.
      */
-    function terminateRail(uint256 railId) external override isRailIdValid(railId) {
+    function terminateRail() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert UnauthorizedCaller();
         }
-        _terminateRail(IFilecoinPayV1($.filecoinPay), railId);
+        _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
     }
 
     /**
@@ -522,23 +518,22 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     /**
      * @notice Sets the end epoch for the deal associated with this validator
      * @dev Only callable by POREP_SERVICE bot
-     * @param dealId The ID of the deal
      * @param endEpoch The Filecoin epoch at which the deal ended
      */
-    function setDealEndEpoch(uint256 dealId, CommonTypes.ChainEpoch endEpoch) external onlyRole(POREP_SERVICE_ROLE) {
+    function setDealEndEpoch(CommonTypes.ChainEpoch endEpoch) external onlyRole(POREP_SERVICE_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
-
-        if (dealId != $.dealId) {
-            revert InvalidDealId();
-        }
 
         int64 unwrappedEndEpoch = CommonTypes.ChainEpoch.unwrap(endEpoch);
         if (unwrappedEndEpoch < 0) {
             revert NegativeEndEpoch();
         }
 
+        if (uint256(uint64(unwrappedEndEpoch)) < block.number) {
+            revert EndEpochInThePast();
+        }
+
         $.dealEndEpoch = endEpoch;
-        emit DealEndEpochUpdated(dealId, endEpoch);
+        emit DealEndEpochUpdated($.dealId, endEpoch);
     }
 
     /**
@@ -580,13 +575,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     /**
      * @notice Sets the initial lockup period for a payment rail
-     * @param railId The ID of the rail for which to set the initial lockup period
      * @param lockupPeriod The lockup period to set
      */
-    function _setInitialLockup(uint256 railId, uint256 lockupPeriod) internal {
+    function _setInitialLockup(uint256 lockupPeriod) internal {
         ValidatorStorage storage $ = _getValidatorStorage();
-        _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), railId, lockupPeriod, 0);
-        emit LockupPeriodUpdated(railId, lockupPeriod);
+        _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), $.railId, lockupPeriod, 0);
+        emit LockupPeriodUpdated($.railId, lockupPeriod);
     }
 
     /**
