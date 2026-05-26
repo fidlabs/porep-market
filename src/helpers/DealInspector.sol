@@ -113,6 +113,49 @@ contract DealInspector {
         }
     }
 
+    /**
+     * @notice Fetches claims for a given (provider, claim IDs) pair along with their matching claim IDs
+     * @dev VerifReg returns claims without IDs, in input order, skipping failures.
+     *      We re-attach the IDs so claimIds[i] matches claims[i].
+     * @param provider The provider actor ID
+     * @param ids The claim IDs to fetch for the provider
+     * @return claimIds The IDs of successfully fetched claims, aligned with claims
+     * @return claims The claims associated with the (provider, ids) pair
+     */
+    function getClaimsForProvider(CommonTypes.FilActorId provider, CommonTypes.FilActorId[] calldata ids)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims)
+    {
+        VerifRegTypes.GetClaimsParams memory getClaimsParams =
+            VerifRegTypes.GetClaimsParams({provider: provider, claim_ids: ids});
+
+        (int256 exitCode, VerifRegTypes.GetClaimsReturn memory result) = VerifRegAPI.getClaims(getClaimsParams);
+        if (exitCode != 0) {
+            revert GetClaimsCallFailed();
+        }
+
+        claims = result.claims;
+        claimIds = new CommonTypes.FilActorId[](claims.length);
+
+        uint256 failIterator = 0;
+        uint256 outIdx = 0;
+        for (uint256 i = 0; i < ids.length; ++i) {
+            if (
+                result.batch_info.fail_codes.length > failIterator
+                    && i == result.batch_info.fail_codes[failIterator].idx
+            ) {
+                ++failIterator;
+                continue;
+            }
+            claimIds[outIdx++] = ids[i];
+        }
+
+        if (outIdx != claims.length) {
+            revert ClaimIdsMismatch(claims.length, outIdx);
+        }
+    }
+
     /// NOTE: This functionality is currently not implemented at mainnet, and is expected to be available in the future.
     ///       Export Sector Status to FEVM (FIP-0112)
     ///       https://github.com/filecoin-project/FIPs/blob/master/FIPS/fip-0112.md

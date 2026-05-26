@@ -253,4 +253,98 @@ contract DealInspectorTest is Test {
         assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 7);
         assertEq(CommonTypes.FilActorId.unwrap(claims[0].provider), 1000);
     }
+
+    function testGetClaimsForProviderReturnsSingleClaim() public view {
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
+        ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
+
+        (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
+            dealInspector.getClaimsForProvider(SP1, ids);
+
+        assertEq(claims.length, 1);
+        assertEq(claimIds.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 1);
+
+        VerifRegTypes.Claim memory claim = claims[0];
+        assertEq(CommonTypes.FilActorId.unwrap(claim.provider), 1000);
+        assertEq(CommonTypes.FilActorId.unwrap(claim.client), 102);
+        assertEq(claim.size, 2048);
+        assertEq(claim.data, hex"000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C7638");
+    }
+
+    function testGetClaimsForProviderReturnsMultipleClaims() public {
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](2);
+        ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
+        ids[1] = CommonTypes.FilActorId.wrap(uint64(2));
+
+        (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
+            dealInspector.getClaimsForProvider(SP1, ids);
+
+        assertEq(claims.length, 2);
+        assertEq(claimIds.length, 2);
+        assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 1);
+        assertEq(CommonTypes.FilActorId.unwrap(claimIds[1]), 2);
+
+        assertEq(CommonTypes.FilActorId.unwrap(claims[0].provider), 1000);
+        assertEq(claims[0].size, 2048);
+        assertEq(claims[0].data, hex"000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C7638");
+        assertEq(CommonTypes.FilActorId.unwrap(claims[1].provider), 1000);
+        assertEq(claims[1].size, 2048);
+        assertEq(claims[1].data, hex"000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C7638");
+    }
+
+    function testGetClaimsForProviderReturnsEmptyResultWhenNoIds() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](0);
+
+        (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
+            dealInspector.getClaimsForProvider(SP1, ids);
+
+        assertEq(claims.length, 0);
+        assertEq(claimIds.length, 0);
+    }
+
+    function testGetClaimsForProviderSkipsFailedClaimIds() public {
+        actorIdMock.setGetClaimsResult(
+            hex"8282018182000681881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](2);
+        ids[0] = CommonTypes.FilActorId.wrap(uint64(10));
+        ids[1] = CommonTypes.FilActorId.wrap(uint64(20));
+
+        (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
+            dealInspector.getClaimsForProvider(SP1, ids);
+
+        assertEq(claims.length, 1);
+        assertEq(claimIds.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 20);
+    }
+
+    function testGetClaimsForProviderRevertsWhenGetClaimsExitCodeNonZero() public {
+        ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
+        vm.etch(CALL_ACTOR_ID, address(failing).code);
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
+        ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
+
+        vm.expectRevert(DealInspector.GetClaimsCallFailed.selector);
+        dealInspector.getClaimsForProvider(SP1, ids);
+    }
+
+    function testGetClaimsForProviderRevertsOnClaimIdsMismatch() public {
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
+        ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
+
+        vm.expectRevert(abi.encodeWithSelector(DealInspector.ClaimIdsMismatch.selector, 2, 1));
+        dealInspector.getClaimsForProvider(SP1, ids);
+    }
 }

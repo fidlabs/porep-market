@@ -108,6 +108,77 @@
     "stateMutability": "view"
   },
   {
+    "type": "function",
+    "name": "getClaimsForProvider",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "ids",
+        "type": "uint64[]",
+        "internalType": "CommonTypes.FilActorId[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "claimIds",
+        "type": "uint64[]",
+        "internalType": "CommonTypes.FilActorId[]"
+      },
+      {
+        "name": "claims",
+        "type": "tuple[]",
+        "internalType": "struct VerifRegTypes.Claim[]",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "client",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "data",
+            "type": "bytes",
+            "internalType": "bytes"
+          },
+          {
+            "name": "size",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "term_min",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "term_max",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "term_start",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "sector",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
     "type": "error",
     "name": "ActorNotFound",
     "inputs": []
