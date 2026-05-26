@@ -42,6 +42,9 @@ deploy flags='':
 upgrade flags='':
     forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
 
+upgrade_validator_beacon flags='':
+    forge script script/UpgradeValidatorBeacon.s.sol:UpgradeValidatorBeacon --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+
 devnet_deploy: clean build
 	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just deploy 
 
@@ -61,6 +64,9 @@ devnet_upgrade: clean build
 
 calibnet_upgrade: clean build
 	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade --slow
+
+calibnet_upgrade_validator_beacon: clean build
+    RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade_validator_beacon --slow
 
 # Full mainnet (production) deploy with 5-gate safety check (requires CONFIRM_MAINNET=yes).
 mainnet_deploy: clean build
@@ -96,6 +102,11 @@ mainnet_deploy_dry: clean build
 mainnet_upgrade: clean build
     ./script/preflight-mainnet.sh upgrade
     RPC_URL=$RPC_MAINNET PRIVATE_KEY=$PRIVATE_KEY_MAINNET just upgrade --slow
+
+# Mainnet Validator beacon upgrade (requires existing deployments/mainnet/latest.json).
+mainnet_upgrade_validator_beacon: clean build
+    ./script/preflight-mainnet.sh validator-beacon-upgrade
+    RPC_URL=$RPC_MAINNET PRIVATE_KEY=$PRIVATE_KEY_MAINNET just upgrade_validator_beacon --slow
 
 rescue_prepare deal_ids term_min term_max:
     ./script/rescue-allocations.sh prepare --deal-ids {{deal_ids}} --term-min {{term_min}} --term-max {{term_max}}
