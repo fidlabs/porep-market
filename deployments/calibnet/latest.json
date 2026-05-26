@@ -1,16 +1,16 @@
 {
   "Client": {
-    "codeHash": "0xd42543b5802b1e5d7879bd79f83160207f9c81aa72c4c32f574c7c711187d995",
-    "deployedCodeHash": "0x7d48367343a339c53a52277e65cdcae4d8cee79a8e4ad89a11fcbf6eb459d4df",
-    "impl": "0x014b5589b1BE374D1621ac8645CcEd208e4aCAa6",
+    "codeHash": "0x8cd93b6af86f8fab78ebe7f210d8deb6179cf17698fa9c7fdecbe36f94308e72",
+    "deployedCodeHash": "0x705a4f40dfa79840b8a2dd26806f58bcdedad61e748f33c9b979ddd3933929fd",
+    "impl": "0x1C223100420d44c36325d41c6194f0184Dc9826a",
     "proxy": "0x1926de8ce11a7527413Dcd0a384652D9548f36c9"
   },
   "FilecoinPay": "0x09a0fDc2723fAd1A7b8e3e00eE5DF73841df55a0",
   "MetaAllocator": "0x09a0fDc2723fAd1A7b8e3e00eE5DF73841df55a0",
   "PoRepMarket": {
-    "codeHash": "0xbb63df51a13fd78bc198a09ff2a823e8b71a1c334aa2c3d43c40416c48d75ccb",
-    "deployedCodeHash": "0xc7366711028967506e6381ddc9c956e0bc0dc167dd2d71ee5c342597244c1b40",
-    "impl": "0x086FFd0a9F883765e592EC8C40Eb60E7D4682F74",
+    "codeHash": "0x8d59bb609d611fcbd98e134695f395d44fd468c351a1ddaed573fa18d507e2ea",
+    "deployedCodeHash": "0x27f7478bb7beb1fec99a65631c0c33acebc284c6886c1e9474efb9dd78e678fe",
+    "impl": "0xe45294d89AB50d0507deC00C80348e992C620084",
     "proxy": "0x32B13b88b038652B3D48262DeCF003a1799345B0"
   },
   "PoRepService": "0x1efBbe336C7763fB63f57d2490269A577fAbD841",
