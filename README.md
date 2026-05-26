@@ -64,6 +64,18 @@ proposeDeal() --> [Proposed] --> acceptDeal() --> [Accepted] --> completeDeal() 
 | **[FilecoinPay](https://github.com/FilOzone/filecoin-pay)** | Smart contract enabling streaming payment channels between payers and recipients |
 | **Miner** | Instance of the [Miner Actor](https://github.com/filecoin-project/builtin-actors/tree/master/actors/miner) |
 
+### Deal States
+
+A deal moves through the following states across its lifecycle.
+
+| State | Description |
+|-------|-------------|
+| **Proposed** | Initial state after a Client submits a deal, when the matched Storage Provider is not configured for auto-approval. Capacity is reserved (pending) on the SP, but the SP has not yet confirmed participation. Skipped if the matched SP is configured for auto-approval - the deal then starts directly in Accepted. |
+| **Accepted** | The matched Storage Provider has acknowledged the deal (or it was auto-approved). The Validator contract can now be deployed, the FilecoinPay rail created, and DataCap allocations made via the Client contract. Reserved capacity is still pending until completion. |
+| **Completed** | The Client has called `completeDeal` once all required DataCap allocations match the proposed deal size (within tolerance). The provider's capacity transitions from pending to committed, and the deal becomes eligible for streamed settlement payments through the rail. |
+| **Rejected** | The deal was cancelled before going live - either explicitly by the Client, the matched SP, or an admin, or automatically after a proposal expires without being accepted. The pending capacity reserved on the SP is released. |
+| **Terminated** | The deal ended after reaching Completed - either because its agreed duration expired or because it was terminated early by the POREP bot. The payment rail is closed, final settlement is processed, and the provider's committed capacity is released. |
+
 ### Provider Capacity States
 
 A Storage Provider's storage capacity moves through four states across the deal lifecycle.
@@ -72,7 +84,7 @@ A Storage Provider's storage capacity moves through four states across the deal 
 |-------|-------------|
 | **Available** | The total amount of storage a Storage Provider has declared and made available for taking on new deals. |
 | **Pending** | Storage that has been reserved for a deal that was proposed but not yet finalized - held aside so it cannot be offered to another client, but not yet locked in. |
-| **Committed** | Storage that is firmly allocated to a deal which has been accepted and finalized. The provider is obligated to store this data for the agreed duration. |
+| **Committed** | Storage that is firmly allocated to a deal that has reached the Completed state. The provider is obligated to store this data for the agreed duration. |
 | **Sealed** | The portion of committed storage that the provider has already physically processed and stored on disk in cryptographically protected form, ready to be proven on the Filecoin network. |
 
 ## System Flow
