@@ -1,16 +1,16 @@
 {
   "Client": {
-    "codeHash": "0xde09614e74d7a16c877c8586e2a2329d841b568f0c107545954ebafdf60048d6",
-    "deployedCodeHash": "0x7d48367343a339c53a52277e65cdcae4d8cee79a8e4ad89a11fcbf6eb459d4df",
-    "impl": "0xd9374A9D6B5D24D27b2B8087AB93839BED9a58AF",
+    "codeHash": "0x907aa62e1bed6f111b922056994747be91ee190293e48f7c22fb761f75c7d0c9",
+    "deployedCodeHash": "0x705a4f40dfa79840b8a2dd26806f58bcdedad61e748f33c9b979ddd3933929fd",
+    "impl": "0x921C09329DC65909d37835Eae38F4D9BaB2EfE1c",
     "proxy": "0x4B099b9eCa7d3872Fa8F9B72b913119B4F08c5ED"
   },
   "FilecoinPay": "0x23b1e018F08BB982348b15a86ee926eEBf7F4DAa",
   "MetaAllocator": "0x1e15357F252FF44d2CebEA99FDB1E0858018cCE1",
   "PoRepMarket": {
-    "codeHash": "0x5e22b84a9050b0e4ccebf655f1c3f110d4789cb42fc1eeb2171c0f68906ec73d",
-    "deployedCodeHash": "0xc7366711028967506e6381ddc9c956e0bc0dc167dd2d71ee5c342597244c1b40",
-    "impl": "0x51aA2FBbDcFf9C5181B7534921949F9507b1f6c2",
+    "codeHash": "0xb3ec112ae1b387929e5341fdc80261fb2b73dd7164773aa8d247e3efe5babbf7",
+    "deployedCodeHash": "0x27f7478bb7beb1fec99a65631c0c33acebc284c6886c1e9474efb9dd78e678fe",
+    "impl": "0x5A8934817B39391E9e02a07e333d3C3ac9251e0B",
     "proxy": "0xBD669aBd1188F52e82aF114E17aCE2842DCc0Eb4"
   },
   "PoRepService": "0x70dA3d219CD3A55f09629c05d283E4457E5E7aeC",
@@ -40,7 +40,7 @@
     "impl": "0x6925e1d9c8AEDF9627648db6f2A788e3e2fc208B",
     "proxy": "0x1814d77CDef6297e9E015667d912aE11ae6f68D8"
   },
-  "ValidatorImpl": "0xC5655AC07b4961639618805D40199E90429e56B7",
+  "ValidatorImpl": "0x0b8C0f10278d2Ec28231224E7948C32b06E6FdA0",
   "block": 5934189,
   "chainId": 314,
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",

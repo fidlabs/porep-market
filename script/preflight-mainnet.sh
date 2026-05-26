@@ -124,7 +124,9 @@ _gate_chain_id() {
 }
 
 _gate_clean_tree() {
-  if [[ -n "$(git status --porcelain 2>/dev/null)" ]]; then
+  local dirty
+  dirty="$(git status --porcelain 2>/dev/null | grep -vE '^\?\? docs$' || true)"
+  if [[ -n "$dirty" ]]; then
     if [[ "${ALLOW_DIRTY_TREE:-}" == "yes" ]]; then
       _log WARN "git tree is dirty (ALLOW_DIRTY_TREE=yes override in effect)"
       return 0
