@@ -56,13 +56,11 @@ that already have claims can still be verified after FIP-1249 activates.
 
 ### ACTIVE deals (already activated, payment flowing)
 
-No impact. Settlement is deterministic from frozen deal state:
-`pricePer32GiBPerMonth`, `billed32GiBUnits`, `serviceStartEpoch`,
-`serviceEndEpoch`. None of these depend on VerifReg. These deals continue to
-completion with no action needed.
-
-If ongoing claim health monitoring is added later, `GetClaims` still works for
-existing claims.
+No impact to already-started payment terms: `pricePer32GiBPerMonth`,
+`billed32GiBUnits`, `serviceStartEpoch`, and `serviceEndEpoch` stay frozen.
+Runtime evidence refresh can still call `GetClaims` for existing claims because
+FIP-1249 blocks new allocations/claims, not reads of existing claims. Settlement
+still cannot move past the adapter's latest verified refresh epoch.
 
 ### ACCEPTED deals with verified claims (evidence batches submitted)
 

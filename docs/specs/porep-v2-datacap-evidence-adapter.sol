@@ -14,6 +14,7 @@ library DataCapAllocationStatus {
     uint8 internal constant NONE = 0;
     uint8 internal constant ALLOCATED = 10;
     uint8 internal constant CLAIMED = 20;
+    uint8 internal constant INACTIVE = 30;
 }
 
 abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
@@ -28,10 +29,14 @@ abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
         uint256 allocatedBytes;
         uint256 claimCount;
         uint256 claimedBytes;
+        uint256 activeClaimedBytes;
+        CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
         bool postingFinished;
         // VerifReg claims are looked up by the same numeric ID returned as the
         // allocation ID. Keep append-only arrays for tooling/history and use
-        // allocationStatus for O(1) duplicate and state checks.
+        // allocationStatus for O(1) duplicate and state checks. CLAIMED means
+        // counted at activation; INACTIVE means a later refresh found the claim
+        // missing, expired, terminated, or no longer matching deal evidence.
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
         mapping(CommonTypes.FilActorId id => uint8 status) allocationStatus;
@@ -97,6 +102,25 @@ abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
         return _activateEvidence(context, evidenceData);
     }
 
+    function refreshEvidenceStatus(Types.ActivationContext calldata context, bytes calldata evidenceData)
+        external
+        override
+        returns (Types.EvidenceStatus memory status)
+    {
+        _onlyMarket();
+        return _refreshEvidenceStatus(context, evidenceData);
+    }
+
+    function currentEvidenceStatus(Types.ActivationContext calldata context)
+        external
+        view
+        override
+        returns (Types.EvidenceStatus memory status)
+    {
+        _onlyMarket();
+        return _currentEvidenceStatus(context);
+    }
+
     // Evidence batches iterate over allocated IDs that have not reached CLAIMED
     // status and call VerifReg GetClaims(provider, ids). When each returned
     // claim matches the frozen deal provider, data CID, size, sector, and term
@@ -109,9 +133,31 @@ abstract contract DataCapEvidenceAdapter is IStorageEvidenceAdapter {
         returns (Types.ActivationDecision memory decision);
 
     // Activation reads already-verified aggregate bytes and avoids looping over
-    // every stored piece or claim for a large deal in one call.
+    // every stored piece or claim for a large deal in one call. This is the V2
+    // replacement for Client.isDataSizeMatching: claimedBytes must satisfy
+    // context.requestedSizeBytes * context.activationToleranceBps / 10_000. On
+    // accepted activation, activeClaimedBytes starts equal to claimedBytes.
     function _activateEvidence(Types.ActivationContext calldata context, bytes calldata evidenceData)
         internal
         virtual
         returns (Types.ActivationDecision memory decision);
+
+    // Runtime refresh is permissionless through PoRepMarket, but not trusted.
+    // The caller only chooses a bounded claim ID batch. The adapter calls
+    // GetClaims(provider, ids), verifies each returned claim against the frozen
+    // deal evidence, marks inactive claims, and updates activeClaimedBytes.
+    // lastEvidenceRefreshEpoch advances to the current epoch only when active
+    // claimed bytes still satisfy the deal threshold. Under-coverage blocks later
+    // settlement by leaving the previous refresh epoch in place.
+    function _refreshEvidenceStatus(Types.ActivationContext calldata context, bytes calldata evidenceData)
+        internal
+        virtual
+        returns (Types.EvidenceStatus memory status);
+
+    // Settlement reads cached active bytes only. It must not call GetClaims.
+    function _currentEvidenceStatus(Types.ActivationContext calldata context)
+        internal
+        view
+        virtual
+        returns (Types.EvidenceStatus memory status);
 }

@@ -238,8 +238,10 @@ Filecoin actors.
 For DataCap / VerifReg, the adapter validates concrete evidence: decoded
 allocation `Data` CIDs and sizes before DataCap transfer, returned allocation
 IDs, VerifReg claim existence, `claim.data`, `claim.size`, provider, sector, and
-the required termMin/termMax checks. Accepted claim bytes must satisfy the
-activation tolerance threshold (see Payment Rule).
+the required termMin/termMax checks. Those per-claim checks prove what the SP
+claimed with VerifReg. They are necessary but not sufficient: aggregate accepted
+claim bytes must also satisfy the activation tolerance threshold (see Payment
+Rule).
 
 Claimed byte count alone is not enough, but whole-manifest equality proofs are
 deferred. Do not add Merkle proof verification, per-piece permanent market
@@ -269,7 +271,9 @@ V1 `Client` behavior maps to V2 as follows:
 | DataCap transfer gateway | `DataCapEvidenceAdapter.submitDataCapBatch` | Adapter validates the frozen deal fields before forwarding/posting DataCap allocation batches. |
 | Transfer completion flag | `DataCapEvidenceAdapter.finishDataCapPosting` | Separate finish transaction closes posting and emits `DealEvidenceReady`; it does not activate payment. |
 | DataCap allocation and claim IDs | `DataCapEvidenceAdapter` storage | PoRepMarket stores only the selected adapter and activation/payment fields. |
+| `isDataSizeMatching` | `DataCapEvidenceAdapter.activateEvidence` | V2 checks adapter-verified `claimedBytes` against frozen `requestedSizeBytes * activationToleranceBps / 10_000`. |
 | Deal completion/payment activation | `PoRepMarket.activateEvidence` plus selected adapter | PoRepMarket calls the adapter, consumes covered bytes, derives billing fields, and moves the deal to `ACTIVE`. |
+| Runtime claim refresh | `PoRepMarket.refreshEvidenceStatus` plus selected adapter | Anyone can trigger a bounded refresh. The adapter calls Filecoin actors and updates cached active bytes / refresh epoch. |
 | Validator settlement checks | `Validator -> PoRepMarket.validateDealSettlement` | Validator does not call DataCap / VerifReg adapters directly. |
 
 The adapter interface is the contract boundary:
@@ -282,17 +286,21 @@ The adapter interface is the contract boundary:
 - market accepts only `EvidenceResult.ACCEPTED`
 - market clamps covered bytes against the frozen deal and derives committed bytes,
   billed units, service start/end, and rail ceiling
+- PoRepMarket forwards runtime refresh batches to the adapter and reads cached
+  active covered bytes during settlement
 - adapter keeps allocation IDs, claim IDs, and aggregate byte counts needed by
   tooling and activation
 
 `evidenceData` is opaque to PoRepMarket. PoRepMarket passes it only to the
 deal's selected adapter together with the frozen `ActivationContext`; it must not
 decode adapter-specific evidence. Each adapter owns its payload format and
-validation logic.
+validation logic. The same adapter can define different payload meanings per
+method.
 
 Examples:
 
-- `DataCapEvidenceAdapter`: `evidenceData = abi.encode(uint64[] allocationIds)`
+- `DataCapEvidenceAdapter.submitEvidenceBatch`: `evidenceData = abi.encode(uint64[] allocationIds)`
+- `DataCapEvidenceAdapter.refreshEvidenceStatus`: `evidenceData = abi.encode(uint64[] claimIds)`
 - `PieceEvidenceAdapter`: `evidenceData = abi.encode(piece CIDs / sector inputs)`
 - `OracleEvidenceAdapter`: `evidenceData = abi.encode(attestation + signature)`
 
@@ -302,11 +310,11 @@ the adapter.
 
 `DataCapEvidenceAdapter` is the concrete sketch for the current VerifReg claim
 path. It can accept claim evidence in multiple batches and track aggregate claim
-count / claimed bytes. It stores allocation IDs, verified claim IDs, and an
-allocation-status mapping for tooling, retry logic, duplicate checks, and review.
-Normal activation and settlement read aggregate counts and byte totals; they do
-not iterate every stored ID. PoRepMarket does not store VerifReg allocation or
-claim IDs.
+count / claimed bytes. It stores allocation IDs, verified claim IDs,
+active-claimed bytes, and an allocation-status mapping for tooling, retry logic,
+duplicate checks, and review. Activation and settlement read aggregate counts and
+byte totals; they do not iterate every stored ID. PoRepMarket does not store
+VerifReg allocation or claim IDs.
 
 VerifReg claims are looked up by the same numeric ID originally returned as the
 allocation ID. `submitEvidenceBatch` should process a bounded slice of allocation
@@ -319,7 +327,45 @@ and claim ID arrays.
 `activateEvidence` does not re-verify individual claims. It reads the adapter's
 accumulated totals from prior `submitEvidenceBatch` calls and checks whether
 those totals satisfy the frozen deal requirements. This keeps activation cheap
-even for huge deals.
+even for huge deals. For DataCap-backed deals, accepted activation initializes
+`activeClaimedBytes = claimedBytes`.
+
+This is the V2 replacement for V1 `Client.isDataSizeMatching`: accepted bytes are
+the sum of adapter-verified, non-duplicated claims for the frozen provider and
+piece data. Activation must reject when:
+
+```text
+claimedBytes < requestedSizeBytes * activationToleranceBps / 10_000
+```
+
+This check compares contract-verified VerifReg claim bytes to the frozen deal
+size. It does not trust SP docs, UI state, or off-chain manifests by themselves.
+
+After activation, runtime evidence refresh is permissionless and caller-triggered,
+but not caller-trusted. Any account can call
+`PoRepMarket.refreshEvidenceStatus(dealId, evidenceData)`. PoRepMarket builds the
+same frozen `ActivationContext` used for activation and forwards the call to the
+deal's selected adapter. The caller only chooses the bounded evidence batch to
+check.
+
+For DataCap-backed deals, `refreshEvidenceStatus` decodes claim IDs and calls
+`GetClaims(provider, claimIds)`. The adapter verifies each returned claim against
+the frozen provider, data CID, size, sector, and term fields. Claims that are
+missing, expired, terminated, duplicated, or no longer matching the frozen deal
+evidence are marked inactive and removed from `activeClaimedBytes`. Settlement
+then reads cached active bytes; it does not trust the caller's assertion.
+
+Refresh also stores `lastEvidenceRefreshEpoch`. For DataCap-backed deals, the
+adapter advances it to the current epoch only when refreshed active claim bytes
+still satisfy:
+
+```text
+activeCoveredBytes >= requestedSizeBytes * activationToleranceBps / 10_000
+```
+
+If refresh finds under-coverage, `lastEvidenceRefreshEpoch` does not advance.
+Settlement past the previous verified refresh point remains blocked until storage
+evidence is refreshed successfully or the deal enters a termination/dispute path.
 
 For DataCap-backed deals, `DataCapEvidenceAdapter` is also the guarded DataCap
 gateway; it is not a separate V2 `Client` contract.
@@ -368,8 +414,7 @@ activation.
 Events are notification, not the only source of truth. The adapter exposes read
 helpers for late-starting or retrying tools: whether posting is finished and
 paginated allocation/claim ID getters. These getters return adapter-owned
-allocation IDs and verified claim IDs; they are not settlement authority and must
-not refresh Filecoin state.
+allocation IDs and verified claim IDs; they do not refresh Filecoin state.
 
 An upper allocation tolerance can be added later if prepared data is routinely
 larger than requested deal size. The starting lower-bound rule is the same
@@ -388,10 +433,10 @@ events for off-chain reconstruction. Normal settlement must not loop over every
 piece or claim in a huge deal.
 
 Activation reads the adapter's already-verified aggregate counts and byte totals
-instead of rechecking every claim in one call. If piece or claim counts are too
-large for a single transaction, tooling splits them across allocation/evidence
-batches.
-Normal settlement must not iterate every stored allocation or claim ID.
+instead of rechecking every claim in one call. Runtime refresh also works in
+bounded batches. If piece or claim counts are too large for a single transaction,
+tooling splits them across allocation, evidence, and refresh batches. Normal
+settlement must not iterate every stored allocation or claim ID.
 
 ## Payment Activation Gate
 
@@ -426,6 +471,11 @@ the market validates all preconditions from stored state.
 The adapter must reject activation when aggregate covered bytes are below the
 activation tolerance threshold, which prevents premature activation even without
 caller restrictions.
+
+`refreshEvidenceStatus` is also permissionless. The caller does not supply a
+trusted status. The caller supplies only a bounded evidence batch, and the adapter
+verifies current Filecoin state before changing cached active bytes and
+`lastEvidenceRefreshEpoch`.
 
 ## Termination Authority
 
@@ -498,15 +548,40 @@ lockup model, the Validator and deal flow adapt accordingly.
 ## Settlement Rule
 
 Normal settlement must be deterministic from frozen deal state, active rail
-state, and the accepted activation fields stored by PoRepMarket. Caller-supplied
-evidence is not authority for ordinary settlement.
+state, accepted activation fields stored by PoRepMarket, and cached active
+covered bytes / refresh epoch from the selected adapter. Caller-supplied evidence
+is not authority for ordinary settlement.
 
 Validator calls PoRepMarket's settlement interface. PoRepMarket checks the deal,
-rail, service window, and accepted activation state before returning a settlement
-decision that includes the settlement amount and settle-up-to epoch.
+rail, service window, accepted activation state, and current adapter evidence
+status before returning a settlement decision that includes the settlement amount
+and settle-up-to epoch. Validator never calls the adapter directly.
 
-Live VerifReg refreshes belong in separate maintenance/challenge functions that
-cap claim IDs per transaction, not in every FilecoinPay settlement.
+Live VerifReg refreshes happen through
+`PoRepMarket.refreshEvidenceStatus(dealId, evidenceData)`. The function is
+permissionless. It forwards to the selected adapter, and the adapter verifies
+Filecoin actor state before updating cached active bytes. For DataCap, refresh
+uses bounded claim ID batches and `GetClaims(provider, claimIds)`.
+
+Settlement reads the cached status through the adapter. It must reject settlement
+when:
+
+```text
+activeCoveredBytes < requestedSizeBytes * activationToleranceBps / 10_000
+```
+
+Settlement must also reject when:
+
+```text
+lastEvidenceRefreshEpoch < toEpoch
+```
+
+This means payment cannot settle past the latest contract-verified evidence
+refresh.
+
+This is trustless for correctness but not automatic for liveness. A bot, tool, or
+user must submit the refresh transaction. The caller cannot decide whether the
+storage is valid.
 
 After the paid service window has ended and settlement has caught up, the deal
 can move from `DealState.ACTIVE` to `DealState.FINALIZED`. `FINALIZED` is the
@@ -577,8 +652,8 @@ does not add another evidence status.
   a piece is in the committed set
 - **Per-piece permanent market storage**: storing individual piece CIDs in
   PoRepMarket (they stay in the adapter)
-- **Normal-settlement VerifReg refreshes**: live claim re-verification during
-  settlement; belongs in separate maintenance/challenge functions
+- **Automatic refresh scheduling**: contracts expose permissionless refresh, but
+  they do not schedule transactions. Bots/tools/users trigger refresh batches
 
 ### Client and payment policy
 

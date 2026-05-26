@@ -63,6 +63,7 @@ flowchart TB
     evidenceAction["activateEvidence<br/>market derives billed units + service window"]
     activationGate{{"accepted evidence + payment authorization"}}
     active(["Active"])
+    refreshAction["refreshEvidenceStatus<br/>bounded current-claim check<br/>sets lastEvidenceRefreshEpoch"]
     finalizeAction["finalizeDeal<br/>after service window is settled"]
     finalized(["Finalized"])
     expireAction["releaseExpiredProposal<br/>release pending capacity"]
@@ -87,6 +88,7 @@ flowchart TB
     active --> finalizeAction --> finalized
 
     active --> service["Payment service window<br/>serviceEndEpoch = serviceStartEpoch + durationEpochs"]
+    active --> refreshAction --> adapter
     service --> validator["Validator settlement<br/>dueAt(toEpoch) - dueAt(fromEpoch)"]
     validator --> filecoinPay["FilecoinPay rail<br/>token = frozen DealPayment.paymentToken"]
 
@@ -99,6 +101,6 @@ flowchart TB
     class proposed,accepted,active state
     class finalized,service,filecoinPay final
     class expired,rejected,terminated stop
-    class acceptAction,railPrep,datacapBatch,datacapReady,evidenceBatch,adapter,evidenceAction,activationGate,finalizeAction,expireAction,rejectAction,terminateFromAccepted,terminateFromActive action
+    class acceptAction,railPrep,datacapBatch,datacapReady,evidenceBatch,adapter,evidenceAction,activationGate,refreshAction,finalizeAction,expireAction,rejectAction,terminateFromAccepted action
     class validator payment
 ```

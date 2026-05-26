@@ -50,6 +50,7 @@ library SharedTypes {
         CommonTypes.FilActorId provider;
         bytes32 pieceSetCommitment;
         uint256 requestedSizeBytes;
+        uint16 activationToleranceBps;
         uint64 durationEpochs;
     }
 
@@ -57,6 +58,14 @@ library SharedTypes {
         uint8 result;
         // Accepted bytes from adapter-checked allocation/claim evidence.
         uint256 coveredBytes;
+        uint16 reasonCode;
+    }
+
+    struct EvidenceStatus {
+        uint8 result;
+        // Currently active bytes from adapter-checked evidence.
+        uint256 activeCoveredBytes;
+        CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
         uint16 reasonCode;
     }
 

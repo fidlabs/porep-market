@@ -108,6 +108,11 @@ selected adapter to activate, then stores state, committed bytes, billed units,
 service start/end, and rail ceiling against the deal. Allocation IDs, claim IDs,
 and DataCap-specific evidence stay in the adapter.
 
+Runtime evidence refresh also goes through PoRepMarket. Any account can trigger a
+bounded refresh batch, but the adapter verifies Filecoin state itself before
+changing cached active bytes used by settlement. Settlement cannot move past
+`lastEvidenceRefreshEpoch`.
+
 Large deals can submit evidence in batches before activation. Batch sizing is a
 gas constraint, not a product cap on the number of pieces or claims in a deal.
 

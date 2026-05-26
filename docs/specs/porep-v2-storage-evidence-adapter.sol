@@ -31,4 +31,21 @@ interface IStorageEvidenceAdapter {
     function activateEvidence(Types.ActivationContext calldata context, bytes calldata evidenceData)
         external
         returns (Types.ActivationDecision memory decision);
+
+    // Refresh current evidence health from adapter-specific source data. The
+    // caller supplies only the bounded batch to check; the adapter verifies state
+    // itself before updating stored active covered bytes. A successful refresh
+    // records the latest epoch through which evidence can support settlement. For
+    // DataCap / VerifReg, evidenceData identifies claim IDs to check with
+    // GetClaims(provider, ids).
+    function refreshEvidenceStatus(Types.ActivationContext calldata context, bytes calldata evidenceData)
+        external
+        returns (Types.EvidenceStatus memory status);
+
+    // Cheap read used by PoRepMarket settlement logic. This must read adapter
+    // storage only; it must not call Filecoin actors or refresh live state.
+    function currentEvidenceStatus(Types.ActivationContext calldata context)
+        external
+        view
+        returns (Types.EvidenceStatus memory status);
 }

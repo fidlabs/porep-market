@@ -102,10 +102,19 @@ implementation plan is locked.
 15. Piece identity is checked at allocation and claim time
 
     DataCap allocation `Data` CIDs and VerifReg claim `Data` CIDs must be
-    checked when they are submitted or returned by Filecoin actors. Claimed bytes
-    alone are not enough to activate payment. `pieceSetCommitment` is
-    `keccak256(manifest file bytes)`. Whole-set on-chain equality proofs are
-    deferred.
+    checked when they are submitted or returned by Filecoin actors. Aggregate
+    accepted claim bytes must also satisfy the activation threshold for the
+    frozen deal size:
+
+    ```text
+    claimedBytes >= requestedSizeBytes * activationToleranceBps / 10_000
+    ```
+
+    This is the V2 replacement for `Client.isDataSizeMatching`. Claimed bytes
+    alone are not enough to activate payment because each counted claim must
+    first match provider, data CID, size, sector, and term fields.
+    `pieceSetCommitment` is `keccak256(manifest file bytes)`. Whole-set on-chain
+    equality proofs are deferred.
 
 16. Payment must be prepared before activation
 
@@ -134,13 +143,13 @@ implementation plan is locked.
 
 19. DataCap allocation and claim IDs stay out of PoRepMarket
 
-    `DataCapEvidenceAdapter` stores allocation IDs, verified claim IDs, and an
-    allocation-status mapping for tooling, retry logic, duplicate checks, and
-    review. Normal activation and settlement use aggregate counts and byte
-    totals, not loops over every stored ID. PoRepMarket stores the selected
-    adapter and payment activation fields, not VerifReg-specific IDs. The
-    adapter exposes whether posting is finished and paginated allocation/claim ID
-    getters for tooling.
+    `DataCapEvidenceAdapter` stores allocation IDs, verified claim IDs,
+    active-claimed bytes, and an allocation-status mapping for tooling, retry
+    logic, duplicate checks, and review. Activation and settlement use aggregate
+    counts and byte totals, not loops over every stored ID. PoRepMarket stores
+    the selected adapter and payment activation fields, not VerifReg-specific
+    IDs. The adapter exposes whether posting is finished and paginated
+    allocation/claim ID getters for tooling.
 
     VerifReg claims are looked up by the same numeric ID originally returned as
     the allocation ID, so evidence batching can process allocation IDs directly.
@@ -150,7 +159,37 @@ implementation plan is locked.
     keeps large-deal evidence processing bounded without comparing two unbounded
     ID arrays.
 
-20. Auto-match is the default proposal entry point
+20. Runtime evidence refresh is permissionless but verified on-chain
+
+    Any account can call
+    `PoRepMarket.refreshEvidenceStatus(dealId, evidenceData)`. PoRepMarket
+    forwards the call to the deal's selected adapter. The caller only chooses the
+    bounded batch to check; the adapter verifies current Filecoin state before
+    updating cached active bytes.
+
+    For `DataCapEvidenceAdapter`, refresh decodes claim IDs, calls
+    `GetClaims(provider, claimIds)`, and marks claims inactive when they are
+    missing, expired, terminated, duplicated, or no longer match the frozen deal
+    evidence. A successful refresh records `lastEvidenceRefreshEpoch = current
+    epoch` only when active covered bytes still satisfy the deal threshold.
+    Settlement must reject payment when:
+
+    ```text
+    activeCoveredBytes < requestedSizeBytes * activationToleranceBps / 10_000
+    ```
+
+    Settlement must also reject when:
+
+    ```text
+    lastEvidenceRefreshEpoch < toEpoch
+    ```
+
+    Payment cannot settle past the latest contract-verified evidence refresh. If
+    refresh finds under-coverage, `lastEvidenceRefreshEpoch` does not advance.
+    This is trustless for correctness, but not automatic for liveness. A bot,
+    tool, or user must submit the refresh transaction.
+
+21. Auto-match is the default proposal entry point
 
     `proposeDealAuto` is the primary path. SPRegistry resolves the provider and
     offer from the client's request criteria. `proposeDealForOffer` (direct offer
@@ -166,13 +205,13 @@ implementation plan is locked.
     reference, without changing the PoRepMarket interface. This extraction is an
     option, not a starting requirement.
 
-21. Strict SLI enforcement is deferred
+22. Strict SLI enforcement is deferred
 
     First deals can run with simpler pilot SLI tooling. Strict SLI checking,
     slashing, and penalty math must be specified separately before becoming
     payment-affecting contract logic.
 
-22. Activation is permissionless
+23. Activation is permissionless
 
     `activateEvidence` does not check the caller. Authorization was already
     expressed in prior steps: client authorized the payment rail, client posted
@@ -181,7 +220,7 @@ implementation plan is locked.
     activation when aggregate covered bytes are below the configured coverage
     threshold for the deal.
 
-23. Termination authority splits at rail creation
+24. Termination authority splits at rail creation
 
     Pre-rail: PoRepMarket methods terminate (`rejectDeal`, `releaseExpiredProposal`,
     `terminateDeal`). Post-rail: termination flows from FilecoinPay through the
@@ -189,7 +228,7 @@ implementation plan is locked.
     independently terminate post-rail deals. Validator records
     `RailStatus.TERMINATED` and caps settlement at `earlyTerminatedEpoch`.
 
-24. `finishDataCapPosting` is a separate transaction by design
+25. `finishDataCapPosting` is a separate transaction by design
 
     Prevents batch submission from atomically closing the deal. In V1, the
     `dealCompleted` flag on transfer could trigger deal completion before the SP
@@ -197,28 +236,28 @@ implementation plan is locked.
     signal (`DealEvidenceReady`) without triggering any state change or payment
     activation.
 
-25. Validator tracks settlement progress
+26. Validator tracks settlement progress
 
     `lastSettledEpoch` lives in Validator storage. Settlement `fromEpoch` must be
     the previous settlement's `toEpoch` (or `serviceStartEpoch` for the first
     settlement). This prevents double-settlement and ensures cumulative math stays
     correct.
 
-26. Adapters report operational status
+27. Adapters report operational status
 
     `IStorageEvidenceAdapter.isOperational()` returns false when the adapter can
     no longer process new evidence. The market uses this to allow admin rejection
     of deals stuck on a non-functional adapter without breaking the
     frozen-snapshot invariant by re-assigning adapters.
 
-27. DataCap adapter has a finite operational lifetime
+28. DataCap adapter has a finite operational lifetime
 
     `DataCapEvidenceAdapter` becomes non-functional when FIP-1249 (or equivalent)
     blocks new DataCap allocations and claims. The adapter abstraction is
     designed for this transition. See `porep-v2-datacap-sunset.md` for the full
     transition plan.
 
-28. Activation uses a configurable coverage tolerance
+29. Activation uses a configurable coverage tolerance
 
     Activation requires `coveredBytes >= requestedSizeBytes * tolerance / 10_000`.
     Clients may not know exact deal size at proposal time, and prepared data may
@@ -226,7 +265,7 @@ implementation plan is locked.
     Whether it should be adaptive, per-deal, per-offer, or whether a strict mode
     (exact match) should be available are decisions that can evolve post-pilot.
 
-29. Auto-match prevents duplicate provider assignment
+30. Auto-match prevents duplicate provider assignment
 
     `proposeDealAuto` must not assign the same provider to the same data twice.
     The picker checks for non-terminal deals with the same `pieceSetCommitment`
@@ -235,7 +274,7 @@ implementation plan is locked.
     different providers) are allowed and expected. Explicit multi-replica
     assignment (picking N providers in one pass) is deferred.
 
-30. FilecoinPay constraints are acknowledged, not abstracted
+31. FilecoinPay constraints are acknowledged, not abstracted
 
     V2 respects FilecoinPay's interface constraints: operator approval before
     rail creation, token decimal floors that motivate `minPricePer32GiBPerMonth`,
@@ -243,7 +282,7 @@ implementation plan is locked.
     wrapped in additional abstraction layers. If FilecoinPay evolves its
     operator or lockup model, the Validator and deal flow adapt directly.
 
-31. Deal status names describe state, not action
+32. Deal status names describe state, not action
 
     Deal states are named as nouns describing what the deal IS: Proposed,
     Accepted, Active, Finalized, Rejected, Expired, Terminated. Not gerunds
