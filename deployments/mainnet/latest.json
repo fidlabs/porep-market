@@ -8,9 +8,9 @@
   "FilecoinPay": "0x23b1e018F08BB982348b15a86ee926eEBf7F4DAa",
   "MetaAllocator": "0x1e15357F252FF44d2CebEA99FDB1E0858018cCE1",
   "PoRepMarket": {
-    "codeHash": "0x5e22b84a9050b0e4ccebf655f1c3f110d4789cb42fc1eeb2171c0f68906ec73d",
-    "deployedCodeHash": "0xc7366711028967506e6381ddc9c956e0bc0dc167dd2d71ee5c342597244c1b40",
-    "impl": "0x51aA2FBbDcFf9C5181B7534921949F9507b1f6c2",
+    "codeHash": "0xb3ec112ae1b387929e5341fdc80261fb2b73dd7164773aa8d247e3efe5babbf7",
+    "deployedCodeHash": "0x27f7478bb7beb1fec99a65631c0c33acebc284c6886c1e9474efb9dd78e678fe",
+    "impl": "0x5A8934817B39391E9e02a07e333d3C3ac9251e0B",
     "proxy": "0xBD669aBd1188F52e82aF114E17aCE2842DCc0Eb4"
   },
   "PoRepService": "0x70dA3d219CD3A55f09629c05d283E4457E5E7aeC",
