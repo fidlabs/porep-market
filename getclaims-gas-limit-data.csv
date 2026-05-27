@@ -1,0 +1,30 @@
+network,method,deal_id,provider,claim_count,total_bytes,avg_bytes_per_claim,encoded_len,result_len,exit_code,success_count,fail_count,returned_claims,gas_estimate,gas_encode,gas_actor_call,gas_decode,gas_loop,notes
+mainnet,DealInspector.getClaims,1,2639429,44,1477469798400,33578859055,,,,,,,428295897,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,8,187709,11,343598432256,31236221114,,,,,,,124781322,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,9,1222595,17,524019564544,30824680267,,,,,,,185735205,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,10,8240,11,311386177536,28307834321,,,,,,,121309090,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,11,187709,11,311386177536,28307834321,,,,,,,126114477,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,12,2639429,11,343598432256,31236221114,,,,,,,137522501,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,15,2846602,11,343598432256,31236221114,,,,,,,86945261,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,17,187709,44,1477469798400,33578859055,,,,,,,390398695,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,18,2639429,208,7112600059904,34195192596,,,,,,,1636600745,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaims,21,8240,208,7112600059904,34195192596,,,,,,,478218475,,,,,DealInspector.getClaims live completed deal; low gas outlier
+mainnet,DealInspector.getClaims,22,2846602,208,7112600059904,34195192596,,,,,,,1436260948,,,,,DealInspector.getClaims live completed deal
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,1,,34359738368,,,,,,,20039590,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,10,,34359738368,,,,,,,76160510,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,50,,34359738368,,,,,,,325690833,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,100,,34359738368,,,,,,,637167637,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,250,,34359738368,,,,,,,1580005837,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,500,,34359738368,,,,,,,3146826221,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,750,,34359738368,,,,,,,4702093708,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,1000,,34359738368,,,,,,,6277641721,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,1250,,34359738368,,,,,,,7836178301,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider repeated,,2639429,1498,,34359738368,,,,,,,9380195327,,,,,provider 2639429 repeated claim 124645105 from deal 18
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1498,51470888075264,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 20B; OK
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1550,53257594470400,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 20B; OK
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1600,54975581388800,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 20B; OK
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1650,56693568307200,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 20B; OK
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1700,58411555225600,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 20B; out of gas
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1680,57724360458240,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 30B; OK
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1686,57930518888448,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 30B; OK
+mainnet,DealInspector.getClaimsForProvider unique eth_call,,2639429,1687,57964878626816,34359738368,,,,,,,,,,,,real unique 32 GiB claims from StateGetClaims; explicit gas 30B; out of gas
