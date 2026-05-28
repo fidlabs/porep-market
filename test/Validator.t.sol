@@ -817,4 +817,24 @@ contract ValidatorTest is Test {
         vm.prank(porepService);
         validator.modifyRailPayment();
     }
+
+    function testVerifyClientFundsRevertsWhenCallerIsNotPoRepMarket() public {
+        vm.expectRevert(Validator.CallerIsNotPoRepMarket.selector);
+        validator.verifyClientFunds(dealId, 1);
+    }
+
+    function testVerifyClientFundsRevertsWhenNotEnoughFunds() public {
+        filecoinPayMock.setAccount(token, admin, 100, 0, 0, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.InsufficientFundsForRail.selector, 200, 100));
+        vm.prank(address(poRepMarketMock));
+        validator.verifyClientFunds(dealId, 2);
+    }
+
+    function testVerifyClientFundsPassesWhenFundsExactlyRequired() public {
+        filecoinPayMock.setAccount(token, admin, 200, 0, 0, 0);
+
+        vm.prank(address(poRepMarketMock));
+        validator.verifyClientFunds(dealId, 2);
+    }
 }

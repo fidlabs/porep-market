@@ -115,4 +115,69 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
         Rail storage r = rails[railId];
         return (r.lockupPeriod, r.lockupFixed);
     }
+
+    struct AccountState {
+        uint256 funds;
+        uint256 lockupCurrent;
+        uint256 lockupRate;
+        uint256 lockupLastSettledAt;
+    }
+
+    mapping(IERC20 => mapping(address => AccountState)) internal _accounts;
+
+    function setAccount(
+        IERC20 token,
+        address owner,
+        uint256 funds,
+        uint256 lockupCurrent,
+        uint256 lockupRate,
+        uint256 lockupLastSettledAt
+    ) external {
+        _accounts[token][owner] = AccountState({
+            funds: funds, lockupCurrent: lockupCurrent, lockupRate: lockupRate, lockupLastSettledAt: lockupLastSettledAt
+        });
+    }
+
+    function accounts(IERC20 token, address owner)
+        external
+        view
+        override
+        returns (uint256 funds, uint256 lockupCurrent, uint256 lockupRate, uint256 lockupLastSettledAt)
+    {
+        AccountState storage account = _accounts[token][owner];
+        return (account.funds, account.lockupCurrent, account.lockupRate, account.lockupLastSettledAt);
+    }
+
+    function getRail(uint256 railId) external view override returns (RailView memory) {
+        Rail storage r = rails[railId];
+        return RailView({
+            token: r.token,
+            from: r.payer,
+            to: r.payee,
+            operator: r.operator,
+            validator: address(0),
+            paymentRate: 0,
+            lockupPeriod: r.lockupPeriod,
+            lockupFixed: r.lockupFixed,
+            settledUpTo: 0,
+            endEpoch: 0,
+            commissionRateBps: r.commissionRateBps,
+            serviceFeeRecipient: r.serviceFeeRecipient
+        });
+    }
+
+    function getAccountInfoIfSettled(IERC20 token, address owner)
+        external
+        view
+        override
+        returns (uint256 fundedUntilEpoch, uint256 currentFunds, uint256 availableFunds, uint256 currentLockupRate)
+    {
+        AccountState storage account = _accounts[token][owner];
+        currentFunds = account.funds;
+        currentLockupRate = account.lockupRate;
+        availableFunds = account.funds - account.lockupCurrent;
+        fundedUntilEpoch = account.lockupRate == 0
+            ? type(uint256).max
+            : account.lockupLastSettledAt + availableFunds / account.lockupRate;
+    }
 }

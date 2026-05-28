@@ -9,6 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {IValidator} from "./interfaces/IValidator.sol";
 import {IClient} from "./interfaces/IClient.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
@@ -365,6 +366,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error DealNotExpiredYet(uint256 dealId, uint256 currentBlock, uint256 expirationBlock);
 
     /**
+     * @notice Error thrown when trying to complete a deal that does not have a validator set
+     * @dev 0x6bb49bc4
+     */
+    error ValidatorNotSet();
+
+    /**
      * @notice Constructor
      */
     constructor() {
@@ -534,6 +541,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Completes a deal
+     * @dev Verifies that that the allocated size for the deal is within the allowed tolerance of the proposed size
+     *      and that the client has sufficient funds deposited in FilecoinPay to cover the deal
      * @param dealId The id of the deal proposal
      */
     function completeDeal(uint256 dealId) external {
@@ -544,10 +553,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (msg.sender != dp.client) revert NotTheClientAddress();
+        if (dp.validator == address(0)) revert ValidatorNotSet();
+        if (dp.railId == 0) revert InvalidRailId();
         uint256 allocatedSize = $._clientSmartContract.getSizeOfAllocations(dealId);
         uint256 proposedSize = dp.terms.dealSizeBytes;
 
         _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
+
+        uint256 allocationsCount = $._clientSmartContract.getClientAllocationIdsPerDeal(dealId).length;
+        IValidator(dp.validator).verifyClientFunds(dealId, allocationsCount);
 
         $._dealIdsReadyForPayment.add(dealId);
         $._SPRegistryContract.commitCapacity(dp.provider, proposedSize, allocatedSize);

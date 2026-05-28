@@ -360,6 +360,24 @@
     "stateMutability": "nonpayable"
   },
   {
+    "type": "function",
+    "name": "verifyClientFunds",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "allocationsCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "view"
+  },
+  {
     "type": "event",
     "name": "DealEndEpochUpdated",
     "inputs": [
@@ -599,6 +617,11 @@
   },
   {
     "type": "error",
+    "name": "CallerIsNotPoRepMarket",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "DealNotCompleted",
     "inputs": [
       {
@@ -612,6 +635,22 @@
     "type": "error",
     "name": "EndEpochInThePast",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientFundsForRail",
+    "inputs": [
+      {
+        "name": "required",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

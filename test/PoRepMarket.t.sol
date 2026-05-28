@@ -15,6 +15,7 @@ import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
 import {ClientSCMock} from "./contracts/ClientSCMock.sol";
+import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {Client} from "../src/Client.sol";
 
 // solhint-disable-next-line max-states-count
@@ -22,6 +23,7 @@ contract PoRepMarketTest is Test {
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
+    ValidatorMock public validatorMock;
     address public validatorAddress;
     ClientSCMock public clientSmartContractAddress;
     address public clientAddress;
@@ -44,7 +46,8 @@ contract PoRepMarketTest is Test {
         PoRepMarket impl = new PoRepMarket();
         spRegistry = new SPRegistryMock();
         validatorFactory = new ValidatorFactoryMock();
-        validatorAddress = vm.addr(0x001);
+        validatorMock = new ValidatorMock();
+        validatorAddress = address(validatorMock);
         clientSmartContractAddress = new ClientSCMock();
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
@@ -381,6 +384,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
@@ -397,6 +404,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealCompletionPadding(10);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         uint256 dealAllocationSizeAtTheBottomLimit =
             defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100;
@@ -418,6 +429,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealCompletionPadding(10);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100;
 
@@ -438,6 +453,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealCompletionPadding(100);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
         vm.prank(clientAddress);
@@ -452,6 +471,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealCompletionPadding(10);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         uint256 dealAllocationSizeAtTheBottomLimit =
             defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100 - 1;
@@ -471,6 +494,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealCompletionPadding(10);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100 + 1;
 
@@ -496,6 +523,10 @@ contract PoRepMarketTest is Test {
         porepMarekMock.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         porepMarekMock.acceptDeal(dealId);
+        vm.startPrank(validatorAddress);
+        porepMarekMock.updateValidator(dealId);
+        porepMarekMock.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
@@ -517,6 +548,11 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
+
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1));
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
@@ -528,6 +564,11 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
+
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1));
         vm.prank(clientAddress);
@@ -544,6 +585,50 @@ contract PoRepMarketTest is Test {
         address notTheClientAddress = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheClientAddress.selector));
         vm.prank(notTheClientAddress);
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenValidatorNotSet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ValidatorNotSet.selector));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenRailIdIsNotSet() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRailId.selector));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
+    }
+
+    function testCompleteDealRevertsWhenClientHasInsufficientFunds() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
+
+        validatorMock.setInsufficientFunds(300, 100);
+
+        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.expectRevert(abi.encodeWithSelector(ValidatorMock.InsufficientFundsForRail.selector, 300, 100));
+        vm.prank(clientAddress);
         poRepMarket.completeDeal(dealId);
     }
 
@@ -568,6 +653,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
@@ -872,6 +961,10 @@ contract PoRepMarketTest is Test {
 
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
@@ -890,8 +983,10 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        vm.prank(validatorAddress);
+        vm.startPrank(validatorAddress);
         poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
 
         clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);

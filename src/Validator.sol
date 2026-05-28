@@ -141,6 +141,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     /**
      * @notice Error indicating that the provided end epoch is not greater than the current end epoch
+     * @dev 0x45016417
      */
     error EndEpochInThePast();
 
@@ -156,6 +157,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @dev 0xe03f8b0e
      */
     error DealNotCompleted(uint256 dealId);
+
+    /**
+     * @notice Error thrown when client has insufficient funds for the rail
+     * @dev 0x2b2fa9a4
+     */
+    error InsufficientFundsForRail(uint256 required, uint256 actual);
+
+    /**
+     * @notice Error indicating that the caller is not the PoRepMarket contract
+     * @dev 0x86807850
+     */
+    error CallerIsNotPoRepMarket();
 
     /**
      * @notice Error indicating that an invalid rail ID was provided
@@ -513,6 +526,29 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         IPoRepMarket($.poRepMarket).terminateDeal($.dealId, terminator, endEpoch);
         emit RailTerminated(railId, terminator, endEpoch);
+    }
+
+    /**
+     * @notice Verifies that the client has deposited enough funds on FilecoinPay to cover allocations
+     * @dev Only callable by the poRepMarket contract
+     * @param dealId ID of the deal being allocated against
+     * @param allocationsCount Number of allocations of the deal
+     */
+    function verifyClientFunds(uint256 dealId, uint256 allocationsCount) external view {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        if (msg.sender != $.poRepMarket) {
+            revert CallerIsNotPoRepMarket();
+        }
+        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal(dealId);
+        uint256 requiredFunds = dealProposal.terms.pricePerSectorPerMonth * allocationsCount;
+
+        IFilecoinPayV1.RailView memory rail = IFilecoinPayV1($.filecoinPay).getRail($.railId);
+        (,, uint256 availableFunds,) =
+            IFilecoinPayV1($.filecoinPay).getAccountInfoIfSettled(rail.token, dealProposal.client);
+
+        if (availableFunds < requiredFunds) {
+            revert InsufficientFundsForRail(requiredFunds, availableFunds);
+        }
     }
 
     /**
