@@ -20,14 +20,12 @@ interface IPoRepMarket {
      * @notice Proposes a deal
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
-     * @param manifestLocation The location of the manifest for the deal
-     * @param manifestHash Content-addressed hash identifying the deal's data
+     * @param manifestInfo Struct containing the manifest location and hash
      */
     function proposeDeal(
         SLITypes.SLIThresholds calldata requirements,
         SLITypes.DealTerms calldata terms,
-        string calldata manifestLocation,
-        bytes32 manifestHash
+        PoRepTypes.ManifestStruct calldata manifestInfo
     ) external;
 
     /**

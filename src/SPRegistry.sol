@@ -523,39 +523,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         bytes32 manifestHash
     ) external onlyRole(MARKET_ROLE) returns (CommonTypes.FilActorId, bool, address) {
         SPRegistryStorage storage $ = _getSPRegistryStorage();
-        uint256 length = $._providerIds.length();
         EnumerableSet.AddressSet storage manifestGroup = $._organizationsByManifestHash[manifestHash];
-        CommonTypes.FilActorId bestProvider;
-        uint256 lowestPending = type(uint256).max;
-        uint256 bestProviderPrice;
-
-        for (uint256 i = 0; i < length; i++) {
-            uint64 id = uint64($._providerIds.at(i));
-            ProviderData storage p = $._providers[id];
-            if (manifestGroup.contains(p.organization)) continue;
-            if (p.paused || p.blocked) continue;
-
-            {
-                uint256 used = p.committedBytes + p.pendingBytes;
-                uint256 remaining = p.availableBytes > used ? p.availableBytes - used : 0;
-                if (remaining < terms.dealSizeBytes) continue;
-            }
-
-            if (!_meetsRequirements(p.capabilities, requirements)) continue;
-            if (p.minDealDurationDays != 0 && terms.durationDays < p.minDealDurationDays) continue;
-            if (p.maxDealDurationDays != 0 && terms.durationDays > p.maxDealDurationDays) continue;
-            if (p.pendingBytes < lowestPending) {
-                lowestPending = p.pendingBytes;
-                bestProvider = CommonTypes.FilActorId.wrap(id);
-                bestProviderPrice = p.pricePerSectorPerMonth;
-                if (lowestPending == 0) break;
-            }
-        }
-
+        (CommonTypes.FilActorId bestProvider, uint256 bestProviderPrice) =
+            _findBestProvider($, requirements, terms, manifestGroup);
         address organization;
 
-        if (CommonTypes.FilActorId.unwrap(bestProvider) != 0) {
-            uint64 bestId = CommonTypes.FilActorId.unwrap(bestProvider);
+        uint64 bestId = CommonTypes.FilActorId.unwrap(bestProvider);
+        if (bestId != 0) {
             $._providers[bestId].pendingBytes += terms.dealSizeBytes;
             organization = $._providers[bestId].organization;
             manifestGroup.add(organization);
@@ -563,8 +537,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         }
 
         // solhint-disable gas-strict-inequalities
-        bool autoApprove = bestProviderPrice > 0 && CommonTypes.FilActorId.unwrap(bestProvider) != 0
-            && terms.pricePerSectorPerMonth >= bestProviderPrice;
+        bool autoApprove = bestProviderPrice > 0 && bestId != 0 && terms.pricePerSectorPerMonth >= bestProviderPrice;
         // solhint-enable gas-strict-inequalities
 
         return (bestProvider, autoApprove, organization);
@@ -769,6 +742,50 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         emit ProviderRegistered(provider, organization);
     }
+
+    // solhint-disable use-natspec
+    /**
+     * @notice Finds the best provider based on the given requirements and terms
+     * @param $ The SPRegistry storage pointer
+     * @param requirements SLI thresholds the client needs
+     * @param terms Commercial terms (size, price, duration)
+     * @param manifestGroup The set of organizations that have already been considered
+     * @return bestProvider The ID of the best provider found, or FilActorId(0) if none
+     * @return bestProviderPrice The price per sector per month for the best provider
+     */
+    function _findBestProvider(
+        SPRegistryStorage storage $,
+        SLITypes.SLIThresholds calldata requirements,
+        SLITypes.DealTerms calldata terms,
+        EnumerableSet.AddressSet storage manifestGroup
+    ) internal view returns (CommonTypes.FilActorId bestProvider, uint256 bestProviderPrice) {
+        uint256 lowestPending = type(uint256).max;
+        uint256 length = $._providerIds.length();
+        for (uint256 i = 0; i < length; i++) {
+            uint64 id = uint64($._providerIds.at(i));
+            ProviderData storage p = $._providers[id];
+            if (manifestGroup.contains(p.organization)) continue;
+            if (p.paused || p.blocked) continue;
+
+            {
+                uint256 used = p.committedBytes + p.pendingBytes;
+                uint256 remaining = p.availableBytes > used ? p.availableBytes - used : 0;
+                if (remaining < terms.dealSizeBytes) continue;
+            }
+
+            if (!_meetsRequirements(p.capabilities, requirements)) continue;
+            if (p.minDealDurationDays != 0 && terms.durationDays < p.minDealDurationDays) continue;
+            if (p.maxDealDurationDays != 0 && terms.durationDays > p.maxDealDurationDays) continue;
+            if (p.pendingBytes < lowestPending) {
+                lowestPending = p.pendingBytes;
+                bestProvider = CommonTypes.FilActorId.wrap(id);
+                bestProviderPrice = p.pricePerSectorPerMonth;
+                if (lowestPending == 0) break;
+            }
+        }
+    }
+
+    // solhint-enable use-natspec
 
     /**
      * @notice Ensures the caller is a miner controlling address, operator, or admin

@@ -815,14 +815,21 @@
         ]
       },
       {
-        "name": "manifestLocation",
-        "type": "string",
-        "internalType": "string"
-      },
-      {
-        "name": "manifestHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
+        "name": "manifestInfo",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.ManifestStruct",
+        "components": [
+          {
+            "name": "location",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "hash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          }
+        ]
       }
     ],
     "outputs": [],

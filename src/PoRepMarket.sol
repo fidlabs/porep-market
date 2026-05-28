@@ -420,24 +420,23 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Proposes a deal
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
-     * @param manifestLocation The location of the manifest for the deal
-     * @param manifestHash Content-addressed hash identifying the deal's data
+     * @param manifestInfo Struct containing the manifest location and hash
+     *
      */
     function proposeDeal(
         SLITypes.SLIThresholds calldata requirements,
         SLITypes.DealTerms calldata terms,
-        string calldata manifestLocation,
-        bytes32 manifestHash
+        PoRepTypes.ManifestStruct calldata manifestInfo
     ) external {
-        _ensureCorrectManifestLocation(manifestLocation);
-        _ensureCorrectManifestHash(manifestHash);
+        _ensureCorrectManifestLocation(manifestInfo.location);
+        _ensureCorrectManifestHash(manifestInfo.hash);
         _ensureCorrectRequirements(requirements);
         _ensureCorrectTerms(terms);
 
         DealProposalsStorage storage $ = s();
 
         (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
-            $._SPRegistryContract.getProviderForDeal(requirements, terms, manifestHash);
+            $._SPRegistryContract.getProviderForDeal(requirements, terms, manifestInfo.hash);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
         }
@@ -455,8 +454,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             state: initialState,
             railId: 0,
             proposedAtBlock: block.number,
-            manifestLocation: manifestLocation,
-            manifestHash: manifestHash
+            manifestLocation: manifestInfo.location,
+            manifestHash: manifestInfo.hash
         });
 
         emit DealProposalCreated(
@@ -464,8 +463,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             msg.sender,
             provider,
             requirements,
-            manifestLocation,
-            manifestHash,
+            manifestInfo.location,
+            manifestInfo.hash,
             terms.dealSizeBytes,
             block.number
         );
