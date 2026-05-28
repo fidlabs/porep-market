@@ -20,6 +20,7 @@ import {MinerUtils} from "./lib/MinerUtils.sol";
  */
 contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ISPRegistry {
     using EnumerableSet for EnumerableSet.UintSet;
+    using EnumerableSet for EnumerableSet.AddressSet;
 
     /**
      * @notice Role to manage contract upgrades
@@ -74,6 +75,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(address => EnumerableSet.UintSet) _orgProviders;
         mapping(uint64 => ProviderData) _providers;
         uint256 sectorPaddingToleranceBps;
+        mapping(bytes32 manifestHash => EnumerableSet.AddressSet organizations) _organizationsByManifestHash;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SPRegistryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -504,20 +506,25 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @notice Find a provider matching requirements and reserve pending capacity
      * @dev Selects the least-pending eligible provider. Reserves `pendingBytes` atomically
      *      so capacity is held between matching and commitment.
+     *      Skips providers whose organization already serves the same `manifestHash` to
+     *      enforce redundancy across distinct organizations (a single org with multiple
+     *      providers counts as one copy).
      *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
      * @param terms Commercial terms (size, price, duration)
+     * @param manifestHash Hash identifying the deal's data
      * @return provider The matched provider, or FilActorId(0) if none found
      * @return autoApprove True if the provider's price per sector is met by the deal terms
      * @return organization The address of the matched provider
      */
-    function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
-        external
-        onlyRole(MARKET_ROLE)
-        returns (CommonTypes.FilActorId, bool, address)
-    {
+    function getProviderForDeal(
+        SLITypes.SLIThresholds calldata requirements,
+        SLITypes.DealTerms calldata terms,
+        bytes32 manifestHash
+    ) external onlyRole(MARKET_ROLE) returns (CommonTypes.FilActorId, bool, address) {
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 length = $._providerIds.length();
+        EnumerableSet.AddressSet storage manifestGroup = $._organizationsByManifestHash[manifestHash];
         CommonTypes.FilActorId bestProvider;
         uint256 lowestPending = type(uint256).max;
         uint256 bestProviderPrice;
@@ -525,7 +532,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         for (uint256 i = 0; i < length; i++) {
             uint64 id = uint64($._providerIds.at(i));
             ProviderData storage p = $._providers[id];
-
+            if (manifestGroup.contains(p.organization)) continue;
             if (p.paused || p.blocked) continue;
 
             {
@@ -535,10 +542,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             }
 
             if (!_meetsRequirements(p.capabilities, requirements)) continue;
-
             if (p.minDealDurationDays != 0 && terms.durationDays < p.minDealDurationDays) continue;
             if (p.maxDealDurationDays != 0 && terms.durationDays > p.maxDealDurationDays) continue;
-
             if (p.pendingBytes < lowestPending) {
                 lowestPending = p.pendingBytes;
                 bestProvider = CommonTypes.FilActorId.wrap(id);
@@ -553,6 +558,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             uint64 bestId = CommonTypes.FilActorId.unwrap(bestProvider);
             $._providers[bestId].pendingBytes += terms.dealSizeBytes;
             organization = $._providers[bestId].organization;
+            manifestGroup.add(organization);
             emit PendingCapacityReserved(bestProvider, terms.dealSizeBytes);
         }
 
@@ -565,19 +571,27 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+        external
+        onlyRole(MARKET_ROLE)
+    {
         _ensureProviderRegistered(provider);
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
-        uint256 committed = $._providers[CommonTypes.FilActorId.unwrap(provider)].committedBytes;
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        uint256 committed = $._providers[id].committedBytes;
         if (sizeBytes > committed) revert ReleaseExceedsCommitted(provider, sizeBytes, committed);
-        $._providers[CommonTypes.FilActorId.unwrap(provider)].committedBytes = committed - sizeBytes;
+        $._providers[id].committedBytes = committed - sizeBytes;
+        $._organizationsByManifestHash[manifestHash].remove($._providers[id].organization);
 
         emit CapacityReleased(provider, sizeBytes);
     }
 
     /// @inheritdoc ISPRegistry
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+        external
+        onlyRole(MARKET_ROLE)
+    {
         _ensureProviderRegistered(provider);
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
@@ -585,6 +599,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 pending = $._providers[id].pendingBytes;
         if (sizeBytes > pending) revert ReleasePendingExceedsPending(provider, sizeBytes, pending);
         $._providers[id].pendingBytes = pending - sizeBytes;
+        $._organizationsByManifestHash[manifestHash].remove($._providers[id].organization);
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }

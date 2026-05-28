@@ -228,6 +228,11 @@
             "internalType": "uint32"
           }
         ]
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [
@@ -631,6 +636,11 @@
         "name": "sizeBytes",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -649,6 +659,11 @@
         "name": "sizeBytes",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],

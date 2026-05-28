@@ -232,6 +232,11 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
+          },
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -355,6 +360,11 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
+          },
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -472,6 +482,11 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
+          },
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
       }
@@ -587,8 +602,32 @@
             "name": "manifestLocation",
             "type": "string",
             "internalType": "string"
+          },
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getManifestHash",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "stateMutability": "view"
@@ -779,6 +818,11 @@
         "name": "manifestLocation",
         "type": "string",
         "internalType": "string"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -1163,6 +1207,12 @@
         "type": "string",
         "indexed": false,
         "internalType": "string"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
       },
       {
         "name": "totalDealSize",
@@ -1555,6 +1605,11 @@
   {
     "type": "error",
     "name": "ERC1967NonPayable",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "EmptyManifestHash",
     "inputs": []
   },
   {

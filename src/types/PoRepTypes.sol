@@ -44,6 +44,7 @@ library PoRepTypes {
      *      railId: ID of the payment rail associated with the deal
      *      proposedAtBlock: Block number when the deal was proposed
      *      manifestLocation: Location of the deal manifest
+     *      manifestHash: Content-addressed hash identifying the deal's data
      */
     struct DealProposal {
         uint256 dealId;
@@ -56,5 +57,6 @@ library PoRepTypes {
         uint256 railId;
         uint256 proposedAtBlock;
         string manifestLocation;
+        bytes32 manifestHash;
     }
 }
