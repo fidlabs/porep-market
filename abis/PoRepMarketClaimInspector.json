@@ -43,7 +43,7 @@
   },
   {
     "type": "function",
-    "name": "getClaims",
+    "name": "getClaimForDeal",
     "inputs": [
       {
         "name": "dealId",

@@ -3,7 +3,7 @@
 pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
-import {DealInspector} from "../src/helpers/DealInspector.sol";
+import {PoRepMarketClaimInspector} from "../src/helpers/PoRepMarketClaimInspector.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {ActorIdMock} from "./contracts/ActorIdMock.sol";
@@ -15,7 +15,7 @@ import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 
-contract DealInspectorTest is Test {
+contract PoRepMarketClaimInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
 
     address public clientAddress;
@@ -26,7 +26,7 @@ contract DealInspectorTest is Test {
     CommonTypes.FilActorId public SP1 = CommonTypes.FilActorId.wrap(uint64(10000));
     // solhint-enable var-name-mixedcase
 
-    DealInspector public dealInspector;
+    PoRepMarketClaimInspector public porepMarketClaimInspector;
     ActorIdMock public actorIdMock;
     PoRepMarketMock public poRepMarketMock;
     ClientSCMock public clientSCMock;
@@ -75,37 +75,37 @@ contract DealInspectorTest is Test {
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
         clientSCMock.setAllocationIds(dealId, ids);
 
-        dealInspector = new DealInspector(address(clientSCMock), address(poRepMarketMock));
+        porepMarketClaimInspector = new PoRepMarketClaimInspector(address(clientSCMock), address(poRepMarketMock));
     }
 
     function testConstructorSetsContractAddresses() public view {
-        assertEq(address(dealInspector.CLIENT_CONTRACT()), address(clientSCMock));
-        assertEq(address(dealInspector.POREPMARKET_CONTRACT()), address(poRepMarketMock));
+        assertEq(address(porepMarketClaimInspector.CLIENT_CONTRACT()), address(clientSCMock));
+        assertEq(address(porepMarketClaimInspector.POREPMARKET_CONTRACT()), address(poRepMarketMock));
     }
 
     function testConstructorRevertsWhenClientContractAddressIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(DealInspector.InvalidClientAddress.selector));
-        new DealInspector(address(0), address(poRepMarketMock));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidClientAddress.selector));
+        new PoRepMarketClaimInspector(address(0), address(poRepMarketMock));
     }
 
     function testConstructorRevertsWhenPoRepMarketContractAddressIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(DealInspector.InvalidPoRepMarketAddress.selector));
-        new DealInspector(address(clientSCMock), address(0));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidPoRepMarketAddress.selector));
+        new PoRepMarketClaimInspector(address(clientSCMock), address(0));
     }
 
     function testConstructorRevertsWhenBothAddressesAreZero() public {
-        vm.expectRevert(abi.encodeWithSelector(DealInspector.InvalidClientAddress.selector));
-        new DealInspector(address(0), address(0));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidClientAddress.selector));
+        new PoRepMarketClaimInspector(address(0), address(0));
     }
 
     function testGetClaimsRevertsWhenDealIdIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(DealInspector.InvalidDealId.selector));
-        dealInspector.getClaims(0);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidDealId.selector));
+        porepMarketClaimInspector.getClaimForDeal(0);
     }
 
     function testGetClaimsReturnsSingleClaim() public view {
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaims(dealId);
+            porepMarketClaimInspector.getClaimForDeal(dealId);
 
         assertEq(claims.length, 1);
         assertEq(claimIds.length, 1);
@@ -129,7 +129,7 @@ contract DealInspectorTest is Test {
         clientSCMock.setAllocationIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaims(dealId);
+            porepMarketClaimInspector.getClaimForDeal(dealId);
 
         assertEq(claims.length, 2);
         assertEq(claimIds.length, 2);
@@ -150,7 +150,7 @@ contract DealInspectorTest is Test {
         clientSCMock.setAllocationIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaims(dealId);
+            porepMarketClaimInspector.getClaimForDeal(dealId);
 
         assertEq(claims.length, 0);
         assertEq(claimIds.length, 0);
@@ -167,7 +167,7 @@ contract DealInspectorTest is Test {
         clientSCMock.setAllocationIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaims(dealId);
+            porepMarketClaimInspector.getClaimForDeal(dealId);
 
         assertEq(claims.length, 1);
         assertEq(claimIds.length, 1);
@@ -178,8 +178,8 @@ contract DealInspectorTest is Test {
         ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
         vm.etch(CALL_ACTOR_ID, address(failing).code);
 
-        vm.expectRevert(DealInspector.GetClaimsCallFailed.selector);
-        dealInspector.getClaims(dealId);
+        vm.expectRevert(PoRepMarketClaimInspector.GetClaimsCallFailed.selector);
+        porepMarketClaimInspector.getClaimForDeal(dealId);
     }
 
     function testGetClaimsRevertsOnClaimIdsMismatch() public {
@@ -191,8 +191,8 @@ contract DealInspectorTest is Test {
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
         clientSCMock.setAllocationIds(dealId, ids);
 
-        vm.expectRevert(abi.encodeWithSelector(DealInspector.ClaimIdsMismatch.selector, 2, 1));
-        dealInspector.getClaims(dealId);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.ClaimIdsMismatch.selector, 2, 1));
+        porepMarketClaimInspector.getClaimForDeal(dealId);
     }
 
     function testGetClaimsUsesProviderFromDealProposal() public {
@@ -216,7 +216,7 @@ contract DealInspectorTest is Test {
         );
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaims(dealId);
+            porepMarketClaimInspector.getClaimForDeal(dealId);
         assertEq(claims.length, 1);
         assertEq(claimIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 1);
@@ -247,7 +247,7 @@ contract DealInspectorTest is Test {
         clientSCMock.setAllocationIds(secondDealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaims(secondDealId);
+            porepMarketClaimInspector.getClaimForDeal(secondDealId);
         assertEq(claims.length, 1);
         assertEq(claimIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 7);
@@ -259,7 +259,7 @@ contract DealInspectorTest is Test {
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaimsForProvider(SP1, ids);
+            porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
 
         assertEq(claims.length, 1);
         assertEq(claimIds.length, 1);
@@ -282,7 +282,7 @@ contract DealInspectorTest is Test {
         ids[1] = CommonTypes.FilActorId.wrap(uint64(2));
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaimsForProvider(SP1, ids);
+            porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
 
         assertEq(claims.length, 2);
         assertEq(claimIds.length, 2);
@@ -302,7 +302,7 @@ contract DealInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](0);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaimsForProvider(SP1, ids);
+            porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
 
         assertEq(claims.length, 0);
         assertEq(claimIds.length, 0);
@@ -318,7 +318,7 @@ contract DealInspectorTest is Test {
         ids[1] = CommonTypes.FilActorId.wrap(uint64(20));
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
-            dealInspector.getClaimsForProvider(SP1, ids);
+            porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
 
         assertEq(claims.length, 1);
         assertEq(claimIds.length, 1);
@@ -332,8 +332,8 @@ contract DealInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
 
-        vm.expectRevert(DealInspector.GetClaimsCallFailed.selector);
-        dealInspector.getClaimsForProvider(SP1, ids);
+        vm.expectRevert(PoRepMarketClaimInspector.GetClaimsCallFailed.selector);
+        porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
     }
 
     function testGetClaimsForProviderRevertsOnClaimIdsMismatch() public {
@@ -344,7 +344,7 @@ contract DealInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
 
-        vm.expectRevert(abi.encodeWithSelector(DealInspector.ClaimIdsMismatch.selector, 2, 1));
-        dealInspector.getClaimsForProvider(SP1, ids);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.ClaimIdsMismatch.selector, 2, 1));
+        porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
     }
 }
