@@ -39,8 +39,8 @@ interface IValidator {
     /**
      * @notice Verifies that the client has deposited enough funds on FilecoinPay to cover allocations
      * @dev Only callable by the poRepMarket contract
-     * @param dealId ID of the deal being allocated against
-     * @param allocationsCount Number of allocations of the deal
+     * @param client Address of the client
+     * @param requiredFunds The amount of funds required to cover the allocations
      */
-    function verifyClientFunds(uint256 dealId, uint256 allocationsCount) external view;
+    function verifyClientFunds(address client, uint256 requiredFunds) external view;
 }

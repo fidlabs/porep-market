@@ -364,12 +364,12 @@
     "name": "verifyClientFunds",
     "inputs": [
       {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "name": "allocationsCount",
+        "name": "requiredFunds",
         "type": "uint256",
         "internalType": "uint256"
       }

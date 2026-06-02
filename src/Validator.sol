@@ -531,24 +531,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     /**
      * @notice Verifies that the client has deposited enough funds on FilecoinPay to cover allocations
      * @dev Only callable by the poRepMarket contract
-     * @param dealId ID of the deal being allocated against
-     * @param allocationsCount Number of allocations of the deal
+     * @param client Address of the client
+     * @param requiredFunds The amount of funds required to cover the allocations
      */
-    function verifyClientFunds(uint256 dealId, uint256 allocationsCount) external view {
+    function verifyClientFunds(address client, uint256 requiredFunds) external view {
         ValidatorStorage storage $ = _getValidatorStorage();
-        if (msg.sender != $.poRepMarket) {
-            revert CallerIsNotPoRepMarket();
-        }
-        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal(dealId);
-        uint256 requiredFunds = dealProposal.terms.pricePerSectorPerMonth * allocationsCount;
-
+        if (msg.sender != $.poRepMarket) revert CallerIsNotPoRepMarket();
         IFilecoinPayV1.RailView memory rail = IFilecoinPayV1($.filecoinPay).getRail($.railId);
-        (,, uint256 availableFunds,) =
-            IFilecoinPayV1($.filecoinPay).getAccountInfoIfSettled(rail.token, dealProposal.client);
-
-        if (availableFunds < requiredFunds) {
-            revert InsufficientFundsForRail(requiredFunds, availableFunds);
-        }
+        (,, uint256 availableFunds,) = IFilecoinPayV1($.filecoinPay).getAccountInfoIfSettled(rail.token, client);
+        if (availableFunds < requiredFunds) revert InsufficientFundsForRail(requiredFunds, availableFunds);
     }
 
     /**

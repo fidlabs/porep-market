@@ -561,7 +561,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
 
         uint256 allocationsCount = $._clientSmartContract.getClientAllocationIdsPerDeal(dealId).length;
-        IValidator(dp.validator).verifyClientFunds(dealId, allocationsCount);
+        uint256 requiredFunds = dp.terms.pricePerSectorPerMonth * allocationsCount;
+        IValidator(dp.validator).verifyClientFunds(dp.client, requiredFunds);
 
         $._dealIdsReadyForPayment.add(dealId);
         $._SPRegistryContract.commitCapacity(dp.provider, proposedSize, allocatedSize);

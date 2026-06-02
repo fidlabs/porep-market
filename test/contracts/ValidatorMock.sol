@@ -26,7 +26,7 @@ contract ValidatorMock {
         mockAvailableFunds = available;
     }
 
-    function verifyClientFunds(uint256, uint256) external view {
+    function verifyClientFunds(address, uint256) external view {
         if (shouldRevertVerifyClientFunds) {
             revert InsufficientFundsForRail(mockRequiredFunds, mockAvailableFunds);
         }

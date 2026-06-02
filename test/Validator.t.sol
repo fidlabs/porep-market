@@ -820,7 +820,7 @@ contract ValidatorTest is Test {
 
     function testVerifyClientFundsRevertsWhenCallerIsNotPoRepMarket() public {
         vm.expectRevert(Validator.CallerIsNotPoRepMarket.selector);
-        validator.verifyClientFunds(dealId, 1);
+        validator.verifyClientFunds(admin, 200);
     }
 
     function testVerifyClientFundsRevertsWhenNotEnoughFunds() public {
@@ -828,13 +828,13 @@ contract ValidatorTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(Validator.InsufficientFundsForRail.selector, 200, 100));
         vm.prank(address(poRepMarketMock));
-        validator.verifyClientFunds(dealId, 2);
+        validator.verifyClientFunds(admin, 200);
     }
 
     function testVerifyClientFundsPassesWhenFundsExactlyRequired() public {
         filecoinPayMock.setAccount(token, admin, 200, 0, 0, 0);
 
         vm.prank(address(poRepMarketMock));
-        validator.verifyClientFunds(dealId, 2);
+        validator.verifyClientFunds(admin, 200);
     }
 }
