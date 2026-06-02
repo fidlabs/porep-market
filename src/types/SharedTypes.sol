@@ -1,0 +1,152 @@
+// SPDX-License-Identifier: MIT
+pragma solidity =0.8.30;
+
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+
+/**
+ * @title Shared Types
+ * @notice Common types used across multiple PoRepMarket contracts
+ */
+library SharedTypes {
+    /**
+     * @notice Number of epochs in one day
+     * @dev 24 hours/day * 60 minutes/hour * 2 epochs/minute = 2_880 epochs
+     */
+    uint256 internal constant EPOCHS_IN_DAY = 2_880;
+
+    uint256 internal constant EPOCHS_IN_MONTH = EPOCHS_IN_DAY * 30;
+
+    /**
+     * @notice Unified SLI thresholds for requirements, capabilities, and attestations
+     * @dev STRUCT EXTENSION PROTOCOL:
+     *      - This struct may be extended by appending new fields
+     *      - New fields MUST be added at the end only
+     *      - Field value of 0 means "do not evaluate this dimension"
+     *      - Existing field order and types MUST NOT change
+     *      - Contracts MUST handle 0 values as "don't care" in comparisons
+     *
+     * @dev Storage compatibility:
+     *      - Old data reads 0 for new fields (uninitialized storage)
+     *      - Old deals automatically skip new SLI dimensions
+     *
+     * @dev Extension example:
+     *      V1: { retrievabilityBps, bandwidthBytesPerSecond, latencyMs }
+     *      V2: { retrievabilityBps, bandwidthBytesPerSecond, latencyMs, indexingPct }
+     */
+    // forge-lint: disable-next-line(pascal-case-struct)
+    struct SLIThresholds {
+        /// @dev Valid range: 0-10000 (basis points, e.g. 7550 = 75.50%). 0 means "don't care".
+        uint16 retrievabilityBps;
+        /// @dev Capped at ~64 Gbps
+        uint16 bandwidthBytesPerSecond;
+        uint16 latencyMs;
+        /// @dev Valid range: 0-100. 0 means "don't care".
+        uint8 indexingPct;
+    }
+
+    /**
+     * @notice DealRequest struct represents the client's request for a storage deal
+     * @param pieceSetCommitment commitment for piece set
+     * @param requestedSizeBytes requested data size in bytes
+     * @param maxPricePer32GiBPerMonth maximum price per 32GiB per month
+     * @param manifestLocation location of the deal manifest
+     * @param paymentToken token used for payments
+     * @param durationDays requested deal duration in days
+     * @param requiredSLIs required service-level indicators
+     */
+    struct DealRequest {
+        bytes32 pieceSetCommitment;
+        uint256 requestedSizeBytes;
+        uint256 maxPricePer32GiBPerMonth;
+        string manifestLocation;
+        address paymentToken;
+        uint32 durationDays; // Client-facing input; converted once before storage
+        SLIThresholds requiredSLIs;
+    }
+
+    /**
+     * @notice OfferSelection struct represents the provider's selection of an offer
+     * @dev Selection is offer-centric. The market resolves provider/payee and freezes them into the deal snapshot
+     * @param offerId ID of the selected offer
+     * @param paymentToken token used for payments
+     * @param pricePer32GiBPerMonth price per 32GiB per month
+     * @param promisedSLIs service-level indicators promised by the provider
+     */
+    struct OfferSelection {
+        uint256 offerId;
+        address paymentToken;
+        uint256 pricePer32GiBPerMonth;
+        SLIThresholds promisedSLIs;
+    }
+
+    /**
+     * @notice DealData struct represents the data associated with a deal
+     * @param pieceSetCommitment commitment for piece set
+     * @param manifestLocation URL or path for humans/tools; contracts do not fetch or trust it.
+     */
+    struct DealData {
+        bytes32 pieceSetCommitment;
+        // URL or path for humans/tools; contracts do not fetch or trust it.
+        string manifestLocation;
+    }
+
+    /**
+     * @notice ActivationContext struct represents the context for deal activation
+     * @param dealId ID of the deal
+     * @param requestedSizeBytes requested data size in bytes
+     * @param pieceSetCommitment commitment for piece set
+     * @param client address of the client
+     * @param durationEpochs requested deal duration in epochs
+     * @param activationToleranceBps activation tolerance in basis points
+     * @param provider ID of the provider
+     */
+    struct ActivationContext {
+        uint256 dealId;
+        uint256 requestedSizeBytes;
+        bytes32 pieceSetCommitment;
+        address client;
+        uint64 durationEpochs;
+        uint16 activationToleranceBps;
+        CommonTypes.FilActorId provider;
+    }
+
+    /**
+     * @notice ActivationDecision struct represents the decision for deal activation
+     * @param coveredBytes accepted bytes from adapter-checked allocation/claim evidence
+     * @param reasonCode code representing the reason for the decision
+     * @param result activation result code
+     */
+    struct ActivationDecision {
+        uint256 coveredBytes;
+        uint16 reasonCode;
+        uint8 result;
+    }
+
+    /**
+     * @notice EvidenceStatus struct represents the status of evidence for a deal
+     * @param activeCoveredBytes currently active bytes from adapter-checked evidence
+     * @param lastEvidenceRefreshEpoch epoch of the last evidence refresh
+     * @param reasonCode code representing the reason for the current status
+     * @param result current result code based on submitted evidence
+     */
+    struct EvidenceStatus {
+        uint256 activeCoveredBytes;
+        CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
+        uint16 reasonCode;
+        uint8 result;
+    }
+
+    /**
+     * @notice SettlementDecision struct represents the decision for deal settlement
+     * @param settlementAmount amount to be settled based on evidence and deal terms
+     * @param settleUptoEpoch epoch up to which the settlement is calculated
+     * @param reasonCode code representing the reason for the settlement decision
+     * @param result settlement result code
+     */
+    struct SettlementDecision {
+        uint256 settlementAmount;
+        CommonTypes.ChainEpoch settleUptoEpoch;
+        uint16 reasonCode;
+        uint8 result;
+    }
+}
