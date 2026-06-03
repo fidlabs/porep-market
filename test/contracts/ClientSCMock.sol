@@ -39,6 +39,10 @@ contract ClientSCMock {
         return allocationIds[dealId];
     }
 
+    function getClientAllocationCountPerDeal(uint256 dealId) external view returns (uint256) {
+        return allocationIds[dealId].length;
+    }
+
     function setDeal(Client.Deal memory deal) external {
         deals[deal.dealId] = deal;
     }

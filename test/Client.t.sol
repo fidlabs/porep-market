@@ -1317,4 +1317,12 @@ contract ClientTest is Test {
         vm.expectRevert(abi.encodeWithSelector(Client.InvalidAllocationSize.selector));
         clientMock.rescueDealAllocations(dealId, params);
     }
+
+    function testGetClientAllocationCountPerDealReturnsLength() public {
+        vm.prank(clientAddress);
+        client.transfer(transferParams, dealId);
+
+        CommonTypes.FilActorId[] memory ids = client.getClientAllocationIdsPerDeal(dealId);
+        assertEq(client.getClientAllocationCountPerDeal(dealId), ids.length);
+    }
 }
