@@ -46,7 +46,7 @@ library SharedTypes {
 
     /**
      * @notice DealRequest struct represents the client's request for a storage deal
-     * @param pieceSetCommitment commitment for piece set
+     * @param manifestHash commitment for piece set
      * @param requestedSizeBytes requested data size in bytes
      * @param maxPricePer32GiBPerMonth maximum price per 32GiB per month
      * @param manifestLocation location of the deal manifest
@@ -55,7 +55,7 @@ library SharedTypes {
      * @param requiredSLIs required service-level indicators
      */
     struct DealRequest {
-        bytes32 pieceSetCommitment;
+        bytes32 manifestHash;
         uint256 requestedSizeBytes;
         uint256 maxPricePer32GiBPerMonth;
         string manifestLocation;
@@ -81,11 +81,11 @@ library SharedTypes {
 
     /**
      * @notice DealData struct represents the data associated with a deal
-     * @param pieceSetCommitment commitment for piece set
+     * @param manifestHash commitment for piece set
      * @param manifestLocation URL or path for humans/tools; contracts do not fetch or trust it.
      */
     struct DealData {
-        bytes32 pieceSetCommitment;
+        bytes32 manifestHash;
         // URL or path for humans/tools; contracts do not fetch or trust it.
         string manifestLocation;
     }
@@ -94,7 +94,6 @@ library SharedTypes {
      * @notice ActivationContext struct represents the context for deal activation
      * @param dealId ID of the deal
      * @param requestedSizeBytes requested data size in bytes
-     * @param pieceSetCommitment commitment for piece set
      * @param client address of the client
      * @param durationEpochs requested deal duration in epochs
      * @param activationToleranceBps activation tolerance in basis points
@@ -103,7 +102,6 @@ library SharedTypes {
     struct ActivationContext {
         uint256 dealId;
         uint256 requestedSizeBytes;
-        bytes32 pieceSetCommitment;
         address client;
         uint64 durationEpochs;
         uint16 activationToleranceBps;
