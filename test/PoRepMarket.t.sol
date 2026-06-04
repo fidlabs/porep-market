@@ -697,7 +697,11 @@ contract PoRepMarketTest is Test {
 
     function testCompleteDealRevertsWhenValidatorNotSet() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        poRepMarket.proposeDeal(
+            defaultRequirements,
+            defaultTerms,
+            PoRepTypes.ManifestStruct({location: expectedManifestLocation, hash: expectedManifestHash})
+        );
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
@@ -709,7 +713,11 @@ contract PoRepMarketTest is Test {
 
     function testCompleteDealRevertsWhenRailIdIsNotSet() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        poRepMarket.proposeDeal(
+            defaultRequirements,
+            defaultTerms,
+            PoRepTypes.ManifestStruct({location: expectedManifestLocation, hash: expectedManifestHash})
+        );
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
@@ -723,7 +731,11 @@ contract PoRepMarketTest is Test {
 
     function testCompleteDealRevertsWhenClientHasInsufficientFunds() public {
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        poRepMarket.proposeDeal(
+            defaultRequirements,
+            defaultTerms,
+            PoRepTypes.ManifestStruct({location: expectedManifestLocation, hash: expectedManifestHash})
+        );
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.startPrank(validatorAddress);
