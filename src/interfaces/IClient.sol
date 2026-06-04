@@ -56,6 +56,13 @@ interface IClient {
     function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory);
 
     /**
+     * @notice custom getter to retrieve allocation count per deal
+     * @param dealId the id of the deal
+     * @return count the number of allocations for the deal
+     */
+    function getClientAllocationCountPerDeal(uint256 dealId) external view returns (uint256);
+
+    /**
      * @notice custom getter to check if claim is terminated
      * @param claimId the id of the claim
      * @return isTerminated whether the claim is terminated

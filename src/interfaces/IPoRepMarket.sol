@@ -57,6 +57,8 @@ interface IPoRepMarket {
 
     /**
      * @notice Completes a deal
+     * @dev Verifies that that the allocated size for the deal is within the allowed tolerance of the proposed size
+     *      and that the client has sufficient funds deposited in FilecoinPay to cover the deal
      * @param dealId The id of the deal proposal
      */
     function completeDeal(uint256 dealId) external;

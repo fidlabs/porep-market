@@ -84,6 +84,25 @@
   },
   {
     "type": "function",
+    "name": "getClientAllocationCountPerDeal",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getClientAllocationIdsPerDeal",
     "inputs": [
       {

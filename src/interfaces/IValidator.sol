@@ -35,4 +35,12 @@ interface IValidator {
      * @return minTimeBetweenSettlementsInEpochs Minimum time between settlements in epochs
      */
     function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs);
+
+    /**
+     * @notice Verifies that the client has deposited enough funds on FilecoinPay to cover allocations
+     * @dev Only callable by the poRepMarket contract
+     * @param client Address of the client
+     * @param requiredFunds The amount of funds required to cover the allocations
+     */
+    function verifyClientFunds(address client, uint256 requiredFunds) external view;
 }
