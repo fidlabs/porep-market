@@ -20,12 +20,12 @@ interface IPoRepMarket {
      * @notice Proposes a deal
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
-     * @param manifestLocation The location of the manifest for the deal
+     * @param manifestInfo Struct containing the manifest location and hash
      */
     function proposeDeal(
         SLITypes.SLIThresholds calldata requirements,
         SLITypes.DealTerms calldata terms,
-        string calldata manifestLocation
+        PoRepTypes.ManifestStruct calldata manifestInfo
     ) external;
 
     /**
@@ -97,6 +97,13 @@ interface IPoRepMarket {
      * @return manifestLocation The manifest location URL for a specific deal proposal
      */
     function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation);
+
+    /**
+     * @notice Retrieves the manifest hash for a specific deal proposal
+     * @param dealId The unique identifier of the deal proposal
+     * @return manifestHash The content-addressed hash of the deal's data
+     */
+    function getManifestHash(uint256 dealId) external view returns (bytes32 manifestHash);
 
     /**
      * @notice Updates the manifest location for a specific deal proposal

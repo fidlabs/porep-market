@@ -32,6 +32,17 @@ library PoRepTypes {
     }
 
     /**
+     * @notice ManifestStruct struct
+     * @dev Represents the manifest of a deal, including its location and content hash
+     *    location: URL path where the manifest can be accessed
+     *    hash: Content-addressed hash identifying the deal's data
+     */
+    struct ManifestStruct {
+        string location;
+        bytes32 hash;
+    }
+
+    /**
      * @notice DealProposal struct
      * @dev Represents a proposal for a PoRep deal, including all relevant details and terms
      *      dealId: Unique identifier for the deal
@@ -44,6 +55,7 @@ library PoRepTypes {
      *      railId: ID of the payment rail associated with the deal
      *      proposedAtBlock: Block number when the deal was proposed
      *      manifestLocation: Location of the deal manifest
+     *      manifestHash: Content-addressed hash identifying the deal's data
      */
     struct DealProposal {
         uint256 dealId;
@@ -56,5 +68,6 @@ library PoRepTypes {
         uint256 railId;
         uint256 proposedAtBlock;
         string manifestLocation;
+        bytes32 manifestHash;
     }
 }

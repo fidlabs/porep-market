@@ -103,6 +103,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param provider The address of the provider
      * @param requirements The SLI thresholds for the deal
      * @param manifestLocation The location of the manifest for the deal
+     * @param manifestHash Content-addressed hash identifying the deal's data
      * @param totalDealSize The total size of the deal in bytes
      * @param proposedAtBlock The block number when the deal was proposed
      */
@@ -112,6 +113,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         CommonTypes.FilActorId indexed provider,
         SLITypes.SLIThresholds requirements,
         string manifestLocation,
+        bytes32 manifestHash,
         uint256 totalDealSize,
         uint256 proposedAtBlock
     );
@@ -297,6 +299,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error TooLongManifestLocation();
 
     /**
+     * @notice Error thrown when zero manifest hash is provided
+     * @dev 0x46829b85
+     */
+    error EmptyManifestHash();
+
+    /**
      * @notice Error thrown when trying to set an invalid client smart contract address
      * @dev 0x39ee49ba
      */
@@ -407,25 +415,28 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         emit ClientSmartContractUpdated(_clientSmartContract);
     }
 
+    // solhint-disable function-max-lines
     /**
      * @notice Proposes a deal
      * @param requirements The SLI thresholds for the deal
      * @param terms The commercial terms for the deal
-     * @param manifestLocation The location of the manifest for the deal
+     * @param manifestInfo Struct containing the manifest location and hash
+     *
      */
     function proposeDeal(
         SLITypes.SLIThresholds calldata requirements,
         SLITypes.DealTerms calldata terms,
-        string calldata manifestLocation
+        PoRepTypes.ManifestStruct calldata manifestInfo
     ) external {
-        _ensureCorrectManifestLocation(manifestLocation);
+        _ensureCorrectManifestLocation(manifestInfo.location);
+        _ensureCorrectManifestHash(manifestInfo.hash);
         _ensureCorrectRequirements(requirements);
         _ensureCorrectTerms(terms);
 
         DealProposalsStorage storage $ = s();
 
         (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
-            $._SPRegistryContract.getProviderForDeal(requirements, terms);
+            $._SPRegistryContract.getProviderForDeal(requirements, terms, manifestInfo.hash);
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
         }
@@ -443,11 +454,19 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             state: initialState,
             railId: 0,
             proposedAtBlock: block.number,
-            manifestLocation: manifestLocation
+            manifestLocation: manifestInfo.location,
+            manifestHash: manifestInfo.hash
         });
 
         emit DealProposalCreated(
-            dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes, block.number
+            dealId,
+            msg.sender,
+            provider,
+            requirements,
+            manifestInfo.location,
+            manifestInfo.hash,
+            terms.dealSizeBytes,
+            block.number
         );
 
         $._dealOrganization[dealId] = organization;
@@ -457,6 +476,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             emit DealAccepted(dealId, msg.sender, provider);
         }
     }
+
+    // solhint-enable function-max-lines
 
     /**
      * @notice Updates the validator for a deal proposal
@@ -589,7 +610,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes, dp.manifestHash);
         $._dealIdsReadyForPayment.remove(dealId);
 
         _changeDealState(dealId, PoRepTypes.DealState.Terminated);
@@ -614,7 +635,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes, dp.manifestHash);
         _changeDealState(dealId, PoRepTypes.DealState.Rejected);
         emit DealRejected(dealId, msg.sender);
     }
@@ -635,7 +656,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert DealNotRejectable(dealId);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes, dp.manifestHash);
         _changeDealState(dealId, PoRepTypes.DealState.Rejected);
         emit DealRejected(dealId, msg.sender);
     }
@@ -661,7 +682,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         // solhint-enable  gas-strict-inequalities
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes, dp.manifestHash);
         _changeDealState(dealId, PoRepTypes.DealState.Rejected);
         emit DealProposalExpired(dealId, block.number);
     }
@@ -782,6 +803,18 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
         _ensureDealExists(dealProposal);
         return dealProposal.manifestLocation;
+    }
+
+    /**
+     * @notice Retrieves the manifest hash for a specific deal proposal
+     * @param dealId The unique identifier of the deal proposal
+     * @return manifestHash The content-addressed hash of the deal's data
+     */
+    function getManifestHash(uint256 dealId) external view returns (bytes32 manifestHash) {
+        DealProposalsStorage storage $ = s();
+        PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+        return dealProposal.manifestHash;
     }
 
     /**
@@ -940,6 +973,16 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         if (bytes(manifestLocation).length > 2048) {
             revert TooLongManifestLocation();
+        }
+    }
+
+    /**
+     * @notice Ensures the manifest hash is non-zero
+     * @param manifestHash The manifest hash for the deal
+     */
+    function _ensureCorrectManifestHash(bytes32 manifestHash) internal pure {
+        if (manifestHash == bytes32(0)) {
+            revert EmptyManifestHash();
         }
     }
 

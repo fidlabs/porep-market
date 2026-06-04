@@ -19,7 +19,7 @@ contract SPRegistryMock is ISPRegistry {
 
     // ============ Implemented Functions ============
 
-    function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
+    function getProviderForDeal(SLITypes.SLIThresholds calldata, SLITypes.DealTerms calldata, bytes32)
         external
         view
         returns (CommonTypes.FilActorId, bool, address)
@@ -78,8 +78,8 @@ contract SPRegistryMock is ISPRegistry {
         _providerInfos[CommonTypes.FilActorId.unwrap(provider)] = info;
     }
 
-    function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
-    function releasePendingCapacity(CommonTypes.FilActorId, uint256) external {}
+    function releaseCapacity(CommonTypes.FilActorId, uint256, bytes32) external {}
+    function releasePendingCapacity(CommonTypes.FilActorId, uint256, bytes32) external {}
     function commitCapacity(CommonTypes.FilActorId, uint256, uint256) external {}
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}

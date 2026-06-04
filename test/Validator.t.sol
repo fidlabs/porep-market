@@ -42,6 +42,7 @@ contract ValidatorTest is Test {
     uint256 public dealId;
     uint256 public railId;
     string public expectedManifestLocation;
+    bytes32 public expectedManifestHash;
 
     SLITypes.SLIThresholds public defaultRequirements;
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
@@ -63,6 +64,7 @@ contract ValidatorTest is Test {
         dealId = 1;
         railId = 1;
         expectedManifestLocation = "https://example.com/manifest";
+        expectedManifestHash = keccak256("test-manifest");
 
         defaultRequirements =
             SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
@@ -79,7 +81,8 @@ contract ValidatorTest is Test {
                 state: PoRepTypes.DealState.Proposed,
                 railId: railId,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
 

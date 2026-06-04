@@ -75,6 +75,7 @@ contract ClientTest is Test {
     uint64[] public earlyTerminatedClaims = new uint64[](0);
 
     string public expectedManifestLocation = "https://example.com/manifest";
+    bytes32 public expectedManifestHash = keccak256("test-manifest");
 
     // solhint-disable-next-line function-max-lines
     function setUp() public {
@@ -135,7 +136,8 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
         metaAllocatorMock.setAllowance(address(client), uint256(10000));
@@ -663,7 +665,8 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Completed,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
 
@@ -797,7 +800,8 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
         vm.prank(clientAddress);
@@ -841,7 +845,8 @@ contract ClientTest is Test {
                 validator: address(validatorMock),
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
         reentrantMetaAllocatorMock.setAttackParams(address(clientWithReentrancy), transferParams, dealId);
@@ -877,7 +882,8 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
         // solhint-disable-next-line reentrancy
@@ -1127,7 +1133,8 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
 
@@ -1258,7 +1265,8 @@ contract ClientTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                manifestHash: expectedManifestHash
             })
         );
 

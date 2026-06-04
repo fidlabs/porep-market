@@ -62,32 +62,45 @@ interface ISPRegistry {
      * @notice Find a provider matching requirements and reserve pending capacity
      * @dev Selects the least-pending eligible provider. Reserves `pendingBytes` atomically
      *      so capacity is held between matching and commitment.
+     *      Skips providers whose organization already serves the same `manifestHash` to
+     *      enforce redundancy across distinct organizations (a single org with multiple
+     *      miners counts as one copy).
      *      Returns FilActorId(0) if no provider matches.
      * @param requirements SLI thresholds the client needs
      * @param terms Commercial terms (size, price, duration)
+     * @param manifestHash Hash identifying the deal's data
      * @return provider The matched provider, or FilActorId(0) if none found
      * @return autoApprove True if the provider's price per sector is met by the deal terms
      * @return organization The address of the matched provider
      */
-    function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
-        external
-        returns (CommonTypes.FilActorId provider, bool autoApprove, address organization);
+    function getProviderForDeal(
+        SLITypes.SLIThresholds calldata requirements,
+        SLITypes.DealTerms calldata terms,
+        bytes32 manifestHash
+    ) external returns (CommonTypes.FilActorId provider, bool autoApprove, address organization);
 
     /**
      * @notice Release committed capacity (called on deal rejection)
-     * @dev Decrements committedBytes for the provider. Reverts on underflow.
+     * @dev Decrements committedBytes for the provider and clears its association
+     *      with `manifestHash` so it can be matched again for the same data later.
+     *      Reverts on underflow.
      * @param provider The provider whose capacity to release
      * @param sizeBytes Amount of capacity to release
+     * @param manifestHash Hash identifying the deal's data. The provider's organization
+     *        entry for this hash is cleared so the organization becomes eligible to serve it again
      */
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
 
     /**
      * @notice Release pending capacity (called on deal rejection before commitment)
-     * @dev Decrements pendingBytes for the provider. Reverts if sizeBytes > pendingBytes.
+     * @dev Decrements pendingBytes for the provider and clears its association
+     *      with `manifestHash`. Reverts if sizeBytes > pendingBytes.
      * @param provider The provider whose pending capacity to release
      * @param sizeBytes Amount of pending capacity to release
+     * @param manifestHash Hash identifying the deal's data. The provider's organization
+     *        entry for this hash is cleared so the organization becomes eligible to serve it again
      */
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
 
     /**
      * @notice Check if address is authorized to act on behalf of a provider
