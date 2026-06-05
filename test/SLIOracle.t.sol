@@ -4,17 +4,17 @@ pragma solidity =0.8.30;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 
 contract SLIOracleTest is Test {
     SLIOracle public sliOracle;
     address public oracle = address(0x123);
-    CommonTypes.FilActorId public provider = CommonTypes.FilActorId.wrap(1000);
-    SLITypes.SLIThresholds public slis =
-        SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+    uint256 public dealId = 1;
+    SharedTypes.SLIThresholds public slis = SharedTypes.SLIThresholds({
+        retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
+    });
 
     function setUp() public {
         SLIOracle impl = new SLIOracle();
@@ -47,21 +47,21 @@ contract SLIOracleTest is Test {
 
     function testSLIAttestationEvent() public {
         vm.expectEmit(true, true, false, false);
-        emit SLIOracle.SLIAttestationUpdate(provider, block.number, slis);
+        emit SLIOracle.SLIAttestationUpdate(dealId, block.number, slis);
         vm.prank(oracle);
-        sliOracle.setSLI(provider, slis);
+        sliOracle.setSLI(dealId, slis);
     }
 
     function testSetSLIAttestation() public {
         vm.prank(oracle);
-        sliOracle.setSLI(provider, slis);
+        sliOracle.setSLI(dealId, slis);
 
-        SLITypes.Attestation memory storedAttestation = sliOracle.getAttestation(provider);
+        SharedTypes.Attestation memory storedAttestation = sliOracle.getAttestation(dealId);
         assertEq(storedAttestation.lastUpdate, block.number);
         assertEq(storedAttestation.slis.retrievabilityBps, slis.retrievabilityBps);
         assertEq(storedAttestation.slis.latencyMs, slis.latencyMs);
         assertEq(storedAttestation.slis.indexingPct, slis.indexingPct);
-        assertEq(storedAttestation.slis.bandwidthMbps, slis.bandwidthMbps);
+        assertEq(storedAttestation.slis.bandwidthBytesPerSecond, slis.bandwidthBytesPerSecond);
     }
 
     function testInitializeRevertInvalidAdmin() public {
@@ -79,42 +79,57 @@ contract SLIOracleTest is Test {
     }
 
     function testSetSLIRevertsInvalidRetrievabilityBps() public {
-        SLITypes.SLIThresholds memory invalidSlis =
-            SLITypes.SLIThresholds({retrievabilityBps: 10_001, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        SharedTypes.SLIThresholds memory invalidSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 10_001, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
+        });
 
         vm.prank(oracle);
         vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidRetrievabilityBps.selector, uint16(10_001)));
-        sliOracle.setSLI(provider, invalidSlis);
+        sliOracle.setSLI(dealId, invalidSlis);
     }
 
     function testSetSLIAcceptsMaxRetrievabilityBps() public {
-        SLITypes.SLIThresholds memory maxSlis =
-            SLITypes.SLIThresholds({retrievabilityBps: 10_000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        SharedTypes.SLIThresholds memory maxSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 10_000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
+        });
 
         vm.prank(oracle);
-        sliOracle.setSLI(provider, maxSlis);
+        sliOracle.setSLI(dealId, maxSlis);
 
-        SLITypes.Attestation memory stored = sliOracle.getAttestation(provider);
+        SharedTypes.Attestation memory stored = sliOracle.getAttestation(dealId);
         assertEq(stored.slis.retrievabilityBps, 10_000);
     }
 
     function testSetSLIRevertsInvalidIndexingPct() public {
-        SLITypes.SLIThresholds memory invalidSlis =
-            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
+        SharedTypes.SLIThresholds memory invalidSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 101
+        });
 
         vm.prank(oracle);
         vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidIndexingPct.selector, uint8(101)));
-        sliOracle.setSLI(provider, invalidSlis);
+        sliOracle.setSLI(dealId, invalidSlis);
     }
 
     function testSetSLIAcceptsMaxIndexingPct() public {
-        SLITypes.SLIThresholds memory maxSlis =
-            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 100});
+        SharedTypes.SLIThresholds memory maxSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 100
+        });
 
         vm.prank(oracle);
-        sliOracle.setSLI(provider, maxSlis);
+        sliOracle.setSLI(dealId, maxSlis);
 
-        SLITypes.Attestation memory stored = sliOracle.getAttestation(provider);
+        SharedTypes.Attestation memory stored = sliOracle.getAttestation(dealId);
         assertEq(stored.slis.indexingPct, 100);
+    }
+
+    function testSetSLIRevertsInvalidDealId() public {
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidDealId.selector));
+        sliOracle.setSLI(0, slis);
+    }
+
+    function testGetAttestationRevertsInvalidDealId() public {
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidDealId.selector));
+        sliOracle.getAttestation(0);
     }
 }

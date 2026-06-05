@@ -147,4 +147,13 @@ library SharedTypes {
         uint16 reasonCode;
         uint8 result;
     }
+
+    /**
+     * @notice Represents an attestation record for SLI (Service Level Indicator) tracking
+     * @dev Stores the timestamp of the last update and the associated SLI thresholds
+     */
+    struct Attestation {
+        uint256 lastUpdate;
+        SLIThresholds slis;
+    }
 }

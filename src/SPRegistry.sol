@@ -9,6 +9,7 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {MinerUtils} from "./lib/MinerUtils.sol";
@@ -58,7 +59,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         address payee;
         bool paused;
         bool blocked;
-        SLITypes.SLIThresholds capabilities;
+        SharedTypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 pendingBytes;
@@ -106,7 +107,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param provider The provider actor ID
      * @param capabilities The updated SLI capabilities
      */
-    event CapabilitiesUpdated(CommonTypes.FilActorId indexed provider, SLITypes.SLIThresholds capabilities);
+    event CapabilitiesUpdated(CommonTypes.FilActorId indexed provider, SharedTypes.SLIThresholds capabilities);
 
     /**
      * @notice AvailableSpaceUpdated event
@@ -414,7 +415,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external {
+    function setCapabilities(CommonTypes.FilActorId provider, SharedTypes.SLIThresholds calldata capabilities)
+        external
+    {
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
@@ -511,7 +514,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @return autoApprove True if the provider's price per sector is met by the deal terms
      * @return organization The address of the matched provider
      */
-    function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
+    function getProviderForDeal(SharedTypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
         onlyRole(MARKET_ROLE)
         returns (CommonTypes.FilActorId, bool, address)
@@ -656,7 +659,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function registerProviderFor(
         CommonTypes.FilActorId provider,
         address organization,
-        SLITypes.SLIThresholds calldata capabilities,
+        SharedTypes.SLIThresholds calldata capabilities,
         uint256 availableBytes,
         uint256 pricePerSectorPerMonth,
         address payee,
@@ -821,13 +824,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param reqs The required SLI thresholds
      * @return True if all non-zero requirement dimensions are met
      */
-    function _meetsRequirements(SLITypes.SLIThresholds memory caps, SLITypes.SLIThresholds calldata reqs)
+    function _meetsRequirements(SharedTypes.SLIThresholds memory caps, SharedTypes.SLIThresholds calldata reqs)
         internal
         pure
         returns (bool)
     {
         if (reqs.retrievabilityBps != 0 && caps.retrievabilityBps < reqs.retrievabilityBps) return false;
-        if (reqs.bandwidthMbps != 0 && caps.bandwidthMbps < reqs.bandwidthMbps) return false;
+        if (reqs.bandwidthBytesPerSecond != 0 && caps.bandwidthBytesPerSecond < reqs.bandwidthBytesPerSecond) {
+            return false;
+        }
         if (reqs.latencyMs != 0 && caps.latencyMs > reqs.latencyMs) return false; // lower is better
         if (reqs.indexingPct != 0 && caps.indexingPct < reqs.indexingPct) return false;
         return true;

@@ -369,7 +369,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
 
         PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
-        uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
+        uint256 score = ISLIScorer($.SLIScorer).calculateScore($.dealId, dealProposal.requirements);
 
         bool scoreMatches = score == 100;
         bool dataSizeMatches = IClient($.clientSC).isDataSizeMatching($.dealId);

@@ -25,6 +25,7 @@ import {FailingMockAddVerifiedClient} from "./contracts/FailingMockAddVerifiedCl
 import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {ClientContractMock} from "./contracts/ClientContractMock.sol";
 import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
@@ -125,8 +126,8 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
@@ -653,8 +654,8 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
@@ -787,8 +788,8 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
@@ -831,8 +832,8 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
@@ -867,8 +868,8 @@ contract ClientTest is Test {
                 dealId: 150,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
@@ -1117,8 +1118,8 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
@@ -1248,8 +1249,8 @@ contract ClientTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({
                     dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365

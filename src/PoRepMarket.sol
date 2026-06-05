@@ -12,6 +12,7 @@ import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IClient} from "./interfaces/IClient.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
@@ -109,7 +110,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         uint256 indexed dealId,
         address indexed client,
         CommonTypes.FilActorId indexed provider,
-        SLITypes.SLIThresholds requirements,
+        SharedTypes.SLIThresholds requirements,
         string manifestLocation,
         uint256 totalDealSize,
         uint256 proposedAtBlock
@@ -407,7 +408,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param manifestLocation The location of the manifest for the deal
      */
     function proposeDeal(
-        SLITypes.SLIThresholds calldata requirements,
+        SharedTypes.SLIThresholds calldata requirements,
         SLITypes.DealTerms calldata terms,
         string calldata manifestLocation
     ) external {
@@ -882,7 +883,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Ensures the requirements are correct
      * @param requirements The SLI thresholds for the deal
      */
-    function _ensureCorrectRequirements(SLITypes.SLIThresholds calldata requirements) internal pure {
+    function _ensureCorrectRequirements(SharedTypes.SLIThresholds calldata requirements) internal pure {
         if (requirements.retrievabilityBps > 10_000) {
             revert InvalidRetrievabilityBps(requirements.retrievabilityBps);
         }

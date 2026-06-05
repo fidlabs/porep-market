@@ -3,13 +3,12 @@
 
 pragma solidity =0.8.30;
 
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {SLITypes} from "../../src/types/SLITypes.sol";
+import {SharedTypes} from "../../src/types/SharedTypes.sol";
 
 contract MockSLIOracle {
     uint256 public lastUpdate;
     uint16 public retrievabilityBps;
-    uint16 public bandwidthMbps;
+    uint16 public bandwidthBytesPerSecond;
     uint16 public latencyMs;
     uint8 public indexingPct;
 
@@ -20,21 +19,21 @@ contract MockSLIOracle {
     function setAttestations(
         uint256 lastUpdate_,
         uint16 retrievabilityBps_,
-        uint16 bandwidthMbps_,
+        uint16 bandwidthBytesPerSecond_,
         uint16 latencyMs_,
         uint8 indexingPct_
     ) public {
         lastUpdate = lastUpdate_;
         retrievabilityBps = retrievabilityBps_;
-        bandwidthMbps = bandwidthMbps_;
+        bandwidthBytesPerSecond = bandwidthBytesPerSecond_;
         latencyMs = latencyMs_;
         indexingPct = indexingPct_;
     }
 
-    function getAttestation(CommonTypes.FilActorId) public view returns (SLITypes.Attestation memory ret) {
+    function getAttestation(uint256) public view returns (SharedTypes.Attestation memory ret) {
         ret.lastUpdate = lastUpdate;
         ret.slis.retrievabilityBps = retrievabilityBps;
-        ret.slis.bandwidthMbps = bandwidthMbps;
+        ret.slis.bandwidthBytesPerSecond = bandwidthBytesPerSecond;
         ret.slis.latencyMs = latencyMs;
         ret.slis.indexingPct = indexingPct;
     }

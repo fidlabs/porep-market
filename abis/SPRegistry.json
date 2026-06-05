@@ -183,7 +183,7 @@
       {
         "name": "requirements",
         "type": "tuple",
-        "internalType": "struct SLITypes.SLIThresholds",
+        "internalType": "struct SharedTypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityBps",
@@ -191,7 +191,7 @@
             "internalType": "uint16"
           },
           {
-            "name": "bandwidthMbps",
+            "name": "bandwidthBytesPerSecond",
             "type": "uint16",
             "internalType": "uint16"
           },
@@ -288,7 +288,7 @@
           {
             "name": "capabilities",
             "type": "tuple",
-            "internalType": "struct SLITypes.SLIThresholds",
+            "internalType": "struct SharedTypes.SLIThresholds",
             "components": [
               {
                 "name": "retrievabilityBps",
@@ -296,7 +296,7 @@
                 "internalType": "uint16"
               },
               {
-                "name": "bandwidthMbps",
+                "name": "bandwidthBytesPerSecond",
                 "type": "uint16",
                 "internalType": "uint16"
               },
@@ -565,7 +565,7 @@
       {
         "name": "capabilities",
         "type": "tuple",
-        "internalType": "struct SLITypes.SLIThresholds",
+        "internalType": "struct SharedTypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityBps",
@@ -573,7 +573,7 @@
             "internalType": "uint16"
           },
           {
-            "name": "bandwidthMbps",
+            "name": "bandwidthBytesPerSecond",
             "type": "uint16",
             "internalType": "uint16"
           },
@@ -702,7 +702,7 @@
       {
         "name": "capabilities",
         "type": "tuple",
-        "internalType": "struct SLITypes.SLIThresholds",
+        "internalType": "struct SharedTypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityBps",
@@ -710,7 +710,7 @@
             "internalType": "uint16"
           },
           {
-            "name": "bandwidthMbps",
+            "name": "bandwidthBytesPerSecond",
             "type": "uint16",
             "internalType": "uint16"
           },
@@ -916,7 +916,7 @@
         "name": "capabilities",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct SLITypes.SLIThresholds",
+        "internalType": "struct SharedTypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityBps",
@@ -924,7 +924,7 @@
             "internalType": "uint16"
           },
           {
-            "name": "bandwidthMbps",
+            "name": "bandwidthBytesPerSecond",
             "type": "uint16",
             "internalType": "uint16"
           },

@@ -4,9 +4,8 @@ pragma solidity =0.8.30;
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SLIOracle} from "./SLIOracle.sol";
-import {SLITypes} from "./types/SLITypes.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 
 /**
@@ -28,17 +27,23 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
 
     /**
      * @notice Thrown when no attestation exists for the given provider
-     * @param provider The FilActor ID of the provider without attestation
-     * @dev 0xddd4695c
+     * @param dealId The deal ID of the deal without attestation
+     * @dev 0xadd9e17f
      */
-    error NoAttestation(CommonTypes.FilActorId provider);
+    error NoAttestation(uint256 dealId);
 
     /**
-     * @notice Thrown when an attestation has expired for the given provider
-     * @param provider The FilActor ID of the provider with expired attestation
-     * @dev 0x06c09405
+     * @notice Thrown when an attestation has expired for the given deal
+     * @param dealId The deal ID of the deal with expired attestation
+     * @dev 0xa5d8657a
      */
-    error AttestationExpired(CommonTypes.FilActorId provider);
+    error AttestationExpired(uint256 dealId);
+
+    /**
+     * @notice Error indicating that an invalid deal ID was provided
+     * @dev 0xb06db32a
+     */
+    error InvalidDealId();
 
     /**
      * @notice Upgradable role which allows for contract upgrades
@@ -106,23 +111,25 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
 
     // solhint-disable gas-strict-inequalities
     /**
-     * @notice Calculate the score for a given provider and required SLI thresholds.
-     * @param provider The ID of the provider.
+     * @notice Calculate the score for a given deal and required SLI thresholds.
+     * @param dealId The id of the deal
      * @param required The SLI thresholds required for the client.
      * @return score The score for SLI.
      */
-    function calculateScore(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata required)
+    function calculateScore(uint256 dealId, SharedTypes.SLIThresholds calldata required)
         external
         view
         returns (uint256 score)
     {
-        SLITypes.Attestation memory attestation = s().oracle.getAttestation(provider);
+        if (dealId == 0) revert InvalidDealId();
 
-        if (attestation.lastUpdate == 0) revert NoAttestation(provider);
+        SharedTypes.Attestation memory attestation = s().oracle.getAttestation(dealId);
+
+        if (attestation.lastUpdate == 0) revert NoAttestation(dealId);
 
         uint256 currentEpoch = block.number;
         if (currentEpoch - attestation.lastUpdate > EPOCHS_IN_MONTH) {
-            revert AttestationExpired(provider);
+            revert AttestationExpired(dealId);
         }
 
         uint256 slasDefined;
@@ -133,9 +140,9 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
             if (required.retrievabilityBps <= attestation.slis.retrievabilityBps) slasMet++;
         }
 
-        if (required.bandwidthMbps != 0) {
+        if (required.bandwidthBytesPerSecond != 0) {
             slasDefined++;
-            if (required.bandwidthMbps <= attestation.slis.bandwidthMbps) slasMet++;
+            if (required.bandwidthBytesPerSecond <= attestation.slis.bandwidthBytesPerSecond) slasMet++;
         }
 
         if (required.latencyMs != 0) {

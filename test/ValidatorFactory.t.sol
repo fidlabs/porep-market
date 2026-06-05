@@ -13,6 +13,7 @@ import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 
@@ -53,8 +54,8 @@ contract ValidatorFactoryTest is Test {
                 dealId: dealId,
                 client: client,
                 provider: provider,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: vm.addr(10),

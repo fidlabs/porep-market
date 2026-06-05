@@ -61,16 +61,16 @@
     "name": "getAttestation",
     "inputs": [
       {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [
       {
         "name": "attestation",
         "type": "tuple",
-        "internalType": "struct SLITypes.Attestation",
+        "internalType": "struct SharedTypes.Attestation",
         "components": [
           {
             "name": "lastUpdate",
@@ -80,7 +80,7 @@
           {
             "name": "slis",
             "type": "tuple",
-            "internalType": "struct SLITypes.SLIThresholds",
+            "internalType": "struct SharedTypes.SLIThresholds",
             "components": [
               {
                 "name": "retrievabilityBps",
@@ -88,7 +88,7 @@
                 "internalType": "uint16"
               },
               {
-                "name": "bandwidthMbps",
+                "name": "bandwidthBytesPerSecond",
                 "type": "uint16",
                 "internalType": "uint16"
               },
@@ -261,14 +261,14 @@
     "name": "setSLI",
     "inputs": [
       {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
         "name": "slis",
         "type": "tuple",
-        "internalType": "struct SLITypes.SLIThresholds",
+        "internalType": "struct SharedTypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityBps",
@@ -276,7 +276,7 @@
             "internalType": "uint16"
           },
           {
-            "name": "bandwidthMbps",
+            "name": "bandwidthBytesPerSecond",
             "type": "uint16",
             "internalType": "uint16"
           },
@@ -426,10 +426,10 @@
     "name": "SLIAttestationUpdate",
     "inputs": [
       {
-        "name": "provider",
-        "type": "uint64",
+        "name": "dealId",
+        "type": "uint256",
         "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
+        "internalType": "uint256"
       },
       {
         "name": "lastUpdate",
@@ -441,7 +441,7 @@
         "name": "slis",
         "type": "tuple",
         "indexed": false,
-        "internalType": "struct SLITypes.SLIThresholds",
+        "internalType": "struct SharedTypes.SLIThresholds",
         "components": [
           {
             "name": "retrievabilityBps",
@@ -449,7 +449,7 @@
             "internalType": "uint16"
           },
           {
-            "name": "bandwidthMbps",
+            "name": "bandwidthBytesPerSecond",
             "type": "uint16",
             "internalType": "uint16"
           },
@@ -537,6 +537,11 @@
   {
     "type": "error",
     "name": "InvalidAdmin",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealId",
     "inputs": []
   },
   {
