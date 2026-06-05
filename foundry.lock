@@ -17,9 +17,6 @@
       "rev": "1801b0541f4fda118a10798fd3486bb7051c5dd6"
     }
   },
-  "lib/fvm-solidity": {
-    "rev": "2b3412a8555cfa7451199e0ba82c1ca870f2f45b"
-  },
   "lib/openzeppelin-contracts": {
     "tag": {
       "name": "v5.5.0",

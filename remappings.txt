@@ -14,6 +14,4 @@ solidity-BigNumber/=lib/filecoin-solidity/contracts/vendor/solidity-BigNumber/sr
 solidity-cborutils/=lib/filecoin-solidity/lib/solidity-cborutils/
 @prb-math/=lib/filecoin-pay/lib/prb-math/src/
 filecoin-pay/=lib/filecoin-pay/src/
-fvm-solidity/=lib/filecoin-pay/lib/fvm-solidity/src/
 prb-math/=lib/filecoin-pay/lib/prb-math/src/
-fvm-solidity/=lib/fvm-solidity/src/

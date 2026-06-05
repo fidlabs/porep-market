@@ -8,8 +8,6 @@ import {IClient} from "../interfaces/IClient.sol";
 import {IPoRepMarket} from "../interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 
-//import {FVMSector, SectorStatus} from "../../lib/fvm-solidity/src/FVMSector.sol";
-
 /**
  * @title PoRepMarketClaimInspector
  * @notice Helper contract to fetch claims for a given deal ID and validate sector status against claimed status
