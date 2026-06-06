@@ -13,3 +13,6 @@
 [submodule "lib/filecoin-pay"]
 	path = lib/filecoin-pay
 	url = https://github.com/FilOzone/filecoin-pay
+[submodule "lib/fvm-solidity"]
+	path = lib/fvm-solidity
+	url = https://github.com/filecoin-project/fvm-solidity
