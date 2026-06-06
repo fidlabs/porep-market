@@ -35,4 +35,10 @@ interface IValidator {
      * @return minTimeBetweenSettlementsInEpochs Minimum time between settlements in epochs
      */
     function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs);
+
+    /**
+     * @notice Retrieves the current status of the payment rail
+     * @return railStatus Current status of the payment rail
+     */
+    function getRailStatus() external view returns (uint8 railStatus);
 }

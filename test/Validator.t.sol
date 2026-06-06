@@ -9,6 +9,7 @@ import {SLIScorer} from "../src/SLIScorer.sol";
 import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
+import {RailStatus} from "../src/types/RailStatus.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
@@ -394,11 +395,15 @@ contract ValidatorTest is Test {
         uint256 sectorCount = clientSCMock.getClientAllocationIdsPerDeal(dealId).length;
         uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
 
+        assertEq(validator.getRailStatus(), RailStatus.PREPARED);
+
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.RailPaymentModified(railId, expectedRate);
 
         vm.prank(porepService);
         validator.modifyRailPayment();
+
+        assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
     }
 
     function testUpdateLockupPeriodEmitsLockupPeriodUpdated() public {
@@ -419,6 +424,8 @@ contract ValidatorTest is Test {
 
         vm.prank(address(filecoinPayMock));
         validator.railTerminated(railId, terminator, endEpoch);
+
+        assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
 
     function testCreateRailRevertsWhenRailAlreadyCreated() public {
@@ -432,6 +439,7 @@ contract ValidatorTest is Test {
         vm.prank(admin);
         validator.terminateRail();
         assertTrue(filecoinPayMock.terminated(railId));
+        assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
 
     function testTerminateRailTerminatesFilecoinPayRailAsPoRepService() public {
@@ -439,6 +447,7 @@ contract ValidatorTest is Test {
         vm.prank(porepService);
         validator.terminateRail();
         assertTrue(filecoinPayMock.terminated(railId));
+        assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
 
     function testTerminateRailRevertsWhenCallerHasPoRepServiceRole() public {
@@ -626,10 +635,14 @@ contract ValidatorTest is Test {
             token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
         );
 
+        assertEq(newValidator.getRailStatus(), RailStatus.NONE);
+
         vm.expectEmit(true, false, false, true, address(newValidator));
         emit Validator.LockupPeriodUpdated(2, 86_400);
 
         newValidator.createRail(token);
+
+        assertEq(newValidator.getRailStatus(), RailStatus.PREPARED);
     }
 
     function testSetDealEndEpochEmitsDealEndEpochUpdated() public {
@@ -657,6 +670,8 @@ contract ValidatorTest is Test {
 
         vm.prank(porepService);
         validator.disableFutureRailPayments();
+
+        assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
 
     function testValidatePaymentCapsSettlementToEarlyTerminatedEpoch() public {

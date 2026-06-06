@@ -65,6 +65,19 @@
   },
   {
     "type": "function",
+    "name": "getRailStatus",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "railStatus",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {

@@ -18,6 +18,7 @@ import {IClient} from "./interfaces/IClient.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
+import {RailStatus} from "./types/RailStatus.sol";
 
 /**
  * @title Validator
@@ -227,6 +228,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     struct ValidatorStorage {
         uint256 railId;
         uint256 dealId;
+        uint8 railStatus;
         address filecoinPay;
         address SLIScorer;
         address clientSC;
@@ -424,7 +426,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         if (!isApproved) {
             revert OperatorNotApproved();
         }
-        /// NOTE: to be discussed - might be shorter period than a month
+
         if (maxLockupPeriod < EPOCHS_IN_MONTH) {
             revert MaxLockupPeriodLessThanMinimum();
         }
@@ -440,6 +442,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address payee = ISPRegistry($.SPRegistry).getPayee($.providerId);
 
         uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, dealProposal.client, payee, 0, address(0));
+        $.railStatus = RailStatus.PREPARED;
         $.railId = railId;
 
         IPoRepMarket($.poRepMarket).updateRailId($.dealId, railId);
@@ -455,6 +458,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         uint256 newRate = _calculateAmountPerEpoch();
         $.amountPerEpoch = newRate;
+        $.railStatus = RailStatus.ACTIVE;
 
         _modifyRailPayment(IFilecoinPayV1($.filecoinPay), $.railId, newRate, 0);
         emit RailPaymentModified($.railId, newRate);
@@ -468,6 +472,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     function disableFutureRailPayments() external override onlyRole(POREP_SERVICE_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
         $.earlyTerminatedEpoch = block.number;
+        $.railStatus = RailStatus.TERMINATED;
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
         emit RailDisabled($.railId);
     }
@@ -491,6 +496,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert UnauthorizedCaller();
         }
+        $.railStatus = RailStatus.TERMINATED;
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
     }
 
@@ -511,6 +517,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
             revert CallerIsNotFilecoinPay();
         }
 
+        $.railStatus = RailStatus.TERMINATED;
         IPoRepMarket($.poRepMarket).terminateDeal($.dealId, terminator, endEpoch);
         emit RailTerminated(railId, terminator, endEpoch);
     }
@@ -560,6 +567,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      */
     function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs) {
         minTimeBetweenSettlementsInEpochs = _getValidatorStorage().minTimeBetweenSettlementsInEpochs;
+    }
+
+    /**
+     * @notice Retrieves the current status of the payment rail
+     * @return railStatus Current status of the payment rail
+     */
+    function getRailStatus() external view returns (uint8 railStatus) {
+        railStatus = _getValidatorStorage().railStatus;
     }
 
     /**
