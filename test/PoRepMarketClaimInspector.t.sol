@@ -13,6 +13,7 @@ import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {ClientSCMock} from "./contracts/ClientSCMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 
 contract PoRepMarketClaimInspectorTest is Test {
@@ -59,8 +60,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
@@ -203,8 +204,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 dealId: dealId,
                 client: clientAddress,
                 provider: customProvider,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
@@ -230,8 +231,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 dealId: secondDealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SLITypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90
+                requirements: SharedTypes.SLIThresholds({
+                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
                 }),
                 terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
                 validator: address(validatorMock),
