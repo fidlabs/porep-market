@@ -14,29 +14,38 @@ import {UtilsHandlers} from "filecoin-solidity/v0.8/utils/UtilsHandlers.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
-import {IClient} from "./interfaces/IClient.sol";
+import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
+import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
+import {EvidenceTypes} from "./types/EvidenceTypes.sol";
 
 /**
- * @title Client
- * @notice Contract for clients to interact with storage providers, manage deals, and handle DataCap transfers
+ * @title DataCapEvidenceAdapter
+ * @notice Contract for handling DataCap evidence interactions
  */
-contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgradeable, ReentrancyGuard {
+contract DataCapEvidenceAdapter is
+    IStorageEvidenceAdapter,
+    IDataCapEvidenceAdapter,
+    Initializable,
+    AccessControlUpgradeable,
+    UUPSUpgradeable,
+    ReentrancyGuard
+{
     using AllocationResponseCbor for DataCapTypes.TransferReturn;
 
-    // @custom:storage-location erc7201:porepmarket.storage.ClientStorage
-    struct ClientStorage {
+    // @custom:storage-location erc7201:porepmarket.storage.DataCapEvidenceAdapterStorage
+    struct DataCapEvidenceAdapterStorage {
         mapping(uint256 dealId => Deal deal) _deals;
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
     }
 
-    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ClientStorage")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant CLIENT_STORAGE_LOCATION =
-        0x2b21b193d0cfac9c3a87c7f79dc75824e9816d95224b141c67bae6ec5621ea00;
+    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DataCapEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant DATA_CAP_EVIDENCE_ADAPTER_STORAGE_LOCATION =
+        0x8787a3d80201bec4a7dca8768c3f8a033ced49efe06774bc65390680a2a0e900;
 
     // solhint-disable-next-line use-natspec
     function _getClientStorage() private pure returns (ClientStorage storage $) {
@@ -218,6 +227,18 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      */
     error InvalidAllocationSize();
 
+    /**
+     * @notice Error thrown when limit is invalid
+     * @dev 0xe55fb509
+     */
+    error InvalidLimit();
+
+    /**
+     * @notice Error thrown when caller is not PoRepMarket contract
+     * @dev 0x9e0125a9
+     */
+    error OnlyMarket();
+
     struct Deal {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
@@ -309,7 +330,7 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
      * @param params The parameters for the transfer
      * @param dealId The id of the deal
      */
-    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId) external nonReentrant {
+    function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external nonReentrant {
         ClientStorage storage $ = s();
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
@@ -645,12 +666,36 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
     }
 
     /**
-     * @notice custom getter to retrieve allocation ids per client and provider
+     * @notice getter to retrieve allocation ids for a deal with pagination
      * @param dealId the id of the deal
-     * @return allocationIds the allocation ids for the client and provider
+     * @param offset index to start from
+     * @param limit max number of ids to return
+     * @return ids allocation ids for the client and provider
+     * @return total total number of allocation ids for the deal
      */
-    function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory) {
-        return s()._deals[dealId].allocationIds;
+    function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 total)
+    {
+        if (limit == 0) revert InvalidLimit();
+        CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
+        uint256 sumOfAllocations = allocationIds.length;
+
+        if (offset >= sumOfAllocations) {
+            return (new CommonTypes.FilActorId[](0), sumOfAllocations);
+        }
+
+        uint256 end = offset + limit;
+        if (end > sumOfAllocations) {
+            end = sumOfAllocations;
+        }
+        uint256 count = end - offset;
+        ids = new CommonTypes.FilActorId[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            ids[i] = allocationIds[offset + i];
+        }
     }
 
     /**
@@ -776,5 +821,36 @@ contract Client is IClient, Initializable, AccessControlUpgradeable, UUPSUpgrade
         for (uint256 i = 0; i < claims.length; ++i) {
             $._terminatedClaims[claims[i]] = true;
         }
+    }
+
+    /**
+     * @notice Getter for the PoRepMarket contract address
+     * @return The address of the PoRepMarket contract
+     */
+    function getPoRepMarketAddress() public view returns (address) {
+        return address(s()._poRepMarketContract);
+    }
+
+    /**
+     * @notice Ensures the caller is the PoRepMarket contract
+     */
+    function _onlyPoRepMarket() internal view {
+        if (msg.sender != getPoRepMarketAddress()) revert OnlyMarket();
+    }
+
+    /**
+     * @notice Modifier to check that the caller is the PoRepMarket contract before executing the function
+     */
+    modifier onlyPoRepMarket(uint256 railId) {
+        _onlyPoRepMarket();
+        _;
+    }
+
+    /**
+     * @notice Getter for the evidence type
+     * @return The evidence type as uint8
+     */
+    function evidenceType() external view returns (uint8) {
+        return EvidenceTypes.VERIF_REG_CLAIMS;
     }
 }
