@@ -517,7 +517,9 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1));
+        dataCapEvidenceAdapterAddress.setDeal(
+            createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1)
+        );
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
         poRepMarket.completeDeal(dealId);
@@ -529,7 +531,9 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1));
+        dataCapEvidenceAdapterAddress.setDeal(
+            createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1)
+        );
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
         poRepMarket.completeDeal(dealId);
