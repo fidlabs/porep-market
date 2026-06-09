@@ -853,5 +853,4 @@ contract DataCapEvidenceAdapter is
     function evidenceType() external pure returns (uint8) {
         return EvidenceTypes.VERIF_REG_CLAIMS;
     }
-
 }
