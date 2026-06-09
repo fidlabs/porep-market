@@ -124,7 +124,7 @@ interface IPoRepMarket {
 
     /**
      * @notice Gets the DataCap evidence adapter address from storage
-     * @return IClient The DataCap evidence adapter address
+     * @return The DataCap evidence adapter address
      */
     function getDataCapEvidenceAdapter() external view returns (address);
 

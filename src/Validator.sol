@@ -32,7 +32,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error CallerIsNotFilecoinPay();
 
     /**
-     * @notice Error indicating that the caller is not the Client Smart Contract
+     * @notice Error indicating that the caller is not the DataCap Evidence Adapter
      * @dev 0x669fc0af
      */
     error CallerIsNotDataCapEvidenceAdapter();

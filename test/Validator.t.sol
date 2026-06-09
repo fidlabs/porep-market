@@ -13,7 +13,7 @@ import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
-import {ClientSCMock} from "./contracts/ClientSCMock.sol";
+import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 
@@ -29,7 +29,7 @@ contract ValidatorTest is Test {
     FilecoinPayV1Mock public filecoinPayMock;
     PoRepMarketMock public poRepMarketMock;
     SPRegistryMock public spRegistryMock;
-    ClientSCMock public dataCapEvidenceAdapterMock;
+    DataCapEvidenceAdapterMock public dataCapEvidenceAdapterMock;
     SLIOracle public sliOracle;
     SLIScorer public sliScorer;
     SPRegistry public spRegistry;
@@ -51,7 +51,7 @@ contract ValidatorTest is Test {
 
     function setUp() public {
         filecoinPayMock = new FilecoinPayV1Mock();
-        dataCapEvidenceAdapterMock = new ClientSCMock();
+        dataCapEvidenceAdapterMock = new DataCapEvidenceAdapterMock();
         poRepMarketMock = new PoRepMarketMock();
         spRegistryMock = new SPRegistryMock();
 
@@ -393,7 +393,7 @@ contract ValidatorTest is Test {
         dealProposal.terms.pricePerSectorPerMonth = 2_000_000;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
-        uint256 sectorCount = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId).length;
+        uint256 sectorCount = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId).length;
         uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
 
         vm.expectEmit(true, false, false, true, address(validator));
