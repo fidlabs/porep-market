@@ -123,19 +123,6 @@
   },
   {
     "type": "function",
-    "name": "getClientSmartContract",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getCompletedDeals",
     "inputs": [],
     "outputs": [
@@ -234,6 +221,19 @@
             "internalType": "string"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDataCapEvidenceAdapter",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "stateMutability": "view"
@@ -874,10 +874,10 @@
   },
   {
     "type": "function",
-    "name": "setClientSmartContract",
+    "name": "setDataCapEvidenceAdapter",
     "inputs": [
       {
-        "name": "_clientSmartContract",
+        "name": "_dataCapEvidenceAdapter",
         "type": "address",
         "internalType": "address"
       }
@@ -1022,10 +1022,10 @@
   },
   {
     "type": "event",
-    "name": "ClientSmartContractUpdated",
+    "name": "DataCapEvidenceAdapterUpdated",
     "inputs": [
       {
-        "name": "clientSmartContract",
+        "name": "dataCapEvidenceAdapter",
         "type": "address",
         "indexed": true,
         "internalType": "address"
@@ -1574,7 +1574,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidClientSmartContractAddress",
+    "name": "InvalidDataCapEvidenceAdapterAddress",
     "inputs": []
   },
   {
