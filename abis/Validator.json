@@ -149,7 +149,7 @@
         "internalType": "address"
       },
       {
-        "name": "_clientSC",
+        "name": "_dataCapEvidenceAdapter",
         "type": "address",
         "internalType": "address"
       },
@@ -589,7 +589,7 @@
   },
   {
     "type": "error",
-    "name": "CallerIsNotClientSC",
+    "name": "CallerIsNotDataCapEvidenceAdapter",
     "inputs": []
   },
   {
@@ -620,7 +620,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidClientSCAddress",
+    "name": "InvalidDataCapEvidenceAdapterAddress",
     "inputs": []
   },
   {
