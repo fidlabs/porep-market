@@ -16,7 +16,7 @@ import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
 import {ClientSCMock} from "./contracts/ClientSCMock.sol";
-import {Client} from "../src/Client.sol";
+import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -24,7 +24,7 @@ contract PoRepMarketTest is Test {
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
-    ClientSCMock public clientSmartContractAddress;
+    ClientSCMock public dataCapEvidenceAdapterAddress;
     address public clientAddress;
     address public providerOwnerAddress;
     address public operatorAddress;
@@ -46,7 +46,7 @@ contract PoRepMarketTest is Test {
         spRegistry = new SPRegistryMock();
         validatorFactory = new ValidatorFactoryMock();
         validatorAddress = vm.addr(0x001);
-        clientSmartContractAddress = new ClientSCMock();
+        dataCapEvidenceAdapterAddress = new ClientSCMock();
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
         operatorAddress = vm.addr(0x005);
@@ -69,7 +69,7 @@ contract PoRepMarketTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
         vm.prank(adminAddress);
-        poRepMarket.setClientSmartContract(address(clientSmartContractAddress));
+        poRepMarket.setDataCapEvidenceAdapter(address(dataCapEvidenceAdapterAddress));
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
@@ -99,9 +99,9 @@ contract PoRepMarketTest is Test {
     function createClientDealWithAllocationSize(uint256 _dealId, uint256 _allocationSize)
         public
         view
-        returns (Client.Deal memory)
+        returns (DataCapEvidenceAdapter.Deal memory)
     {
-        return Client.Deal({
+        return DataCapEvidenceAdapter.Deal({
             completed: false,
             client: clientAddress,
             validator: validatorAddress,
@@ -384,7 +384,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealCompleted(dealId, clientAddress, defaultTerms.dealSizeBytes, providerFilActorId);
@@ -403,7 +403,7 @@ contract PoRepMarketTest is Test {
         uint256 dealAllocationSizeAtTheBottomLimit =
             defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100;
 
-        clientSmartContractAddress.setDeal(
+        dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheBottomLimit)
         );
         vm.prank(clientAddress);
@@ -423,7 +423,7 @@ contract PoRepMarketTest is Test {
 
         uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100;
 
-        clientSmartContractAddress.setDeal(
+        dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheUpperLimit)
         );
         vm.prank(clientAddress);
@@ -441,7 +441,7 @@ contract PoRepMarketTest is Test {
         vm.prank(adminAddress);
         poRepMarket.setDealCompletionPadding(100);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
         poRepMarket.completeDeal(dealId);
@@ -458,7 +458,7 @@ contract PoRepMarketTest is Test {
         uint256 dealAllocationSizeAtTheBottomLimit =
             defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100 - 1;
 
-        clientSmartContractAddress.setDeal(
+        dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheBottomLimit)
         );
         vm.prank(clientAddress);
@@ -476,7 +476,7 @@ contract PoRepMarketTest is Test {
 
         uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100 + 1;
 
-        clientSmartContractAddress.setDeal(
+        dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheUpperLimit)
         );
         vm.prank(clientAddress);
@@ -493,13 +493,13 @@ contract PoRepMarketTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
         vm.prank(adminAddress);
-        porepMarekMock.setClientSmartContract(address(clientSmartContractAddress));
+        porepMarekMock.setDataCapEvidenceAdapter(address(dataCapEvidenceAdapterAddress));
         vm.prank(clientAddress);
         porepMarekMock.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
         porepMarekMock.acceptDeal(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
         porepMarekMock.completeDeal(dealId);
 
@@ -519,7 +519,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1));
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
         poRepMarket.completeDeal(dealId);
@@ -531,7 +531,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1));
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidAllocationSizeForDealCompletion.selector));
         poRepMarket.completeDeal(dealId);
@@ -571,7 +571,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
         poRepMarket.completeDeal(dealId);
 
@@ -814,10 +814,10 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, tooLongManifestLocation);
     }
 
-    function testSetClientSmartContractRevertsWhenAddressIsZero() public {
+    function testSetDataCapEvidenceAdapterRevertsWhenAddressIsZero() public {
         vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidClientSmartContractAddress.selector));
-        poRepMarket.setClientSmartContract(address(0));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDataCapEvidenceAdapterAddress.selector));
+        poRepMarket.setDataCapEvidenceAdapter(address(0));
     }
 
     function testTerminateDealEmitsEventAndSetsState() public {
@@ -835,7 +835,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateRailId(dealId, railId);
         vm.stopPrank();
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
         poRepMarket.completeDeal(dealId);
 
@@ -877,7 +877,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
         poRepMarket.completeDeal(dealId);
 
@@ -897,7 +897,7 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
-        clientSmartContractAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
         vm.prank(clientAddress);
         poRepMarket.completeDeal(dealId);
 
@@ -1191,8 +1191,8 @@ contract PoRepMarketTest is Test {
         assertEq(poRepMarket.getSPRegistryContract(), address(spRegistry));
     }
 
-    function testGetClientSmartContract() public view {
-        assertEq(poRepMarket.getClientSmartContract(), address(clientSmartContractAddress));
+    function testGetDataCapEvidenceAdapter() public view {
+        assertEq(poRepMarket.getDataCapEvidenceAdapter(), address(dataCapEvidenceAdapterAddress));
     }
 
     function testGetValidatorFactoryContract() public view {

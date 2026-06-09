@@ -27,7 +27,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     struct ValidatorFactoryStorage {
         mapping(uint256 dealId => address contractAddress) _instances;
         mapping(address => bool) _isValidatorContract;
-        address _clientSmartContract;
+        address _dataCapEvidenceAdapter;
         address _poRepService;
         address _filecoinPay;
         address _sliScorer;
@@ -84,10 +84,10 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     error InvalidPoRepMarketAddress();
 
     /**
-     * @notice Error indicating that the provided ClientSmartContract address is invalid
+     * @notice Error indicating that the provided DataCapEvidenceAdapter address is invalid
      * @dev 0x39ee49ba
      */
-    error InvalidClientSmartContractAddress();
+    error InvalidDataCapEvidenceAdapterAddress();
 
     /**
      * @notice Error indicating that the provided FilecoinPay address is invalid
@@ -189,12 +189,12 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     }
 
     /**
-     * @notice Initializes the contract with the PoRepMarket, ClientSmartContract, and FilecoinPay addresses
+     * @notice Initializes the contract with the PoRepMarket, DataCapEvidenceAdapter, and FilecoinPay addresses
      * @dev This function is called after the contract is initialized with the admin and implementation addresses
      * @param _poRepService The address of the PoRepService contract
      * @param _filecoinPay The address of the FilecoinPay contract
      * @param _sliScorer The address of the SLIScorer contract
-     * @param _clientSmartContract The address of the ClientSmartContract contract
+     * @param _dataCapEvidenceAdapter The address of the DataCapEvidenceAdapter contract
      * @param _poRepMarket The address of the PoRepMarket contract
      * @param _SPRegistry The address of the SPRegistry contract
      */
@@ -202,20 +202,20 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         address _poRepService,
         address _filecoinPay,
         address _sliScorer,
-        address _clientSmartContract,
+        address _dataCapEvidenceAdapter,
         address _poRepMarket,
         address _SPRegistry
     ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
-        if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
+        if (_dataCapEvidenceAdapter == address(0)) revert InvalidDataCapEvidenceAdapterAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
         if (_sliScorer == address(0)) revert InvalidSliScorerAddress();
         if (_SPRegistry == address(0)) revert InvalidSPRegistryAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
-        $._clientSmartContract = _clientSmartContract;
+        $._dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
         $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
         $._sliScorer = _sliScorer;
@@ -246,7 +246,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
                         $._poRepService,
                         $._filecoinPay,
                         $._sliScorer,
-                        $._clientSmartContract,
+                        $._dataCapEvidenceAdapter,
                         $._poRepMarket,
                         $._SPRegistry,
                         dealId

@@ -48,20 +48,20 @@ contract DataCapEvidenceAdapter is
         0x8787a3d80201bec4a7dca8768c3f8a033ced49efe06774bc65390680a2a0e900;
 
     // solhint-disable-next-line use-natspec
-    function _getClientStorage() private pure returns (ClientStorage storage $) {
+    function _getDataCapEvidenceAdapterStorage() private pure returns (DataCapEvidenceAdapterStorage storage $) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            $.slot := CLIENT_STORAGE_LOCATION
+            $.slot := DATA_CAP_EVIDENCE_ADAPTER_STORAGE_LOCATION
         }
     }
 
     /**
-     * @dev Returns the storage struct for the Client contract.
+     * @dev Returns the storage struct for the DataCapEvidenceAdapter contract.
      * @notice function to allow acess to storage for inheriting contracts
-     * @return ClientStorage storage struct
+     * @return DataCapEvidenceAdapterStorage storage struct
      */
-    function s() internal pure returns (ClientStorage storage) {
-        return _getClientStorage();
+    function s() internal pure returns (DataCapEvidenceAdapterStorage storage) {
+        return _getDataCapEvidenceAdapterStorage();
     }
 
     uint32 private constant _FRC46_TOKEN_TYPE = 2233613279; // method_hash!("FRC46") as u32;
@@ -292,7 +292,7 @@ contract DataCapEvidenceAdapter is
         _grantRole(RESCUE_ROLE, admin);
         _grantRole(TERMINATION_ORACLE, terminationOracle);
 
-        ClientStorage storage $ = s();
+        DataCapEvidenceAdapterStorage storage $ = s();
         $._poRepMarketContract = IPoRepMarket(_poRepMarketContract);
         $._metaAllocatorContract = IMetaAllocator(_metaAllocatorContract);
     }
@@ -331,7 +331,7 @@ contract DataCapEvidenceAdapter is
      * @param dealId The id of the deal
      */
     function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external nonReentrant {
-        ClientStorage storage $ = s();
+        DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
 
         if (proposal.state != PoRepTypes.DealState.Accepted) {
@@ -385,7 +385,7 @@ contract DataCapEvidenceAdapter is
         nonReentrant
         onlyRole(RESCUE_ROLE)
     {
-        ClientStorage storage $ = s();
+        DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
         if (proposal.state != PoRepTypes.DealState.Completed || $._deals[dealId].dealId == 0) {
             revert InvalidDealStateForTransfer();
@@ -563,7 +563,7 @@ contract DataCapEvidenceAdapter is
      * @param proposal The deal proposal.
      */
     function _registerDeal(PoRepTypes.DealProposal memory proposal) internal {
-        ClientStorage storage $ = s();
+        DataCapEvidenceAdapterStorage storage $ = s();
 
         if (proposal.railId == 0) {
             revert InvalidRailId();
@@ -671,16 +671,16 @@ contract DataCapEvidenceAdapter is
      * @param offset index to start from
      * @param limit max number of ids to return
      * @return ids allocation ids for the client and provider
-     * @return total total number of allocation ids for the deal
+     * @return sumOfAllocations total number of allocation ids for the deal
      */
     function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
         external
         view
-        returns (CommonTypes.FilActorId[] memory ids, uint256 total)
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfAllocations)
     {
         if (limit == 0) revert InvalidLimit();
         CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
-        uint256 sumOfAllocations = allocationIds.length;
+        sumOfAllocations = allocationIds.length;
 
         if (offset >= sumOfAllocations) {
             return (new CommonTypes.FilActorId[](0), sumOfAllocations);
@@ -741,7 +741,7 @@ contract DataCapEvidenceAdapter is
      */
     function isDataSizeMatching(uint256 dealId) external nonReentrant returns (bool) {
         Deal storage deal = _getStorageDeal(dealId);
-        ClientStorage storage $ = s();
+        DataCapEvidenceAdapterStorage storage $ = s();
 
         if (deal.validator == address(0)) {
             revert ValidatorNotSet(dealId);
@@ -817,7 +817,7 @@ contract DataCapEvidenceAdapter is
      * @param claims An array of claim IDs to mark as terminated.
      */
     function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
-        ClientStorage storage $ = s();
+        DataCapEvidenceAdapterStorage storage $ = s();
         for (uint256 i = 0; i < claims.length; ++i) {
             $._terminatedClaims[claims[i]] = true;
         }
@@ -841,7 +841,7 @@ contract DataCapEvidenceAdapter is
     /**
      * @notice Modifier to check that the caller is the PoRepMarket contract before executing the function
      */
-    modifier onlyPoRepMarket(uint256 railId) {
+    modifier onlyPoRepMarket() {
         _onlyPoRepMarket();
         _;
     }
@@ -850,7 +850,8 @@ contract DataCapEvidenceAdapter is
      * @notice Getter for the evidence type
      * @return The evidence type as uint8
      */
-    function evidenceType() external view returns (uint8) {
+    function evidenceType() external pure returns (uint8) {
         return EvidenceTypes.VERIF_REG_CLAIMS;
     }
+
 }

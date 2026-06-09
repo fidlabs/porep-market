@@ -15,60 +15,60 @@ interface IStorageEvidenceAdapter {
      */
     function evidenceType() external view returns (uint8);
 
-    /**
-     * @notice Returns whether the adapter can still process new evidence
-     * @dev Returns false when the adapter is no longer operational, for example
-     * when the DataCap adapter can no longer accept allocations or claims
-     * @return True if the adapter can process new evidence, false if it is no longer operational
-     */
-    function isOperational() external view returns (bool);
+    // /**
+    //  * @notice Returns whether the adapter can still process new evidence
+    //  * @dev Returns false when the adapter is no longer operational, for example
+    //  * when the DataCap adapter can no longer accept allocations or claims
+    //  * @return True if the adapter can process new evidence, false if it is no longer operational
+    //  */
+    // function isOperational() external view returns (bool);
 
-    /**
-     * @notice Submit one bounded batch of adapter-specific evidence for a deal
-     * @dev `evidenceData` is opaque to PoRepMarket; the selected adapter defines,
-     * decodes, and validates its contents
-     * @param context Activation context for the deal and market state
-     * @param evidenceData Adapter-specific evidence payload
-     * @return decision Activation decision for the submitted evidence batch
-     */
-    function submitEvidenceBatch(Types.ActivationContext calldata context, bytes calldata evidenceData)
-        external
-        returns (Types.ActivationDecision memory decision);
+    // /**
+    //  * @notice Submit one bounded batch of adapter-specific evidence for a deal
+    //  * @dev `evidenceData` is opaque to PoRepMarket; the selected adapter defines,
+    //  * decodes, and validates its contents
+    //  * @param context Activation context for the deal and market state
+    //  * @param evidenceData Adapter-specific evidence payload
+    //  * @return decision Activation decision for the submitted evidence batch
+    //  */
+    // function submitEvidenceBatch(Types.ActivationContext calldata context, bytes calldata evidenceData)
+    //     external
+    //     returns (Types.ActivationDecision memory decision);
 
-    /**
-     * @notice Return the adapter's activation decision after submitted evidence
-     * covers enough bytes for the frozen deal
-     * @dev This function does not set payment terms; PoRepMarket consumes the
-     * returned covered bytes and derives committed bytes, billed units, service
-     * start/end, rail ceiling, and deal state
-     * @param context Activation context for the deal and market state
-     * @param evidenceData Adapter-specific evidence payload
-     * @return decision Activation decision for the provided evidence
-     */
-    function activateEvidence(Types.ActivationContext calldata context, bytes calldata evidenceData)
-        external
-        returns (Types.ActivationDecision memory decision);
+    // /**
+    //  * @notice Return the adapter's activation decision after submitted evidence
+    //  * covers enough bytes for the frozen deal
+    //  * @dev This function does not set payment terms; PoRepMarket consumes the
+    //  * returned covered bytes and derives committed bytes, billed units, service
+    //  * start/end, rail ceiling, and deal state
+    //  * @param context Activation context for the deal and market state
+    //  * @param evidenceData Adapter-specific evidence payload
+    //  * @return decision Activation decision for the provided evidence
+    //  */
+    // function activateEvidence(Types.ActivationContext calldata context, bytes calldata evidenceData)
+    //     external
+    //     returns (Types.ActivationDecision memory decision);
 
-    /**
-     * @notice Refresh current evidence health from adapter-specific source data
-     * @dev The caller supplies only the bounded batch to check; the adapter
-     * verifies state itself before updating stored active covered bytes
-     * @param context Activation context for the deal and market state
-     * @param evidenceData Bounded batch of evidence used to verify current status
-     * @return status Updated evidence status
-     */
-    function refreshEvidenceStatus(Types.ActivationContext calldata context, bytes calldata evidenceData)
-        external
-        returns (Types.EvidenceStatus memory status);
+    // /**
+    //  * @notice Refresh current evidence health from adapter-specific source data
+    //  * @dev The caller supplies only the bounded batch to check; the adapter
+    //  * verifies state itself before updating stored active covered bytes
+    //  * @param context Activation context for the deal and market state
+    //  * @param evidenceData Bounded batch of evidence used to verify current status
+    //  * @return status Updated evidence status
+    //  */
+    // function refreshEvidenceStatus(Types.ActivationContext calldata context, bytes calldata evidenceData)
+    //     external
+    //     returns (Types.EvidenceStatus memory status);
 
-    /**
-     * @notice Read current evidence status from adapter storage only
-     * @dev Must not call Filecoin actors or refresh live state
-     * @param context Activation context for the deal and market state
-     * @return status Current adapter-local evidence status
-     */
-    function currentEvidenceStatus(Types.ActivationContext calldata context)
-        external
-        view
-        returns (Types.EvidenceStatus memory status);
+    // /**
+    //  * @notice Read current evidence status from adapter storage only
+    //  * @dev Must not call Filecoin actors or refresh live state
+    //  * @param context Activation context for the deal and market state
+    //  * @return status Current adapter-local evidence status
+    //  */
+    // function currentEvidenceStatus(Types.ActivationContext calldata context)
+    //     external
+    //     view
+    //     returns (Types.EvidenceStatus memory status);
 }
