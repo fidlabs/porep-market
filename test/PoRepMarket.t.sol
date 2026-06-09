@@ -14,7 +14,7 @@ import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
-import {ClientSCMock} from "./contracts/ClientSCMock.sol";
+import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 
 // solhint-disable-next-line max-states-count
@@ -23,7 +23,7 @@ contract PoRepMarketTest is Test {
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
-    ClientSCMock public dataCapEvidenceAdapterAddress;
+    DataCapEvidenceAdapterMock public dataCapEvidenceAdapterAddress;
     address public clientAddress;
     address public providerOwnerAddress;
     address public operatorAddress;
@@ -45,7 +45,7 @@ contract PoRepMarketTest is Test {
         spRegistry = new SPRegistryMock();
         validatorFactory = new ValidatorFactoryMock();
         validatorAddress = vm.addr(0x001);
-        dataCapEvidenceAdapterAddress = new ClientSCMock();
+        dataCapEvidenceAdapterAddress = new DataCapEvidenceAdapterMock();
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
         operatorAddress = vm.addr(0x005);

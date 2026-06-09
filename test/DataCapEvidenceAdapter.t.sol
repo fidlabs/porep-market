@@ -23,7 +23,7 @@ import {FailingMockInvalidSecondElementInnerLength} from "./contracts/FailingMoc
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
 import {FailingMockAddVerifiedClient} from "./contracts/FailingMockAddVerifiedClient.sol";
 import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
-import {ClientContractMock} from "./contracts/ClientContractMock.sol";
+import {DataCapEvidenceAdapterContractMock} from "./contracts/DataCapEvidenceAdapterContractMock.sol";
 import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
@@ -34,7 +34,7 @@ import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
 
 // solhint-disable max-states-count
-contract ClientTest is Test {
+contract DataCapEvidenceAdapterTest is Test {
     error MissingAllocationId();
     error UnexpectedAllocationId();
 
@@ -144,7 +144,8 @@ contract ClientTest is Test {
 
     function setupProxy(address impl) public returns (address) {
         bytes memory initData = abi.encodeCall(
-            DataCapEvidenceAdapter.initialize, (address(this), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
+            DataCapEvidenceAdapter.initialize,
+            (address(this), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return address(proxy);
@@ -156,7 +157,7 @@ contract ClientTest is Test {
         assertFalse(deal.completed);
     }
 
-    function _registerDealWithOneAllocation(ClientContractMock dataCapEvidenceAdapterMock) internal {
+    function _registerDealWithOneAllocation(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
         actorIdMock.setGetClaimsResult(hex"8282008080");
         actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
@@ -168,7 +169,7 @@ contract ClientTest is Test {
         poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
     }
 
-    function _registerDealWithTwoAllocations(ClientContractMock dataCapEvidenceAdapterMock) internal {
+    function _registerDealWithTwoAllocations(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(20000));
         actorIdMock.setGetClaimsResult(hex"8282008080");
         actorIdMock.setDataCapTransferResult(hex"83410041004A83820180820080820102");
@@ -180,7 +181,7 @@ contract ClientTest is Test {
         poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
     }
 
-    function _grantRescueRole(ClientContractMock dataCapEvidenceAdapterMock, address account) internal {
+    function _grantRescueRole(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock, address account) internal {
         vm.prank(address(this));
         dataCapEvidenceAdapterMock.grantRole(dataCapEvidenceAdapterMock.RESCUE_ROLE(), account);
     }
@@ -224,8 +225,11 @@ contract ClientTest is Test {
         }
     }
 
-    function _assertOneAllocationDealUnchanged(ClientContractMock dataCapEvidenceAdapterMock) internal view {
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+    function _assertOneAllocationDealUnchanged(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock)
+        internal
+        view
+    {
+        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
 
@@ -253,10 +257,12 @@ contract ClientTest is Test {
     }
 
     function testGetAllocationIdsPerDealPaginates() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
 
-        (CommonTypes.FilActorId[] memory firstPage, uint256 sumOfAllocations) = dataCapEvidenceAdapterMock.getAllocationIdsPerDeal(dealId, 0, 1);
+        (CommonTypes.FilActorId[] memory firstPage, uint256 sumOfAllocations) =
+            dataCapEvidenceAdapterMock.getAllocationIdsPerDeal(dealId, 0, 1);
         assertEq(sumOfAllocations, 2);
         assertEq(firstPage.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(firstPage[0]), 1);
@@ -277,7 +283,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRevertsWithoutRescueRole() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
 
         address unauthorized = vm.addr(0x523);
@@ -291,7 +298,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsNonCompletedMarketDeal() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -305,7 +313,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsUnregisteredLocalDeal() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
         poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
 
@@ -314,7 +323,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsZeroReplacementSize() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -328,7 +338,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsTooTightReplacementWindow() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -337,12 +348,15 @@ contract ClientTest is Test {
             2048
         );
 
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, int64(518400), int64(529919)));
+        vm.expectRevert(
+            abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, int64(518400), int64(529919))
+        );
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
     }
 
     function testRescueDealAllocationsRejectsExpiredReplacementAllocation() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -357,7 +371,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsPartialReplacement() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -366,7 +381,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsMismatchedAmount() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -378,7 +394,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsWrongReceiver() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -390,7 +407,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsDifferentReplacementProvider() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -404,7 +422,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsClaimExtensions() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
@@ -418,7 +437,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRollsBackWhenDataCapTransferFails() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
         actorIdMock.setDataCapTransferExitCode(16);
@@ -430,7 +450,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRollsBackWhenReturnedAllocationCountIsTooSmall() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
         actorIdMock.setDataCapTransferResult(hex"8341004100488382018082008080");
@@ -442,7 +463,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRollsBackWhenReturnedAllocationCountIsTooLarge() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
         actorIdMock.setDataCapTransferResult(hex"83410041004C8382018082008082182A182B");
@@ -454,14 +476,15 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsReplacesTrackedIdsAndPreservesDealIdentity() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
         actorIdMock.setDataCapTransferResult(hex"83410041004A8382018082008081182A");
 
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
 
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 42);
 
@@ -479,14 +502,15 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsReplacesMultipleTrackedIdsAndPreservesAggregateSize() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
         actorIdMock.setDataCapTransferResult(hex"83410041004C8382018082008082182A182B");
 
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _twoAllocationRescueParams());
 
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 2);
         _assertDoesNotContainAllocationId(ids, 1);
         _assertDoesNotContainAllocationId(ids, 2);
@@ -517,22 +541,24 @@ contract ClientTest is Test {
     }
 
     function testShouldAddAllocationsIdsAfterTransfer() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
-        (CommonTypes.FilActorId[] memory clientAllocationIdsBefore,) =
+        (CommonTypes.FilActorId[] memory allocationIdsBefore,) =
             dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
-        assertEq(clientAllocationIdsBefore.length, 0);
+        assertEq(allocationIdsBefore.length, 0);
 
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710021A005034AC";
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        CommonTypes.FilActorId[] memory clientAllocationIdsAfter = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
-        assertEq(clientAllocationIdsAfter.length, 2);
-        assertEq(CommonTypes.FilActorId.unwrap(clientAllocationIdsAfter[0]), 2);
-        assertEq(CommonTypes.FilActorId.unwrap(clientAllocationIdsAfter[1]), 1);
+        CommonTypes.FilActorId[] memory allocationIdsAfter =
+            dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
+        assertEq(allocationIdsAfter.length, 2);
+        assertEq(CommonTypes.FilActorId.unwrap(allocationIdsAfter[0]), 2);
+        assertEq(CommonTypes.FilActorId.unwrap(allocationIdsAfter[1]), 1);
     }
 
     function testInvalidClaimExtensionRequest() public {
@@ -546,7 +572,9 @@ contract ClientTest is Test {
     function testHandleFilecoinMethodExpectRevertInvalidCaller() public {
         bytes memory params =
             hex"821a85223bdf585b861903f3061903f34a006f05b59d3b2000000058458281861903e8d82a5828000181e2039220207dcae81b2a679a3955cc2e4b3504c23ce55b2db5dd2119841ecafa550e53900e1908001a0007e9001a005033401a0002d3028040";
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidCaller.selector, address(this), datacapContract));
+        vm.expectRevert(
+            abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidCaller.selector, address(this), datacapContract)
+        );
         dataCapEvidenceAdapter.handle_filecoin_method(3726118371, 81, params);
     }
 
@@ -570,7 +598,8 @@ contract ClientTest is Test {
         bytes memory params =
             hex"821A85223BDF58598607061903F34A006F05B59D3B2000000058458281861903E8D82A5828000181E2039220207DCAE81B2A679A3955CC2E4B3504C23CE55B2DB5DD2119841ECAFA550E53900E1908001A0007E9001A005033401A0002D3028040";
         vm.prank(datacapContract);
-        (uint32 exitCode, uint64 codec, bytes memory data) = dataCapEvidenceAdapter.handle_filecoin_method(3726118371, 0x51, params);
+        (uint32 exitCode, uint64 codec, bytes memory data) =
+            dataCapEvidenceAdapter.handle_filecoin_method(3726118371, 0x51, params);
         assertEq(exitCode, 0);
         assertEq(codec, 0);
         assertEq(data, "");
@@ -580,7 +609,8 @@ contract ClientTest is Test {
         bytes memory params =
             hex"821A85223BDF58598606061903F34A006F05B59D3B2000000058458281861903E8D82A5828000181E2039220207DCAE81B2A679A3955CC2E4B3504C23CE55B2DB5DD2119841ECAFA550E53900E1908001A0007E9001A005033401A0002D3028040";
         vm.prank(datacapContract);
-        (uint32 exitCode, uint64 codec, bytes memory data) = dataCapEvidenceAdapter.handle_filecoin_method(3726118371, 0x51, params);
+        (uint32 exitCode, uint64 codec, bytes memory data) =
+            dataCapEvidenceAdapter.handle_filecoin_method(3726118371, 0x51, params);
         assertEq(exitCode, 0);
         assertEq(codec, 0);
         assertEq(data, "");
@@ -618,7 +648,9 @@ contract ClientTest is Test {
         actorIdMock.setGetClaimsResult(hex"8282008080");
 
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, int64(518400), int64(529919)));
+        vm.expectRevert(
+            abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, int64(518400), int64(529919))
+        );
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 
@@ -628,7 +660,9 @@ contract ClientTest is Test {
         actorIdMock.setGetClaimsResult(hex"8282008080");
 
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, type(int64).max, type(int64).max));
+        vm.expectRevert(
+            abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, type(int64).max, type(int64).max)
+        );
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 
@@ -641,7 +675,8 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
 
-        (CommonTypes.FilActorId[] memory ids,) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        (CommonTypes.FilActorId[] memory ids,) =
+            dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
         assertEq(ids.length, 1);
     }
 
@@ -667,7 +702,8 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
 
-        (CommonTypes.FilActorId[] memory ids,) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        (CommonTypes.FilActorId[] memory ids,) =
+            dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
         assertEq(ids.length, 1);
     }
 
@@ -802,7 +838,8 @@ contract ClientTest is Test {
     }
 
     function testShouldNotOverrideDealWhileReplayingIfAlreadyRegistered() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(1000000));
 
         transferParams.operator_data =
@@ -853,7 +890,8 @@ contract ClientTest is Test {
             DataCapEvidenceAdapter.initialize,
             (address(this), terminationOracle, address(poRepMarketMock), address(reentrantMetaAllocatorMock))
         );
-        DataCapEvidenceAdapter dataCapEvidenceAdapterWithReentrancy = DataCapEvidenceAdapter(address(new ERC1967Proxy(address(impl), initData)));
+        DataCapEvidenceAdapter dataCapEvidenceAdapterWithReentrancy =
+            DataCapEvidenceAdapter(address(new ERC1967Proxy(address(impl), initData)));
 
         poRepMarketMock.setDealProposal(
             dealId,
@@ -874,7 +912,9 @@ contract ClientTest is Test {
                 manifestLocation: expectedManifestLocation
             })
         );
-        reentrantMetaAllocatorMock.setAttackParams(address(dataCapEvidenceAdapterWithReentrancy), transferParams, dealId);
+        reentrantMetaAllocatorMock.setAttackParams(
+            address(dataCapEvidenceAdapterWithReentrancy), transferParams, dealId
+        );
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClient.selector));
@@ -882,7 +922,8 @@ contract ClientTest is Test {
     }
 
     function testShouldAddClaimExtensionIdsAfterTransfer() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(1000000));
 
         transferParams.operator_data =
@@ -929,7 +970,8 @@ contract ClientTest is Test {
     }
 
     function testIsDataSizeMatchingHappyPath() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
@@ -937,7 +979,7 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
 
@@ -947,7 +989,8 @@ contract ClientTest is Test {
     }
 
     function testIsDataSizeMatchingRemovesTerminatedClaimAndReturnsFalse() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
@@ -960,19 +1003,20 @@ contract ClientTest is Test {
         vm.prank(terminationOracle);
         dataCapEvidenceAdapterMock.claimsTerminatedEarly(claims);
 
-        CommonTypes.FilActorId[] memory beforeIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory beforeIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 1);
 
         vm.prank(address(validatorMock));
         bool ok = dataCapEvidenceAdapterMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
-        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 0);
     }
 
     function testIsDataSizeMatchingRemovesExpiredClaimAndReturnsFalse() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
@@ -985,12 +1029,13 @@ contract ClientTest is Test {
         bool ok = dataCapEvidenceAdapterMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
-        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 0);
     }
 
     function testIsDataSizeMatchingSkipsFailCodes() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
@@ -1001,14 +1046,14 @@ contract ClientTest is Test {
             hex"8282008182001081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
 
-        CommonTypes.FilActorId[] memory beforeIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory beforeIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 1);
 
         vm.prank(address(validatorMock));
         bool ok = dataCapEvidenceAdapterMock.isDataSizeMatching(dealId);
         assertTrue(!ok);
 
-        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 1);
     }
@@ -1023,7 +1068,8 @@ contract ClientTest is Test {
     }
 
     function testIsDataSizeMatchingRemovesTerminatedClaimId() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         actorIdMock.setGetClaimsResult(
@@ -1034,7 +1080,7 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        CommonTypes.FilActorId[] memory beforeIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory beforeIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 2);
 
         uint64[] memory claims = new uint64[](1);
@@ -1046,7 +1092,7 @@ contract ClientTest is Test {
         vm.prank(address(validatorMock));
         dataCapEvidenceAdapterMock.isDataSizeMatching(dealId);
 
-        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 2);
     }
@@ -1082,7 +1128,8 @@ contract ClientTest is Test {
     }
 
     function testDeleteDealAllocationIdByIndex() public {
-        ClientContractMock mock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(mock), uint256(10000));
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
@@ -1090,27 +1137,28 @@ contract ClientTest is Test {
         vm.prank(clientAddress);
         mock.submitDataCapBatch(transferParams, dealId);
 
-        CommonTypes.FilActorId[] memory beforeIds = mock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory beforeIds = mock.getAllAllocationIdsPerDeal(dealId);
         assertEq(beforeIds.length, 2);
         assertEq(CommonTypes.FilActorId.unwrap(beforeIds[0]), 3);
         assertEq(CommonTypes.FilActorId.unwrap(beforeIds[1]), 1);
 
         mock.deleteDealAllocationIdByIndex(dealId, 0);
 
-        CommonTypes.FilActorId[] memory afterIds = mock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory afterIds = mock.getAllAllocationIdsPerDeal(dealId);
         assertEq(afterIds.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(afterIds[0]), 1);
     }
 
     function testIsDataSizeMatchingRevertsWhenGetClaimsExitCodeNonZero() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getClientAllocationIdsPerDeal(dealId);
+        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
         assertEq(ids.length, 1);
 
         ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
@@ -1122,7 +1170,8 @@ contract ClientTest is Test {
     }
 
     function testIsDataSizeMatchingCallerNotValidator() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
@@ -1131,12 +1180,17 @@ contract ClientTest is Test {
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
         vm.prank(address(0x123));
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidCaller.selector, address(0x123), address(validatorMock)));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                DataCapEvidenceAdapter.InvalidCaller.selector, address(0x123), address(validatorMock)
+            )
+        );
         dataCapEvidenceAdapterMock.isDataSizeMatching(dealId);
     }
 
     function testIsDataSizeMatchingDealWithNoValidator() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
@@ -1167,7 +1221,8 @@ contract ClientTest is Test {
     }
 
     function testShouldThrowInsufficientAllowance() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
@@ -1177,7 +1232,8 @@ contract ClientTest is Test {
     }
 
     function testShouldThrowAmountEqualZero() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         transferParams.operator_data =
@@ -1191,13 +1247,16 @@ contract ClientTest is Test {
     }
 
     function testShouldEmitMetaAllocatorDatacapAllocatedEvent() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
 
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit IMetaAllocator.DatacapAllocated(
-            address(dataCapEvidenceAdapterMock), FilAddresses.fromEthAddress(address(dataCapEvidenceAdapterMock)).data, uint256(6144)
+            address(dataCapEvidenceAdapterMock),
+            FilAddresses.fromEthAddress(address(dataCapEvidenceAdapterMock)).data,
+            uint256(6144)
         );
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
     }
@@ -1298,7 +1357,8 @@ contract ClientTest is Test {
     }
 
     function testShouldReturnDealAllocatedSize() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
 
         uint256 sizeOfTransfer = 6144;
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(sizeOfTransfer * 3));
@@ -1334,7 +1394,8 @@ contract ClientTest is Test {
     }
 
     function testRescueDealAllocationsRejectsAllocationSizeExceedingSector() public {
-        ClientContractMock dataCapEvidenceAdapterMock = ClientContractMock(setupProxy(address(new ClientContractMock())));
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 

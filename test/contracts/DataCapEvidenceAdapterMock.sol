@@ -6,7 +6,7 @@ pragma solidity =0.8.30;
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {DataCapEvidenceAdapter} from "../../src/DataCapEvidenceAdapter.sol";
 
-contract ClientSCMock {
+contract DataCapEvidenceAdapterMock {
     mapping(CommonTypes.FilActorId provider => bool ok) public valid;
     mapping(uint256 dealId => bool matches) public dataSizeMatches;
     mapping(uint256 dealId => DataCapEvidenceAdapter.Deal deal) public deals;
@@ -24,7 +24,11 @@ contract ClientSCMock {
         return dataSizeMatches[dealId];
     }
 
-    function getClientDealInfo(uint256 dealId) external view returns (DataCapEvidenceAdapter.Deal memory) {
+    function getDataCapEvidenceAdapterDealInfo(uint256 dealId)
+        external
+        view
+        returns (DataCapEvidenceAdapter.Deal memory)
+    {
         return deals[dealId];
     }
 
@@ -35,7 +39,7 @@ contract ClientSCMock {
         }
     }
 
-    function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory) {
+    function getAllAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory) {
         return allocationIds[dealId];
     }
 
