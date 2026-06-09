@@ -10,11 +10,11 @@ import {SLITypes} from "../types/SLITypes.sol";
  */
 interface IPoRepMarket {
     /**
-     * @notice Sets the client smart contract
-     * @dev Sets the client smart contract
-     * @param _clientSmartContract The address of the client smart contract
+     * @notice Sets the DataCap evidence adapter
+     * @dev Sets the DataCap evidence adapter
+     * @param _dataCapEvidenceAdapter The address of the DataCap evidence adapter
      */
-    function setClientSmartContract(address _clientSmartContract) external;
+    function setDataCapEvidenceAdapter(address _dataCapEvidenceAdapter) external;
 
     /**
      * @notice Proposes a deal
@@ -122,10 +122,10 @@ interface IPoRepMarket {
     function getSPRegistryContract() external view returns (address);
 
     /**
-     * @notice Gets the client smart contract address from storage
-     * @return IClient The client smart contract address
+     * @notice Gets the DataCap evidence adapter address from storage
+     * @return IClient The DataCap evidence adapter address
      */
-    function getClientSmartContract() external view returns (address);
+    function getDataCapEvidenceAdapter() external view returns (address);
 
     /**
      * @notice Gets the validator factory contract address from storage

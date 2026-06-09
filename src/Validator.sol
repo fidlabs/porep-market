@@ -14,7 +14,7 @@ import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
-import {IClient} from "./interfaces/IClient.sol";
+import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -35,7 +35,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @notice Error indicating that the caller is not the Client Smart Contract
      * @dev 0x669fc0af
      */
-    error CallerIsNotClientSC();
+    error CallerIsNotDataCapEvidenceAdapter();
 
     /**
      * @notice Error indicating that the admin address provided during initialization is the zero address
@@ -56,10 +56,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidSLIScorerAddress();
 
     /**
-     * @notice Error indicating that the client smart contract address provided during initialization is the zero address
+     * @notice Error indicating that the DataCap evidence adapter address provided during initialization is the zero address
      * @dev 0xe75a5f1c
      */
-    error InvalidClientSCAddress();
+    error InvalidDataCapEvidenceAdapterAddress();
 
     /**
      * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
@@ -229,7 +229,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 dealId;
         address filecoinPay;
         address SLIScorer;
-        address clientSC;
+        address dataCapEvidenceAdapter;
         address poRepMarket;
         address SPRegistry;
         CommonTypes.FilActorId providerId;
@@ -287,7 +287,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLIScorer Address of the SLIScorer contract
-     * @param _clientSC Address of the client smart contract
+     * @param _dataCapEvidenceAdapter Address of the DataCap evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
      * @param _SPRegistry Address of the SPRegistry contract
      * @param _dealId The ID of the deal for which this validator is being initialized
@@ -297,13 +297,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _porepService,
         address _filecoinPay,
         address _SLIScorer,
-        address _clientSC,
+        address _dataCapEvidenceAdapter,
         address _poRepMarket,
         address _SPRegistry,
         uint256 _dealId
     ) external initializer {
         _validateInitializeAddresses(
-            _admin, _porepService, _filecoinPay, _SLIScorer, _clientSC, _SPRegistry, _poRepMarket
+            _admin, _porepService, _filecoinPay, _SLIScorer, _dataCapEvidenceAdapter, _SPRegistry, _poRepMarket
         );
 
         __AccessControl_init();
@@ -317,7 +317,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         $.providerId = dealProposal.provider;
         $.filecoinPay = _filecoinPay;
         $.SLIScorer = _SLIScorer;
-        $.clientSC = _clientSC;
+        $.dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
         $.poRepMarket = _poRepMarket;
         $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
@@ -372,7 +372,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
 
         bool scoreMatches = score == 100;
-        bool dataSizeMatches = IClient($.clientSC).isDataSizeMatching($.dealId);
+        bool dataSizeMatches = IDataCapEvidenceAdapter($.dataCapEvidenceAdapter).isDataSizeMatching($.dealId);
 
         if (!scoreMatches || !dataSizeMatches) {
             result.settleUpto = toEpoch;
@@ -591,7 +591,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         ValidatorStorage storage $ = _getValidatorStorage();
 
         PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
-        CommonTypes.FilActorId[] memory allocationIds = IClient($.clientSC).getClientAllocationIdsPerDeal($.dealId);
+        (CommonTypes.FilActorId[] memory allocationIds,) =
+            IDataCapEvidenceAdapter($.dataCapEvidenceAdapter).getAllocationIdsPerDeal($.dealId, 0, type(uint256).max);
 
         uint256 sectorCount = allocationIds.length;
         uint256 pricePerSectorPerMonth = dealProposal.terms.pricePerSectorPerMonth;
@@ -615,7 +616,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLIScorer Address of the SLIScorer contract
-     * @param _clientSC Address of the client smart contract
+     * @param _dataCapEvidenceAdapter Address of the DataCap evidence adapter
      * @param _SPRegistry Address of the SPRegistry contract
      * @param _poRepMarket Address of the PoRepMarket contract
      */
@@ -624,7 +625,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _porepService,
         address _filecoinPay,
         address _SLIScorer,
-        address _clientSC,
+        address _dataCapEvidenceAdapter,
         address _SPRegistry,
         address _poRepMarket
     ) internal pure {
@@ -640,8 +641,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         if (_SLIScorer == address(0)) {
             revert InvalidSLIScorerAddress();
         }
-        if (_clientSC == address(0)) {
-            revert InvalidClientSCAddress();
+        if (_dataCapEvidenceAdapter == address(0)) {
+            revert InvalidDataCapEvidenceAdapterAddress();
         }
         if (_SPRegistry == address(0)) {
             revert InvalidSPRegistryAddress();

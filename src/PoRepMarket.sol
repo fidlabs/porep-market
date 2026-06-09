@@ -9,7 +9,7 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
-import {IClient} from "./interfaces/IClient.sol";
+import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -70,7 +70,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
-        IClient _clientSmartContract;
+        IDataCapEvidenceAdapter _dataCapEvidenceAdapter;
         uint256 _dealIdCounter;
         uint256 _dealCompletionPadding;
         uint256 _dealProposalExpiration;
@@ -176,11 +176,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     event ManifestLocationUpdated(uint256 indexed dealId, string oldManifestLocation, string newManifestLocation);
 
     /**
-     * @notice ClientSmartContractUpdated event
-     * @dev ClientSmartContractUpdated event is emitted when the client smart contract is updated
-     * @param clientSmartContract The address of the client smart contract
+     * @notice DataCapEvidenceAdapterUpdated event
+     * @dev DataCapEvidenceAdapterUpdated event is emitted when the DataCap evidence adapter is updated
+     * @param dataCapEvidenceAdapter The address of the DataCap evidence adapter
      */
-    event ClientSmartContractUpdated(address indexed clientSmartContract);
+    event DataCapEvidenceAdapterUpdated(address indexed dataCapEvidenceAdapter);
 
     /**
      * @notice DealCompletionPaddingUpdated event
@@ -296,10 +296,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error TooLongManifestLocation();
 
     /**
-     * @notice Error thrown when trying to set an invalid client smart contract address
+     * @notice Error thrown when trying to set an invalid DataCap evidence adapter address
      * @dev 0x39ee49ba
      */
-    error InvalidClientSmartContractAddress();
+    error InvalidDataCapEvidenceAdapterAddress();
 
     /**
      * @notice Error thrown when deal duration in terms is invalid
@@ -389,15 +389,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
-     * @notice Sets the client smart contract
-     * @dev Sets the client smart contract
-     * @param _clientSmartContract The address of the client smart contract
+     * @notice Sets the DataCap evidence adapter
+     * @dev Sets the DataCap evidence adapter
+     * @param _dataCapEvidenceAdapter The address of the DataCap evidence adapter
      */
-    function setClientSmartContract(address _clientSmartContract) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
+    function setDataCapEvidenceAdapter(address _dataCapEvidenceAdapter) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_dataCapEvidenceAdapter == address(0)) revert InvalidDataCapEvidenceAdapterAddress();
         DealProposalsStorage storage $ = _getDealProposalsStorage();
-        $._clientSmartContract = IClient(_clientSmartContract);
-        emit ClientSmartContractUpdated(_clientSmartContract);
+        $._dataCapEvidenceAdapter = IDataCapEvidenceAdapter(_dataCapEvidenceAdapter);
+        emit DataCapEvidenceAdapterUpdated(_dataCapEvidenceAdapter);
     }
 
     /**
@@ -544,7 +544,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (msg.sender != dp.client) revert NotTheClientAddress();
-        uint256 allocatedSize = $._clientSmartContract.getSizeOfAllocations(dealId);
+        uint256 allocatedSize = $._dataCapEvidenceAdapter.getSizeOfAllocations(dealId);
         uint256 proposedSize = dp.terms.dealSizeBytes;
 
         _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
@@ -740,12 +740,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
-     * @notice Gets the client smart contract address from storage
-     * @return IClient The client smart contract address
+     * @notice Gets the DataCap evidence adapter address from storage
+     * @return IDataCapEvidenceAdapter The DataCap evidence adapter address
      */
-    function getClientSmartContract() external view returns (address) {
+    function getDataCapEvidenceAdapter() external view returns (address) {
         DealProposalsStorage storage $ = s();
-        return address($._clientSmartContract);
+        return address($._dataCapEvidenceAdapter);
     }
 
     /**
