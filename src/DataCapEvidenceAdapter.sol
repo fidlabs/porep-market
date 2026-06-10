@@ -683,15 +683,12 @@ contract DataCapEvidenceAdapter is
         sumOfAllocations = allocationIds.length;
 
         // solhint-disable-next-line gas-strict-inequalities
-        if (offset > sumOfAllocations - 1) {
+        if (offset >= sumOfAllocations) {
             return (new CommonTypes.FilActorId[](0), sumOfAllocations);
         }
 
-        uint256 end = offset + limit;
-        if (end > sumOfAllocations) {
-            end = sumOfAllocations;
-        }
-        uint256 count = end - offset;
+        uint256 remaining = sumOfAllocations - offset;
+        uint256 count = limit > remaining ? remaining : limit;
         ids = new CommonTypes.FilActorId[](count);
 
         for (uint256 i = 0; i < count; i++) {
