@@ -670,7 +670,7 @@ contract DataCapEvidenceAdapter is
      * @param dealId the id of the deal
      * @param offset index to start from
      * @param limit max number of ids to return
-     * @return ids allocation ids for the client and provider
+     * @return ids allocation ids for the deal
      * @return sumOfAllocations total number of allocation ids for the deal
      */
     function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
@@ -682,7 +682,8 @@ contract DataCapEvidenceAdapter is
         CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
         sumOfAllocations = allocationIds.length;
 
-        if (offset >= sumOfAllocations) {
+        // solhint-disable-next-line gas-strict-inequalities
+        if (offset > sumOfAllocations - 1) {
             return (new CommonTypes.FilActorId[](0), sumOfAllocations);
         }
 
