@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {SharedTypes as Types} from "../types/SharedTypes.sol";
-
 /**
  * @title Storage evidence adapter interface
  * @notice Defines the adapter used by PoRepMarket to submit, activate, refresh,
