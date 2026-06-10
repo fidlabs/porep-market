@@ -3,7 +3,7 @@
     "type": "constructor",
     "inputs": [
       {
-        "name": "_clientContract",
+        "name": "_dataCapEvidenceAdapter",
         "type": "address",
         "internalType": "address"
       },
@@ -17,13 +17,13 @@
   },
   {
     "type": "function",
-    "name": "CLIENT_CONTRACT",
+    "name": "DATA_CAP_EVIDENCE_ADAPTER",
     "inputs": [],
     "outputs": [
       {
         "name": "",
         "type": "address",
-        "internalType": "contract IClient"
+        "internalType": "contract IDataCapEvidenceAdapter"
       }
     ],
     "stateMutability": "view"
@@ -211,11 +211,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidClientAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidCodec",
     "inputs": [
       {
@@ -224,6 +219,11 @@
         "internalType": "uint64"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidDataCapEvidenceAdapterAddress",
+    "inputs": []
   },
   {
     "type": "error",

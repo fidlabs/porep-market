@@ -10,7 +10,7 @@ import {ActorIdMock} from "./contracts/ActorIdMock.sol";
 import {ActorIdExitCodeErrorFailingMock} from "./contracts/ActorIdExitCodeErrorFailingMock.sol";
 import {MockProxy} from "./contracts/MockProxy.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
-import {ClientSCMock} from "./contracts/ClientSCMock.sol";
+import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
@@ -30,7 +30,7 @@ contract PoRepMarketClaimInspectorTest is Test {
     PoRepMarketClaimInspector public porepMarketClaimInspector;
     ActorIdMock public actorIdMock;
     PoRepMarketMock public poRepMarketMock;
-    ClientSCMock public clientSCMock;
+    DataCapEvidenceAdapterMock public dataCapEvidenceAdapterMock;
     ValidatorMock public validatorMock;
 
     string public expectedManifestLocation = "https://example.com/manifest";
@@ -41,7 +41,7 @@ contract PoRepMarketClaimInspectorTest is Test {
         dealId = 1;
 
         poRepMarketMock = new PoRepMarketMock();
-        clientSCMock = new ClientSCMock();
+        dataCapEvidenceAdapterMock = new DataCapEvidenceAdapterMock();
         validatorMock = new ValidatorMock();
         actorIdMock = new ActorIdMock();
 
@@ -74,28 +74,29 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
-        porepMarketClaimInspector = new PoRepMarketClaimInspector(address(clientSCMock), address(poRepMarketMock));
+        porepMarketClaimInspector =
+            new PoRepMarketClaimInspector(address(dataCapEvidenceAdapterMock), address(poRepMarketMock));
     }
 
     function testConstructorSetsContractAddresses() public view {
-        assertEq(address(porepMarketClaimInspector.CLIENT_CONTRACT()), address(clientSCMock));
+        assertEq(address(porepMarketClaimInspector.DATA_CAP_EVIDENCE_ADAPTER()), address(dataCapEvidenceAdapterMock));
         assertEq(address(porepMarketClaimInspector.POREPMARKET_CONTRACT()), address(poRepMarketMock));
     }
 
-    function testConstructorRevertsWhenClientContractAddressIsZero() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidClientAddress.selector));
+    function testConstructorRevertsWhenDataCapEvidenceAdapterAddressIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidDataCapEvidenceAdapterAddress.selector));
         new PoRepMarketClaimInspector(address(0), address(poRepMarketMock));
     }
 
     function testConstructorRevertsWhenPoRepMarketContractAddressIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidPoRepMarketAddress.selector));
-        new PoRepMarketClaimInspector(address(clientSCMock), address(0));
+        new PoRepMarketClaimInspector(address(dataCapEvidenceAdapterMock), address(0));
     }
 
     function testConstructorRevertsWhenBothAddressesAreZero() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidClientAddress.selector));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidDataCapEvidenceAdapterAddress.selector));
         new PoRepMarketClaimInspector(address(0), address(0));
     }
 
@@ -127,7 +128,7 @@ contract PoRepMarketClaimInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](2);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
         ids[1] = CommonTypes.FilActorId.wrap(uint64(2));
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -148,7 +149,7 @@ contract PoRepMarketClaimInspectorTest is Test {
     function testGetClaimsReturnsEmptyResultWhenNoAllocations() public {
         actorIdMock.setGetClaimsResult(hex"8282008080");
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](0);
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -165,7 +166,7 @@ contract PoRepMarketClaimInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](2);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(10));
         ids[1] = CommonTypes.FilActorId.wrap(uint64(20));
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -190,7 +191,7 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.ClaimIdsMismatch.selector, 2, 1));
         porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -245,7 +246,7 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(7));
-        clientSCMock.setAllocationIds(secondDealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(secondDealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(secondDealId);
