@@ -831,20 +831,21 @@ contract DataCapEvidenceAdapter is
         return address(s()._poRepMarketContract);
     }
 
-    /**
-     * @notice Ensures the caller is the PoRepMarket contract
-     */
-    function _onlyPoRepMarket() internal view {
-        if (msg.sender != getPoRepMarketAddress()) revert OnlyMarket();
-    }
+    // Will be implemented in the future
+    // /**
+    //  * @notice Ensures the caller is the PoRepMarket contract
+    //  */
+    // function _onlyPoRepMarket() internal view {
+    //     if (msg.sender != getPoRepMarketAddress()) revert OnlyMarket();
+    // }
 
-    /**
-     * @notice Modifier to check that the caller is the PoRepMarket contract before executing the function
-     */
-    modifier onlyPoRepMarket() {
-        _onlyPoRepMarket();
-        _;
-    }
+    // /**
+    //  * @notice Modifier to check that the caller is the PoRepMarket contract before executing the function
+    //  */
+    // modifier onlyPoRepMarket() {
+    //     _onlyPoRepMarket();
+    //     _;
+    // }
 
     /**
      * @notice Getter for the evidence type

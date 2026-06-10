@@ -437,6 +437,22 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
     }
 
+    function testRescueDealAllocationsRejectsNegativeValue() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
+        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
+
+        DataCapTypes.TransferParams memory params = DataCapTypes.TransferParams({
+            to: FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)),
+            amount: CommonTypes.BigInt({val: abi.encodePacked(uint256(2048) * 1 ether), neg: true}),
+            operator_data: hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC"
+        });
+
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
+        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
+    }
+
     function testRescueDealAllocationsRollsBackWhenDataCapTransferFails() public {
         DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
@@ -1296,6 +1312,10 @@ contract DataCapEvidenceAdapterTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidMetaAllocatorContractAddress.selector));
         c.initialize(address(clientAddress), terminationOracle, address(poRepMarketMock), address(0));
+    }
+
+    function testGetPoRepMarketAddress() public view {
+        assertEq(dataCapEvidenceAdapter.getPoRepMarketAddress(), address(poRepMarketMock));
     }
 
     function testShouldRevertWhenAlreadyRegisteredDealTransferIsCalledByNotTheClient() public {
