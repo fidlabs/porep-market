@@ -2,6 +2,7 @@
 pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
 import {IPoRepMarket} from "../interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {FVMSector, SectorStatus} from "../../lib/fvm-solidity/src/FVMSector.sol";
@@ -9,8 +10,9 @@ import {FVMSector, SectorStatus} from "../../lib/fvm-solidity/src/FVMSector.sol"
 /**
  * @title PoRepMarketSectorStatusInspector
  * @notice Helper contract to validate sector status for a given deal ID against claimed status
+ * @dev Inherits {Multicall} so multiple validateSectorStatus calls can be batched into a single call
  */
-contract PoRepMarketSectorStatusInspector {
+contract PoRepMarketSectorStatusInspector is Multicall {
     /**
      * @notice Error indicating that an invalid deal ID was provided
      * @dev 0xb06db32a
