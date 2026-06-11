@@ -458,7 +458,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         uint256 newRate = _calculateAmountPerEpoch();
         $.amountPerEpoch = newRate;
-        $.railStatus = RailStatus.ACTIVE;
+
+        if ($.railStatus != RailStatus.TERMINATED) {
+            $.railStatus = RailStatus.ACTIVE;
+        }
 
         _modifyRailPayment(IFilecoinPayV1($.filecoinPay), $.railId, newRate, 0);
         emit RailPaymentModified($.railId, newRate);
