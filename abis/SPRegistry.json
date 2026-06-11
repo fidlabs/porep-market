@@ -192,8 +192,8 @@
           },
           {
             "name": "bandwidthBytesPerSecond",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
             "name": "latencyMs",
@@ -297,8 +297,8 @@
               },
               {
                 "name": "bandwidthBytesPerSecond",
-                "type": "uint16",
-                "internalType": "uint16"
+                "type": "uint64",
+                "internalType": "uint64"
               },
               {
                 "name": "latencyMs",
@@ -574,8 +574,8 @@
           },
           {
             "name": "bandwidthBytesPerSecond",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
             "name": "latencyMs",
@@ -711,8 +711,8 @@
           },
           {
             "name": "bandwidthBytesPerSecond",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
             "name": "latencyMs",
@@ -925,8 +925,8 @@
           },
           {
             "name": "bandwidthBytesPerSecond",
-            "type": "uint16",
-            "internalType": "uint16"
+            "type": "uint64",
+            "internalType": "uint64"
           },
           {
             "name": "latencyMs",
