@@ -8,11 +8,11 @@ import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
-import {ClientSCMock} from "./contracts/ClientSCMock.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 
@@ -28,7 +28,6 @@ contract ValidatorTest is Test {
     FilecoinPayV1Mock public filecoinPayMock;
     PoRepMarketMock public poRepMarketMock;
     SPRegistryMock public spRegistryMock;
-    ClientSCMock public clientSCMock;
     SLIOracle public sliOracle;
     SLIScorer public sliScorer;
     SPRegistry public spRegistry;
@@ -36,28 +35,22 @@ contract ValidatorTest is Test {
     address public admin;
     address public porepService;
     address public oracleUpdater;
-    address public clientSC;
     IERC20 public token;
     CommonTypes.FilActorId public providerFilActorId;
     uint256 public dealId;
     uint256 public railId;
     string public expectedManifestLocation;
-
     SLITypes.SLIThresholds public defaultRequirements;
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
-    uint256 public constant BLOCK_TIMESTAMP = 1_772_000_000;
-    int64 public constant CHAIN_EPOCH = 5_800_000;
 
     function setUp() public {
         filecoinPayMock = new FilecoinPayV1Mock();
-        clientSCMock = new ClientSCMock();
         poRepMarketMock = new PoRepMarketMock();
         spRegistryMock = new SPRegistryMock();
 
         admin = address(this);
         porepService = vm.addr(0x123);
         oracleUpdater = vm.addr(0xA11CE);
-        clientSC = address(clientSCMock);
         token = IERC20(vm.addr(0x5));
         providerFilActorId = CommonTypes.FilActorId.wrap(20000);
         dealId = 1;
@@ -102,23 +95,17 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
         );
 
-        filecoinPayMock.setOperatorApproval(token, admin, address(validator), true, 1_000_000, 1_000_000, 0, 0, 86_400);
-
-        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
-        ids[0] = CommonTypes.FilActorId.wrap(1);
-        clientSCMock.setAllocationIds(dealId, ids);
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(validator), true, 1_000_000, 1_000_000, 0, 0, EPOCHS_IN_MONTH
+        );
 
         vm.prank(admin);
         validator.createRail(token);
-
-        vm.prank(porepService);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(providerFilActorId, defaultRequirements);
@@ -160,7 +147,6 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -174,7 +160,6 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -190,19 +175,7 @@ contract ValidatorTest is Test {
         assertEq(result.note, "too early for settlement");
     }
 
-    function testValidatePaymentDatacapMismatch() public {
-        vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result =
-            validator.validatePayment(1, 100, 0, type(uint256).max, 1);
-
-        assertEq(result.modifiedAmount, 0);
-        assertEq(result.settleUpto, type(uint256).max);
-        assertEq(result.note, "data size does not match the deal proposal");
-    }
-
     function testValidatePaymentFullSlashWhenScoreZero() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
-
         vm.prank(oracleUpdater);
         sliOracle.setSLI(
             providerFilActorId,
@@ -216,20 +189,6 @@ contract ValidatorTest is Test {
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
         assertEq(result.note, "score below required threshold");
-    }
-
-    function testValidatePaymentOkWhenScorePositiveAndDatacapMatches() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
-
-        vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
-
-        vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 86_400, 1);
-
-        assertEq(result.modifiedAmount, 100);
-        assertEq(result.settleUpto, 86_400);
-        assertEq(result.note, "payment validated successfully");
     }
 
     function testValidatePaymentCallerIsNotFilecoinPayRevert() public {
@@ -271,7 +230,6 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -289,7 +247,6 @@ contract ValidatorTest is Test {
             address(0),
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -307,7 +264,6 @@ contract ValidatorTest is Test {
             porepService,
             address(0),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -324,25 +280,6 @@ contract ValidatorTest is Test {
             admin,
             porepService,
             address(filecoinPayMock),
-            address(0),
-            clientSC,
-            address(poRepMarketMock),
-            address(spRegistryMock),
-            dealId
-        );
-    }
-
-    function testInitializeRevertsWhenClientSCIsZeroAddress() public {
-        Validator impl = new Validator();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
-        Validator newValidator = Validator(address(proxy));
-
-        vm.expectRevert(Validator.InvalidClientSCAddress.selector);
-        newValidator.initialize(
-            admin,
-            porepService,
-            address(filecoinPayMock),
-            address(sliScorer),
             address(0),
             address(poRepMarketMock),
             address(spRegistryMock),
@@ -361,7 +298,6 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(0),
             address(spRegistryMock),
             dealId
@@ -379,26 +315,10 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(0),
             dealId
         );
-    }
-
-    function testModifyRailPaymentEmitsRailPaymentModified() public {
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = 2_000_000;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
-
-        uint256 sectorCount = clientSCMock.getClientAllocationIdsPerDeal(dealId).length;
-        uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
-
-        vm.expectEmit(true, false, false, true, address(validator));
-        emit Validator.RailPaymentModified(railId, expectedRate);
-
-        vm.prank(porepService);
-        validator.modifyRailPayment();
     }
 
     function testUpdateLockupPeriodEmitsLockupPeriodUpdated() public {
@@ -453,48 +373,6 @@ contract ValidatorTest is Test {
         validator.terminateRail();
     }
 
-    function testValidatePaymentReturnsDealEndedWhenFromEpochPastDealEndEpoch() public {
-        vm.prank(porepService);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(10)));
-
-        clientSCMock.setDataSizeMatching(dealId, true);
-
-        vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
-
-        assertEq(result.modifiedAmount, 0);
-        assertEq(result.settleUpto, 10);
-        assertEq(result.note, "deal ended");
-    }
-
-    function testValidatePaymentCapsSettlementToDealEndEpoch() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
-
-        vm.prank(porepService);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
-
-        vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
-
-        vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
-
-        assertEq(result.modifiedAmount, 10 * 1000);
-        assertEq(result.settleUpto, 1000);
-        assertEq(result.note, "payment limited to deal endepoch");
-    }
-
-    function testSetDealEndEpochCallerIsNotPoRepServiceRevert() public {
-        address unauthorized = vm.addr(0x321);
-        bytes32 expectedRole = validator.POREP_SERVICE_ROLE();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, expectedRole)
-        );
-        vm.prank(unauthorized);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1_000_000)));
-    }
-
     function testCreateRailRevertsWhenOperatorNotApproved() public {
         Validator impl = new Validator();
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
@@ -505,14 +383,13 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
         );
 
         filecoinPayMock.setOperatorApproval(
-            token, admin, address(newValidator), false, 1_000_000, 1_000_000, 0, 0, 86_400
+            token, admin, address(newValidator), false, 1_000_000, 1_000_000, 0, 0, EPOCHS_IN_MONTH
         );
 
         vm.expectRevert(Validator.OperatorNotApproved.selector);
@@ -529,7 +406,6 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -553,13 +429,14 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
         );
 
-        filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, 86_400);
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, EPOCHS_IN_MONTH
+        );
 
         vm.expectRevert(Validator.InvalidLockupAllowance.selector);
         newValidator.createRail(token);
@@ -575,35 +452,17 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
         );
 
-        filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, 86_400);
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, EPOCHS_IN_MONTH
+        );
 
         vm.expectRevert(Validator.InvalidRateAllowance.selector);
         newValidator.createRail(token);
-    }
-
-    function testModifyRailPaymentRevertsWhenSectorCountIsZero() public {
-        CommonTypes.FilActorId[] memory emptyIds = new CommonTypes.FilActorId[](0);
-        clientSCMock.setAllocationIds(dealId, emptyIds);
-
-        vm.expectRevert(Validator.InvalidSectorCount.selector);
-        vm.prank(porepService);
-        validator.modifyRailPayment();
-    }
-
-    function testValidatePaymentRevertsWhenDealNotCompleted() public {
-        vm.prank(porepService);
-        vm.roll(0);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(0)));
-
-        vm.expectRevert(abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId));
-        vm.prank(address(filecoinPayMock));
-        validator.validatePayment(railId, 100, 0, 86_400, 1);
     }
 
     function testCreateRailEmitsInitialLockupPeriodUpdated() public {
@@ -616,39 +475,19 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
         );
 
         filecoinPayMock.setOperatorApproval(
-            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
+            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, EPOCHS_IN_MONTH
         );
 
         vm.expectEmit(true, false, false, true, address(newValidator));
-        emit Validator.LockupPeriodUpdated(2, 86_400);
+        emit Validator.LockupPeriodUpdated(2, EPOCHS_IN_MONTH);
 
         newValidator.createRail(token);
-    }
-
-    function testSetDealEndEpochEmitsDealEndEpochUpdated() public {
-        CommonTypes.ChainEpoch newEndEpoch = CommonTypes.ChainEpoch.wrap(int64(123_456));
-
-        vm.expectEmit(true, false, false, true, address(validator));
-        emit Validator.DealEndEpochUpdated(dealId, newEndEpoch);
-
-        vm.prank(porepService);
-        validator.setDealEndEpoch(newEndEpoch);
-    }
-
-    function testSetDealEndEpochRevertsWhenEndEpochIsInThePast() public {
-        vm.prank(porepService);
-        // forge-lint: disable-next-line(unsafe-typecast)
-        vm.roll(uint256(uint64(CHAIN_EPOCH)));
-
-        vm.expectRevert(Validator.EndEpochInThePast.selector);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH - 1)));
     }
 
     function testDisableFutureRailPaymentsEmitsRailDisabled() public {
@@ -657,72 +496,6 @@ contract ValidatorTest is Test {
 
         vm.prank(porepService);
         validator.disableFutureRailPayments();
-    }
-
-    function testValidatePaymentCapsSettlementToEarlyTerminatedEpoch() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
-
-        vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
-
-        vm.warp(BLOCK_TIMESTAMP);
-
-        vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
-
-        vm.prank(porepService);
-        validator.disableFutureRailPayments();
-
-        vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result =
-            validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
-
-        assertEq(result.modifiedAmount, 10);
-        assertEq(result.settleUpto, 1);
-        assertEq(result.note, "payment limited to deal endepoch");
-    }
-
-    function testValidatePaymentUsesEarlyTerminatedEpochWhenEarlierThanDealEndEpoch() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
-
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 chainEpochConversion = uint256(uint64(CHAIN_EPOCH));
-        uint256 earlyTerminationEpoch = chainEpochConversion - 100_000;
-        vm.roll(earlyTerminationEpoch);
-
-        vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
-
-        vm.prank(porepService);
-        validator.disableFutureRailPayments();
-
-        vm.prank(address(filecoinPayMock));
-        IFilecoinPayValidator.ValidationResult memory result =
-            validator.validatePayment(railId, 50000000, 0, chainEpochConversion, 10);
-
-        assertEq(result.modifiedAmount, 10 * earlyTerminationEpoch);
-        assertEq(result.settleUpto, earlyTerminationEpoch);
-        assertEq(result.note, "payment limited to deal endepoch");
-    }
-
-    function testModifyRailPaymentRevertsWhenCalculatedAmountIsZero() public {
-        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
-        ids[0] = CommonTypes.FilActorId.wrap(1);
-        clientSCMock.setAllocationIds(dealId, ids);
-
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = 1;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
-
-        vm.expectRevert(Validator.InvalidZeroAmount.selector);
-        vm.prank(porepService);
-        validator.modifyRailPayment();
-    }
-
-    function testSetDealEndEpochNegativeEndEpochRevert() public {
-        vm.expectRevert(Validator.NegativeEndEpoch.selector);
-        vm.prank(porepService);
-        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(-1)));
     }
 
     function testSetMinEpochsBetweenSettlementsRevertsMinTimeNotReached() public {
@@ -763,58 +536,66 @@ contract ValidatorTest is Test {
         validator.setMinEpochsBetweenSettlements(11051200);
     }
 
-    function testFuzzModifyRailPaymentZeroAmountWithNonZeroParams(uint256 sectorCount, uint256 pricePerSectorPerMonth)
-        public
-    {
-        sectorCount = bound(sectorCount, 1, 1_000);
-        uint256 maxPricePerSectorPerMonth = (EPOCHS_IN_MONTH - 1) / sectorCount;
-        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, 1, maxPricePerSectorPerMonth);
+    function testValidatePaymentReturnsMarketSettlement() public {
+        poRepMarketMock.setSettlementDecision(
+            SharedTypes.SettlementDecision({
+                settlementAmount: 500,
+                // forge-lint: disable-next-line(unsafe-typecast)
+                settleUptoEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(EPOCHS_IN_MONTH))),
+                reasonCode: 0,
+                result: 0
+            })
+        );
 
-        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](sectorCount);
-        for (uint256 i = 0; i < sectorCount; ++i) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            ids[i] = CommonTypes.FilActorId.wrap(uint64(i + 1));
-        }
-        clientSCMock.setAllocationIds(dealId, ids);
+        vm.prank(address(filecoinPayMock));
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(railId, 100, 0, EPOCHS_IN_MONTH, 1);
 
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
-
-        uint256 expectedAmount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
-        assertEq(expectedAmount, 0);
-
-        vm.expectRevert(Validator.InvalidZeroAmount.selector);
-        vm.prank(porepService);
-        validator.modifyRailPayment();
+        assertEq(result.modifiedAmount, 500);
+        assertEq(result.settleUpto, EPOCHS_IN_MONTH);
+        assertEq(result.note, "payment validated by market");
+        assertEq(poRepMarketMock.lastSettlementToEpoch(), EPOCHS_IN_MONTH);
     }
 
-    function testFuzzModifyRailPaymentSucceedsWhenCalculatedAmountIsNonZero(
-        uint256 sectorCount,
-        uint256 pricePerSectorPerMonth
-    ) public {
-        sectorCount = bound(sectorCount, 1, 1_000);
-        uint256 minPricePerSectorPerMonth = (EPOCHS_IN_MONTH + sectorCount - 1) / sectorCount;
-        pricePerSectorPerMonth = bound(pricePerSectorPerMonth, minPricePerSectorPerMonth, 1_000_000);
-
-        CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](sectorCount);
-        for (uint256 i = 0; i < sectorCount; ++i) {
-            // forge-lint: disable-next-line(unsafe-typecast)
-            ids[i] = CommonTypes.FilActorId.wrap(uint64(i + 1));
-        }
-        clientSCMock.setAllocationIds(dealId, ids);
-
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
-
-        uint256 expectedAmount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
-        assertGt(expectedAmount, 0);
-
-        vm.expectEmit(true, false, false, true, address(validator));
-        emit Validator.RailPaymentModified(railId, expectedAmount);
+    function testValidatePaymentCapsSettlementToEarlyTerminatedEpoch() public {
+        vm.roll(1000);
 
         vm.prank(porepService);
-        validator.modifyRailPayment();
+        validator.disableFutureRailPayments();
+
+        poRepMarketMock.setSettlementDecision(
+            SharedTypes.SettlementDecision({
+                settlementAmount: 250,
+                settleUptoEpoch: CommonTypes.ChainEpoch.wrap(int64(1000)),
+                reasonCode: 0,
+                result: 0
+            })
+        );
+
+        vm.prank(address(filecoinPayMock));
+        IFilecoinPayValidator.ValidationResult memory result =
+            validator.validatePayment(railId, 100, 0, EPOCHS_IN_MONTH, 1);
+
+        assertEq(poRepMarketMock.lastSettlementToEpoch(), 1000);
+        assertEq(result.modifiedAmount, 250);
+        assertEq(result.settleUpto, 1000);
+    }
+
+    function testModifyRailPaymentEmitsRailPaymentModified() public {
+        uint256 newRate = 2_000_000;
+
+        vm.expectEmit(true, false, false, true, address(validator));
+        emit Validator.RailPaymentModified(railId, newRate);
+
+        vm.prank(address(poRepMarketMock));
+        validator.modifyRailPayment(newRate);
+    }
+
+    function testModifyRailPaymentRevertsWhenCallerIsNotPoRepMarket() public {
+        address notMarket = vm.addr(0xAAA);
+
+        vm.expectRevert(Validator.CallerIsNotPoRepMarket.selector);
+        vm.prank(notMarket);
+        validator.modifyRailPayment(2_000_000);
     }
 }

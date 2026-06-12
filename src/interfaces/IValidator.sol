@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-
 /**
  * @title Interface for Validator
  * @notice Defines the interface for the part of the Validator contract that is exposed to the Operator
@@ -15,13 +13,6 @@ interface IValidator {
      * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
      */
     function disableFutureRailPayments() external;
-
-    /**
-     * @notice Sets the end epoch for the deal associated with this validator
-     * @dev Only callable by POREP_SERVICE bot
-     * @param endEpoch The Filecoin epoch at which the deal ended
-     */
-    function setDealEndEpoch(CommonTypes.ChainEpoch endEpoch) external;
 
     /**
      * @notice Sets the minimum time between settlements in epochs

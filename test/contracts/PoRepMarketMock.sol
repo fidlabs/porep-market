@@ -4,10 +4,16 @@
 pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../../src/types/SharedTypes.sol";
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepTypes.DealProposal deal) public deals;
     uint256 public completeDealCallCount;
+
+    SharedTypes.SettlementDecision private settlementDecision;
+    uint256 public lastSettlementFromEpoch;
+    uint256 public lastSettlementToEpoch;
 
     function setDealProposal(uint256 dealId, PoRepTypes.DealProposal calldata dealProposal) external {
         deals[dealId] = dealProposal;
@@ -36,5 +42,20 @@ contract PoRepMarketMock {
 
     function terminateDeal(uint256 dealId, address, uint256) external {
         deals[dealId].state = PoRepTypes.DealState.Terminated;
+    }
+
+    function setSettlementDecision(SharedTypes.SettlementDecision calldata decision) external {
+        settlementDecision = decision;
+    }
+
+    function validateDealSettlement(uint256, CommonTypes.ChainEpoch fromEpoch, CommonTypes.ChainEpoch toEpoch)
+        external
+        returns (SharedTypes.SettlementDecision memory)
+    {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        lastSettlementFromEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(fromEpoch)));
+        // forge-lint: disable-next-line(unsafe-typecast)
+        lastSettlementToEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(toEpoch)));
+        return settlementDecision;
     }
 }

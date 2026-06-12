@@ -13,11 +13,12 @@ import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
+import {IPoRepMarketSettlement} from "./interfaces/IPoRepMarketSettlement.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
-import {IClient} from "./interfaces/IClient.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 
 /**
  * @title Validator
@@ -32,10 +33,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error CallerIsNotFilecoinPay();
 
     /**
-     * @notice Error indicating that the caller is not the Client Smart Contract
-     * @dev 0x669fc0af
+     * @notice Error indicating that the caller is not the PoRepMarket contract
+     * @dev 0x8680785
      */
-    error CallerIsNotClientSC();
+    error CallerIsNotPoRepMarket();
 
     /**
      * @notice Error indicating that the admin address provided during initialization is the zero address
@@ -54,12 +55,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @dev 0x91d3d465
      */
     error InvalidSLIScorerAddress();
-
-    /**
-     * @notice Error indicating that the client smart contract address provided during initialization is the zero address
-     * @dev 0xe75a5f1c
-     */
-    error InvalidClientSCAddress();
 
     /**
      * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
@@ -92,12 +87,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error RailAlreadyCreated();
 
     /**
-     * @notice Error indicating that an invalid deal ID was provided
-     * @dev 0xb06db32a
-     */
-    error InvalidDealId();
-
-    /**
      * @notice Error indicating that the operator is not approved
      * @dev 0xe3129001
      */
@@ -122,40 +111,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidRateAllowance();
 
     /**
-     * @notice Error indicating that the number of sectors in the deal is zero, which is invalid
-     * @dev 0xe725084a
-     */
-    error InvalidSectorCount();
-
-    /**
      * @notice Error indicating that the caller is not authorized to perform the action
      * @dev 0x5c427cd9
      */
     error UnauthorizedCaller();
-
-    /**
-     * @notice Error indicating that the provided end epoch is negative, which is invalid
-     * @dev 0x122b2d2c
-     */
-    error NegativeEndEpoch();
-
-    /**
-     * @notice Error indicating that the provided end epoch is not greater than the current end epoch
-     */
-    error EndEpochInThePast();
-
-    /**
-     * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
-     * @dev 0xdd484e70
-     */
-    error InvalidZeroAmount();
-
-    /**
-     * @notice Error indicating that the deal associated with this validator has not been completed yet
-     * @param dealId The ID of the deal that is not completed
-     * @dev 0xe03f8b0e
-     */
-    error DealNotCompleted(uint256 dealId);
 
     /**
      * @notice Error indicating that an invalid rail ID was provided
@@ -202,13 +161,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     event RailPaymentModified(uint256 indexed railId, uint256 newRate);
 
     /**
-     * @notice Event emitted when the deal end epoch is updated
-     * @param dealId The ID of the deal
-     * @param endEpoch The Filecoin epoch at which the deal ended
-     */
-    event DealEndEpochUpdated(uint256 indexed dealId, CommonTypes.ChainEpoch endEpoch);
-
-    /**
      * @notice Event emitted when a rail is disabled for future payments
      * @param railId The ID of the rail that has been disabled
      */
@@ -229,12 +181,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 dealId;
         address filecoinPay;
         address SLIScorer;
-        address clientSC;
         address poRepMarket;
         address SPRegistry;
         CommonTypes.FilActorId providerId;
-        CommonTypes.ChainEpoch dealEndEpoch;
-        uint256 amountPerEpoch;
         uint256 earlyTerminatedEpoch;
         uint256 minTimeBetweenSettlementsInEpochs;
     }
@@ -287,7 +236,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLIScorer Address of the SLIScorer contract
-     * @param _clientSC Address of the client smart contract
      * @param _poRepMarket Address of the PoRepMarket contract
      * @param _SPRegistry Address of the SPRegistry contract
      * @param _dealId The ID of the deal for which this validator is being initialized
@@ -297,14 +245,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _porepService,
         address _filecoinPay,
         address _SLIScorer,
-        address _clientSC,
         address _poRepMarket,
         address _SPRegistry,
         uint256 _dealId
     ) external initializer {
-        _validateInitializeAddresses(
-            _admin, _porepService, _filecoinPay, _SLIScorer, _clientSC, _SPRegistry, _poRepMarket
-        );
+        _validateInitializeAddresses(_admin, _porepService, _filecoinPay, _SLIScorer, _SPRegistry, _poRepMarket);
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -317,7 +262,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         $.providerId = dealProposal.provider;
         $.filecoinPay = _filecoinPay;
         $.SLIScorer = _SLIScorer;
-        $.clientSC = _clientSC;
         $.poRepMarket = _poRepMarket;
         $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
@@ -328,7 +272,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     // solhint-enable func-param-name-mixedcase
 
-    // solhint-disable function-max-lines, gas-strict-inequalities
+    // solhint-disable no-unused-vars
     /**
      * @notice Validates a proposed payment amount for a payment rail
      * @dev Only callable by the FilecoinPay contract
@@ -351,17 +295,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         _checkRailIdValid(railId);
 
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 dealEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap($.dealEndEpoch)));
-
-        if (dealEndEpoch == 0) {
-            revert DealNotCompleted($.dealId);
-        }
-
-        if ($.earlyTerminatedEpoch != 0 && $.earlyTerminatedEpoch < dealEndEpoch) {
-            dealEndEpoch = $.earlyTerminatedEpoch;
-        }
-
         if (toEpoch < fromEpoch + $.minTimeBetweenSettlementsInEpochs) {
             result.settleUpto = fromEpoch;
             result.note = "too early for settlement";
@@ -372,33 +305,33 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 score = ISLIScorer($.SLIScorer).calculateScore($.providerId, dealProposal.requirements);
 
         bool scoreMatches = score == 100;
-        bool dataSizeMatches = IClient($.clientSC).isDataSizeMatching($.dealId);
 
-        if (!scoreMatches || !dataSizeMatches) {
+        if (!scoreMatches) {
             result.settleUpto = toEpoch;
-            result.note =
-                !scoreMatches ? "score below required threshold" : "data size does not match the deal proposal";
+            result.note = "score below required threshold";
             return result;
         }
 
-        if (fromEpoch >= dealEndEpoch) {
-            result.settleUpto = fromEpoch;
-            result.note = "deal ended";
-            return result;
+        uint256 settleToEpoch = toEpoch;
+        if ($.earlyTerminatedEpoch != 0 && $.earlyTerminatedEpoch < settleToEpoch) {
+            settleToEpoch = $.earlyTerminatedEpoch;
         }
 
-        if (toEpoch > dealEndEpoch) {
-            result.modifiedAmount = rate * (dealEndEpoch - fromEpoch);
-            result.note = "payment limited to deal endepoch";
-            result.settleUpto = dealEndEpoch;
-        } else {
-            result.modifiedAmount = proposedAmount;
-            result.note = "payment validated successfully";
-            result.settleUpto = toEpoch;
-        }
+        SharedTypes.SettlementDecision memory decision = IPoRepMarketSettlement($.poRepMarket)
+            .validateDealSettlement(
+                $.dealId,
+                // forge-lint: disable-next-line(unsafe-typecast)
+                CommonTypes.ChainEpoch.wrap(int64(uint64(fromEpoch))),
+                // forge-lint: disable-next-line(unsafe-typecast)
+                CommonTypes.ChainEpoch.wrap(int64(uint64(settleToEpoch)))
+            );
+
+        result.modifiedAmount = decision.settlementAmount;
+        result.settleUpto = uint256(uint64(CommonTypes.ChainEpoch.unwrap(decision.settleUptoEpoch)));
+        result.note = "payment validated by market";
     }
 
-    // solhint-enable function-max-lines, gas-strict-inequalities
+    // solhint-enable no-unused-vars
 
     /**
      * @notice Creates a payment rail with the specified parameters and set initial lockup period
@@ -448,14 +381,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     /**
      * @notice Modifies the payment rate
-     * @dev Only callable by POREP_SERVICE bot
+     * @dev Only callable by PoRepMarket contract
+     * @param newRate The new payment rate to set for the rail
      */
-    function modifyRailPayment() external override onlyRole(POREP_SERVICE_ROLE) {
+    function modifyRailPayment(uint256 newRate) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-
-        uint256 newRate = _calculateAmountPerEpoch();
-        $.amountPerEpoch = newRate;
-
+        if (msg.sender != $.poRepMarket) {
+            revert CallerIsNotPoRepMarket();
+        }
         _modifyRailPayment(IFilecoinPayV1($.filecoinPay), $.railId, newRate, 0);
         emit RailPaymentModified($.railId, newRate);
     }
@@ -516,27 +449,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Sets the end epoch for the deal associated with this validator
-     * @dev Only callable by POREP_SERVICE bot
-     * @param endEpoch The Filecoin epoch at which the deal ended
-     */
-    function setDealEndEpoch(CommonTypes.ChainEpoch endEpoch) external onlyRole(POREP_SERVICE_ROLE) {
-        ValidatorStorage storage $ = _getValidatorStorage();
-
-        int64 unwrappedEndEpoch = CommonTypes.ChainEpoch.unwrap(endEpoch);
-        if (unwrappedEndEpoch < 0) {
-            revert NegativeEndEpoch();
-        }
-        // forge-lint: disable-next-line(unsafe-typecast)
-        if (uint256(uint64(unwrappedEndEpoch)) < block.number) {
-            revert EndEpochInThePast();
-        }
-
-        $.dealEndEpoch = endEpoch;
-        emit DealEndEpochUpdated($.dealId, endEpoch);
-    }
-
-    /**
      * @notice Sets the minimum time between settlements in epochs
      * @dev Only callable by the admin
      * @param minEpochs Minimum time between settlements in epochs
@@ -584,38 +496,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Calculates the amount to be paid per epoch for the deal
-     * @return Amount to be paid per epoch
-     */
-    function _calculateAmountPerEpoch() internal view returns (uint256) {
-        ValidatorStorage storage $ = _getValidatorStorage();
-
-        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
-        CommonTypes.FilActorId[] memory allocationIds = IClient($.clientSC).getClientAllocationIdsPerDeal($.dealId);
-
-        uint256 sectorCount = allocationIds.length;
-        uint256 pricePerSectorPerMonth = dealProposal.terms.pricePerSectorPerMonth;
-
-        if (sectorCount == 0) {
-            revert InvalidSectorCount();
-        }
-
-        uint256 amount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
-
-        if (amount == 0) {
-            revert InvalidZeroAmount();
-        }
-
-        return amount;
-    }
-
-    /**
      * @notice Validates that the provided addresses for initialization are not zero addresses
      * @param _admin Address to be granted the default admin role
      * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLIScorer Address of the SLIScorer contract
-     * @param _clientSC Address of the client smart contract
      * @param _SPRegistry Address of the SPRegistry contract
      * @param _poRepMarket Address of the PoRepMarket contract
      */
@@ -624,7 +509,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _porepService,
         address _filecoinPay,
         address _SLIScorer,
-        address _clientSC,
         address _SPRegistry,
         address _poRepMarket
     ) internal pure {
@@ -639,9 +523,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
         if (_SLIScorer == address(0)) {
             revert InvalidSLIScorerAddress();
-        }
-        if (_clientSC == address(0)) {
-            revert InvalidClientSCAddress();
         }
         if (_SPRegistry == address(0)) {
             revert InvalidSPRegistryAddress();

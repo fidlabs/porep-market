@@ -149,11 +149,6 @@
         "internalType": "address"
       },
       {
-        "name": "_clientSC",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
@@ -175,7 +170,13 @@
   {
     "type": "function",
     "name": "modifyRailPayment",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "newRate",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -233,19 +234,6 @@
         "name": "account",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setDealEndEpoch",
-    "inputs": [
-      {
-        "name": "endEpoch",
-        "type": "int64",
-        "internalType": "CommonTypes.ChainEpoch"
       }
     ],
     "outputs": [],
@@ -358,25 +346,6 @@
       }
     ],
     "stateMutability": "nonpayable"
-  },
-  {
-    "type": "event",
-    "name": "DealEndEpochUpdated",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "endEpoch",
-        "type": "int64",
-        "indexed": false,
-        "internalType": "CommonTypes.ChainEpoch"
-      }
-    ],
-    "anonymous": false
   },
   {
     "type": "event",
@@ -589,43 +558,17 @@
   },
   {
     "type": "error",
-    "name": "CallerIsNotClientSC",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "CallerIsNotFilecoinPay",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "DealNotCompleted",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "EndEpochInThePast",
+    "name": "CallerIsNotPoRepMarket",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidAdminAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidClientSCAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidDealId",
     "inputs": []
   },
   {
@@ -691,27 +634,12 @@
   },
   {
     "type": "error",
-    "name": "InvalidSectorCount",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidZeroAmount",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "MaxLockupPeriodLessThanMinimum",
     "inputs": []
   },
   {
     "type": "error",
     "name": "MinEpochsBetweenSettlementsExceeded",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NegativeEndEpoch",
     "inputs": []
   },
   {

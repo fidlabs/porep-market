@@ -15,7 +15,13 @@
   {
     "type": "function",
     "name": "modifyRailPayment",
-    "inputs": [],
+    "inputs": [
+      {
+        "name": "newRate",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [],
     "stateMutability": "nonpayable"
   },

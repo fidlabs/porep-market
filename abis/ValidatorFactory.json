@@ -187,11 +187,6 @@
         "internalType": "address"
       },
       {
-        "name": "_clientSmartContract",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
@@ -574,11 +569,6 @@
   {
     "type": "error",
     "name": "InvalidClientAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidClientSmartContractAddress",
     "inputs": []
   },
   {

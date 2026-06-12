@@ -27,7 +27,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     struct ValidatorFactoryStorage {
         mapping(uint256 dealId => address contractAddress) _instances;
         mapping(address => bool) _isValidatorContract;
-        address _clientSmartContract;
         address _poRepService;
         address _filecoinPay;
         address _sliScorer;
@@ -82,12 +81,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
      * @dev 0xc9cc4a06
      */
     error InvalidPoRepMarketAddress();
-
-    /**
-     * @notice Error indicating that the provided ClientSmartContract address is invalid
-     * @dev 0x39ee49ba
-     */
-    error InvalidClientSmartContractAddress();
 
     /**
      * @notice Error indicating that the provided FilecoinPay address is invalid
@@ -194,7 +187,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
      * @param _poRepService The address of the PoRepService contract
      * @param _filecoinPay The address of the FilecoinPay contract
      * @param _sliScorer The address of the SLIScorer contract
-     * @param _clientSmartContract The address of the ClientSmartContract contract
      * @param _poRepMarket The address of the PoRepMarket contract
      * @param _SPRegistry The address of the SPRegistry contract
      */
@@ -202,20 +194,17 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         address _poRepService,
         address _filecoinPay,
         address _sliScorer,
-        address _clientSmartContract,
         address _poRepMarket,
         address _SPRegistry
     ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
-        if (_clientSmartContract == address(0)) revert InvalidClientSmartContractAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
         if (_sliScorer == address(0)) revert InvalidSliScorerAddress();
         if (_SPRegistry == address(0)) revert InvalidSPRegistryAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
-        $._clientSmartContract = _clientSmartContract;
         $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
         $._sliScorer = _sliScorer;
@@ -241,16 +230,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
                 $._beacon,
                 abi.encodeCall(
                     Validator.initialize,
-                    (
-                        $._admin,
-                        $._poRepService,
-                        $._filecoinPay,
-                        $._sliScorer,
-                        $._clientSmartContract,
-                        $._poRepMarket,
-                        $._SPRegistry,
-                        dealId
-                    )
+                    ($._admin, $._poRepService, $._filecoinPay, $._sliScorer, $._poRepMarket, $._SPRegistry, dealId)
                 )
             )
         );

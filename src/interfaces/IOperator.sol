@@ -22,8 +22,9 @@ interface IOperator {
 
     /**
      * @notice Modifies the payment rate and optionally makes a one-time payment.
+     * @param newRate The new payment rate to set for the rail
      */
-    function modifyRailPayment() external;
+    function modifyRailPayment(uint256 newRate) external;
 
     /**
      * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
