@@ -85,7 +85,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
 
     /**
      * @notice Error indicating that the provided DataCapEvidenceAdapter address is invalid
-     * @dev 0x39ee49ba
+     * @dev 0xd2178646
      */
     error InvalidDataCapEvidenceAdapterAddress();
 

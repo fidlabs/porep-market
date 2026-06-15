@@ -705,6 +705,11 @@
   },
   {
     "type": "error",
+    "name": "CallerIsNotPoRepMarket",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -913,11 +918,6 @@
   {
     "type": "error",
     "name": "NotInitializing",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "OnlyMarket",
     "inputs": []
   },
   {

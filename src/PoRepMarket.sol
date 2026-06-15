@@ -298,7 +298,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Error thrown when trying to set an invalid DataCap evidence adapter address
-     * @dev 0x39ee49ba
+     * @dev 0xd2178646
      */
     error InvalidDataCapEvidenceAdapterAddress();
 

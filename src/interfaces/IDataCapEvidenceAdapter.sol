@@ -90,4 +90,10 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
      * @return sizeOfAllocations size of allocations for the selected deal
      */
     function getSizeOfAllocations(uint256 dealId) external view returns (uint256);
+
+    /**
+     * @notice Getter for the PoRepMarket contract address
+     * @return Address of the PoRepMarket contract
+     */
+    function getPoRepMarketAddress() external view returns (address);
 }

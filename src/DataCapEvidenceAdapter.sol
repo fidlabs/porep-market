@@ -235,9 +235,9 @@ contract DataCapEvidenceAdapter is
 
     /**
      * @notice Error thrown when caller is not PoRepMarket contract
-     * @dev 0x9e0125a9
+     * @dev 0x86807850
      */
-    error OnlyMarket();
+    error CallerIsNotPoRepMarket();
 
     struct Deal {
         // Deprecated; retained to preserve the deployed storage layout.
@@ -821,20 +821,21 @@ contract DataCapEvidenceAdapter is
         }
     }
 
+    /// TODO: in future change visibility to external
     /**
      * @notice Getter for the PoRepMarket contract address
-     * @return The address of the PoRepMarket contract
+     * @return Address of the PoRepMarket contract
      */
     function getPoRepMarketAddress() public view returns (address) {
         return address(s()._poRepMarketContract);
     }
 
-    // Will be implemented in the future
+    /// Note: Will be implemented in the future
     // /**
     //  * @notice Ensures the caller is the PoRepMarket contract
     //  */
     // function _onlyPoRepMarket() internal view {
-    //     if (msg.sender != getPoRepMarketAddress()) revert OnlyMarket();
+    //     if (msg.sender != getPoRepMarketAddress()) revert CallerIsNotPoRepMarket();
     // }
 
     // /**

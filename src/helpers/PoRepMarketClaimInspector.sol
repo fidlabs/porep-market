@@ -33,7 +33,7 @@ contract PoRepMarketClaimInspector {
 
     /**
      * @notice Error indicating that the DataCapEvidenceAdapter address provided during contract deployment is invalid
-     * @dev 0x4d9c0a3f
+     * @dev 0xd2178646
      */
     error InvalidDataCapEvidenceAdapterAddress();
 

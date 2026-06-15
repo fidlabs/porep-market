@@ -33,7 +33,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     /**
      * @notice Error indicating that the caller is not the DataCap Evidence Adapter
-     * @dev 0x669fc0af
+     * @dev 0xd7232b64
      */
     error CallerIsNotDataCapEvidenceAdapter();
 
@@ -57,7 +57,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     /**
      * @notice Error indicating that the DataCap evidence adapter address provided during initialization is the zero address
-     * @dev 0xe75a5f1c
+     * @dev 0xd2178646
      */
     error InvalidDataCapEvidenceAdapterAddress();
 
