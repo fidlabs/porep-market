@@ -4,9 +4,8 @@ pragma solidity =0.8.30;
 
 import {Test} from "lib/forge-std/src/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {MockSLIOracle} from "./contracts/MockSLIOracle.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
@@ -14,8 +13,8 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 contract SLIScorerTest is Test {
     SLIScorer public sliScorer;
     address public client = vm.addr(1);
-    CommonTypes.FilActorId public provider;
-    SLITypes.SLIThresholds public sliParams;
+    uint256 public dealId;
+    SharedTypes.SLIThresholds public sliParams;
     MockSLIOracle public oracle;
 
     function setUp() public {
@@ -24,8 +23,10 @@ contract SLIScorerTest is Test {
         bytes memory initData = abi.encodeCall(SLIScorer.initialize, (address(this), SLIOracle(address(oracle))));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         sliScorer = SLIScorer(address(proxy));
-        provider = CommonTypes.FilActorId.wrap(1000);
-        sliParams = SLITypes.SLIThresholds({retrievabilityBps: 9900, bandwidthMbps: 99, latencyMs: 99, indexingPct: 99});
+        dealId = 1;
+        sliParams = SharedTypes.SLIThresholds({
+            retrievabilityBps: 9900, bandwidthBytesPerSecond: 99, latencyMs: 99, indexingPct: 99
+        });
     }
 
     function testIsAdminSet() public view {
@@ -46,15 +47,16 @@ contract SLIScorerTest is Test {
     }
 
     function testCalculateScoreRevertNoAttestation() public {
-        vm.expectRevert(abi.encodeWithSelector(SLIScorer.NoAttestation.selector, provider));
-        sliScorer.calculateScore(provider, sliParams);
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.NoAttestation.selector, dealId));
+        sliScorer.calculateScore(dealId, sliParams);
     }
 
     function testCalculateScoreForNoSLAsDefined() public {
         vm.prank(client);
         oracle.setAttestations(block.timestamp, 0, 0, 0, 0);
-        sliParams = SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0});
-        uint256 score = sliScorer.calculateScore(provider, sliParams);
+        sliParams =
+            SharedTypes.SLIThresholds({retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0});
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
         assertEq(score, 100);
     }
 
@@ -62,7 +64,7 @@ contract SLIScorerTest is Test {
         vm.prank(client);
         oracle.setAttestations(1000, 10000, 100, 100, 80);
         vm.roll(1001);
-        uint256 score = sliScorer.calculateScore(provider, sliParams);
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
         assertEq(score, 50);
     }
 
@@ -70,23 +72,25 @@ contract SLIScorerTest is Test {
         vm.prank(client);
         oracle.setAttestations(1000, 10000, 100, 95, 100);
         vm.roll(1001);
-        uint256 score = sliScorer.calculateScore(provider, sliParams);
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
         assertEq(score, 100);
     }
 
     function testCalculateScoreForLatency() public {
-        sliParams = SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 40, indexingPct: 0});
+        sliParams = SharedTypes.SLIThresholds({
+            retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 40, indexingPct: 0
+        });
         oracle.setAttestations(1000, 0, 0, 40, 0);
         vm.roll(1001);
-        uint256 score = sliScorer.calculateScore(provider, sliParams);
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
         assertEq(score, 100);
     }
 
     function testCalculateRevertAttestationExpired() public {
         oracle.setAttestations(1000, 0, 0, 40, 0);
         vm.roll(1000000);
-        vm.expectRevert(abi.encodeWithSelector(SLIScorer.AttestationExpired.selector, provider));
-        sliScorer.calculateScore(provider, sliParams);
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.AttestationExpired.selector, dealId));
+        sliScorer.calculateScore(dealId, sliParams);
     }
 
     function testInitializeRevertInvalidAdmin() public {
@@ -101,5 +105,10 @@ contract SLIScorerTest is Test {
         bytes memory initData = abi.encodeCall(SLIScorer.initialize, (address(this), SLIOracle(address(0))));
         vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidOracle.selector));
         new ERC1967Proxy(address(impl), initData);
+    }
+
+    function testCalculateScoreRevertsInvalidDealId() public {
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidDealId.selector));
+        sliScorer.calculateScore(0, sliParams);
     }
 }

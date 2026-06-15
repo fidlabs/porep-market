@@ -8,6 +8,7 @@ import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 
@@ -43,7 +44,7 @@ contract ValidatorTest is Test {
     uint256 public railId;
     string public expectedManifestLocation;
 
-    SLITypes.SLIThresholds public defaultRequirements;
+    SharedTypes.SLIThresholds public defaultRequirements;
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
     uint256 public constant BLOCK_TIMESTAMP = 1_772_000_000;
     int64 public constant CHAIN_EPOCH = 5_800_000;
@@ -64,8 +65,9 @@ contract ValidatorTest is Test {
         railId = 1;
         expectedManifestLocation = "https://example.com/manifest";
 
-        defaultRequirements =
-            SLITypes.SLIThresholds({retrievabilityBps: 8000, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        defaultRequirements = SharedTypes.SLIThresholds({
+            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
+        });
 
         poRepMarketMock.setDealProposal(
             dealId,
@@ -121,7 +123,7 @@ contract ValidatorTest is Test {
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(CHAIN_EPOCH)));
 
         vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+        sliOracle.setSLI(dealId, defaultRequirements);
     }
 
     function testIsAdminSet() public view {
@@ -205,8 +207,8 @@ contract ValidatorTest is Test {
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(
-            providerFilActorId,
-            SLITypes.SLIThresholds({retrievabilityBps: 0, bandwidthMbps: 0, latencyMs: 0, indexingPct: 0})
+            dealId,
+            SharedTypes.SLIThresholds({retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0})
         );
 
         vm.prank(address(filecoinPayMock));
@@ -222,7 +224,7 @@ contract ValidatorTest is Test {
         clientSCMock.setDataSizeMatching(dealId, true);
 
         vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+        sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(1, 100, 0, 86_400, 1);
@@ -474,7 +476,7 @@ contract ValidatorTest is Test {
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
 
         vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+        sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
@@ -663,12 +665,12 @@ contract ValidatorTest is Test {
         clientSCMock.setDataSizeMatching(dealId, true);
 
         vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+        sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.warp(BLOCK_TIMESTAMP);
 
         vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+        sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.prank(porepService);
         validator.disableFutureRailPayments();
@@ -691,7 +693,7 @@ contract ValidatorTest is Test {
         vm.roll(earlyTerminationEpoch);
 
         vm.prank(oracleUpdater);
-        sliOracle.setSLI(providerFilActorId, defaultRequirements);
+        sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.prank(porepService);
         validator.disableFutureRailPayments();

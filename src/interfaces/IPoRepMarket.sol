@@ -2,6 +2,7 @@
 pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
+import {SharedTypes} from "../types/SharedTypes.sol";
 import {SLITypes} from "../types/SLITypes.sol";
 
 /**
@@ -23,7 +24,7 @@ interface IPoRepMarket {
      * @param manifestLocation The location of the manifest for the deal
      */
     function proposeDeal(
-        SLITypes.SLIThresholds calldata requirements,
+        SharedTypes.SLIThresholds calldata requirements,
         SLITypes.DealTerms calldata terms,
         string calldata manifestLocation
     ) external;

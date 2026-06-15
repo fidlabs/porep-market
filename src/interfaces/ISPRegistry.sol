@@ -2,6 +2,7 @@
 pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+import {SharedTypes} from "../types/SharedTypes.sol";
 import {SLITypes} from "../types/SLITypes.sol";
 
 /**
@@ -15,7 +16,7 @@ interface ISPRegistry {
         address payee;
         bool paused;
         bool blocked;
-        SLITypes.SLIThresholds capabilities;
+        SharedTypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 pendingBytes;
@@ -69,7 +70,7 @@ interface ISPRegistry {
      * @return autoApprove True if the provider's price per sector is met by the deal terms
      * @return organization The address of the matched provider
      */
-    function getProviderForDeal(SLITypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
+    function getProviderForDeal(SharedTypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
         returns (CommonTypes.FilActorId provider, bool autoApprove, address organization);
 
@@ -145,7 +146,7 @@ interface ISPRegistry {
      * @param provider The provider to update
      * @param capabilities The SLI capabilities this provider guarantees
      */
-    function setCapabilities(CommonTypes.FilActorId provider, SLITypes.SLIThresholds calldata capabilities) external;
+    function setCapabilities(CommonTypes.FilActorId provider, SharedTypes.SLIThresholds calldata capabilities) external;
 
     /**
      * @notice Set the monthly price per sector for a provider

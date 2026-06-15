@@ -9,6 +9,7 @@ import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
@@ -31,7 +32,7 @@ contract PoRepMarketTest is Test {
     uint256 public railId;
     uint256 public dealId;
     uint256 public totalDealSize;
-    SLITypes.SLIThresholds internal defaultRequirements;
+    SharedTypes.SLIThresholds internal defaultRequirements;
     SLITypes.DealTerms internal defaultTerms;
 
     uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
@@ -56,8 +57,9 @@ contract PoRepMarketTest is Test {
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
 
-        defaultRequirements =
-            SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        defaultRequirements = SharedTypes.SLIThresholds({
+            retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
+        });
         defaultTerms = SLITypes.DealTerms({
             dealSizeBytes: totalDealSize, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
         });
@@ -137,7 +139,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.client, clientAddress);
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), CommonTypes.FilActorId.unwrap(providerFilActorId));
         assertEq(p.requirements.retrievabilityBps, defaultRequirements.retrievabilityBps);
-        assertEq(p.requirements.bandwidthMbps, defaultRequirements.bandwidthMbps);
+        assertEq(p.requirements.bandwidthBytesPerSecond, defaultRequirements.bandwidthBytesPerSecond);
         assertEq(p.requirements.latencyMs, defaultRequirements.latencyMs);
         assertEq(p.requirements.indexingPct, defaultRequirements.indexingPct);
         assertEq(p.manifestLocation, expectedManifestLocation);
@@ -154,7 +156,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.client, address(0));
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), 0);
         assertEq(p.requirements.retrievabilityBps, 0);
-        assertEq(p.requirements.bandwidthMbps, 0);
+        assertEq(p.requirements.bandwidthBytesPerSecond, 0);
         assertEq(p.requirements.latencyMs, 0);
         assertEq(p.requirements.indexingPct, 0);
         assertEq(p.terms.dealSizeBytes, 0);
@@ -646,16 +648,18 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenRetrievabilityBpsExceeds10000() public {
-        SLITypes.SLIThresholds memory badRequirements =
-            SLITypes.SLIThresholds({retrievabilityBps: 10001, bandwidthMbps: 500, latencyMs: 200, indexingPct: 90});
+        SharedTypes.SLIThresholds memory badRequirements = SharedTypes.SLIThresholds({
+            retrievabilityBps: 10001, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
+        });
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidRetrievabilityBps.selector, uint16(10001)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms, expectedManifestLocation);
     }
 
     function testProposeDealRevertsWhenIndexingPctExceeds100() public {
-        SLITypes.SLIThresholds memory badRequirements =
-            SLITypes.SLIThresholds({retrievabilityBps: 80, bandwidthMbps: 500, latencyMs: 200, indexingPct: 101});
+        SharedTypes.SLIThresholds memory badRequirements = SharedTypes.SLIThresholds({
+            retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 101
+        });
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidIndexingPct.selector, uint8(101)));
         poRepMarket.proposeDeal(badRequirements, defaultTerms, expectedManifestLocation);

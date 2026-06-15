@@ -38,7 +38,7 @@ library SharedTypes {
         /// @dev Valid range: 0-10000 (basis points, e.g. 7550 = 75.50%). 0 means "don't care".
         uint16 retrievabilityBps;
         /// @dev Capped at ~64 Gbps
-        uint16 bandwidthBytesPerSecond;
+        uint64 bandwidthBytesPerSecond;
         uint16 latencyMs;
         /// @dev Valid range: 0-100. 0 means "don't care".
         uint8 indexingPct;
@@ -146,5 +146,14 @@ library SharedTypes {
         CommonTypes.ChainEpoch settleUptoEpoch;
         uint16 reasonCode;
         uint8 result;
+    }
+
+    /**
+     * @notice Represents an attestation record for SLI (Service Level Indicator) tracking
+     * @dev Stores the timestamp of the last update and the associated SLI thresholds
+     */
+    struct Attestation {
+        uint256 lastUpdate;
+        SLIThresholds slis;
     }
 }

@@ -3,6 +3,7 @@
 pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+import {SharedTypes} from "./SharedTypes.sol";
 import {SLITypes} from "./SLITypes.sol";
 
 /**
@@ -49,7 +50,7 @@ library PoRepTypes {
         uint256 dealId;
         address client;
         CommonTypes.FilActorId provider;
-        SLITypes.SLIThresholds requirements;
+        SharedTypes.SLIThresholds requirements;
         SLITypes.DealTerms terms;
         address validator;
         DealState state;
