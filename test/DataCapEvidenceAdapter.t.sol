@@ -332,6 +332,11 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, 0);
     }
 
+    function testGetAllocationIdsPerDealRevertsWhenDealIdIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealId.selector));
+        dataCapEvidenceAdapter.getAllocationIdsPerDeal(0, 0, 1);
+    }
+
     function testRescueDealAllocationsRevertsWithoutRescueRole() public {
         DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
@@ -1483,5 +1488,104 @@ contract DataCapEvidenceAdapterTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationSize.selector));
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
+    }
+
+    function testGetClaimIdsRevertsWhenLimitIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidLimit.selector));
+        dataCapEvidenceAdapter.getClaimIds(dealId, 0, 0);
+    }
+
+    function testGetClaimIdsRevertsWhenDealIdIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealId.selector));
+        dataCapEvidenceAdapter.getClaimIds(0, 0, 1);
+    }
+
+    function testGetClaimIdsReturnsEmptyWhenDealHasNoAllocations() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+
+        (CommonTypes.FilActorId[] memory ids, uint256 total) =
+            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(total, 0);
+        assertEq(ids.length, 0);
+    }
+
+    function testGetClaimIdsReturnsSingleClaim() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        (CommonTypes.FilActorId[] memory ids, uint256 total) =
+            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(total, 1);
+        assertEq(ids.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
+    }
+
+    function testGetClaimIdsPaginates() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        (CommonTypes.FilActorId[] memory firstPage, uint256 total) =
+            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, 1);
+        assertEq(total, 2);
+        assertEq(firstPage.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(firstPage[0]), 1);
+
+        (CommonTypes.FilActorId[] memory secondPage,) = dataCapEvidenceAdapterMock.getClaimIds(dealId, 1, 2);
+        assertEq(secondPage.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(secondPage[0]), 2);
+
+        (CommonTypes.FilActorId[] memory emptyPage, uint256 emptyTotal) =
+            dataCapEvidenceAdapterMock.getClaimIds(dealId, 2, 1);
+        assertEq(emptyTotal, 2);
+        assertEq(emptyPage.length, 0);
+    }
+
+    function testGetClaimIdsSkipsFailedClaimIds() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282018182000681881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        (CommonTypes.FilActorId[] memory ids, uint256 total) =
+            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(total, 1);
+        assertEq(ids.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 2);
+    }
+
+    function testGetClaimIdsRevertsWhenGetClaimsExitCodeNonZero() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
+
+        ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
+        vm.etch(CALL_ACTOR_ID, address(failing).code);
+
+        vm.expectRevert(DataCapEvidenceAdapter.GetClaimsCallFailed.selector);
+        dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
+    }
+
+    function testGetClaimIdsRevertsOnClaimIdsMismatch() public {
+        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.ClaimIdsMismatch.selector, 2, 1));
+        dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
     }
 }
