@@ -13,7 +13,7 @@ import {SLITypes} from "../src/types/SLITypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
-import {ClientSCMock} from "./contracts/ClientSCMock.sol";
+import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 
@@ -29,7 +29,7 @@ contract ValidatorTest is Test {
     FilecoinPayV1Mock public filecoinPayMock;
     PoRepMarketMock public poRepMarketMock;
     SPRegistryMock public spRegistryMock;
-    ClientSCMock public clientSCMock;
+    DataCapEvidenceAdapterMock public dataCapEvidenceAdapterMock;
     SLIOracle public sliOracle;
     SLIScorer public sliScorer;
     SPRegistry public spRegistry;
@@ -37,7 +37,7 @@ contract ValidatorTest is Test {
     address public admin;
     address public porepService;
     address public oracleUpdater;
-    address public clientSC;
+    address public dataCapEvidenceAdapter;
     IERC20 public token;
     CommonTypes.FilActorId public providerFilActorId;
     uint256 public dealId;
@@ -51,14 +51,14 @@ contract ValidatorTest is Test {
 
     function setUp() public {
         filecoinPayMock = new FilecoinPayV1Mock();
-        clientSCMock = new ClientSCMock();
+        dataCapEvidenceAdapterMock = new DataCapEvidenceAdapterMock();
         poRepMarketMock = new PoRepMarketMock();
         spRegistryMock = new SPRegistryMock();
 
         admin = address(this);
         porepService = vm.addr(0x123);
         oracleUpdater = vm.addr(0xA11CE);
-        clientSC = address(clientSCMock);
+        dataCapEvidenceAdapter = address(dataCapEvidenceAdapterMock);
         token = IERC20(vm.addr(0x5));
         providerFilActorId = CommonTypes.FilActorId.wrap(20000);
         dealId = 1;
@@ -104,7 +104,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -114,7 +114,7 @@ contract ValidatorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(1);
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         vm.prank(admin);
         validator.createRail(token);
@@ -162,7 +162,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -176,7 +176,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -203,7 +203,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentFullSlashWhenScoreZero() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
+        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(
@@ -221,7 +221,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentOkWhenScorePositiveAndDatacapMatches() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
+        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(dealId, defaultRequirements);
@@ -273,7 +273,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -291,7 +291,7 @@ contract ValidatorTest is Test {
             address(0),
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -309,7 +309,7 @@ contract ValidatorTest is Test {
             porepService,
             address(0),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -327,19 +327,19 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(0),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
         );
     }
 
-    function testInitializeRevertsWhenClientSCIsZeroAddress() public {
+    function testInitializeRevertsWhenDataCapEvidenceAdapterIsZeroAddress() public {
         Validator impl = new Validator();
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        vm.expectRevert(Validator.InvalidClientSCAddress.selector);
+        vm.expectRevert(Validator.InvalidDataCapEvidenceAdapterAddress.selector);
         newValidator.initialize(
             admin,
             porepService,
@@ -363,7 +363,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(0),
             address(spRegistryMock),
             dealId
@@ -381,7 +381,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(0),
             dealId
@@ -393,7 +393,7 @@ contract ValidatorTest is Test {
         dealProposal.terms.pricePerSectorPerMonth = 2_000_000;
         poRepMarketMock.setDealProposal(dealId, dealProposal);
 
-        uint256 sectorCount = clientSCMock.getClientAllocationIdsPerDeal(dealId).length;
+        uint256 sectorCount = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId).length;
         uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
 
         vm.expectEmit(true, false, false, true, address(validator));
@@ -459,7 +459,7 @@ contract ValidatorTest is Test {
         vm.prank(porepService);
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(10)));
 
-        clientSCMock.setDataSizeMatching(dealId, true);
+        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
@@ -470,7 +470,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentCapsSettlementToDealEndEpoch() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
+        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         vm.prank(porepService);
         validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
@@ -507,7 +507,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -531,7 +531,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -555,7 +555,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -577,7 +577,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -591,7 +591,7 @@ contract ValidatorTest is Test {
 
     function testModifyRailPaymentRevertsWhenSectorCountIsZero() public {
         CommonTypes.FilActorId[] memory emptyIds = new CommonTypes.FilActorId[](0);
-        clientSCMock.setAllocationIds(dealId, emptyIds);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, emptyIds);
 
         vm.expectRevert(Validator.InvalidSectorCount.selector);
         vm.prank(porepService);
@@ -618,7 +618,7 @@ contract ValidatorTest is Test {
             porepService,
             address(filecoinPayMock),
             address(sliScorer),
-            clientSC,
+            dataCapEvidenceAdapter,
             address(poRepMarketMock),
             address(spRegistryMock),
             dealId
@@ -662,7 +662,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentCapsSettlementToEarlyTerminatedEpoch() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
+        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(dealId, defaultRequirements);
@@ -685,7 +685,7 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentUsesEarlyTerminatedEpochWhenEarlierThanDealEndEpoch() public {
-        clientSCMock.setDataSizeMatching(dealId, true);
+        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 chainEpochConversion = uint256(uint64(CHAIN_EPOCH));
@@ -710,7 +710,7 @@ contract ValidatorTest is Test {
     function testModifyRailPaymentRevertsWhenCalculatedAmountIsZero() public {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(1);
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
         dealProposal.terms.pricePerSectorPerMonth = 1;
@@ -777,7 +777,7 @@ contract ValidatorTest is Test {
             // forge-lint: disable-next-line(unsafe-typecast)
             ids[i] = CommonTypes.FilActorId.wrap(uint64(i + 1));
         }
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
         dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
@@ -804,7 +804,7 @@ contract ValidatorTest is Test {
             // forge-lint: disable-next-line(unsafe-typecast)
             ids[i] = CommonTypes.FilActorId.wrap(uint64(i + 1));
         }
-        clientSCMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
         dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;

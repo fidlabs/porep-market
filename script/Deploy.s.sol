@@ -6,7 +6,7 @@ import {Script} from "forge-std/Script.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
-import {Client} from "../src/Client.sol";
+import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
@@ -19,14 +19,14 @@ contract Deploy is Script, DeployUtils {
 
     address internal poRepMarket;
     address internal validatorFactory;
-    address internal clientSmartContract;
+    address internal dataCapEvidenceAdapter;
     address internal sliOracle;
     address internal sliScorer;
 
     address internal poRepMarketImpl;
     address internal validatorFactoryImpl;
     address internal validatorImpl;
-    address internal clientSmartContractImpl;
+    address internal dataCapEvidenceAdapterImpl;
     address internal sliOracleImpl;
     address internal sliScorerImpl;
     address internal validator;
@@ -56,17 +56,17 @@ contract Deploy is Script, DeployUtils {
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
         (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
-        (clientSmartContract, clientSmartContractImpl) =
-            _deployClientSmartContract(admin, terminationOracle, poRepMarket, metaAllocator);
+        (dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl) =
+            _deployDataCapEvidenceAdapter(admin, terminationOracle, poRepMarket, metaAllocator);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
         // circular dependencies
-        PoRepMarket(poRepMarket).setClientSmartContract(clientSmartContract);
+        PoRepMarket(poRepMarket).setDataCapEvidenceAdapter(dataCapEvidenceAdapter);
         ValidatorFactory(validatorFactory)
-            .initialize2(poRepService, filecoinPay, sliScorer, clientSmartContract, poRepMarket, spRegistry);
+            .initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
         SPRegistry(spRegistry).initialize2(poRepMarket);
 
         if (operatorAddress != address(0)) {
@@ -103,15 +103,16 @@ contract Deploy is Script, DeployUtils {
         impl = address(_impl);
     }
 
-    function _deployClientSmartContract(
+    function _deployDataCapEvidenceAdapter(
         address _admin,
         address _terminationOracle,
         address _porepMarket,
         address _metaAllocator
     ) internal returns (address proxy, address impl) {
-        Client _impl = new Client();
-        bytes memory init =
-            abi.encodeCall(Client.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator));
+        DataCapEvidenceAdapter _impl = new DataCapEvidenceAdapter();
+        bytes memory init = abi.encodeCall(
+            DataCapEvidenceAdapter.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator)
+        );
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
@@ -147,7 +148,7 @@ contract Deploy is Script, DeployUtils {
 
         serializeContract(json, "PoRepMarket", poRepMarket, poRepMarketImpl);
         serializeContract(json, "ValidatorFactory", validatorFactory, validatorFactoryImpl);
-        serializeContract(json, "Client", clientSmartContract, clientSmartContractImpl);
+        serializeContract(json, "DataCapEvidenceAdapter", dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl);
         serializeContract(json, "SLIOracle", sliOracle, sliOracleImpl);
         serializeContract(json, "SLIScorer", sliScorer, sliScorerImpl);
         serializeContract(json, "SPRegistry", spRegistry, spRegistryImpl);

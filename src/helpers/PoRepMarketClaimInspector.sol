@@ -4,7 +4,7 @@ pragma solidity =0.8.30;
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {VerifRegAPI} from "filecoin-solidity/v0.8/VerifRegAPI.sol";
-import {IClient} from "../interfaces/IClient.sol";
+import {IDataCapEvidenceAdapter} from "../interfaces/IDataCapEvidenceAdapter.sol";
 import {IPoRepMarket} from "../interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 
@@ -32,10 +32,10 @@ contract PoRepMarketClaimInspector {
     error InvalidPoRepMarketAddress();
 
     /**
-     * @notice Error indicating that the client smart contract address provided during contract deployment is invalid
-     * @dev 0x4d9c0a3f
+     * @notice Error indicating that the DataCapEvidenceAdapter address provided during contract deployment is invalid
+     * @dev 0xd2178646
      */
-    error InvalidClientAddress();
+    error InvalidDataCapEvidenceAdapterAddress();
 
     /**
      * @notice Error indicating a mismatch between the number of claims returned and the number of claim IDs processed
@@ -44,9 +44,9 @@ contract PoRepMarketClaimInspector {
     error ClaimIdsMismatch(uint256 claimsLength, uint256 claimIdsLength);
 
     /**
-     * @notice Client smart contract address used to fetch allocation IDs for a given deal ID
+     * @notice DataCapEvidenceAdapter address used to fetch allocation IDs for a given deal ID
      */
-    IClient public immutable CLIENT_CONTRACT;
+    IDataCapEvidenceAdapter public immutable DATA_CAP_EVIDENCE_ADAPTER;
 
     /**
      * @notice PoRepMarket contract address used to fetch deal proposal details for a given deal ID
@@ -54,13 +54,13 @@ contract PoRepMarketClaimInspector {
     IPoRepMarket public immutable POREPMARKET_CONTRACT;
 
     /**
-     * @notice Initializes the DealInspector contract with the addresses of the client and PoRepMarket contracts
-     * @param _clientContract Address of the client smart contract
+     * @notice Initializes the DealInspector contract with the addresses of the DataCapEvidenceAdapter and PoRepMarket contracts
+     * @param _dataCapEvidenceAdapter Address of the DataCapEvidenceAdapter contract
      * @param _poRepMarketContract Address of the PoRepMarket contract
      */
-    constructor(address _clientContract, address _poRepMarketContract) {
-        _ensureNonZeroAddresses(_clientContract, _poRepMarketContract);
-        CLIENT_CONTRACT = IClient(_clientContract);
+    constructor(address _dataCapEvidenceAdapter, address _poRepMarketContract) {
+        _ensureNonZeroAddresses(_dataCapEvidenceAdapter, _poRepMarketContract);
+        DATA_CAP_EVIDENCE_ADAPTER = IDataCapEvidenceAdapter(_dataCapEvidenceAdapter);
         POREPMARKET_CONTRACT = IPoRepMarket(_poRepMarketContract);
     }
 
@@ -81,7 +81,8 @@ contract PoRepMarketClaimInspector {
             revert InvalidDealId();
         }
         PoRepTypes.DealProposal memory deal = POREPMARKET_CONTRACT.getDealProposal(dealId);
-        CommonTypes.FilActorId[] memory ids = CLIENT_CONTRACT.getClientAllocationIdsPerDeal(dealId);
+        (CommonTypes.FilActorId[] memory ids,) =
+            DATA_CAP_EVIDENCE_ADAPTER.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
             VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: ids});
 
@@ -156,12 +157,12 @@ contract PoRepMarketClaimInspector {
 
     /**
      * @notice Ensures that the provided addresses are non-zero
-     * @param _clientSC Address of the client smart contract address
+     * @param _dataCapEvidenceAdapter Address of the DataCapEvidenceAdapter contract
      * @param _poRepMarket Address of the PoRepMarket contract address
      */
-    function _ensureNonZeroAddresses(address _clientSC, address _poRepMarket) internal pure {
-        if (_clientSC == address(0)) {
-            revert InvalidClientAddress();
+    function _ensureNonZeroAddresses(address _dataCapEvidenceAdapter, address _poRepMarket) internal pure {
+        if (_dataCapEvidenceAdapter == address(0)) {
+            revert InvalidDataCapEvidenceAdapterAddress();
         }
         if (_poRepMarket == address(0)) {
             revert InvalidPoRepMarketAddress();

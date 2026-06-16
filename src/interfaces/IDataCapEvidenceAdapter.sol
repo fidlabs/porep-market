@@ -5,19 +5,20 @@ pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {DataCapTypes} from "filecoin-solidity/v0.8/types/DataCapTypes.sol";
+import {IStorageEvidenceAdapter} from "./IStorageEvidenceAdapter.sol";
 
 /**
- * @title IClient
- * @notice Interface for client interactions with storage providers
+ * @title IDataCapEvidenceAdapter
+ * @notice Interface for DataCap evidence interactions
  */
-interface IClient {
+interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     /**
      * @notice This function transfers DataCap tokens from the client to the storage provider
      * @dev This function can only be called by the client
      * @param params The parameters for the transfer
      * @param dealId The id of the deal
      */
-    function transfer(DataCapTypes.TransferParams calldata params, uint256 dealId) external;
+    function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external;
 
     /**
      * @notice Replaces all broken tracked allocations for a completed existing deal.
@@ -49,11 +50,17 @@ interface IClient {
         returns (uint32 exitCode, uint64 codec, bytes memory data);
 
     /**
-     * @notice custom getter to retrieve allocation ids per client and provider
+     * @notice getter to retrieve allocation ids for a deal with pagination
      * @param dealId the id of the deal
-     * @return allocationIds the allocation ids for the client and provider
+     * @param offset pagination offset for the allocation ids
+     * @param limit pagination limit for the allocation ids
+     * @return ids list of allocation ids for the given deal
+     * @return total total number of allocations for the given deal
      */
-    function getClientAllocationIdsPerDeal(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory);
+    function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 total);
 
     /**
      * @notice custom getter to check if claim is terminated
@@ -83,4 +90,10 @@ interface IClient {
      * @return sizeOfAllocations size of allocations for the selected deal
      */
     function getSizeOfAllocations(uint256 dealId) external view returns (uint256);
+
+    /**
+     * @notice Getter for the PoRepMarket contract address
+     * @return Address of the PoRepMarket contract
+     */
+    function getPoRepMarketAddress() external view returns (address);
 }
