@@ -105,10 +105,7 @@ contract Deploy is Script, DeployUtils {
 
     function _deployDataCapEvidenceAdapter() internal returns (address proxy, address impl) {
         DataCapEvidenceAdapter _impl = new DataCapEvidenceAdapter();
-        bytes memory init = abi.encodeCall(
-            DataCapEvidenceAdapter.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator)
-        );
-        proxy = createProxy(init, address(_impl));
+        proxy = createProxy("", address(_impl));
         impl = address(_impl);
     }
 
