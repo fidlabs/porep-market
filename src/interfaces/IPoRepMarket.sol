@@ -4,6 +4,7 @@ pragma solidity =0.8.30;
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
 import {SLITypes} from "../types/SLITypes.sol";
+import {SharedTypes} from "../types/SharedTypes.sol";
 
 /**
  * @title IPoRepMarket interface
@@ -11,11 +12,11 @@ import {SLITypes} from "../types/SLITypes.sol";
  */
 interface IPoRepMarket {
     /**
-     * @notice Sets the DataCap evidence adapter
-     * @dev Sets the DataCap evidence adapter
-     * @param _dataCapEvidenceAdapter The address of the DataCap evidence adapter
+     * @notice Sets the global evidence adapter
+     * @dev New deals snapshot this adapter at proposal time
+     * @param _globalEvidenceAdapter The address of the global evidence adapter
      */
-    function setDataCapEvidenceAdapter(address _dataCapEvidenceAdapter) external;
+    function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) external;
 
     /**
      * @notice Proposes a deal
@@ -123,10 +124,54 @@ interface IPoRepMarket {
     function getSPRegistryContract() external view returns (address);
 
     /**
-     * @notice Gets the DataCap evidence adapter address from storage
-     * @return The DataCap evidence adapter address
+     * @notice Gets the global evidence adapter address from storage
+     * @return The global evidence adapter address
      */
-    function getDataCapEvidenceAdapter() external view returns (address);
+    function getGlobalEvidenceAdapter() external view returns (address);
+
+    /**
+     * @notice Gets the evidence adapter assigned to a deal
+     * @param dealId The id of the deal proposal
+     * @return The deal evidence adapter address
+     */
+    function getDealEvidenceAdapter(uint256 dealId) external view returns (address);
+
+    /**
+     * @notice Submit evidence to the adapter assigned to a deal
+     * @param dealId The id of the deal proposal
+     * @param evidenceData Adapter-specific evidence payload
+     * @return decision Adapter activation decision for the submitted batch
+     */
+    function submitEvidenceBatch(uint256 dealId, bytes calldata evidenceData)
+        external
+        returns (SharedTypes.ActivationDecision memory decision);
+
+    /**
+     * @notice Activate evidence for a deal through its assigned adapter
+     * @param dealId The id of the deal proposal
+     * @param evidenceData Adapter-specific evidence payload
+     * @return decision Adapter activation decision
+     */
+    function activateEvidence(uint256 dealId, bytes calldata evidenceData)
+        external
+        returns (SharedTypes.ActivationDecision memory decision);
+
+    /**
+     * @notice Refresh evidence status for a deal through its assigned adapter
+     * @param dealId The id of the deal proposal
+     * @param evidenceData Adapter-specific evidence payload
+     * @return status Updated evidence status
+     */
+    function refreshEvidenceStatus(uint256 dealId, bytes calldata evidenceData)
+        external
+        returns (SharedTypes.EvidenceStatus memory status);
+
+    /**
+     * @notice Reads current evidence status for a deal through its assigned adapter
+     * @param dealId The id of the deal proposal
+     * @return status Current evidence status
+     */
+    function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status);
 
     /**
      * @notice Gets the validator factory contract address from storage

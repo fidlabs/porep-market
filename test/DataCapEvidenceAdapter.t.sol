@@ -137,7 +137,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapter), uint256(10000));
@@ -746,7 +747,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: PoRepTypes.DealState.Completed,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
 
@@ -881,7 +883,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
         vm.prank(clientAddress);
@@ -926,7 +929,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
         reentrantMetaAllocatorMock.setAttackParams(
@@ -965,7 +969,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
         // solhint-disable-next-line reentrancy
@@ -1228,7 +1233,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
 
@@ -1368,7 +1374,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
 

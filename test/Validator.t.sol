@@ -81,7 +81,8 @@ contract ValidatorTest is Test {
                 state: PoRepTypes.DealState.Proposed,
                 railId: railId,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: dataCapEvidenceAdapter
             })
         );
 
