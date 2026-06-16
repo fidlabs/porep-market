@@ -20,6 +20,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {EvidenceTypes} from "./types/EvidenceTypes.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 
 /**
  * @title DataCapEvidenceAdapter
@@ -372,6 +373,46 @@ contract DataCapEvidenceAdapter is
             }
         }
         deal.sizeOfAllocations += allocationsAndClaimsSize;
+    }
+
+    /// Note: this function is only added for testing purpose, will be implemented in the future
+    function submitEvidenceBatch(SharedTypes.ActivationContext calldata, bytes calldata)
+        external
+        pure
+        returns (SharedTypes.ActivationDecision memory decision)
+    {
+        return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
+    }
+
+    /// Note: this function is only added for testing purpose, will be implemented in the future
+    function activateEvidence(SharedTypes.ActivationContext calldata, bytes calldata)
+        external
+        pure
+        returns (SharedTypes.ActivationDecision memory decision)
+    {
+        return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
+    }
+
+    /// Note: this function is only added for testing purpose, will be implemented in the future
+    function refreshEvidenceStatus(SharedTypes.ActivationContext calldata, bytes calldata)
+        external
+        pure
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
+        return SharedTypes.EvidenceStatus({
+            activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
+        });
+    }
+
+    /// Note: this function is only added for testing purpose, will be implemented in the future
+    function currentEvidenceStatus(SharedTypes.ActivationContext calldata)
+        external
+        pure
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
+        return SharedTypes.EvidenceStatus({
+            activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
+        });
     }
 
     // solhint-disable function-max-lines

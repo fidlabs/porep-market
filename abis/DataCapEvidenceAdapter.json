@@ -71,6 +71,79 @@
   },
   {
     "type": "function",
+    "name": "activateEvidence",
+    "inputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ActivationContext",
+        "components": [
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "activationToleranceBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "decision",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ActivationDecision",
+        "components": [
+          {
+            "name": "coveredBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "reasonCode",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "result",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "claimsTerminatedEarly",
     "inputs": [
       {
@@ -81,6 +154,79 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "currentEvidenceStatus",
+    "inputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ActivationContext",
+        "components": [
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "activationToleranceBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.EvidenceStatus",
+        "components": [
+          {
+            "name": "activeCoveredBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lastEvidenceRefreshEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "reasonCode",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "result",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -323,6 +469,84 @@
   },
   {
     "type": "function",
+    "name": "refreshEvidenceStatus",
+    "inputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ActivationContext",
+        "components": [
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "activationToleranceBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.EvidenceStatus",
+        "components": [
+          {
+            "name": "activeCoveredBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "lastEvidenceRefreshEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "reasonCode",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "result",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
     "name": "renounceRole",
     "inputs": [
       {
@@ -464,6 +688,79 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "submitEvidenceBatch",
+    "inputs": [
+      {
+        "name": "",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ActivationContext",
+        "components": [
+          {
+            "name": "dealId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "activationToleranceBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          }
+        ]
+      },
+      {
+        "name": "",
+        "type": "bytes",
+        "internalType": "bytes"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "decision",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ActivationDecision",
+        "components": [
+          {
+            "name": "coveredBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "reasonCode",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "result",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "pure"
   },
   {
     "type": "function",

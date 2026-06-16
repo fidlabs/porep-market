@@ -9,10 +9,11 @@ import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/acce
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
-import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
+import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -27,6 +28,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice role to manage contract upgrades
      */
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
+    /**
+     * @notice role to manage PoRep service operations
+     */
+    bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     /**
      * @notice Number of epochs in one month
@@ -70,7 +76,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
-        IDataCapEvidenceAdapter _dataCapEvidenceAdapter;
+        IStorageEvidenceAdapter _globalEvidenceAdapter;
         uint256 _dealIdCounter;
         uint256 _dealCompletionPadding;
         uint256 _dealProposalExpiration;
@@ -176,11 +182,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     event ManifestLocationUpdated(uint256 indexed dealId, string oldManifestLocation, string newManifestLocation);
 
     /**
-     * @notice DataCapEvidenceAdapterUpdated event
-     * @dev DataCapEvidenceAdapterUpdated event is emitted when the DataCap evidence adapter is updated
-     * @param dataCapEvidenceAdapter The address of the DataCap evidence adapter
+     * @notice GlobalEvidenceAdapterUpdated event
+     * @dev Emitted when the global evidence adapter is updated
+     * @param evidenceAdapter The address of the global evidence adapter
      */
-    event DataCapEvidenceAdapterUpdated(address indexed dataCapEvidenceAdapter);
+    event GlobalEvidenceAdapterUpdated(address indexed evidenceAdapter);
 
     /**
      * @notice DealCompletionPaddingUpdated event
@@ -296,10 +302,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error TooLongManifestLocation();
 
     /**
-     * @notice Error thrown when trying to set an invalid DataCap evidence adapter address
+     * @notice Error thrown when trying to set an invalid evidence adapter address
      * @dev 0x39ee49ba
      */
-    error InvalidDataCapEvidenceAdapterAddress();
+    error InvalidEvidenceAdapterAddress();
 
     /**
      * @notice Error thrown when deal duration in terms is invalid
@@ -376,28 +382,38 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param _admin The address of the admin
      * @param _validatorFactory The address of the validator registry
      * @param _spRegistry The address of the SP registry
+     * @param _globalEvidenceAdapter The address of the default evidence adapter
      */
-    function initialize(address _admin, address _validatorFactory, address _spRegistry) public initializer {
+    function initialize(address _admin, address _validatorFactory, address _spRegistry, address _globalEvidenceAdapter)
+        public
+        initializer
+    {
+        if (_globalEvidenceAdapter == address(0)) revert InvalidEvidenceAdapterAddress();
+
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
+        _grantRole(POREP_SERVICE_ROLE, _admin);
 
         DealProposalsStorage storage $ = s();
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
+        $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
         $._dealProposalExpiration = DEFAULT_DEAL_PROPOSAL_EXPIRATION;
+
+        emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
 
     /**
-     * @notice Sets the DataCap evidence adapter
-     * @dev Sets the DataCap evidence adapter
-     * @param _dataCapEvidenceAdapter The address of the DataCap evidence adapter
+     * @notice Sets the global evidence adapter
+     * @dev New deals snapshot this adapter at proposal time
+     * @param _globalEvidenceAdapter The address of the global evidence adapter
      */
-    function setDataCapEvidenceAdapter(address _dataCapEvidenceAdapter) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_dataCapEvidenceAdapter == address(0)) revert InvalidDataCapEvidenceAdapterAddress();
+    function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) public onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (_globalEvidenceAdapter == address(0)) revert InvalidEvidenceAdapterAddress();
         DealProposalsStorage storage $ = _getDealProposalsStorage();
-        $._dataCapEvidenceAdapter = IDataCapEvidenceAdapter(_dataCapEvidenceAdapter);
-        emit DataCapEvidenceAdapterUpdated(_dataCapEvidenceAdapter);
+        $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
+        emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
 
     /**
@@ -416,6 +432,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureCorrectTerms(terms);
 
         DealProposalsStorage storage $ = s();
+        IStorageEvidenceAdapter evidenceAdapter = $._globalEvidenceAdapter;
+        if (address(evidenceAdapter) == address(0)) revert InvalidEvidenceAdapterAddress();
 
         (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
             $._SPRegistryContract.getProviderForDeal(requirements, terms);
@@ -436,13 +454,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             state: initialState,
             railId: 0,
             proposedAtBlock: block.number,
-            manifestLocation: manifestLocation
+            manifestLocation: manifestLocation,
+            evidenceAdapter: address(evidenceAdapter)
         });
-
-        emit DealProposalCreated(
-            dealId, msg.sender, provider, requirements, manifestLocation, terms.dealSizeBytes, block.number
-        );
-
+        {
+            uint256 dealSizeBytes = terms.dealSizeBytes;
+            emit DealProposalCreated(
+                dealId, msg.sender, provider, requirements, manifestLocation, dealSizeBytes, block.number
+            );
+        }
         $._dealOrganization[dealId] = organization;
         $._dealIdsByStateByOrganization[initialState][organization].add(dealId);
 
@@ -544,7 +564,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
 
         if (msg.sender != dp.client) revert NotTheClientAddress();
-        uint256 allocatedSize = $._dataCapEvidenceAdapter.getSizeOfAllocations(dealId);
+        SharedTypes.EvidenceStatus memory status =
+            IStorageEvidenceAdapter(dp.evidenceAdapter).currentEvidenceStatus(_activationContext(dp));
+        uint256 allocatedSize = status.activeCoveredBytes;
         uint256 proposedSize = dp.terms.dealSizeBytes;
 
         _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
@@ -740,12 +762,91 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
-     * @notice Gets the DataCap evidence adapter address from storage
-     * @return IDataCapEvidenceAdapter The DataCap evidence adapter address
+     * @notice Gets the global evidence adapter address from storage
+     * @return The global evidence adapter address
      */
-    function getDataCapEvidenceAdapter() external view returns (address) {
+    function getGlobalEvidenceAdapter() external view returns (address) {
         DealProposalsStorage storage $ = s();
-        return address($._dataCapEvidenceAdapter);
+        return address($._globalEvidenceAdapter);
+    }
+
+    /**
+     * @notice Gets the evidence adapter address assigned to a deal
+     * @param dealId The id of the deal proposal
+     * @return The evidence adapter address for the deal
+     */
+    function getDealEvidenceAdapter(uint256 dealId) external view returns (address) {
+        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+        return dealProposal.evidenceAdapter;
+    }
+
+    /**
+     * @notice Submit evidence to the adapter assigned to a deal
+     * @param dealId The id of the deal proposal
+     * @param evidenceData Adapter-specific evidence payload
+     * @return decision Adapter activation decision for the submitted batch
+     */
+    function submitEvidenceBatch(uint256 dealId, bytes calldata evidenceData)
+        external
+        returns (SharedTypes.ActivationDecision memory decision)
+    {
+        _ensurePoRepServiceOrAdmin();
+        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+
+        return IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
+            .submitEvidenceBatch(_activationContext(dealProposal), evidenceData);
+    }
+
+    /**
+     * @notice Activate evidence for a deal through its assigned adapter
+     * @param dealId The id of the deal proposal
+     * @param evidenceData Adapter-specific evidence payload
+     * @return decision Adapter activation decision
+     */
+    function activateEvidence(uint256 dealId, bytes calldata evidenceData)
+        external
+        returns (SharedTypes.ActivationDecision memory decision)
+    {
+        _ensurePoRepServiceOrAdmin();
+        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+
+        return IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
+            .activateEvidence(_activationContext(dealProposal), evidenceData);
+    }
+
+    /**
+     * @notice Refresh evidence status for a deal through its assigned adapter
+     * @param dealId The id of the deal proposal
+     * @param evidenceData Adapter-specific evidence payload
+     * @return status Updated evidence status
+     */
+    function refreshEvidenceStatus(uint256 dealId, bytes calldata evidenceData)
+        external
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
+        _ensurePoRepServiceOrAdmin();
+        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+
+        return IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
+            .refreshEvidenceStatus(_activationContext(dealProposal), evidenceData);
+    }
+
+    /**
+     * @notice Reads current evidence status for a deal through its assigned adapter
+     * @param dealId The id of the deal proposal
+     * @return status Current evidence status
+     */
+    function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status) {
+        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
+        _ensureDealExists(dealProposal);
+
+        return
+            IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
+                .currentEvidenceStatus(_activationContext(dealProposal));
     }
 
     /**
@@ -854,6 +955,35 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     function _getDealProposalExpiration(DealProposalsStorage storage $) internal view returns (uint256) {
         return $._dealProposalExpiration == 0 ? DEFAULT_DEAL_PROPOSAL_EXPIRATION : $._dealProposalExpiration;
+    }
+
+    /**
+     * @notice Builds adapter activation context for a deal proposal
+     * @param dp The deal proposal
+     * @return context The adapter activation context
+     */
+    function _activationContext(PoRepTypes.DealProposal memory dp)
+        internal
+        view
+        returns (SharedTypes.ActivationContext memory context)
+    {
+        return SharedTypes.ActivationContext({
+            dealId: dp.dealId,
+            requestedSizeBytes: dp.terms.dealSizeBytes,
+            client: dp.client,
+            durationEpochs: uint64(uint256(dp.terms.durationDays) * SharedTypes.EPOCHS_IN_DAY),
+            activationToleranceBps: uint16(s()._dealCompletionPadding),
+            provider: dp.provider
+        });
+    }
+
+    /**
+     * @notice Ensures caller has admin or PoRep service role
+     */
+    function _ensurePoRepServiceOrAdmin() internal view {
+        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(POREP_SERVICE_ROLE, msg.sender)) {
+            revert AccessControlUnauthorizedAccount(msg.sender, POREP_SERVICE_ROLE);
+        }
     }
 
     //  solhint-enable

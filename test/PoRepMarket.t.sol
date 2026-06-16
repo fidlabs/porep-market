@@ -12,6 +12,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
@@ -62,12 +63,12 @@ contract PoRepMarketTest is Test {
             dealSizeBytes: totalDealSize, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
         });
 
-        bytes memory initData =
-            abi.encodeCall(PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry)));
+        bytes memory initData = abi.encodeCall(
+            PoRepMarket.initialize,
+            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+        );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarket(address(proxy));
-        vm.prank(adminAddress);
-        poRepMarket.setDataCapEvidenceAdapter(address(dataCapEvidenceAdapterAddress));
 
         spRegistry.setNextProvider(providerFilActorId);
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
@@ -90,7 +91,8 @@ contract PoRepMarketTest is Test {
             railId: railId,
             state: state,
             proposedAtBlock: block.number,
-            manifestLocation: expectedManifestLocation
+            manifestLocation: expectedManifestLocation,
+            evidenceAdapter: address(dataCapEvidenceAdapterAddress)
         });
     }
 
@@ -148,6 +150,7 @@ contract PoRepMarketTest is Test {
         assertEq(p.railId, 0);
         assertEq(p.proposedAtBlock, 100);
         assertTrue(p.state == PoRepTypes.DealState.Proposed);
+        assertEq(p.evidenceAdapter, address(dataCapEvidenceAdapterAddress));
 
         p = poRepMarket.getDealProposal(0);
         assertEq(p.dealId, 0);
@@ -164,6 +167,22 @@ contract PoRepMarketTest is Test {
         assertEq(p.railId, 0);
         assertEq(p.proposedAtBlock, 0);
         assertEq(uint8(p.state), 0);
+    }
+
+    function testProposeDealSnapshotsGlobalEvidenceAdapter() public {
+        DataCapEvidenceAdapterMock newEvidenceAdapter = new DataCapEvidenceAdapterMock();
+
+        vm.prank(adminAddress);
+        poRepMarket.setGlobalEvidenceAdapter(address(newEvidenceAdapter));
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        assertEq(poRepMarket.getDealEvidenceAdapter(dealId), address(newEvidenceAdapter));
+
+        vm.prank(adminAddress);
+        poRepMarket.setGlobalEvidenceAdapter(address(dataCapEvidenceAdapterAddress));
+
+        assertEq(poRepMarket.getDealEvidenceAdapter(dealId), address(newEvidenceAdapter));
     }
 
     function testShouldIncrementDealIdCounter() public {
@@ -486,12 +505,14 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
         // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address)", adminAddress, address(validatorFactory), address(spRegistry)
+            "initialize(address,address,address,address)",
+            adminAddress,
+            address(validatorFactory),
+            address(spRegistry),
+            address(dataCapEvidenceAdapterAddress)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
-        vm.prank(adminAddress);
-        porepMarekMock.setDataCapEvidenceAdapter(address(dataCapEvidenceAdapterAddress));
         vm.prank(clientAddress);
         porepMarekMock.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
         vm.prank(providerOwnerAddress);
@@ -814,10 +835,169 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, tooLongManifestLocation);
     }
 
-    function testSetDataCapEvidenceAdapterRevertsWhenAddressIsZero() public {
+    function testSetGlobalEvidenceAdapterRevertsWhenAddressIsZero() public {
         vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDataCapEvidenceAdapterAddress.selector));
-        poRepMarket.setDataCapEvidenceAdapter(address(0));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidEvidenceAdapterAddress.selector));
+        poRepMarket.setGlobalEvidenceAdapter(address(0));
+    }
+
+    function testSetGlobalEvidenceAdapterUpdatesAdapter() public {
+        DataCapEvidenceAdapterMock newEvidenceAdapter = new DataCapEvidenceAdapterMock();
+
+        vm.prank(adminAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.GlobalEvidenceAdapterUpdated(address(newEvidenceAdapter));
+        poRepMarket.setGlobalEvidenceAdapter(address(newEvidenceAdapter));
+
+        assertEq(poRepMarket.getGlobalEvidenceAdapter(), address(newEvidenceAdapter));
+    }
+
+    function testSetGlobalEvidenceAdapterRevertsWhenCallerIsNotAdmin() public {
+        DataCapEvidenceAdapterMock newEvidenceAdapter = new DataCapEvidenceAdapterMock();
+        address caller = vm.addr(0x999);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.DEFAULT_ADMIN_ROLE()
+            )
+        );
+        vm.prank(caller);
+        poRepMarket.setGlobalEvidenceAdapter(address(newEvidenceAdapter));
+    }
+
+    function testSubmitEvidenceBatchRevertsWhenCallerIsNotAdminOrPoRepService() public {
+        address caller = vm.addr(0x999);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
+            )
+        );
+        vm.prank(caller);
+        poRepMarket.submitEvidenceBatch(dealId, abi.encode("payload"));
+    }
+
+    function testSubmitEvidenceBatchCallsAssignedDealAdapter() public {
+        bytes memory evidenceData = abi.encode("payload");
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        DataCapEvidenceAdapterMock newEvidenceAdapter = new DataCapEvidenceAdapterMock();
+        vm.prank(adminAddress);
+        poRepMarket.setGlobalEvidenceAdapter(address(newEvidenceAdapter));
+
+        vm.prank(adminAddress);
+        poRepMarket.submitEvidenceBatch(dealId, evidenceData);
+
+        assertEq(dataCapEvidenceAdapterAddress.submittedEvidence(dealId), evidenceData);
+        assertEq(dataCapEvidenceAdapterAddress.submitEvidenceCaller(dealId), address(poRepMarket));
+        assertEq(newEvidenceAdapter.submittedEvidence(dealId).length, 0);
+    }
+
+    function testActivateEvidenceAllowsAdmin() public {
+        bytes memory evidenceData = abi.encode("activate");
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        poRepMarket.activateEvidence(dealId, evidenceData);
+
+        assertEq(dataCapEvidenceAdapterAddress.activatedEvidence(dealId), evidenceData);
+    }
+
+    function testActivateEvidenceAllowsPoRepServiceRole() public {
+        bytes memory evidenceData = abi.encode("activate");
+        address service = vm.addr(0x777);
+        bytes32 serviceRole = poRepMarket.POREP_SERVICE_ROLE();
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        poRepMarket.grantRole(serviceRole, service);
+
+        vm.prank(service);
+        poRepMarket.activateEvidence(dealId, evidenceData);
+
+        assertEq(dataCapEvidenceAdapterAddress.activatedEvidence(dealId), evidenceData);
+    }
+
+    function testActivateEvidenceRevertsWhenCallerIsNotServiceOrAdmin() public {
+        address caller = vm.addr(0x999);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
+            )
+        );
+        vm.prank(caller);
+        poRepMarket.activateEvidence(dealId, abi.encode("activate"));
+    }
+
+    function testRefreshEvidenceStatusAllowsAdmin() public {
+        bytes memory evidenceData = abi.encode("refresh");
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
+
+        assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
+    }
+
+    function testRefreshEvidenceStatusAllowsPoRepServiceRole() public {
+        bytes memory evidenceData = abi.encode("refresh");
+        address service = vm.addr(0x777);
+        bytes32 serviceRole = poRepMarket.POREP_SERVICE_ROLE();
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        poRepMarket.grantRole(serviceRole, service);
+
+        vm.prank(service);
+        poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
+
+        assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
+    }
+
+    function testRefreshEvidenceStatusRevertsWhenCallerIsNotServiceOrAdmin() public {
+        address caller = vm.addr(0x999);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
+            )
+        );
+        vm.prank(caller);
+        poRepMarket.refreshEvidenceStatus(dealId, abi.encode("refresh"));
+    }
+
+    function testCurrentEvidenceStatusIsReadableByAnyCaller() public {
+        uint256 coveredBytes = defaultTerms.dealSizeBytes;
+        address caller = vm.addr(0x999);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, coveredBytes));
+
+        vm.prank(caller);
+        SharedTypes.EvidenceStatus memory status = poRepMarket.currentEvidenceStatus(dealId);
+
+        assertEq(status.activeCoveredBytes, coveredBytes);
     }
 
     function testTerminateDealEmitsEventAndSetsState() public {
@@ -1191,8 +1371,8 @@ contract PoRepMarketTest is Test {
         assertEq(poRepMarket.getSPRegistryContract(), address(spRegistry));
     }
 
-    function testGetDataCapEvidenceAdapter() public view {
-        assertEq(poRepMarket.getDataCapEvidenceAdapter(), address(dataCapEvidenceAdapterAddress));
+    function testGetGlobalEvidenceAdapter() public view {
+        assertEq(poRepMarket.getGlobalEvidenceAdapter(), address(dataCapEvidenceAdapterAddress));
     }
 
     function testGetValidatorFactoryContract() public view {
