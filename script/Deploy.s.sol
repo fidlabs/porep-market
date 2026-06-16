@@ -55,16 +55,15 @@ contract Deploy is Script, DeployUtils {
 
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
         (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
+        (dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl) = _deployDataCapEvidenceAdapter();
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
-        (dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl) =
-            _deployDataCapEvidenceAdapter(admin, terminationOracle, poRepMarket, metaAllocator);
+        DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
-        // circular dependencies
-        PoRepMarket(poRepMarket).setDataCapEvidenceAdapter(dataCapEvidenceAdapter);
+        PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
         ValidatorFactory(validatorFactory)
             .initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
         SPRegistry(spRegistry).initialize2(poRepMarket);
@@ -98,19 +97,15 @@ contract Deploy is Script, DeployUtils {
         returns (address proxy, address impl)
     {
         PoRepMarket _impl = new PoRepMarket();
-        bytes memory init = abi.encodeCall(PoRepMarket.initialize, (_admin, _validatorFactory, _spRegistry));
+        bytes memory init =
+            abi.encodeCall(PoRepMarket.initialize, (_admin, _validatorFactory, _spRegistry, dataCapEvidenceAdapter));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
 
-    function _deployDataCapEvidenceAdapter(
-        address _admin,
-        address _terminationOracle,
-        address _porepMarket,
-        address _metaAllocator
-    ) internal returns (address proxy, address impl) {
+    function _deployDataCapEvidenceAdapter() internal returns (address proxy, address impl) {
         DataCapEvidenceAdapter _impl = new DataCapEvidenceAdapter();
-        bytes memory init = abi.encodeCall(
+         bytes memory init = abi.encodeCall(
             DataCapEvidenceAdapter.initialize, (_admin, _terminationOracle, _porepMarket, _metaAllocator)
         );
         proxy = createProxy(init, address(_impl));
