@@ -32,6 +32,7 @@ import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
+import {SharedTypes} from "../src/types/SharedTypes.sol";
 
 // solhint-disable max-states-count
 contract DataCapEvidenceAdapterTest is Test {
@@ -76,6 +77,15 @@ contract DataCapEvidenceAdapterTest is Test {
     uint64[] public earlyTerminatedClaims = new uint64[](0);
 
     string public expectedManifestLocation = "https://example.com/manifest";
+
+    SharedTypes.ActivationContext public activationContext = SharedTypes.ActivationContext({
+        dealId: dealId,
+        requestedSizeBytes: totalDealSize,
+        client: clientAddress,
+        durationEpochs: 0,
+        activationToleranceBps: 0,
+        provider: SP1
+    });
 
     // solhint-disable-next-line function-max-lines
     function setUp() public {
@@ -255,6 +265,43 @@ contract DataCapEvidenceAdapterTest is Test {
 
     function testDataCapEvidenceAdapterEvidenceType() public view {
         assertEq(dataCapEvidenceAdapter.evidenceType(), EvidenceTypes.VERIF_REG_CLAIMS);
+    }
+
+    function testSubmitEvidenceBatchReturnsDummyDecision() public view {
+        SharedTypes.ActivationDecision memory decision =
+            dataCapEvidenceAdapter.submitEvidenceBatch(activationContext, abi.encode("dummy"));
+
+        assertEq(decision.coveredBytes, 0);
+        assertEq(decision.reasonCode, 0);
+        assertEq(decision.result, 0);
+    }
+
+    function testActivateEvidenceReturnsDummyDecision() public view {
+        SharedTypes.ActivationDecision memory decision =
+            dataCapEvidenceAdapter.activateEvidence(activationContext, abi.encode("dummy"));
+
+        assertEq(decision.coveredBytes, 0);
+        assertEq(decision.reasonCode, 0);
+        assertEq(decision.result, 0);
+    }
+
+    function testRefreshEvidenceStatusReturnsDummyStatus() public view {
+        SharedTypes.EvidenceStatus memory status =
+            dataCapEvidenceAdapter.refreshEvidenceStatus(activationContext, abi.encode("dummy"));
+
+        assertEq(status.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 0);
+        assertEq(status.reasonCode, 0);
+        assertEq(status.result, 0);
+    }
+
+    function testCurrentEvidenceStatusReturnsDummyStatus() public view {
+        SharedTypes.EvidenceStatus memory status = dataCapEvidenceAdapter.currentEvidenceStatus(activationContext);
+
+        assertEq(status.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 0);
+        assertEq(status.reasonCode, 0);
+        assertEq(status.result, 0);
     }
 
     function testGetAllocationIdsPerDealPaginates() public {
