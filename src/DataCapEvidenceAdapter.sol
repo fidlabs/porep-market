@@ -376,6 +376,11 @@ contract DataCapEvidenceAdapter is
     }
 
     /// Note: this function is only added for testing purpose, will be implemented in the future
+    /**
+     * @notice Submits a batch of storage evidence.
+     * @dev This function is only added for testing purpose, will be implemented in the future.
+     * @return decision Dummy activation decision.
+     */
     function submitEvidenceBatch(SharedTypes.ActivationContext calldata, bytes calldata)
         external
         pure
@@ -385,6 +390,11 @@ contract DataCapEvidenceAdapter is
     }
 
     /// Note: this function is only added for testing purpose, will be implemented in the future
+    /**
+     * @notice Activates submitted storage evidence.
+     * @dev This function is only added for testing purpose, will be implemented in the future.
+     * @return decision Dummy activation decision.
+     */
     function activateEvidence(SharedTypes.ActivationContext calldata, bytes calldata)
         external
         pure
@@ -394,6 +404,11 @@ contract DataCapEvidenceAdapter is
     }
 
     /// Note: this function is only added for testing purpose, will be implemented in the future
+    /**
+     * @notice Refreshes the current storage evidence status.
+     * @dev This function is only added for testing purpose, will be implemented in the future.
+     * @return status Dummy evidence status.
+     */
     function refreshEvidenceStatus(SharedTypes.ActivationContext calldata, bytes calldata)
         external
         pure
@@ -405,6 +420,11 @@ contract DataCapEvidenceAdapter is
     }
 
     /// Note: this function is only added for testing purpose, will be implemented in the future
+    /**
+     * @notice Gets the current storage evidence status.
+     * @dev This function is only added for testing purpose, will be implemented in the future.
+     * @return status Dummy evidence status.
+     */
     function currentEvidenceStatus(SharedTypes.ActivationContext calldata)
         external
         pure

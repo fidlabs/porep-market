@@ -4,7 +4,6 @@ pragma solidity =0.8.30;
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
 import {SLITypes} from "../types/SLITypes.sol";
-import {SharedTypes} from "../types/SharedTypes.sol";
 
 /**
  * @title IPoRepMarket interface

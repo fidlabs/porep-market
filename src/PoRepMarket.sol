@@ -14,7 +14,6 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {SLITypes} from "./types/SLITypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
-import {SharedTypes} from "./types/SharedTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
