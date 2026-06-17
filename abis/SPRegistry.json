@@ -19,6 +19,19 @@
   },
   {
     "type": "function",
+    "name": "DEFAULT_MATCH_PRICE_BAND_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "MARKET_ROLE",
     "inputs": [],
     "outputs": [
@@ -32,13 +45,39 @@
   },
   {
     "type": "function",
-    "name": "MAX_DEAL_DURATION_DAYS",
+    "name": "MAX_ACTIVE_OFFERS_PER_PROVIDER",
     "inputs": [],
     "outputs": [
       {
         "name": "",
-        "type": "uint32",
-        "internalType": "uint32"
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_BPS",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "MAX_OFFER_NAME_BYTES",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -78,6 +117,19 @@
         "name": "",
         "type": "bytes32",
         "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "SECTOR_SIZE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -146,6 +198,138 @@
   },
   {
     "type": "function",
+    "name": "createOffer",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      },
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.OfferTerms",
+        "components": [
+          {
+            "name": "minSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "minDurationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "maxDurationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      },
+      {
+        "name": "slis",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "bandwidthBytesPerSecond",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      },
+      {
+        "name": "payments",
+        "type": "tuple[]",
+        "internalType": "struct SharedTypes.OfferPaymentInput[]",
+        "components": [
+          {
+            "name": "token",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "active",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getActiveOffers",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "offerIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getActiveOffersByProvider",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "offerIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getCommittedProviders",
     "inputs": [],
     "outputs": [
@@ -153,6 +337,192 @@
         "name": "",
         "type": "uint64[]",
         "internalType": "CommonTypes.FilActorId[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getMatchPriceBandBps",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOffer",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "info",
+        "type": "tuple",
+        "internalType": "struct ISPRegistry.OfferInfo",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "name",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "active",
+            "type": "bool",
+            "internalType": "bool"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOfferPayment",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "payment",
+        "type": "tuple",
+        "internalType": "struct ISPRegistry.OfferPayment",
+        "components": [
+          {
+            "name": "active",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOfferSLIs",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "slis",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "bandwidthBytesPerSecond",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOfferTerms",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.OfferTerms",
+        "components": [
+          {
+            "name": "minSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "minDurationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "maxDurationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getOffersByProvider",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "offerIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
       }
     ],
     "stateMutability": "view"
@@ -172,6 +542,86 @@
         "name": "",
         "type": "address",
         "internalType": "address"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPaymentTokenConfig",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "config",
+        "type": "tuple",
+        "internalType": "struct ISPRegistry.TokenConfig",
+        "components": [
+          {
+            "name": "allowed",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "minPricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getPaymentTokens",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "tokens",
+        "type": "address[]",
+        "internalType": "address[]"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getProviderCapacity",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "info",
+        "type": "tuple",
+        "internalType": "struct ISPRegistry.ProviderCapacityInfo",
+        "components": [
+          {
+            "name": "availableBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "committedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "pendingBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -232,17 +682,17 @@
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
       },
       {
-        "name": "",
+        "name": "autoApprove",
         "type": "bool",
         "internalType": "bool"
       },
       {
-        "name": "",
+        "name": "organization",
         "type": "address",
         "internalType": "address"
       }
@@ -537,6 +987,285 @@
   },
   {
     "type": "function",
+    "name": "previewOfferForDeal",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.DealRequest",
+        "components": [
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "selection",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ProviderDealSelection",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "promisedSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "reservedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "previewProviderForDeal",
+    "inputs": [
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.DealRequest",
+        "components": [
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "selection",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ProviderDealSelection",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "promisedSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "reservedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "proxiableUUID",
     "inputs": [],
     "outputs": [
@@ -563,39 +1292,7 @@
         "internalType": "address"
       },
       {
-        "name": "capabilities",
-        "type": "tuple",
-        "internalType": "struct SharedTypes.SLIThresholds",
-        "components": [
-          {
-            "name": "retrievabilityBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "bandwidthBytesPerSecond",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "latencyMs",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "indexingPct",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
-      },
-      {
         "name": "availableBytes",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "pricePerSectorPerMonth",
         "type": "uint256",
         "internalType": "uint256"
       },
@@ -603,16 +1300,6 @@
         "name": "payee",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "minDealDurationDays",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "maxDealDurationDays",
-        "type": "uint32",
-        "internalType": "uint32"
       }
     ],
     "outputs": [],
@@ -674,6 +1361,285 @@
   },
   {
     "type": "function",
+    "name": "reserveOfferForDeal",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.DealRequest",
+        "components": [
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "selection",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ProviderDealSelection",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "promisedSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "reservedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "reserveProviderForDeal",
+    "inputs": [
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.DealRequest",
+        "components": [
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "selection",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ProviderDealSelection",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "promisedSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "reservedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "revokeRole",
     "inputs": [
       {
@@ -692,39 +1658,12 @@
   },
   {
     "type": "function",
-    "name": "setCapabilities",
+    "name": "setMatchPriceBandBps",
     "inputs": [
       {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "capabilities",
-        "type": "tuple",
-        "internalType": "struct SharedTypes.SLIThresholds",
-        "components": [
-          {
-            "name": "retrievabilityBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "bandwidthBytesPerSecond",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "latencyMs",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "indexingPct",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
+        "name": "bps",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -732,22 +1671,63 @@
   },
   {
     "type": "function",
-    "name": "setDealDurationLimits",
+    "name": "setOfferActive",
     "inputs": [
       {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "minDealDurationDays",
-        "type": "uint32",
-        "internalType": "uint32"
+        "name": "active",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setOfferName",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
       },
       {
-        "name": "maxDealDurationDays",
-        "type": "uint32",
-        "internalType": "uint32"
+        "name": "name",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "setOfferPayment",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "active",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "pricePer32GiBPerMonth",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "outputs": [],
@@ -773,15 +1753,20 @@
   },
   {
     "type": "function",
-    "name": "setPrice",
+    "name": "setPaymentToken",
     "inputs": [
       {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
       },
       {
-        "name": "pricePerSectorPerMonth",
+        "name": "allowed",
+        "type": "bool",
+        "internalType": "bool"
+      },
+      {
+        "name": "minPricePer32GiBPerMonth",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -904,47 +1889,6 @@
   },
   {
     "type": "event",
-    "name": "CapabilitiesUpdated",
-    "inputs": [
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "capabilities",
-        "type": "tuple",
-        "indexed": false,
-        "internalType": "struct SharedTypes.SLIThresholds",
-        "components": [
-          {
-            "name": "retrievabilityBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "bandwidthBytesPerSecond",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "latencyMs",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "indexingPct",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "CapacityCommitted",
     "inputs": [
       {
@@ -983,31 +1927,6 @@
   },
   {
     "type": "event",
-    "name": "DealDurationLimitsUpdated",
-    "inputs": [
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "minDealDurationDays",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
-      },
-      {
-        "name": "maxDealDurationDays",
-        "type": "uint32",
-        "indexed": false,
-        "internalType": "uint32"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
     "name": "Initialized",
     "inputs": [
       {
@@ -1021,13 +1940,156 @@
   },
   {
     "type": "event",
-    "name": "OrganizationAdded",
+    "name": "MatchPriceBandUpdated",
     "inputs": [
       {
-        "name": "organization",
+        "name": "oldBps",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newBps",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OfferActiveUpdated",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "active",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OfferCreated",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "name",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OfferNameUpdated",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "oldName",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      },
+      {
+        "name": "newName",
+        "type": "string",
+        "indexed": false,
+        "internalType": "string"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OfferPaymentUpdated",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "token",
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      },
+      {
+        "name": "active",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "pricePer32GiBPerMonth",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "OfferSelected",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "indexed": true,
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "pricePer32GiBPerMonth",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "reservedBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1053,6 +2115,31 @@
         "type": "address",
         "indexed": true,
         "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PaymentTokenUpdated",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "allowed",
+        "type": "bool",
+        "indexed": false,
+        "internalType": "bool"
+      },
+      {
+        "name": "minPricePer32GiBPerMonth",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -1088,31 +2175,6 @@
       },
       {
         "name": "sizeBytes",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "PriceUpdated",
-    "inputs": [
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "oldPrice",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "newPrice",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1405,22 +2467,6 @@
   },
   {
     "type": "error",
-    "name": "DurationExceedsProtocolMax",
-    "inputs": [
-      {
-        "name": "durationDays",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "maxDays",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -1449,6 +2495,27 @@
     "type": "error",
     "name": "FailedCall",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InsufficientProviderCapacity",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "requestedBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "remainingBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",
@@ -1495,12 +2562,54 @@
   },
   {
     "type": "error",
+    "name": "InvalidOfferDurationBounds",
+    "inputs": [
+      {
+        "name": "minDurationEpochs",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "maxDurationEpochs",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidOfferName",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidOfferSizeBounds",
+    "inputs": [
+      {
+        "name": "minSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidOrganizationAddress",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidPayeeAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPaymentToken",
     "inputs": []
   },
   {
@@ -1531,6 +2640,22 @@
   },
   {
     "type": "error",
+    "name": "MatchPriceBandTooHigh",
+    "inputs": [
+      {
+        "name": "bps",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maxBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "MaxProvidersReached",
     "inputs": [
       {
@@ -1542,19 +2667,8 @@
   },
   {
     "type": "error",
-    "name": "MinDurationExceedsMax",
-    "inputs": [
-      {
-        "name": "minDays",
-        "type": "uint32",
-        "internalType": "uint32"
-      },
-      {
-        "name": "maxDays",
-        "type": "uint32",
-        "internalType": "uint32"
-      }
-    ]
+    "name": "NoOfferMatched",
+    "inputs": []
   },
   {
     "type": "error",
@@ -1606,6 +2720,108 @@
   },
   {
     "type": "error",
+    "name": "OfferInactive",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OfferNotFound",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OfferPriceBelowPerEpochMinimum",
+    "inputs": [
+      {
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "estimatedSectorCount",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "epochsInMonth",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "OfferSLIsNotMet",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PaymentTokenNotAllowed",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PriceAboveClientMaximum",
+    "inputs": [
+      {
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "maximum",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PriceBelowTokenMinimum",
+    "inputs": [
+      {
+        "name": "token",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "price",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "minimum",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ProviderAlreadyRegistered",
     "inputs": [
       {
@@ -1618,6 +2834,17 @@
   {
     "type": "error",
     "name": "ProviderIsBlocked",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ProviderIsPaused",
     "inputs": [
       {
         "name": "provider",
@@ -1681,6 +2908,38 @@
   },
   {
     "type": "error",
+    "name": "RequestDurationOutsideOfferBounds",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "durationEpochs",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "RequestSizeOutsideOfferBounds",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "requestedSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ToleranceBpsTooHigh",
     "inputs": [
       {
@@ -1690,6 +2949,22 @@
       },
       {
         "name": "maxBps",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "TooManyActiveOffers",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      },
+      {
+        "name": "maxOffers",
         "type": "uint256",
         "internalType": "uint256"
       }

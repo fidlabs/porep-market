@@ -1,2199 +1,991 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec
+// solhint-disable use-natspec, function-max-lines, gas-strict-inequalities
 pragma solidity =0.8.30;
 
 import {Test} from "lib/forge-std/src/Test.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
-import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
-import {ResolveAddressPrecompileMock} from "./contracts/ResolveAddressPrecompileMock.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {MockProxy} from "./contracts/MockProxy.sol";
+import {ResolveAddressPrecompileMock} from "./contracts/ResolveAddressPrecompileMock.sol";
 
-// solhint-disable-next-line max-states-count
 contract SPRegistryTest is Test {
-    SPRegistry public spRegistry;
-    address public adminAddress;
-    address public poRepMarketAddress;
-    address public owner1;
-    address public owner2;
-    address public unauthorizedAddress;
-    address public operatorAddress;
+    address internal constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
 
-    CommonTypes.FilActorId public provider1;
-    CommonTypes.FilActorId public provider2;
-    CommonTypes.FilActorId public provider3;
+    SPRegistry internal spRegistry;
 
-    SharedTypes.SLIThresholds internal defaultCapabilities = SharedTypes.SLIThresholds({
-        retrievabilityBps: 9500, bandwidthBytesPerSecond: 1000, latencyMs: 100, indexingPct: 90
-    });
+    address internal admin = vm.addr(0x001);
+    address internal market = vm.addr(0x002);
+    address internal owner1 = vm.addr(0x003);
+    address internal owner2 = vm.addr(0x004);
+    address internal operator = vm.addr(0x005);
+    address internal token = vm.addr(0x100);
+    address internal token2 = vm.addr(0x101);
+    address internal unauthorized = vm.addr(0x999);
+    ResolveAddressPrecompileMock internal resolveAddress =
+        ResolveAddressPrecompileMock(payable(0xFE00000000000000000000000000000000000001));
 
-    SLITypes.DealTerms internal defaultTerms =
-        SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 365});
+    CommonTypes.FilActorId internal provider1 = CommonTypes.FilActorId.wrap(1000);
+    CommonTypes.FilActorId internal provider2 = CommonTypes.FilActorId.wrap(2000);
+    CommonTypes.FilActorId internal provider3 = CommonTypes.FilActorId.wrap(3000);
 
     uint256 internal defaultAvailableBytes = 10_000_000;
 
+    SharedTypes.SLIThresholds internal defaultSLIs = SharedTypes.SLIThresholds({
+        retrievabilityBps: 9500, bandwidthBytesPerSecond: 1000, latencyMs: 100, indexingPct: 90
+    });
+
     function setUp() public {
         SPRegistry impl = new SPRegistry();
-        adminAddress = vm.addr(0x001);
-        poRepMarketAddress = vm.addr(0x002);
-        owner1 = vm.addr(0x003);
-        owner2 = vm.addr(0x004);
-        unauthorizedAddress = vm.addr(0x005);
-        operatorAddress = vm.addr(0x006);
-
-        provider1 = CommonTypes.FilActorId.wrap(1000);
-        provider2 = CommonTypes.FilActorId.wrap(2000);
-        provider3 = CommonTypes.FilActorId.wrap(3000);
-
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (admin));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         spRegistry = SPRegistry(address(proxy));
 
-        vm.prank(adminAddress);
-        spRegistry.initialize2(poRepMarketAddress);
+        vm.prank(admin);
+        spRegistry.initialize2(market);
 
-        bytes32 operatorRole = spRegistry.OPERATOR_ROLE();
-        vm.prank(adminAddress);
-        spRegistry.grantRole(operatorRole, operatorAddress);
-    }
-
-    function testInitializeSetsAdminRole() public view {
-        assertTrue(spRegistry.hasRole(spRegistry.DEFAULT_ADMIN_ROLE(), adminAddress));
-    }
-
-    function testInitializeSetsUpgraderRole() public view {
-        assertTrue(spRegistry.hasRole(spRegistry.UPGRADER_ROLE(), adminAddress));
-    }
-
-    function testInitialize2GrantsMarketRole() public view {
-        assertTrue(spRegistry.hasRole(spRegistry.MARKET_ROLE(), poRepMarketAddress));
-    }
-
-    function testInitializeRevertsForZeroAdmin() public {
-        SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (address(0)));
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidAdminAddress.selector));
-        new ERC1967Proxy(address(impl), initData);
-    }
-
-    function testInitialize2RevertsForZeroAddress() public {
-        SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        SPRegistry registry = SPRegistry(address(proxy));
-
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidPoRepMarketAddress.selector));
-        registry.initialize2(address(0));
-    }
-
-    function testInitialize2RevertsForNonAdmin() public {
-        SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        SPRegistry registry = SPRegistry(address(proxy));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), registry.DEFAULT_ADMIN_ROLE()
-            )
-        );
-        registry.initialize2(poRepMarketAddress);
-    }
-
-    function testInitialize2CannotBeCalledTwice() public {
-        SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (adminAddress));
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
-        SPRegistry registry = SPRegistry(address(proxy));
-
-        vm.prank(adminAddress);
-        registry.initialize2(poRepMarketAddress);
-
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        registry.initialize2(poRepMarketAddress);
-    }
-
-    function testEIP7201StorageSlotIsCorrect() public pure {
-        // solhint-disable-next-line gas-small-strings
-        bytes32 expected = keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SPRegistryStorage")) - 1))
-            & ~bytes32(uint256(0xff));
-        assertEq(expected, 0x29a3c97291f1bc298e74d2ad6fe62e764c2656f8f0c161acf9b2bd013019df00);
-    }
-
-    function testAuthorizeUpgradeRevertsForNonUpgrader() public {
-        address newImpl = address(new SPRegistry());
-        bytes32 upgraderRole = spRegistry.UPGRADER_ROLE();
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, upgraderRole
-            )
-        );
-        spRegistry.upgradeToAndCall(newImpl, "");
-    }
-
-    function testPauseProviderSetsPausedTrue() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(adminAddress);
-        spRegistry.pauseProvider(provider1);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertTrue(info.paused);
-    }
-
-    function testUnpauseProviderSetsPausedFalse() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.pauseProvider(provider1);
-        spRegistry.unpauseProvider(provider1);
-        vm.stopPrank();
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertFalse(info.paused);
-    }
-
-    function testOperatorCanPauseAndUnpauseProvider() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(operatorAddress);
-        spRegistry.pauseProvider(provider1);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertTrue(info.paused);
-
-        vm.prank(operatorAddress);
-        spRegistry.unpauseProvider(provider1);
-
-        info = spRegistry.getProviderInfo(provider1);
-        assertFalse(info.paused);
-    }
-
-    function testPauseProviderEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, false);
-        emit SPRegistry.ProviderPaused(provider1);
-        spRegistry.pauseProvider(provider1);
-    }
-
-    function testUnpauseProviderEmitsEvent() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.pauseProvider(provider1);
-        vm.expectEmit(true, false, false, false);
-        emit SPRegistry.ProviderUnpaused(provider1);
-        spRegistry.unpauseProvider(provider1);
+        vm.startPrank(admin);
+        spRegistry.grantRole(spRegistry.OPERATOR_ROLE(), operator);
         vm.stopPrank();
     }
 
-    function testPauseProviderRevertsForUnregistered() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.pauseProvider(provider1);
-    }
-
-    function testPauseProviderRevertsWhenBlocked() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.pauseProvider(provider1);
-        vm.stopPrank();
-    }
-
-    function testUnpauseProviderRevertsWhenBlocked() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.pauseProvider(provider1);
-        spRegistry.blockProvider(provider1);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.unpauseProvider(provider1);
-        vm.stopPrank();
-    }
-
-    function testBlockProviderSetsBlockedTrue() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.stopPrank();
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertTrue(info.blocked);
-    }
-
-    function testUnblockProviderSetsBlockedFalse() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        spRegistry.unblockProvider(provider1);
-        vm.stopPrank();
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertFalse(info.blocked);
-    }
-
-    function testBlockProviderRevertsForNonAdmin() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert();
-        spRegistry.blockProvider(provider1);
-    }
-
-    function testUnblockProviderRevertsForNonAdmin() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.stopPrank();
-
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert();
-        spRegistry.unblockProvider(provider1);
-    }
-
-    function testBlockProviderRevertsForUnregistered() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.blockProvider(provider1);
-    }
-
-    function testBlockedProviderCannotUpdateAvailableSpace() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.updateAvailableSpace(provider1, 999);
-        vm.stopPrank();
-    }
-
-    function testBlockedProviderCannotSetCapabilities() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.setCapabilities(provider1, defaultCapabilities);
-        vm.stopPrank();
-    }
-
-    function testBlockedProviderCannotSetPrice() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.setPrice(provider1, 500);
-        vm.stopPrank();
-    }
-
-    function testBlockProviderEmitsEvent() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        vm.expectEmit(true, false, false, false);
-        emit SPRegistry.ProviderBlocked(provider1);
-        spRegistry.blockProvider(provider1);
-        vm.stopPrank();
-    }
-
-    function testUnblockProviderEmitsEvent() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.expectEmit(true, false, false, false);
-        emit SPRegistry.ProviderUnblocked(provider1);
-        spRegistry.unblockProvider(provider1);
-        vm.stopPrank();
-    }
-
-    function testSetPriceUpdatesProviderPrice() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.prank(adminAddress);
-        spRegistry.setPrice(provider1, 250);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSectorPerMonth, 250);
-    }
-
-    function testOperatorCanSetPrice() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.prank(operatorAddress);
-        spRegistry.setPrice(provider1, 250);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSectorPerMonth, 250);
-    }
-
-    function testRegisterProviderForRevertsForActorIdZero() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidProviderActorId.selector));
-        spRegistry.registerProviderFor(
-            CommonTypes.FilActorId.wrap(0), owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-    }
-
-    function testRegisterProviderForRevertsForZeroOwner() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidOrganizationAddress.selector));
-        spRegistry.registerProviderFor(
-            provider1, address(0), defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-    }
-
-    function testIsProviderRegisteredReturnsFalseForUnregistered() public view {
-        assertFalse(spRegistry.isProviderRegistered(provider1));
-    }
-
-    function testRegisterProviderForEmitsEvents() public {
-        vm.prank(adminAddress);
-        vm.expectEmit(true, true, false, false);
-        emit SPRegistry.ProviderRegistered(provider1, owner1);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.CapabilitiesUpdated(provider1, defaultCapabilities);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-    }
-
-    function testRegisterProviderForSetsAllFields() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        assertTrue(spRegistry.isProviderRegistered(provider1));
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.organization, owner1);
-        assertFalse(info.paused);
-        assertEq(info.availableBytes, defaultAvailableBytes);
-        assertEq(info.capabilities.retrievabilityBps, defaultCapabilities.retrievabilityBps);
-    }
-
-    function testRegisterProviderForRevertsIfAlreadyRegistered() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderAlreadyRegistered.selector, provider1));
-        spRegistry.registerProviderFor(
-            provider1, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.stopPrank();
-    }
-
-    function testRegisterProviderForRevertsForNonAdmin() public {
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.NotAdminOrOperator.selector, unauthorizedAddress));
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-    }
-
-    function testRegisterProviderForSetsDefaultPrice() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0), 0, 0
-        );
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSectorPerMonth, 250);
-    }
-
-    function testRegisterProviderForEmitsDefaultPriceEvent() public {
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.PriceUpdated(provider1, 0, 250);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 250, address(0), 0, 0
-        );
-    }
-
-    function testRegisterProviderForZeroPriceEmitsDefaultPriceEvent() public {
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.PriceUpdated(provider1, 0, 0);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-    }
-
-    function testRegisterProviderForSucceedsWithOperatorRole() public {
-        vm.prank(operatorAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        assertTrue(spRegistry.isProviderRegistered(provider1));
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.organization, owner1);
-        assertEq(info.availableBytes, defaultAvailableBytes);
-        assertEq(info.pricePerSectorPerMonth, 100);
-    }
-
-    function testRegisterProviderForStillWorksForAdmin() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        assertTrue(spRegistry.isProviderRegistered(provider1));
-    }
-
-    function testUpdateAvailableSpaceEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // Use admin path since MinerAPI precompile is not available in Foundry
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.AvailableSpaceUpdated(provider1, 5_000_000);
-        spRegistry.updateAvailableSpace(provider1, 5_000_000);
-    }
-
-    function testUpdateAvailableSpaceSetsValue() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // Use admin path since MinerAPI precompile is not available in Foundry
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.prank(adminAddress);
-        spRegistry.updateAvailableSpace(provider1, 5_000_000);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.availableBytes, 5_000_000);
-    }
-
-    function testSetCapabilitiesEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // Use admin path since MinerAPI precompile is not available in Foundry
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.CapabilitiesUpdated(provider1, defaultCapabilities);
-        spRegistry.setCapabilities(provider1, defaultCapabilities);
-    }
-
-    function testSetCapabilitiesSetsValues() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // Use admin path since MinerAPI precompile is not available in Foundry
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.prank(adminAddress);
-        spRegistry.setCapabilities(provider1, defaultCapabilities);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.capabilities.retrievabilityBps, 9500);
-        assertEq(info.capabilities.bandwidthBytesPerSecond, 1000);
-        assertEq(info.capabilities.latencyMs, 100);
-        assertEq(info.capabilities.indexingPct, 90);
-    }
-
-    function testSetCapabilitiesRevertsInvalidRetrievabilityBps() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        SharedTypes.SLIThresholds memory bad = SharedTypes.SLIThresholds({
-            retrievabilityBps: 10001, bandwidthBytesPerSecond: 100, latencyMs: 100, indexingPct: 50
+    function _terms() internal pure returns (SharedTypes.OfferTerms memory) {
+        return SharedTypes.OfferTerms({
+            minSizeBytes: 1,
+            maxSizeBytes: 10_000_000,
+            minDurationEpochs: uint64(180 * SharedTypes.EPOCHS_IN_DAY),
+            maxDurationEpochs: uint64(360 * SharedTypes.EPOCHS_IN_DAY)
         });
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidRetrievabilityBps.selector, uint16(10001)));
-        spRegistry.setCapabilities(provider1, bad);
     }
 
-    function testSetCapabilitiesAcceptsMaxRetrievabilityBps() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        SharedTypes.SLIThresholds memory maxBps = SharedTypes.SLIThresholds({
-            retrievabilityBps: 10000, bandwidthBytesPerSecond: 100, latencyMs: 100, indexingPct: 50
+    function _paymentRows(uint256 price) internal view returns (SharedTypes.OfferPaymentInput[] memory rows) {
+        rows = new SharedTypes.OfferPaymentInput[](1);
+        rows[0] = SharedTypes.OfferPaymentInput({token: token, active: true, pricePer32GiBPerMonth: price});
+    }
+
+    function _request(uint256 maxPrice) internal view returns (SharedTypes.DealRequest memory) {
+        return SharedTypes.DealRequest({
+            manifestHash: keccak256("manifest"),
+            requestedSizeBytes: 1_000_000,
+            maxPricePer32GiBPerMonth: maxPrice,
+            manifestLocation: "https://example.com/manifest",
+            paymentToken: token,
+            durationDays: 180,
+            requiredSLIs: SharedTypes.SLIThresholds({
+                retrievabilityBps: 9000, bandwidthBytesPerSecond: 500, latencyMs: 150, indexingPct: 80
+            })
         });
-        vm.prank(adminAddress);
-        spRegistry.setCapabilities(provider1, maxBps);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.capabilities.retrievabilityBps, 10000);
     }
 
-    function testSetCapabilitiesRevertsInvalidIndexingPct() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        SharedTypes.SLIThresholds memory bad = SharedTypes.SLIThresholds({
-            retrievabilityBps: 5000, bandwidthBytesPerSecond: 100, latencyMs: 100, indexingPct: 101
-        });
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidIndexingPct.selector, uint8(101)));
-        spRegistry.setCapabilities(provider1, bad);
+    function _legacyTerms(uint256 maxPrice) internal pure returns (SLITypes.DealTerms memory) {
+        return SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: maxPrice, durationDays: 180});
     }
 
-    function testSetCapabilitiesAdminCanSet() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        SharedTypes.SLIThresholds memory newCaps = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(adminAddress);
-        spRegistry.setCapabilities(provider1, newCaps);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.capabilities.retrievabilityBps, 8000);
+    function _registerProvider(CommonTypes.FilActorId provider, address owner) internal {
+        vm.prank(admin);
+        spRegistry.registerProviderFor(provider, owner, defaultAvailableBytes, address(0));
     }
 
-    function testOperatorCanSetCapabilities() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        SharedTypes.SLIThresholds memory newCaps = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(operatorAddress);
-        spRegistry.setCapabilities(provider1, newCaps);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.capabilities.retrievabilityBps, 8000);
+    function _allowToken() internal {
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, true, 86_400);
     }
 
-    function testSetCapabilitiesRevertsForNonControllerNonAdmin() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // MinerUtils precompile doesn't exist in Foundry, so calling from a non-admin address
-        // will revert when MinerUtils tries to call MinerAPI precompile
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert();
-        spRegistry.setCapabilities(provider1, defaultCapabilities);
+    function _allowToken(address allowedToken, uint256 minimum) internal {
+        vm.prank(admin);
+        spRegistry.setPaymentToken(allowedToken, true, minimum);
     }
 
-    function testUpdateAvailableSpaceAdminCanSet() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.prank(adminAddress);
-        spRegistry.updateAvailableSpace(provider1, 5_000_000);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.availableBytes, 5_000_000);
+    function _createOffer(CommonTypes.FilActorId provider, string memory name, uint256 price)
+        internal
+        returns (uint256)
+    {
+        vm.prank(operator);
+        return spRegistry.createOffer(provider, name, _terms(), defaultSLIs, _paymentRows(price));
     }
 
-    function testOperatorCanUpdateAvailableSpace() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.prank(operatorAddress);
-        spRegistry.updateAvailableSpace(provider1, 5_000_000);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.availableBytes, 5_000_000);
+    function _requestWith(uint256 sizeBytes, uint32 durationDays, uint256 maxPrice, address paymentToken)
+        internal
+        view
+        returns (SharedTypes.DealRequest memory request)
+    {
+        request = _request(maxPrice);
+        request.requestedSizeBytes = sizeBytes;
+        request.durationDays = durationDays;
+        request.paymentToken = paymentToken;
     }
 
-    function testUpdateAvailableSpaceRevertsForNonControllerNonAdmin() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // MinerUtils precompile doesn't exist in Foundry, so calling from a non-admin address
-        // will revert when MinerUtils tries to call MinerAPI precompile
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert();
-        spRegistry.updateAvailableSpace(provider1, 5_000_000);
+    function _requestWithSLIs(SharedTypes.SLIThresholds memory slis)
+        internal
+        view
+        returns (SharedTypes.DealRequest memory request)
+    {
+        request = _request(100_000);
+        request.requiredSLIs = slis;
     }
 
-    function testUpdateAvailableSpaceRevertsWhenBelowCommittedPlusPending() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        // Create pending reservation
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        spRegistry.getProviderForDeal(req, defaultTerms);
-        // pendingBytes = 1_000_000 (defaultTerms.dealSizeBytes)
-
-        // Try to set available below pending — should revert
-        vm.prank(adminAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.AvailableBelowCommittedPlusPending.selector, provider1, 500_000, 0, 1_000_000
-            )
-        );
-        spRegistry.updateAvailableSpace(provider1, 500_000);
-    }
-
-    function testUpdateAvailableSpaceAllowsExactCommittedPlusPending() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        // Create pending reservation
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        spRegistry.getProviderForDeal(req, defaultTerms);
-
-        // Set available exactly at committed + pending — should succeed
-        vm.prank(adminAddress);
-        spRegistry.updateAvailableSpace(provider1, defaultTerms.dealSizeBytes);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.availableBytes, defaultTerms.dealSizeBytes);
-    }
-
-    function testIsAuthorizedForProviderReturnsTrueForAdmin() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        assertTrue(spRegistry.isAuthorizedForProvider(adminAddress, provider1));
-    }
-
-    function testIsAuthorizedForProviderReturnsTrueForOperator() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        assertTrue(spRegistry.isAuthorizedForProvider(operatorAddress, provider1));
-    }
-
-    function testIsAuthorizedForProviderRevertsForNonAdminWithoutPrecompile() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        // MinerUtils precompile doesn't exist in Foundry, so calling with a non-admin address
-        // will revert when MinerUtils tries to call MinerAPI precompile
-        // TODO: integration test with MinerAPI mock for controlling-address path
-        vm.expectRevert();
-        spRegistry.isAuthorizedForProvider(owner2, provider1);
-    }
-
-    function testIsAuthorizedForProviderReturnsTrueForAdminEvenWhenUnregistered() public view {
-        // Admin check happens before MinerUtils check (no _ensureProviderRegistered in isAuthorizedForProvider)
-        assertTrue(spRegistry.isAuthorizedForProvider(adminAddress, provider1));
-    }
-
-    function testGetProviderInfoDefaultPriceIsZeroByDefault() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pricePerSectorPerMonth, 0);
-    }
-
-    function testGetProviderForDealAutoApproveTrueWhenPriceMatches() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (, bool autoApprove,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertTrue(autoApprove);
-    }
-
-    function testGetProviderForDealAutoApproveTrueWhenPriceExceeds() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 50, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (, bool autoApprove,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertTrue(autoApprove);
-    }
-
-    function testGetProviderForDealAutoApproveFalseWhenPriceBelowDefault() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 200, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (, bool autoApprove,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertFalse(autoApprove);
-    }
-
-    function testGetProviderForDealAutoApproveFalseWhenPriceNotSet() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (, bool autoApprove,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertFalse(autoApprove);
-    }
-
-    function testGetProviderForDealAutoApproveFalseWhenNoProviderMatches() public {
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result, bool autoApprove,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-        assertFalse(autoApprove);
-    }
-
-    function testGetProvidersReturnsEmpty() public view {
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
-        assertEq(providers.length, 0);
-    }
-
-    function testGetProvidersReturnsRegistered() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
-        assertEq(providers.length, 2);
-    }
-
-    function testGetCommittedProvidersReturnsEmpty() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        CommonTypes.FilActorId[] memory committed = spRegistry.getCommittedProviders();
-        assertEq(committed.length, 0);
-    }
-
-    function testGetCommittedProvidersReturnsOnlyCommitted() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        // Commit capacity for provider1 only
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-
-        CommonTypes.FilActorId[] memory committed = spRegistry.getCommittedProviders();
-        assertEq(committed.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(committed[0]), CommonTypes.FilActorId.unwrap(provider1));
-    }
-
-    function testGetProviderInfoReturnsZeroedForUnregistered() public view {
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.organization, address(0));
-        assertEq(info.availableBytes, 0);
-    }
-
-    function testGetProviderInfoReturnsFullData() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.organization, owner1);
-        assertEq(info.payee, owner1);
-        assertFalse(info.paused);
-        assertEq(info.capabilities.retrievabilityBps, 9500);
-        assertEq(info.capabilities.bandwidthBytesPerSecond, 1000);
-        assertEq(info.capabilities.latencyMs, 100);
-        assertEq(info.capabilities.indexingPct, 90);
-        assertEq(info.availableBytes, defaultAvailableBytes);
-        assertEq(info.committedBytes, 0);
-        assertEq(info.pendingBytes, 0);
-        assertEq(info.pricePerSectorPerMonth, 0);
-    }
-
-    function testGetProviderForDealReturnsZeroWhenNoProviders() public {
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-    }
-
-    function testGetProviderForDealReturnsMatchingProvider() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider1));
-    }
-
-    function testGetProviderForDealSkipsInsufficientCapacity() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, defaultCapabilities, 500, 0, address(0), 0, 0); // less than defaultTerms.dealSizeBytes
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-    }
-
-    function testGetProviderForDealSkipsUnmetRequirements() public {
-        SharedTypes.SLIThresholds memory lowCapabilities = SharedTypes.SLIThresholds({
-            retrievabilityBps: 5000, bandwidthBytesPerSecond: 100, latencyMs: 500, indexingPct: 30
-        });
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0, address(0), 0, 0);
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-    }
-
-    function testGetProviderForDealPicksLeastPending() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-
-        // First call routes to provider1 (insertion order tiebreak), giving it pending bytes
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId first,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(first), CommonTypes.FilActorId.unwrap(provider1));
-
-        // Second call must route to provider2 — it has 0 pending vs provider1's dealSizeBytes
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId second,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(second), CommonTypes.FilActorId.unwrap(provider2));
-    }
-
-    function testGetProviderForDealZeroRequirementSkipsDimension() public {
-        SharedTypes.SLIThresholds memory lowCapabilities = SharedTypes.SLIThresholds({
-            retrievabilityBps: 1000, bandwidthBytesPerSecond: 50, latencyMs: 999, indexingPct: 5
-        });
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowCapabilities, defaultAvailableBytes, 0, address(0), 0, 0);
-
-        // All zeros = don't care about any SLI dimension
-        SharedTypes.SLIThresholds memory req =
-            SharedTypes.SLIThresholds({retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0});
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider1));
-    }
-
-    function testGetProviderForDealSkipsUnmetBandwidth() public {
-        SharedTypes.SLIThresholds memory lowBandwidth = SharedTypes.SLIThresholds({
-            retrievabilityBps: 9500, bandwidthBytesPerSecond: 100, latencyMs: 100, indexingPct: 90
-        });
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowBandwidth, defaultAvailableBytes, 0, address(0), 0, 0);
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 0, bandwidthBytesPerSecond: 500, latencyMs: 0, indexingPct: 0
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-    }
-
-    function testGetProviderForDealLatencyLowerIsBetter() public {
-        // Provider with high latency should NOT match low latency requirement
-        SharedTypes.SLIThresholds memory highLatency = SharedTypes.SLIThresholds({
-            retrievabilityBps: 9500, bandwidthBytesPerSecond: 1000, latencyMs: 500, indexingPct: 90
-        });
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, highLatency, defaultAvailableBytes, 0, address(0), 0, 0);
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 100, indexingPct: 0
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-    }
-
-    function testGetProviderForDealSkipsUnmetIndexing() public {
-        SharedTypes.SLIThresholds memory lowIndexing = SharedTypes.SLIThresholds({
-            retrievabilityBps: 9500, bandwidthBytesPerSecond: 1000, latencyMs: 100, indexingPct: 30
-        });
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(provider1, owner1, lowIndexing, defaultAvailableBytes, 0, address(0), 0, 0);
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 80
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result), 0);
-    }
-
-    function testGetProviderForDealRevertsForNonMarketRole() public {
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        bytes32 marketRole = spRegistry.MARKET_ROLE();
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, marketRole
-            )
-        );
-        spRegistry.getProviderForDeal(req, defaultTerms);
-    }
-
-    function testCommitCapacityIncrementsCommittedBytes() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.committedBytes, 1000);
-    }
-
-    function testCommitCapacityAccumulates() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.startPrank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-        spRegistry.commitCapacity(provider1, 2000, 2000);
-        vm.stopPrank();
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.committedBytes, 3000);
-    }
-
-    function testCommitCapacityEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(poRepMarketAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.CapacityCommitted(provider1, 1000);
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-    }
-
-    function testCommitCapacityRevertsForUnregistered() public {
-        vm.prank(poRepMarketAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-    }
-
-    function testCommitCapacityRevertsForNonMarketRole() public {
-        bytes32 marketRole = spRegistry.MARKET_ROLE();
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, marketRole
-            )
-        );
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-    }
-
-    function testReleaseCapacityEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 3000, 3000);
-
-        vm.prank(poRepMarketAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.CapacityReleased(provider1, 1000);
-        spRegistry.releaseCapacity(provider1, 1000);
-    }
-
-    function testReleaseCapacityDecrementsCommittedBytes() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.startPrank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 3000, 3000);
-        spRegistry.releaseCapacity(provider1, 1000);
-        vm.stopPrank();
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.committedBytes, 2000);
-    }
-
-    function testReleaseCapacityRevertsForUnregistered() public {
-        vm.prank(poRepMarketAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.releaseCapacity(provider1, 1000);
-    }
-
-    function testReleaseCapacityRevertsForNonMarketRole() public {
-        bytes32 marketRole = spRegistry.MARKET_ROLE();
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, marketRole
-            )
-        );
-        spRegistry.releaseCapacity(provider1, 1000);
-    }
-
-    function testGetProviderForDealTiebreakEqualPending() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-
-        // Both have 0 pending bytes; first registered wins (EnumerableSet insertion order)
-        assertEq(CommonTypes.FilActorId.unwrap(result), CommonTypes.FilActorId.unwrap(provider1));
-    }
-
-    function testCommitCapacityRevertsWhenExceedingAvailable() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(poRepMarketAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.CommitExceedsAvailable.selector, provider1, defaultAvailableBytes + 1, defaultAvailableBytes
-            )
-        );
-        spRegistry.commitCapacity(provider1, defaultAvailableBytes + 1, defaultAvailableBytes + 1);
-    }
-
-    function testCommitCapacityRevertsWhenAccumulatedExceedsAvailable() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.startPrank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, defaultAvailableBytes, defaultAvailableBytes);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.CommitExceedsAvailable.selector, provider1, defaultAvailableBytes + 1, defaultAvailableBytes
-            )
-        );
-        spRegistry.commitCapacity(provider1, 1, 1);
-        vm.stopPrank();
-    }
-
-    function testCommitCapacitySucceedsAtExactAvailable() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, defaultAvailableBytes, defaultAvailableBytes);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.committedBytes, defaultAvailableBytes);
-    }
-
-    function testReleaseCapacityRevertsWhenExceedingCommitted() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.startPrank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, 1000, 1000);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ReleaseExceedsCommitted.selector, provider1, 1001, 1000));
-        spRegistry.releaseCapacity(provider1, 1001);
-        vm.stopPrank();
-    }
-
-    function testReleaseCapacityRevertsWhenNothingCommitted() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(poRepMarketAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ReleaseExceedsCommitted.selector, provider1, 1, 0));
-        spRegistry.releaseCapacity(provider1, 1);
-    }
-
-    function testRegisterProviderForRevertsInvalidRetrievabilityBps() public {
-        SharedTypes.SLIThresholds memory bad = SharedTypes.SLIThresholds({
-            retrievabilityBps: 10001, bandwidthBytesPerSecond: 100, latencyMs: 100, indexingPct: 50
-        });
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidRetrievabilityBps.selector, uint16(10001)));
-        spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0, address(0), 0, 0);
-    }
-
-    function testRegisterProviderForRevertsInvalidIndexingPct() public {
-        SharedTypes.SLIThresholds memory bad = SharedTypes.SLIThresholds({
-            retrievabilityBps: 5000, bandwidthBytesPerSecond: 100, latencyMs: 100, indexingPct: 101
-        });
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidIndexingPct.selector, uint8(101)));
-        spRegistry.registerProviderFor(provider1, owner1, bad, defaultAvailableBytes, 0, address(0), 0, 0);
-    }
-
-    function testGetProviderForDealReservesPendingBytes() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        spRegistry.getProviderForDeal(req, defaultTerms);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pendingBytes, defaultTerms.dealSizeBytes);
-    }
-
-    function testGetProviderForDealSkipsProviderWithFullPending() public {
-        // Register provider1 with capacity just enough for one deal
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultTerms.dealSizeBytes, 0, address(0), 0, 0
-        );
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-
-        // First deal reserves pending, consuming all remaining capacity
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result1,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result1), CommonTypes.FilActorId.unwrap(provider1));
-
-        // Second deal should not match because pending fills available
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId result2,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(result2), 0);
-    }
-
-    function testReleasePendingCapacityDecrementsPending() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        // Reserve pending via getProviderForDeal
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        spRegistry.getProviderForDeal(req, defaultTerms);
-
-        // Release pending
-        vm.prank(poRepMarketAddress);
-        spRegistry.releasePendingCapacity(provider1, defaultTerms.dealSizeBytes);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pendingBytes, 0);
-    }
-
-    function testReleasePendingCapacityRevertsWhenExceedsPending() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(poRepMarketAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ReleasePendingExceedsPending.selector, provider1, 100, 0));
-        spRegistry.releasePendingCapacity(provider1, 100);
-    }
-
-    function testReleasePendingCapacityRevertsForNonMarketRole() public {
-        bytes32 marketRole = spRegistry.MARKET_ROLE();
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, marketRole
-            )
-        );
-        spRegistry.releasePendingCapacity(provider1, 100);
-    }
-
-    function testSetToleranceBpsUpdatesValue() public {
-        vm.prank(adminAddress);
-        spRegistry.setToleranceBps(1000);
-        assertEq(spRegistry.getToleranceBps(), 1000);
-    }
-
-    function testSetToleranceBpsEmitsEvent() public {
-        vm.prank(adminAddress);
-        vm.expectEmit(false, false, false, true);
-        emit SPRegistry.ToleranceBpsUpdated(0, 1000);
-        spRegistry.setToleranceBps(1000);
-    }
-
-    function testSetToleranceBpsRevertsForNonAdmin() public {
-        bytes32 adminRole = spRegistry.DEFAULT_ADMIN_ROLE();
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorizedAddress, adminRole
-            )
-        );
-        spRegistry.setToleranceBps(1000);
-    }
-
-    function testSetToleranceBpsRevertsAboveMax() public {
-        uint256 maxBps = spRegistry.MAX_TOLERANCE_BPS();
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ToleranceBpsTooHigh.selector, 10_001, maxBps));
-        spRegistry.setToleranceBps(10_001);
-    }
-
-    function testSetToleranceBpsAllowsMax() public {
-        vm.prank(adminAddress);
-        spRegistry.setToleranceBps(10_000);
-        assertEq(spRegistry.getToleranceBps(), 10_000);
-    }
-
-    function testCommitCapacityRevertsWhenActualExceedsTolerance() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        spRegistry.setToleranceBps(1000); // 10% tolerance
-        vm.stopPrank();
-
-        uint256 estimated = 1000;
-        // 10% tolerance means max allowed = 1000 * 11000 / 10000 = 1100
-        uint256 actualOverTolerance = 1101;
-
-        vm.prank(poRepMarketAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.ActualSizeExceedsTolerance.selector, provider1, actualOverTolerance, 1100)
-        );
-        spRegistry.commitCapacity(provider1, estimated, actualOverTolerance);
-    }
-
-    function testCommitCapacityAllowsWithinTolerance() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        spRegistry.setToleranceBps(1000); // 10% tolerance
-        vm.stopPrank();
-
-        uint256 estimated = 1000;
-        // 10% tolerance means max allowed = 1000 * 11000 / 10000 = 1100
-        uint256 actualWithinTolerance = 1100;
-
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, estimated, actualWithinTolerance);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.committedBytes, actualWithinTolerance);
-    }
-
-    function testSetPriceEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.PriceUpdated(provider1, 100, 500);
-        spRegistry.setPrice(provider1, 500);
-    }
-
-    function testSetPriceRevertsForUnregistered() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.setPrice(provider1, 500);
-    }
-
-    function testCommitCapacityReleasesPendingWhenEstimatedWithinPending() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        // Reserve pending via getProviderForDeal
-        vm.prank(poRepMarketAddress);
-        spRegistry.getProviderForDeal(defaultCapabilities, defaultTerms);
-
-        ISPRegistry.ProviderInfo memory infoBefore = spRegistry.getProviderInfo(provider1);
-        assertEq(infoBefore.pendingBytes, defaultTerms.dealSizeBytes);
-
-        // Commit with estimatedSizeBytes == pendingBytes (hits p.pendingBytes -= estimatedSizeBytes)
-        vm.prank(poRepMarketAddress);
-        spRegistry.commitCapacity(provider1, defaultTerms.dealSizeBytes, defaultTerms.dealSizeBytes);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.pendingBytes, 0);
-        assertEq(info.committedBytes, defaultTerms.dealSizeBytes);
-    }
-
-    function testCommitCapacityEmitsCorrectReleasedAmountWhenEstimatedExceedsPending() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        // Reserve 500 pending via getProviderForDeal
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        SLITypes.DealTerms memory smallTerms =
-            SLITypes.DealTerms({dealSizeBytes: 500, pricePerSectorPerMonth: 100, durationDays: 365});
-
-        vm.prank(poRepMarketAddress);
-        spRegistry.getProviderForDeal(req, smallTerms);
-
-        // Commit with estimated=1000 (exceeds pending=500), actual=800
-        // Should emit PendingCapacityReleased with 500 (actual pending), NOT 1000
-        vm.prank(poRepMarketAddress);
-        vm.expectEmit(true, true, true, true);
-        emit SPRegistry.PendingCapacityReleased(provider1, 500);
-        spRegistry.commitCapacity(provider1, 1000, 800);
-    }
-
-    function testSetCapabilitiesRevertsWithNotControllerForNonControllingAddress() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        // Set up MinerAPI precompile mocks so isControllingAddress returns false (not reverts)
-        address nonController = vm.addr(0x099);
-        _setupMinerPrecompileMocks(nonController);
-
-        vm.prank(nonController);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.NotProviderControllerOrAdmin.selector, nonController, provider1)
-        );
-        spRegistry.setCapabilities(provider1, defaultCapabilities);
-    }
-
-    function testGetProviderForDealSkipsPausedProvider() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.pauseProvider(provider1);
-        vm.stopPrank();
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider2));
-    }
-
-    function testGetProviderForDealReturnsZeroWhenAllPaused() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.pauseProvider(provider1);
-        vm.stopPrank();
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), 0);
-    }
-
-    function testGetProviderForDealSkipsBlockedProvider() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.stopPrank();
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider2));
-    }
-
-    function testGetProviderForDealReturnsZeroWhenAllBlocked() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.blockProvider(provider1);
-        vm.stopPrank();
-
-        SharedTypes.SLIThresholds memory req = SharedTypes.SLIThresholds({
-            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 50
-        });
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(req, defaultTerms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), 0);
-    }
-
-    // ==================== R2: MAX_PROVIDERS tests ====================
-
-    function testMaxProvidersConstantIs500() public view {
-        assertEq(spRegistry.MAX_PROVIDERS(), 500);
-    }
-
-    function testRegisterProviderForAllowsExactlyMaxProviders() public {
-        vm.startPrank(adminAddress);
-        // solhint-disable-next-line gas-strict-inequalities
-        for (uint64 i = 1; i <= 500; i++) {
-            spRegistry.registerProviderFor(
-                CommonTypes.FilActorId.wrap(i),
-                owner1,
-                defaultCapabilities,
-                defaultAvailableBytes,
-                100,
-                address(0),
-                0,
-                0
-            );
-        }
-        vm.stopPrank();
-        assertEq(spRegistry.getProviders().length, 500);
-    }
-
-    function testRegisterProviderForRevertsWhenMaxProvidersReached() public {
-        vm.startPrank(adminAddress);
-        // solhint-disable-next-line gas-strict-inequalities
-        for (uint64 i = 1; i <= 500; i++) {
-            spRegistry.registerProviderFor(
-                CommonTypes.FilActorId.wrap(i),
-                owner1,
-                defaultCapabilities,
-                defaultAvailableBytes,
-                100,
-                address(0),
-                0,
-                0
-            );
-        }
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MaxProvidersReached.selector, 500));
-        spRegistry.registerProviderFor(
-            CommonTypes.FilActorId.wrap(501), owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        vm.stopPrank();
-    }
-
-    // ==================== R3: getProvidersByOrganization tests ====================
-
-    function testGetProvidersByOrganizationReturnsEmpty() public view {
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProvidersByOrganization(owner1);
-        assertEq(providers.length, 0);
-    }
-
-    function testGetProvidersByOrganizationReturnsSingleProvider() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProvidersByOrganization(owner1);
-        assertEq(providers.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(providers[0]), CommonTypes.FilActorId.unwrap(provider1));
-    }
-
-    function testGetProvidersByOrganizationReturnsMultipleProviders() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProvidersByOrganization(owner1);
-        assertEq(providers.length, 2);
-    }
-
-    function testGetProvidersByOrganizationIsolatesOrganizations() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        CommonTypes.FilActorId[] memory org1Providers = spRegistry.getProvidersByOrganization(owner1);
-        CommonTypes.FilActorId[] memory org2Providers = spRegistry.getProvidersByOrganization(owner2);
-        assertEq(org1Providers.length, 1);
-        assertEq(org2Providers.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(org1Providers[0]), CommonTypes.FilActorId.unwrap(provider1));
-        assertEq(CommonTypes.FilActorId.unwrap(org2Providers[0]), CommonTypes.FilActorId.unwrap(provider2));
-    }
-
-    // ============ Payee Tests ============
-
-    function testRegisterProviderForSetsPayeeToOrganization() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        assertEq(spRegistry.getPayee(provider1), owner1);
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.payee, owner1);
-    }
-
-    function testSetPayeeUpdatesPayee() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        address newPayee = vm.addr(0x099);
-
-        vm.prank(adminAddress);
-        vm.expectEmit(true, true, true, true);
-        emit SPRegistry.PayeeUpdated(provider1, owner1, newPayee);
-        spRegistry.setPayee(provider1, newPayee);
-
-        assertEq(spRegistry.getPayee(provider1), newPayee);
-    }
-
-    function testOperatorCanSetPayee() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        address newPayee = vm.addr(0x098);
-        vm.prank(operatorAddress);
-        spRegistry.setPayee(provider1, newPayee);
-
-        assertEq(spRegistry.getPayee(provider1), newPayee);
-    }
-
-    function testSetPayeeRevertsForZeroAddress() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidPayeeAddress.selector));
-        spRegistry.setPayee(provider1, address(0));
-    }
-
-    function testSetPayeeRevertsForUnauthorizedCaller() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        _setupMinerPrecompileMocks(unauthorizedAddress);
-
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.NotProviderControllerOrAdmin.selector, unauthorizedAddress, provider1)
-        );
-        spRegistry.setPayee(provider1, vm.addr(0x099));
-    }
-
-    function testAdminCanSetPayee() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-
-        address newPayee = vm.addr(0x099);
-        vm.prank(adminAddress);
-        spRegistry.setPayee(provider1, newPayee);
-
-        assertEq(spRegistry.getPayee(provider1), newPayee);
-    }
-
-    function testSetPayeeRevertsForUnregisteredProvider() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.setPayee(provider1, vm.addr(0x099));
-    }
-
-    function testSetPayeeRevertsForBlockedProvider() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 0, address(0), 0, 0
-        );
-        vm.prank(adminAddress);
-        spRegistry.blockProvider(provider1);
-
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.setPayee(provider1, vm.addr(0x099));
-    }
-
-    function _setupMinerPrecompileMocks(address caller) internal {
-        // ResolveAddress precompile at 0xFE00000000000000000000000000000000000001
-        ResolveAddressPrecompileMock resolveAddressMock = new ResolveAddressPrecompileMock();
-        vm.etch(address(0xFE00000000000000000000000000000000000001), address(resolveAddressMock).code);
-        ResolveAddressPrecompileMock(address(0xFE00000000000000000000000000000000000001))
-            .setId(caller, uint64(CommonTypes.FilActorId.unwrap(provider1)));
-
-        // CALL_ACTOR_ID at 0xfe00000000000000000000000000000000000005
-        // Uses ActorIdFailingMock which returns (exitCode=0, controllingAddress=false)
+    function _installFalseControllingAddressMock() internal {
         ActorIdFailingMock failingMock = new ActorIdFailingMock();
-        vm.etch(address(0xfe00000000000000000000000000000000000005), address(failingMock).code);
+        ResolveAddressPrecompileMock resolveAddressPrecompileMock = new ResolveAddressPrecompileMock();
+        address actorIdProxy = address(new MockProxy(address(5555)));
 
-        // MockProxy at address(5555) for actor dispatch
-        MockProxy proxy = new MockProxy(address(5555));
-        vm.etch(address(5555), address(proxy).code);
+        vm.etch(address(resolveAddress), address(resolveAddressPrecompileMock).code);
+        vm.etch(CALL_ACTOR_ID, address(failingMock).code);
+        vm.etch(address(5555), address(actorIdProxy).code);
+        resolveAddress.setId(unauthorized, 1000);
     }
 
-    function testGetPayAddressForProviderReturnsZeroAddress() public view {
-        address payAddress = spRegistry.getPayee(provider1);
-        assertEq(payAddress, address(0));
+    function testInitializeRevertsWhenAdminIsZero() public {
+        SPRegistry impl = new SPRegistry();
+
+        vm.expectRevert(SPRegistry.InvalidAdminAddress.selector);
+        new ERC1967Proxy(address(impl), abi.encodeCall(SPRegistry.initialize, (address(0))));
     }
 
-    function testRegisterProviderForWithDurationLimits() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 90, 365
-        );
+    function testInitialize2RevertsWhenMarketIsZero() public {
+        SPRegistry impl = new SPRegistry();
+        SPRegistry freshRegistry =
+            SPRegistry(address(new ERC1967Proxy(address(impl), abi.encodeCall(SPRegistry.initialize, (admin)))));
+
+        vm.prank(admin);
+        vm.expectRevert(SPRegistry.InvalidPoRepMarketAddress.selector);
+        freshRegistry.initialize2(address(0));
+    }
+
+    function testGetProviderInfoAndCapacityAreSeparateViews() public {
+        _registerProvider(provider1, owner1);
 
         ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 90);
-        assertEq(info.maxDealDurationDays, 365);
+        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+
+        assertEq(info.organization, owner1);
+        assertEq(info.payee, owner1);
+        assertFalse(info.paused);
+        assertFalse(info.blocked);
+        assertEq(capacity.availableBytes, defaultAvailableBytes);
+        assertEq(capacity.pendingBytes, 0);
+        assertEq(capacity.committedBytes, 0);
     }
 
-    function testRegisterProviderForRevertsMinExceedsMax() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MinDurationExceedsMax.selector, 365, 90));
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 365, 90
-        );
+    function testProviderOfferLifecycleEnforcesActiveCapAndReenable() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+
+        uint256 firstOfferId;
+        for (uint256 i = 0; i < 5; i++) {
+            vm.prank(operator);
+            uint256 offerId = spRegistry.createOffer(
+                provider1, string.concat("offer-", vm.toString(i)), _terms(), defaultSLIs, _paymentRows(90_000 + i)
+            );
+            if (i == 0) firstOfferId = offerId;
+        }
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.TooManyActiveOffers.selector, provider1, 5));
+        spRegistry.createOffer(provider1, "sixth", _terms(), defaultSLIs, _paymentRows(95_000));
+
+        vm.prank(operator);
+        spRegistry.setOfferActive(firstOfferId, false);
+        assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 4);
+
+        vm.prank(operator);
+        spRegistry.createOffer(provider1, "replacement", _terms(), defaultSLIs, _paymentRows(95_000));
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.TooManyActiveOffers.selector, provider1, 5));
+        spRegistry.setOfferActive(firstOfferId, true);
+
+        vm.prank(operator);
+        spRegistry.setOfferActive(6, false);
+
+        vm.prank(operator);
+        spRegistry.setOfferActive(firstOfferId, true);
+        assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 5);
     }
 
-    function testRegisterProviderForEmitsDurationEvent() public {
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.DealDurationLimitsUpdated(provider1, 90, 365);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 90, 365
-        );
+    function testPreviewAndReserveProviderSelectSameOfferButOnlyReserveMutatesPending() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, "standard", _terms(), defaultSLIs, _paymentRows(90_000));
+
+        SharedTypes.DealRequest memory request = _request(100_000);
+        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(request);
+        ISPRegistry.ProviderCapacityInfo memory beforeReserve = spRegistry.getProviderCapacity(provider1);
+
+        vm.prank(market);
+        SharedTypes.ProviderDealSelection memory reserved = spRegistry.reserveProviderForDeal(request);
+        ISPRegistry.ProviderCapacityInfo memory afterReserve = spRegistry.getProviderCapacity(provider1);
+
+        assertEq(preview.offerId, offerId);
+        assertEq(reserved.offerId, offerId);
+        assertEq(beforeReserve.pendingBytes, 0);
+        assertEq(afterReserve.pendingBytes, request.requestedSizeBytes);
     }
 
-    // -----------------------------------------------------------------------
-    // setDealDurationLimits tests
-    // -----------------------------------------------------------------------
+    function testLegacyGetProviderForDealReturnsNoProviderWhenNoOfferMatches() public {
+        vm.prank(market);
+        (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
+            spRegistry.getProviderForDeal(defaultSLIs, _legacyTerms(100_000));
 
-    function testSetDealDurationLimitsBothNonZero() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(adminAddress);
-        spRegistry.setDealDurationLimits(provider1, 90, 365);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 90);
-        assertEq(info.maxDealDurationDays, 365);
+        assertEq(CommonTypes.FilActorId.unwrap(provider), 0);
+        assertFalse(autoApprove);
+        assertEq(organization, address(0));
     }
 
-    function testOperatorCanSetDealDurationLimits() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testLegacyGetProviderForDealReservesSelectedOffer() public {
+        address token3 = vm.addr(0x102);
+        address token4 = vm.addr(0x103);
 
-        vm.prank(operatorAddress);
-        spRegistry.setDealDurationLimits(provider1, 90, 365);
+        _allowToken(token, 1);
+        _allowToken(token2, 1);
+        _allowToken(token3, 1);
+        _allowToken(token4, 1);
+        _registerProvider(provider1, owner1);
 
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 90);
-        assertEq(info.maxDealDurationDays, 365);
+        SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](4);
+        rows[0] = SharedTypes.OfferPaymentInput({token: token, active: true, pricePer32GiBPerMonth: 100_000});
+        rows[1] = SharedTypes.OfferPaymentInput({token: token2, active: false, pricePer32GiBPerMonth: 1});
+        rows[2] = SharedTypes.OfferPaymentInput({token: token3, active: true, pricePer32GiBPerMonth: 90_000});
+        rows[3] = SharedTypes.OfferPaymentInput({token: token4, active: true, pricePer32GiBPerMonth: 95_000});
+
+        vm.prank(operator);
+        spRegistry.createOffer(provider1, "legacy", _terms(), defaultSLIs, rows);
+
+        vm.prank(market);
+        (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
+            spRegistry.getProviderForDeal(defaultSLIs, _legacyTerms(90_000));
+
+        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+        assertEq(CommonTypes.FilActorId.unwrap(provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertTrue(autoApprove);
+        assertEq(organization, owner1);
+        assertEq(capacity.pendingBytes, 1_000_000);
     }
 
-    function testSetDealDurationLimitsMinOnly() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testLegacyGetProviderForDealRejectsOutOfBoundsOffer() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _createOffer(provider1, "standard", 90_000);
 
-        vm.prank(adminAddress);
-        spRegistry.setDealDurationLimits(provider1, 90, 0);
+        SLITypes.DealTerms memory tooSmall = _legacyTerms(100_000);
+        tooSmall.dealSizeBytes = 0;
 
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 90);
-        assertEq(info.maxDealDurationDays, 0);
+        vm.prank(market);
+        (CommonTypes.FilActorId provider,,) = spRegistry.getProviderForDeal(defaultSLIs, tooSmall);
+
+        assertEq(CommonTypes.FilActorId.unwrap(provider), 0);
     }
 
-    function testSetDealDurationLimitsMaxOnly() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testAutoMatchUsesLeastPendingProviderInsidePriceBand() public {
+        _allowToken();
+        vm.prank(admin);
+        spRegistry.setMatchPriceBandBps(100);
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
 
-        vm.prank(adminAddress);
-        spRegistry.setDealDurationLimits(provider1, 0, 365);
+        vm.prank(operator);
+        spRegistry.createOffer(provider1, "p1", _terms(), defaultSLIs, _paymentRows(90_000));
+        vm.prank(operator);
+        uint256 provider2Offer = spRegistry.createOffer(provider2, "p2", _terms(), defaultSLIs, _paymentRows(90_500));
 
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 0);
-        assertEq(info.maxDealDurationDays, 365);
+        vm.prank(market);
+        spRegistry.reserveOfferForDeal(1, _request(100_000));
+
+        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(preview.offerId, provider2Offer);
     }
 
-    function testSetDealDurationLimitsClearLimits() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 90, 365
-        );
+    function testAutoMatchChoosesCheapestOutsidePriceBand() public {
+        _allowToken();
+        vm.prank(admin);
+        spRegistry.setMatchPriceBandBps(100);
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
 
-        vm.prank(adminAddress);
-        spRegistry.setDealDurationLimits(provider1, 0, 0);
+        vm.prank(operator);
+        uint256 cheapOffer = spRegistry.createOffer(provider1, "cheap", _terms(), defaultSLIs, _paymentRows(90_000));
+        vm.prank(operator);
+        spRegistry.createOffer(provider2, "expensive", _terms(), defaultSLIs, _paymentRows(92_000));
 
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 0);
-        assertEq(info.maxDealDurationDays, 0);
+        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(preview.offerId, cheapOffer);
     }
 
-    function testSetDealDurationLimitsRevertsMinExceedsMax() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testPreviewOfferReturnsEmptyButReserveRevertsForInactiveOffer() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, "standard", _terms(), defaultSLIs, _paymentRows(90_000));
+        vm.prank(operator);
+        spRegistry.setOfferActive(offerId, false);
 
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MinDurationExceedsMax.selector, 365, 90));
-        spRegistry.setDealDurationLimits(provider1, 365, 90);
+        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+
+        assertEq(CommonTypes.FilActorId.unwrap(preview.provider), 0);
+        assertEq(preview.offerId, 0);
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferInactive.selector, offerId));
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
     }
 
-    function testSetDealDurationLimitsRevertsUnauthorized() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testProviderAdminViewsAndMutableState() public {
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner1);
 
-        _setupMinerPrecompileMocks(unauthorizedAddress);
+        assertTrue(spRegistry.isProviderRegistered(provider1));
+        assertFalse(spRegistry.isProviderRegistered(provider3));
 
-        vm.prank(unauthorizedAddress);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.NotProviderControllerOrAdmin.selector, unauthorizedAddress, provider1)
-        );
-        spRegistry.setDealDurationLimits(provider1, 90, 365);
-    }
+        CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
+        assertEq(providers.length, 2);
+        CommonTypes.FilActorId[] memory orgProviders = spRegistry.getProvidersByOrganization(owner1);
+        assertEq(orgProviders.length, 2);
+        assertEq(spRegistry.getCommittedProviders().length, 0);
 
-    function testSetDealDurationLimitsEmitsEvent() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+        vm.prank(operator);
+        spRegistry.pauseProvider(provider1);
+        assertTrue(spRegistry.getProviderInfo(provider1).paused);
 
-        vm.prank(adminAddress);
-        vm.expectEmit(true, false, false, true);
-        emit SPRegistry.DealDurationLimitsUpdated(provider1, 90, 365);
-        spRegistry.setDealDurationLimits(provider1, 90, 365);
-    }
+        vm.prank(operator);
+        spRegistry.unpauseProvider(provider1);
+        assertFalse(spRegistry.getProviderInfo(provider1).paused);
 
-    function testSetDealDurationLimitsRevertsBlockedProvider() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+        vm.prank(operator);
+        spRegistry.setPayee(provider1, owner2);
+        assertEq(spRegistry.getPayee(provider1), owner2);
+
+        vm.prank(operator);
+        spRegistry.updateAvailableSpace(provider1, defaultAvailableBytes + 1);
+        assertEq(spRegistry.getProviderCapacity(provider1).availableBytes, defaultAvailableBytes + 1);
+
+        vm.prank(admin);
         spRegistry.blockProvider(provider1);
-        vm.stopPrank();
+        assertTrue(spRegistry.getProviderInfo(provider1).blocked);
 
-        vm.prank(adminAddress);
+        vm.prank(admin);
+        spRegistry.unblockProvider(provider1);
+        assertFalse(spRegistry.getProviderInfo(provider1).blocked);
+
+        _allowToken(token2, 123);
+        ISPRegistry.TokenConfig memory tokenConfig = spRegistry.getPaymentTokenConfig(token2);
+        assertTrue(tokenConfig.allowed);
+        assertEq(tokenConfig.minPricePer32GiBPerMonth, 123);
+        address[] memory paymentTokens = spRegistry.getPaymentTokens();
+        assertEq(paymentTokens.length, 1);
+        assertEq(paymentTokens[0], token2);
+
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token2, false, 123);
+        assertFalse(spRegistry.getPaymentTokenConfig(token2).allowed);
+        assertEq(spRegistry.getPaymentTokens().length, 0);
+
+        assertEq(spRegistry.getMatchPriceBandBps(), 100);
+        vm.prank(admin);
+        spRegistry.setMatchPriceBandBps(250);
+        assertEq(spRegistry.getMatchPriceBandBps(), 250);
+
+        assertEq(spRegistry.getToleranceBps(), 0);
+        vm.prank(admin);
+        spRegistry.setToleranceBps(500);
+        assertEq(spRegistry.getToleranceBps(), 500);
+
+        assertTrue(spRegistry.isAuthorizedForProvider(admin, provider1));
+        assertTrue(spRegistry.isAuthorizedForProvider(operator, provider1));
+    }
+
+    function testProviderAdminValidationReverts() public {
+        vm.prank(unauthorized);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.NotAdminOrOperator.selector, unauthorized));
+        spRegistry.registerProviderFor(provider1, owner1, defaultAvailableBytes, address(0));
+
+        vm.prank(admin);
+        vm.expectRevert(SPRegistry.InvalidOrganizationAddress.selector);
+        spRegistry.registerProviderFor(provider1, address(0), defaultAvailableBytes, address(0));
+
+        vm.prank(admin);
+        vm.expectRevert(SPRegistry.InvalidProviderActorId.selector);
+        spRegistry.registerProviderFor(CommonTypes.FilActorId.wrap(0), owner1, defaultAvailableBytes, address(0));
+
+        _registerProvider(provider1, owner1);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderAlreadyRegistered.selector, provider1));
+        spRegistry.registerProviderFor(provider1, owner1, defaultAvailableBytes, address(0));
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider2));
+        spRegistry.pauseProvider(provider2);
+
+        vm.prank(admin);
+        spRegistry.blockProvider(provider1);
+
+        vm.prank(operator);
         vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
-        spRegistry.setDealDurationLimits(provider1, 90, 365);
-    }
+        spRegistry.pauseProvider(provider1);
 
-    function testSetDealDurationLimitsRevertsMinExceedsProtocolMax() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+        vm.prank(admin);
+        spRegistry.unblockProvider(provider1);
 
-        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
-        vm.prank(adminAddress);
+        vm.prank(operator);
+        vm.expectRevert(SPRegistry.InvalidPayeeAddress.selector);
+        spRegistry.setPayee(provider1, address(0));
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MatchPriceBandTooHigh.selector, 10_001, 10_000));
+        spRegistry.setMatchPriceBandBps(10_001);
+
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ToleranceBpsTooHigh.selector, 10_001, 10_000));
+        spRegistry.setToleranceBps(10_001);
+
+        _installFalseControllingAddressMock();
+        assertFalse(spRegistry.isAuthorizedForProvider(unauthorized, provider1));
+        vm.prank(unauthorized);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+            abi.encodeWithSelector(SPRegistry.NotProviderControllerOrAdmin.selector, unauthorized, provider1)
         );
-        spRegistry.setDealDurationLimits(provider1, 1279, 0);
+        spRegistry.updateAvailableSpace(provider1, defaultAvailableBytes);
     }
 
-    function testSetDealDurationLimitsRevertsMaxExceedsProtocolMax() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testMaxProviderLimitIsEnforced() public {
+        for (uint64 i = 1; i <= 500; i++) {
+            vm.prank(admin);
+            spRegistry.registerProviderFor(CommonTypes.FilActorId.wrap(i), owner1, 0, address(0));
+        }
 
-        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
-        vm.prank(adminAddress);
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MaxProvidersReached.selector, 500));
+        spRegistry.registerProviderFor(CommonTypes.FilActorId.wrap(501), owner1, 0, address(0));
+    }
+
+    function testOfferGettersAndMutableMarketFields() public {
+        _allowToken();
+        _allowToken(token2, 10);
+        _registerProvider(provider1, owner1);
+
+        SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](2);
+        rows[0] = SharedTypes.OfferPaymentInput({token: token, active: true, pricePer32GiBPerMonth: 90_000});
+        rows[1] = SharedTypes.OfferPaymentInput({token: token2, active: false, pricePer32GiBPerMonth: 10});
+
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, "standard", _terms(), defaultSLIs, rows);
+
+        ISPRegistry.OfferInfo memory offer = spRegistry.getOffer(offerId);
+        assertEq(CommonTypes.FilActorId.unwrap(offer.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(offer.name, "standard");
+        assertTrue(offer.active);
+
+        SharedTypes.OfferTerms memory terms = spRegistry.getOfferTerms(offerId);
+        assertEq(terms.minSizeBytes, 1);
+        assertEq(terms.maxSizeBytes, 10_000_000);
+        assertEq(terms.minDurationEpochs, uint64(180 * SharedTypes.EPOCHS_IN_DAY));
+
+        SharedTypes.SLIThresholds memory slis = spRegistry.getOfferSLIs(offerId);
+        assertEq(slis.retrievabilityBps, defaultSLIs.retrievabilityBps);
+        assertEq(slis.indexingPct, defaultSLIs.indexingPct);
+
+        assertEq(spRegistry.getOffersByProvider(provider1).length, 1);
+        assertEq(spRegistry.getActiveOffers().length, 1);
+
+        vm.prank(operator);
+        spRegistry.setOfferActive(offerId, true);
+
+        vm.prank(operator);
+        spRegistry.setOfferName(offerId, "renamed");
+        assertEq(spRegistry.getOffer(offerId).name, "renamed");
+
+        vm.prank(operator);
+        spRegistry.setOfferPayment(offerId, token2, true, 11);
+        ISPRegistry.OfferPayment memory payment = spRegistry.getOfferPayment(offerId, token2);
+        assertTrue(payment.active);
+        assertEq(payment.pricePer32GiBPerMonth, 11);
+    }
+
+    function testOfferCreationValidationReverts() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+
+        vm.prank(operator);
+        vm.expectRevert(SPRegistry.InvalidOfferName.selector);
+        spRegistry.createOffer(provider1, "", _terms(), defaultSLIs, _paymentRows(90_000));
+
+        SharedTypes.OfferTerms memory terms = _terms();
+        terms.minSizeBytes = 20;
+        terms.maxSizeBytes = 10;
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidOfferSizeBounds.selector, 20, 10));
+        spRegistry.createOffer(provider1, "bad-size", terms, defaultSLIs, _paymentRows(90_000));
+
+        terms = _terms();
+        terms.minDurationEpochs = 20;
+        terms.maxDurationEpochs = 10;
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidOfferDurationBounds.selector, 20, 10));
+        spRegistry.createOffer(provider1, "bad-duration", terms, defaultSLIs, _paymentRows(90_000));
+
+        SharedTypes.SLIThresholds memory slis = defaultSLIs;
+        slis.retrievabilityBps = 10_001;
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidRetrievabilityBps.selector, 10_001));
+        spRegistry.createOffer(provider1, "bad-sli", _terms(), slis, _paymentRows(90_000));
+
+        slis = defaultSLIs;
+        slis.indexingPct = 101;
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.InvalidIndexingPct.selector, 101));
+        spRegistry.createOffer(provider1, "bad-index", _terms(), slis, _paymentRows(90_000));
+
+        SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](1);
+        rows[0] = SharedTypes.OfferPaymentInput({token: address(0), active: true, pricePer32GiBPerMonth: 90_000});
+        vm.prank(operator);
+        vm.expectRevert(SPRegistry.InvalidPaymentToken.selector);
+        spRegistry.createOffer(provider1, "bad-token", _terms(), defaultSLIs, rows);
+
+        rows[0] = SharedTypes.OfferPaymentInput({token: token2, active: true, pricePer32GiBPerMonth: 90_000});
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, token2));
+        spRegistry.createOffer(provider1, "bad-token", _terms(), defaultSLIs, rows);
+
+        rows[0] = SharedTypes.OfferPaymentInput({token: token, active: true, pricePer32GiBPerMonth: 1});
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PriceBelowTokenMinimum.selector, token, 1, 86_400));
+        spRegistry.createOffer(provider1, "bad-price", _terms(), defaultSLIs, rows);
+
+        vm.prank(admin);
+        vm.expectRevert(SPRegistry.InvalidPaymentToken.selector);
+        spRegistry.setPaymentToken(address(0), true, 1);
+    }
+
+    function testOfferMutationValidationReverts() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotFound.selector, 0));
+        spRegistry.setOfferName(0, "missing");
+
+        vm.prank(operator);
+        vm.expectRevert(SPRegistry.InvalidOfferName.selector);
+        spRegistry.setOfferName(offerId, "");
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotFound.selector, 999));
+        spRegistry.setOfferPayment(999, token, true, 90_000);
+
+        vm.prank(operator);
+        vm.expectRevert(SPRegistry.InvalidPaymentToken.selector);
+        spRegistry.setOfferPayment(offerId, address(0), true, 90_000);
+    }
+
+    function testCapacityAccountingAndReverts() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
+        vm.prank(market);
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
+        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, 1_000_000);
+
+        vm.prank(operator);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+            abi.encodeWithSelector(SPRegistry.AvailableBelowCommittedPlusPending.selector, provider1, 1, 0, 1_000_000)
         );
-        spRegistry.setDealDurationLimits(provider1, 0, 1279);
-    }
+        spRegistry.updateAvailableSpace(provider1, 1);
 
-    function testRegisterProviderForRevertsMinExceedsProtocolMax() public {
-        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
-        vm.prank(adminAddress);
+        vm.prank(market);
+        spRegistry.releasePendingCapacity(provider1, 400_000);
+        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, 600_000);
+
+        vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+            abi.encodeWithSelector(SPRegistry.ReleasePendingExceedsPending.selector, provider1, 700_000, 600_000)
         );
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 1279, 0
-        );
-    }
+        spRegistry.releasePendingCapacity(provider1, 700_000);
 
-    function testRegisterProviderForRevertsMaxExceedsProtocolMax() public {
-        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
-        vm.prank(adminAddress);
+        vm.prank(market);
+        spRegistry.commitCapacity(provider1, 1_000_000, 500_000);
+        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+        assertEq(capacity.pendingBytes, 0);
+        assertEq(capacity.committedBytes, 500_000);
+        assertEq(spRegistry.getCommittedProviders().length, 1);
+
+        vm.prank(market);
+        spRegistry.releaseCapacity(provider1, 100_000);
+        assertEq(spRegistry.getProviderCapacity(provider1).committedBytes, 400_000);
+
+        vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+            abi.encodeWithSelector(SPRegistry.ReleaseExceedsCommitted.selector, provider1, 500_000, 400_000)
         );
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 1279
-        );
-    }
+        spRegistry.releaseCapacity(provider1, 500_000);
 
-    function testSetDealDurationLimitsAcceptsProtocolMax() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        vm.prank(adminAddress);
-        spRegistry.setDealDurationLimits(provider1, 1278, 1278);
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 1278);
-        assertEq(info.maxDealDurationDays, 1278);
-    }
-
-    function testRegisterProviderForAcceptsProtocolMax() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 1278, 1278
-        );
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 1278);
-        assertEq(info.maxDealDurationDays, 1278);
-    }
-
-    function testSetDealDurationLimitsRevertsProtocolMaxBeforeCrossCheck() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-
-        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
-        vm.prank(adminAddress);
+        vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+            abi.encodeWithSelector(SPRegistry.CommitExceedsAvailable.selector, provider1, 10_400_000, 10_000_000)
         );
-        spRegistry.setDealDurationLimits(provider1, 1279, 90);
-    }
+        spRegistry.commitCapacity(provider1, 0, 10_000_000);
 
-    function testRegisterProviderForRevertsProtocolMaxBeforeCrossCheck() public {
-        uint32 protocolMax = spRegistry.MAX_DEAL_DURATION_DAYS();
-        vm.prank(adminAddress);
+        vm.prank(admin);
+        spRegistry.setToleranceBps(100);
+        vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.DurationExceedsProtocolMax.selector, uint32(1279), protocolMax)
+            abi.encodeWithSelector(SPRegistry.ActualSizeExceedsTolerance.selector, provider1, 1_020_000, 1_010_000)
         );
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 1279, 90
+        spRegistry.commitCapacity(provider1, 1_000_000, 1_020_000);
+    }
+
+    function testReserveValidationFailures() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotFound.selector, 999));
+        spRegistry.reserveOfferForDeal(999, _request(100_000));
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.RequestSizeOutsideOfferBounds.selector, offerId, 0));
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(0, 180, 100_000, token));
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.RequestSizeOutsideOfferBounds.selector, offerId, 10_000_001));
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(10_000_001, 180, 100_000, token));
+
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.RequestDurationOutsideOfferBounds.selector, offerId, uint64(179 * SharedTypes.EPOCHS_IN_DAY)
+            )
+        );
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 179, 100_000, token));
+
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.RequestDurationOutsideOfferBounds.selector, offerId, uint64(361 * SharedTypes.EPOCHS_IN_DAY)
+            )
+        );
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 361, 100_000, token));
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PriceAboveClientMaximum.selector, 90_000, 89_999));
+        spRegistry.reserveOfferForDeal(offerId, _request(89_999));
+
+        address unallowedToken = vm.addr(0x102);
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, unallowedToken));
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, unallowedToken));
+
+        vm.prank(operator);
+        spRegistry.updateAvailableSpace(provider1, 500_000);
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.InsufficientProviderCapacity.selector, provider1, 1_000_000, 500_000)
+        );
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token));
+    }
+
+    function testReserveOfferRevertsWhenProviderPausedOrBlocked() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
+        vm.prank(operator);
+        spRegistry.pauseProvider(provider1);
+        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(preview.provider), 0);
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsPaused.selector, provider1));
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
+
+        vm.prank(operator);
+        spRegistry.unpauseProvider(provider1);
+        vm.prank(admin);
+        spRegistry.blockProvider(provider1);
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
+    }
+
+    function testPreviewValidationFailuresReturnEmptySelection() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
+        SharedTypes.ProviderDealSelection memory selection =
+            spRegistry.previewOfferForDeal(999, _requestWith(1_000_000, 180, 100_000, token));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        selection = spRegistry.previewOfferForDeal(offerId, _requestWith(0, 180, 100_000, token));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        selection = spRegistry.previewOfferForDeal(offerId, _requestWith(1_000_000, 179, 100_000, token));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        selection = spRegistry.previewOfferForDeal(
+            offerId,
+            _requestWithSLIs(
+                SharedTypes.SLIThresholds({
+                    retrievabilityBps: 9501, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0
+                })
+            )
+        );
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        selection = spRegistry.previewOfferForDeal(offerId, _request(89_999));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        vm.prank(operator);
+        spRegistry.updateAvailableSpace(provider1, 500_000);
+        selection = spRegistry.previewOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        vm.prank(operator);
+        spRegistry.updateAvailableSpace(provider1, defaultAvailableBytes);
+
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, false, 86_400);
+        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, true, 91_000);
+        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, true, 86_400);
+        vm.prank(operator);
+        spRegistry.setOfferPayment(offerId, token, false, 90_000);
+        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+    }
+
+    function testPaymentAndSLIValidationFailures() public {
+        _allowToken();
+        _allowToken(token2, 100);
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, token2));
+        spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token2));
+
+        vm.prank(operator);
+        spRegistry.setOfferPayment(offerId, token, false, 90_000);
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, token));
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
+
+        vm.prank(operator);
+        spRegistry.setOfferPayment(offerId, token, true, 90_000);
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, true, 91_000);
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PriceBelowTokenMinimum.selector, token, 90_000, 91_000));
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
+
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, true, 86_400);
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        spRegistry.reserveOfferForDeal(
+            offerId,
+            _requestWithSLIs(
+                SharedTypes.SLIThresholds({
+                    retrievabilityBps: 9501, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0
+                })
+            )
+        );
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        spRegistry.reserveOfferForDeal(
+            offerId,
+            _requestWithSLIs(
+                SharedTypes.SLIThresholds({
+                    retrievabilityBps: 0, bandwidthBytesPerSecond: 1001, latencyMs: 0, indexingPct: 0
+                })
+            )
+        );
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        spRegistry.reserveOfferForDeal(
+            offerId,
+            _requestWithSLIs(
+                SharedTypes.SLIThresholds({
+                    retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 99, indexingPct: 0
+                })
+            )
+        );
+
+        vm.prank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        spRegistry.reserveOfferForDeal(
+            offerId,
+            _requestWithSLIs(
+                SharedTypes.SLIThresholds({
+                    retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 91
+                })
+            )
         );
     }
 
-    function testSetDealDurationLimitsRevertsUnregistered() public {
-        vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderNotRegistered.selector, provider1));
-        spRegistry.setDealDurationLimits(provider1, 90, 365);
+    function testLowPriceOfferRejectedWhenRequestedSizeWouldProduceZeroPerEpochPayment() public {
+        _allowToken(token, 1);
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "low-price", 1);
+        SharedTypes.DealRequest memory request = _request(1);
+
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, request);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        selection = spRegistry.previewProviderForDeal(request);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.OfferPriceBelowPerEpochMinimum.selector, 1, 1, SharedTypes.EPOCHS_IN_MONTH
+            )
+        );
+        spRegistry.reserveOfferForDeal(offerId, request);
+
+        vm.prank(market);
+        vm.expectRevert(SPRegistry.NoOfferMatched.selector);
+        spRegistry.reserveProviderForDeal(request);
     }
 
-    // -----------------------------------------------------------------------
-    // getProviderForDeal duration filter tests
-    // -----------------------------------------------------------------------
+    function testZeroSizeOfferRequestUsesPaymentFloorValidationInsteadOfPanic() public {
+        _allowToken(token, 1);
+        _registerProvider(provider1, owner1);
 
-    function testGetProviderForDealSkipsBelowMinDuration() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
+        SharedTypes.OfferTerms memory terms = _terms();
+        terms.minSizeBytes = 0;
+        terms.maxSizeBytes = 0;
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, "zero-min", terms, defaultSLIs, _paymentRows(1));
+
+        SharedTypes.DealRequest memory request = _requestWith(0, 180, 1, token);
+
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, request);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.OfferPriceBelowPerEpochMinimum.selector, 1, 0, SharedTypes.EPOCHS_IN_MONTH
+            )
         );
-        spRegistry.setDealDurationLimits(provider1, 180, 0);
-        vm.stopPrank();
-
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 90});
-
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), 0);
+        spRegistry.reserveOfferForDeal(offerId, request);
     }
 
-    function testGetProviderForDealSkipsAboveMaxDuration() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 0, 180);
-        vm.stopPrank();
+    function testLowPriceOfferAllowedWhenLargeRequestProducesNonZeroPerEpochPayment() public {
+        uint256 sectorSize = 32 * 1024 * 1024 * 1024;
+        uint256 requestSize = ((SharedTypes.EPOCHS_IN_MONTH - 1) * sectorSize) + 1;
 
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 360});
+        _allowToken(token, 1);
+        _registerProvider(provider1, owner1);
+        vm.prank(operator);
+        spRegistry.updateAvailableSpace(provider1, requestSize);
 
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), 0);
+        SharedTypes.OfferTerms memory terms = _terms();
+        terms.maxSizeBytes = 0;
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, "large-low-price", terms, defaultSLIs, _paymentRows(1));
+
+        SharedTypes.DealRequest memory request = _requestWith(requestSize, 180, 1, token);
+
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, request);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(selection.pricePer32GiBPerMonth, 1);
+
+        vm.prank(market);
+        selection = spRegistry.reserveOfferForDeal(offerId, request);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, requestSize);
     }
 
-    function testGetProviderForDealMatchesExactMinDuration() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 180, 0);
-        vm.stopPrank();
+    function testPausedBlockedAndNoMatchPreviewPaths() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
 
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 180});
+        vm.prank(operator);
+        spRegistry.pauseProvider(provider1);
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        selection = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
 
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+        vm.prank(market);
+        vm.expectRevert(SPRegistry.NoOfferMatched.selector);
+        spRegistry.reserveProviderForDeal(_request(100_000));
+
+        vm.prank(operator);
+        spRegistry.unpauseProvider(provider1);
+        vm.prank(admin);
+        spRegistry.blockProvider(provider1);
+        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
     }
 
-    function testGetProviderForDealMatchesExactMaxDuration() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 0, 360);
-        vm.stopPrank();
+    function testSameProviderBestOfferSelectionTieBreaks() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
 
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 360});
+        vm.prank(operator);
+        spRegistry.createOffer(provider1, "expensive", _terms(), defaultSLIs, _paymentRows(91_000));
+        vm.prank(operator);
+        uint256 cheapOffer = spRegistry.createOffer(provider1, "cheap", _terms(), defaultSLIs, _paymentRows(90_000));
+        vm.prank(operator);
+        spRegistry.createOffer(provider1, "same-price", _terms(), defaultSLIs, _paymentRows(90_000));
 
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(selection.offerId, cheapOffer);
     }
 
-    function testGetProviderForDealZeroDurationLimitsMatchAll() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
+    function testFinalSelectionTieBreaksByProviderAndOffer() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
 
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 1080});
+        uint256 provider1Offer = _createOffer(provider1, "p1", 90_000);
+        _createOffer(provider2, "p2", 90_000);
 
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(selection.offerId, provider1Offer);
     }
 
-    function testGetProviderForDealMinOnlyNoUpperBound() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 90, 0);
-        vm.stopPrank();
+    function testFinalSelectionPrefersLowerPriceWithinWideBand() public {
+        _allowToken();
+        vm.prank(admin);
+        spRegistry.setMatchPriceBandBps(10_000);
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
 
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 1080});
+        _createOffer(provider1, "p1", 91_000);
+        uint256 provider2Offer = _createOffer(provider2, "p2", 90_000);
 
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(selection.offerId, provider2Offer);
     }
 
-    function testGetProviderForDealMaxOnlyNoLowerBound() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 0, 360);
-        vm.stopPrank();
+    function testUpgradeAuthorizationSuccessCoversAuthorizeUpgrade() public {
+        SPRegistry newImpl = new SPRegistry();
 
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 30});
-
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider1));
-    }
-
-    function testGetProviderForDealSelectsProviderWithMatchingDuration() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 360, 0);
-
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider2, 30, 180);
-        vm.stopPrank();
-
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 90});
-
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider2));
-    }
-
-    function testGetProviderForDealDurationFilterBeforeEarlyBreak() public {
-        vm.startPrank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        spRegistry.setDealDurationLimits(provider1, 360, 0);
-
-        spRegistry.registerProviderFor(
-            provider2, owner2, defaultCapabilities, defaultAvailableBytes, 100, address(0), 0, 0
-        );
-        vm.stopPrank();
-
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 90});
-
-        vm.prank(poRepMarketAddress);
-        (CommonTypes.FilActorId matched,,) = spRegistry.getProviderForDeal(SharedTypes.SLIThresholds(0, 0, 0, 0), terms);
-        assertEq(CommonTypes.FilActorId.unwrap(matched), CommonTypes.FilActorId.unwrap(provider2));
-    }
-
-    // -----------------------------------------------------------------------
-    // getProviderInfo duration limits test
-    // -----------------------------------------------------------------------
-
-    function testGetProviderInfoIncludesDurationLimits() public {
-        vm.prank(adminAddress);
-        spRegistry.registerProviderFor(
-            provider1, owner1, defaultCapabilities, defaultAvailableBytes, 100, address(0), 60, 720
-        );
-
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        assertEq(info.minDealDurationDays, 60);
-        assertEq(info.maxDealDurationDays, 720);
+        vm.prank(admin);
+        spRegistry.upgradeToAndCall(address(newImpl), "");
     }
 }

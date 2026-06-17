@@ -31,7 +31,7 @@ library SharedTypes {
      *
      * @dev Extension example:
      *      V1: { retrievabilityBps, bandwidthBytesPerSecond, latencyMs }
-     *      V2: { retrievabilityBps, bandwidthBytesPerSecond, latencyMs, indexingPct }
+     *      Extended: { retrievabilityBps, bandwidthBytesPerSecond, latencyMs, indexingPct }
      */
     // forge-lint: disable-next-line(pascal-case-struct)
     struct SLIThresholds {
@@ -77,6 +77,52 @@ library SharedTypes {
         address paymentToken;
         uint256 pricePer32GiBPerMonth;
         SLIThresholds promisedSLIs;
+    }
+
+    /**
+     * @notice Provider offer terms that define immutable offer shape
+     * @param minSizeBytes Minimum request size accepted by the offer
+     * @param maxSizeBytes Maximum request size accepted by the offer (0 = no maximum)
+     * @param minDurationEpochs Minimum paid service duration in epochs (0 = no minimum)
+     * @param maxDurationEpochs Maximum paid service duration in epochs (0 = no maximum)
+     */
+    struct OfferTerms {
+        uint256 minSizeBytes;
+        uint256 maxSizeBytes;
+        uint64 minDurationEpochs;
+        uint64 maxDurationEpochs;
+    }
+
+    /**
+     * @notice Payment row for an offer and ERC20 token
+     * @param token ERC20 token address
+     * @param active True when this token row can be selected
+     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units
+     */
+    struct OfferPaymentInput {
+        address token;
+        bool active;
+        uint256 pricePer32GiBPerMonth;
+    }
+
+    /**
+     * @notice Selected offer snapshot returned by SPRegistry
+     * @param provider Selected storage provider actor ID
+     * @param offerId Selected offer ID
+     * @param paymentToken ERC20 token selected for the deal
+     * @param payee Provider-level payment recipient frozen into the deal
+     * @param pricePer32GiBPerMonth Monthly price frozen into the deal
+     * @param promisedSLIs SLI terms promised by the selected offer
+     * @param reservedBytes Bytes reserved by the request
+     */
+    struct ProviderDealSelection {
+        CommonTypes.FilActorId provider;
+        uint256 offerId;
+        address paymentToken;
+        address payee;
+        uint256 pricePer32GiBPerMonth;
+        SLIThresholds promisedSLIs;
+        uint256 reservedBytes;
     }
 
     /**
