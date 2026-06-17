@@ -188,6 +188,17 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapterMock.grantRole(dataCapEvidenceAdapterMock.RESCUE_ROLE(), account);
     }
 
+    function _activationContext() internal pure returns (SharedTypes.ActivationContext memory context) {
+        context = SharedTypes.ActivationContext({
+            dealId: 1,
+            requestedSizeBytes: 0,
+            client: address(0x789),
+            durationEpochs: 0,
+            activationToleranceBps: 0,
+            provider: CommonTypes.FilActorId.wrap(1)
+        });
+    }
+
     function _rescueParams(bytes memory operatorData, uint256 amount)
         internal
         pure
@@ -256,6 +267,43 @@ contract DataCapEvidenceAdapterTest is Test {
 
     function testDataCapEvidenceAdapterEvidenceType() public view {
         assertEq(dataCapEvidenceAdapter.evidenceType(), EvidenceTypes.VERIF_REG_CLAIMS);
+    }
+
+    function testSubmitEvidenceBatchReturnsDummyDecision() public view {
+        SharedTypes.ActivationDecision memory decision =
+            dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), "");
+
+        assertEq(decision.coveredBytes, 0);
+        assertEq(decision.reasonCode, 0);
+        assertEq(decision.result, 0);
+    }
+
+    function testActivateEvidenceReturnsDummyDecision() public view {
+        SharedTypes.ActivationDecision memory decision =
+            dataCapEvidenceAdapter.activateEvidence(_activationContext(), "");
+
+        assertEq(decision.coveredBytes, 0);
+        assertEq(decision.reasonCode, 0);
+        assertEq(decision.result, 0);
+    }
+
+    function testRefreshEvidenceStatusReturnsDummyStatus() public view {
+        SharedTypes.EvidenceStatus memory status =
+            dataCapEvidenceAdapter.refreshEvidenceStatus(_activationContext(), "");
+
+        assertEq(status.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 0);
+        assertEq(status.reasonCode, 0);
+        assertEq(status.result, 0);
+    }
+
+    function testCurrentEvidenceStatusReturnsDummyStatus() public view {
+        SharedTypes.EvidenceStatus memory status = dataCapEvidenceAdapter.currentEvidenceStatus(_activationContext());
+
+        assertEq(status.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 0);
+        assertEq(status.reasonCode, 0);
+        assertEq(status.result, 0);
     }
 
     function testGetAllocationIdsPerDealPaginates() public {
