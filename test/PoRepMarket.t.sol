@@ -838,6 +838,24 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(defaultRequirements, defaultTerms, tooLongManifestLocation);
     }
 
+    function testInitializeRevertsWhenGlobalEvidenceAdapterIsZero() public {
+        PoRepMarket impl = new PoRepMarket();
+        bytes memory initData = abi.encodeCall(
+            PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry), address(0))
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidEvidenceAdapterAddress.selector));
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function testProposeDealRevertsWhenGlobalEvidenceAdapterIsZero() public {
+        PoRepMarket uninitializedMarket = new PoRepMarket();
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidEvidenceAdapterAddress.selector));
+        uninitializedMarket.proposeDeal(defaultRequirements, defaultTerms, expectedManifestLocation);
+    }
+
     function testSetGlobalEvidenceAdapterRevertsWhenAddressIsZero() public {
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidEvidenceAdapterAddress.selector));
