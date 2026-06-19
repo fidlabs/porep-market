@@ -62,7 +62,8 @@ contract ValidatorFactoryTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 200,
                 proposedAtBlock: block.number,
-                manifestLocation: "https://example.com/manifest"
+                manifestLocation: "https://example.com/manifest",
+                evidenceAdapter: dataCapEvidenceAdapter
             })
         );
 

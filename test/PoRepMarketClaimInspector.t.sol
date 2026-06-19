@@ -68,7 +68,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
         );
 
@@ -213,7 +214,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
         );
 
@@ -240,7 +242,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
                 proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                manifestLocation: expectedManifestLocation,
+                evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
         );
 
