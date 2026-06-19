@@ -232,8 +232,8 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         ValidatorFactoryStorage storage $ = s();
         if ($._instances[dealId] != address(0)) revert InstanceAlreadyExists();
 
-        PoRepTypes.DealProposal memory dp = IPoRepMarket($._poRepMarket).getDealProposal(dealId);
-        if (msg.sender != dp.client) revert InvalidClientAddress();
+        PoRepTypes.Deal memory deal = IPoRepMarket($._poRepMarket).getDeal(dealId);
+        if (msg.sender != deal.client) revert InvalidClientAddress();
 
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,

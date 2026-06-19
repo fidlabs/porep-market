@@ -3,7 +3,6 @@ pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
-import {SLITypes} from "../types/SLITypes.sol";
 
 /**
  * @title IPoRepMarket interface
@@ -19,53 +18,96 @@ interface IPoRepMarket {
 
     /**
      * @notice Proposes a deal
-     * @param requirements The SLI thresholds for the deal
-     * @param terms The commercial terms for the deal
-     * @param manifestLocation The location of the manifest for the deal
+     * @param request The client deal request
      */
-    function proposeDeal(
-        SharedTypes.SLIThresholds calldata requirements,
-        SLITypes.DealTerms calldata terms,
-        string calldata manifestLocation
-    ) external;
+    function proposeDeal(SharedTypes.DealRequest calldata request) external;
 
     /**
-     * @notice Updates the validator for a deal proposal
-     * @param dealId The id of the deal proposal
+     * @notice Updates the validator for a deal
+     * @param dealId The id of the deal
      */
     function updateValidator(uint256 dealId) external;
 
     /**
-     * @notice Updates the rail id for a deal proposal
-     * @dev Updates the rail id for a deal proposal
-     * @param dealId The id of the deal proposal
+     * @notice Updates the rail id for a deal
+     * @dev Updates the rail id for a deal
+     * @param dealId The id of the deal
      * @param railId The id of the rail
      */
     function updateRailId(uint256 dealId, uint256 railId) external;
 
     /**
-     * @notice Gets a deal proposal
-     * @param dealId The id of the deal proposal
-     * @return DealProposal The deal proposal
+     * @notice Gets a deal
+     * @param dealId The id of the deal
+     * @return deal The deal
      */
-    function getDealProposal(uint256 dealId) external view returns (PoRepTypes.DealProposal memory);
+    function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory deal);
+
+    /**
+     * @notice Gets the data fields for a deal
+     * @param dealId The id of the deal
+     * @return dealData The deal data
+     */
+    function getDealData(uint256 dealId) external view returns (SharedTypes.DealData memory dealData);
+
+    /**
+     * @notice Gets the frozen size and duration terms for a deal
+     * @param dealId The id of the deal
+     * @return terms The deal terms
+     */
+    function getDealTerms(uint256 dealId) external view returns (PoRepTypes.DealTerms memory terms);
+
+    /**
+     * @notice Gets the proposal timing for a deal
+     * @param dealId The id of the deal
+     * @return timing The deal timing
+     */
+    function getDealTiming(uint256 dealId) external view returns (PoRepTypes.DealTiming memory timing);
+
+    /**
+     * @notice Gets the service window for a deal
+     * @param dealId The id of the deal
+     * @return service The deal service window
+     */
+    function getDealService(uint256 dealId) external view returns (PoRepTypes.DealService memory service);
+
+    /**
+     * @notice Gets the reserved and committed capacity for a deal
+     * @param dealId The id of the deal
+     * @return capacity The deal capacity
+     */
+    function getDealCapacity(uint256 dealId) external view returns (PoRepTypes.DealCapacity memory capacity);
+
+    /**
+     * @notice Gets payment terms and rail accounting for a deal
+     * @param dealId The id of the deal
+     * @return payment The deal payment data
+     */
+    function getDealPayment(uint256 dealId) external view returns (PoRepTypes.DealPayment memory payment);
+
+    /**
+     * @notice Gets SLI thresholds for a deal
+     * @param dealId The id of the deal
+     * @return slis The deal SLI thresholds
+     */
+    function getDealSLIs(uint256 dealId) external view returns (SharedTypes.SLIThresholds memory slis);
 
     /**
      * @notice Accepts a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function acceptDeal(uint256 dealId) external;
 
     /**
      * @notice Completes a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function completeDeal(uint256 dealId) external;
 
     /**
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param terminator The address that terminated the deal
      * @param endEpoch The Filecoin epoch at which the deal was terminated
      */
@@ -73,35 +115,35 @@ interface IPoRepMarket {
 
     /**
      * @notice Rejects a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function rejectDeal(uint256 dealId) external;
 
     /**
      * @notice Rejects a deal in Accepted state before rail is set
      * @dev Only callable by the admin
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
      * @notice Gets all completed deals
-     * @return completedDeals Array of completed deal proposals
+     * @return activeDeals Array of active deals
      */
-    function getCompletedDeals() external view returns (PoRepTypes.DealProposal[] memory completedDeals);
+    function getCompletedDeals() external view returns (PoRepTypes.Deal[] memory activeDeals);
 
     /**
-     * @notice Retrieves the manifest location URL for a specific deal proposal
-     * @param dealId The unique identifier of the deal proposal
-     * @return manifestLocation The manifest location URL for a specific deal proposal
+     * @notice Retrieves the manifest location URL for a specific deal
+     * @param dealId The unique identifier of the deal
+     * @return manifestLocation The manifest location URL for a specific deal
      */
     function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation);
 
     /**
-     * @notice Updates the manifest location for a specific deal proposal
+     * @notice Updates the manifest location for a specific deal
      * @dev Only callable by the admin
-     * @param dealId The unique identifier of the deal proposal
-     * @param newManifestLocation The new manifest location URL to be updated for the deal proposal
+     * @param dealId The unique identifier of the deal
+     * @param newManifestLocation The new manifest location URL to be updated for the deal
      */
     function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external;
 
@@ -109,12 +151,12 @@ interface IPoRepMarket {
      * @notice Gets deals for a specific organization by state
      * @param organization The address of the organization
      * @param state The state of the deals to retrieve
-     * @return deals Array of deal proposals for the organization in the specified state (from all providers associated with the organization)
+     * @return deals Array of deals for the organization in the specified state (from all providers associated with the organization)
      */
     function getDealsForOrganizationByState(address organization, PoRepTypes.DealState state)
         external
         view
-        returns (PoRepTypes.DealProposal[] memory deals);
+        returns (PoRepTypes.Deal[] memory deals);
 
     /**
      * @notice Gets the SPRegistry contract address from storage
@@ -130,14 +172,14 @@ interface IPoRepMarket {
 
     /**
      * @notice Gets the evidence adapter assigned to a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @return The deal evidence adapter address
      */
     function getDealEvidenceAdapter(uint256 dealId) external view returns (address);
 
     /**
      * @notice Submit evidence to the adapter assigned to a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param evidenceData Adapter-specific evidence payload
      * @return decision Adapter activation decision for the submitted batch
      */
@@ -147,7 +189,7 @@ interface IPoRepMarket {
 
     /**
      * @notice Activate evidence for a deal through its assigned adapter
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param evidenceData Adapter-specific evidence payload
      * @return decision Adapter activation decision
      */
@@ -157,7 +199,7 @@ interface IPoRepMarket {
 
     /**
      * @notice Refresh evidence status for a deal through its assigned adapter
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param evidenceData Adapter-specific evidence payload
      * @return status Updated evidence status
      */
@@ -167,7 +209,7 @@ interface IPoRepMarket {
 
     /**
      * @notice Reads current evidence status for a deal through its assigned adapter
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @return status Current evidence status
      */
     function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status);
@@ -180,28 +222,27 @@ interface IPoRepMarket {
 
     /**
      * @notice Gets all deals
-     * @return deals Array of all deal proposals
+     * @return deals Array of all deals
      */
-    function getDeals() external view returns (PoRepTypes.DealProposal[] memory deals);
+    function getDeals() external view returns (PoRepTypes.Deal[] memory deals);
 
     /**
      * @notice Rejects expired deal
-     * @param dealId The id of the deal proposal
-     * @dev A deal proposal is considered expired if it has been in the proposed state for more than the dealProposalExpiration
-     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setNewDealProposalExpiration function
+     * @param dealId The id of the deal
+     * @dev A deal is considered expired if it has been in the proposed state past the configured expiration
      */
     function rejectExpiredDeal(uint256 dealId) external;
 
     /**
-     * @notice Sets new deal proposal expiration
+     * @notice Sets new proposed deal expiration
      * @dev Only callable by the admin
-     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     * @param newDealExpiration The new proposed deal expiration in epochs
      */
-    function setNewDealProposalExpiration(uint256 newDealProposalExpiration) external;
+    function setNewDealExpiration(uint256 newDealExpiration) external;
 
     /**
-     * @notice Retrieves the deal proposal expiration
-     * @return dealProposalExpiration The deal proposal expiration in epochs
+     * @notice Retrieves the proposed deal expiration
+     * @return dealExpiration The proposed deal expiration in epochs
      */
-    function getDealProposalExpiration() external view returns (uint256);
+    function getDealExpiration() external view returns (uint256);
 }

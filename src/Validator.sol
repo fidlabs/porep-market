@@ -18,6 +18,7 @@ import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol"
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
+import {SharedTypes} from "./types/SharedTypes.sol";
 import {RailStatus} from "./types/RailStatus.sol";
 
 /**
@@ -314,9 +315,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
-        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket(_poRepMarket).getDealProposal(_dealId);
+        PoRepTypes.Deal memory deal = IPoRepMarket(_poRepMarket).getDeal(_dealId);
 
-        $.providerId = dealProposal.provider;
+        $.providerId = deal.provider;
         $.filecoinPay = _filecoinPay;
         $.SLIScorer = _SLIScorer;
         $.dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
@@ -370,16 +371,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
             return result;
         }
 
-        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
-        uint256 score = ISLIScorer($.SLIScorer).calculateScore($.dealId, dealProposal.requirements);
+        SharedTypes.SLIThresholds memory slis = IPoRepMarket($.poRepMarket).getDealSLIs($.dealId);
+        uint256 score = ISLIScorer($.SLIScorer).calculateScore($.dealId, slis);
 
         bool scoreMatches = score == 100;
         bool dataSizeMatches = IDataCapEvidenceAdapter($.dataCapEvidenceAdapter).isDataSizeMatching($.dealId);
 
         if (!scoreMatches || !dataSizeMatches) {
             result.settleUpto = toEpoch;
-            result.note =
-                !scoreMatches ? "score below required threshold" : "data size does not match the deal proposal";
+            result.note = !scoreMatches ? "score below required threshold" : "data size does not match the deal";
             return result;
         }
 
@@ -410,9 +410,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      */
     function createRail(IERC20 token) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
+        PoRepTypes.Deal memory deal = IPoRepMarket($.poRepMarket).getDeal($.dealId);
 
-        if (msg.sender != dealProposal.client) {
+        if (msg.sender != deal.client) {
             revert CallerIsNotClient();
         }
 
@@ -421,7 +421,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
 
         (bool isApproved, uint256 rateAllowance, uint256 lockupAllowance,,, uint256 maxLockupPeriod) =
-            IFilecoinPayV1($.filecoinPay).operatorApprovals(token, dealProposal.client, address(this));
+            IFilecoinPayV1($.filecoinPay).operatorApprovals(token, deal.client, address(this));
 
         if (!isApproved) {
             revert OperatorNotApproved();
@@ -441,7 +441,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         address payee = ISPRegistry($.SPRegistry).getPayee($.providerId);
 
-        uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, dealProposal.client, payee, 0, address(0));
+        uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, deal.client, payee, 0, address(0));
         $.railStatus = RailStatus.PREPARED;
         $.railId = railId;
 
@@ -608,12 +608,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     function _calculateAmountPerEpoch() internal view returns (uint256) {
         ValidatorStorage storage $ = _getValidatorStorage();
 
-        PoRepTypes.DealProposal memory dealProposal = IPoRepMarket($.poRepMarket).getDealProposal($.dealId);
+        PoRepTypes.DealPayment memory payment = IPoRepMarket($.poRepMarket).getDealPayment($.dealId);
         (CommonTypes.FilActorId[] memory allocationIds,) =
             IDataCapEvidenceAdapter($.dataCapEvidenceAdapter).getAllocationIdsPerDeal($.dealId, 0, type(uint256).max);
 
         uint256 sectorCount = allocationIds.length;
-        uint256 pricePerSectorPerMonth = dealProposal.terms.pricePerSectorPerMonth;
+        uint256 pricePerSectorPerMonth = payment.pricePer32GiBPerMonth;
 
         if (sectorCount == 0) {
             revert InvalidSectorCount();

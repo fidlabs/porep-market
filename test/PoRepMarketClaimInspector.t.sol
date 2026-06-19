@@ -13,8 +13,6 @@ import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
-import {SharedTypes} from "../src/types/SharedTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 
 contract PoRepMarketClaimInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
@@ -54,21 +52,16 @@ contract PoRepMarketClaimInspectorTest is Test {
             hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
         );
@@ -200,21 +193,16 @@ contract PoRepMarketClaimInspectorTest is Test {
 
     function testGetClaimsUsesProviderFromDealProposal() public {
         CommonTypes.FilActorId customProvider = CommonTypes.FilActorId.wrap(uint64(20000));
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: customProvider,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
         );
@@ -228,21 +216,16 @@ contract PoRepMarketClaimInspectorTest is Test {
 
     function testGetClaimsHandlesDifferentDealId() public {
         uint256 secondDealId = 42;
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             secondDealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: secondDealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
         );

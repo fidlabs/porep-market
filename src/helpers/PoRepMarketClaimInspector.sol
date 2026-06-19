@@ -49,7 +49,7 @@ contract PoRepMarketClaimInspector {
     IDataCapEvidenceAdapter public immutable DATA_CAP_EVIDENCE_ADAPTER;
 
     /**
-     * @notice PoRepMarket contract address used to fetch deal proposal details for a given deal ID
+     * @notice PoRepMarket contract address used to fetch deal details for a given deal ID
      */
     IPoRepMarket public immutable POREPMARKET_CONTRACT;
 
@@ -80,7 +80,7 @@ contract PoRepMarketClaimInspector {
         if (dealId == 0) {
             revert InvalidDealId();
         }
-        PoRepTypes.DealProposal memory deal = POREPMARKET_CONTRACT.getDealProposal(dealId);
+        PoRepTypes.Deal memory deal = POREPMARKET_CONTRACT.getDeal(dealId);
         (CommonTypes.FilActorId[] memory ids,) =
             DATA_CAP_EVIDENCE_ADAPTER.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
