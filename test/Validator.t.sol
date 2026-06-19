@@ -69,20 +69,28 @@ contract ValidatorTest is Test {
             retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
         });
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: admin,
                 provider: providerFilActorId,
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
-                requirements: defaultRequirements,
-                validator: address(0),
+                offerId: 0,
                 state: PoRepTypes.DealState.Proposed,
-                railId: railId,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
-                evidenceAdapter: dataCapEvidenceAdapter
+                evidenceAdapter: dataCapEvidenceAdapter,
+                validator: address(0),
+                railId: railId
+            })
+        );
+        poRepMarketMock.setDealSLIs(dealId, defaultRequirements);
+        poRepMarketMock.setDealPayment(
+            dealId,
+            PoRepTypes.DealPayment({
+                paymentToken: address(token),
+                payee: address(0),
+                pricePer32GiBPerMonth: 100,
+                billed32GiBUnits: 0,
+                railMaxRatePerEpoch: 0
             })
         );
 
@@ -200,7 +208,7 @@ contract ValidatorTest is Test {
 
         assertEq(result.modifiedAmount, 0);
         assertEq(result.settleUpto, type(uint256).max);
-        assertEq(result.note, "data size does not match the deal proposal");
+        assertEq(result.note, "data size does not match the deal");
     }
 
     function testValidatePaymentFullSlashWhenScoreZero() public {
@@ -390,12 +398,12 @@ contract ValidatorTest is Test {
     }
 
     function testModifyRailPaymentEmitsRailPaymentModified() public {
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = 2_000_000;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
+        PoRepTypes.DealPayment memory payment = poRepMarketMock.getDealPayment(dealId);
+        payment.pricePer32GiBPerMonth = 2_000_000;
+        poRepMarketMock.setDealPayment(dealId, payment);
 
         uint256 sectorCount = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId).length;
-        uint256 expectedRate = (dealProposal.terms.pricePerSectorPerMonth * sectorCount) / 86_400;
+        uint256 expectedRate = (payment.pricePer32GiBPerMonth * sectorCount) / 86_400;
 
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.RailPaymentModified(railId, expectedRate);
@@ -713,9 +721,9 @@ contract ValidatorTest is Test {
         ids[0] = CommonTypes.FilActorId.wrap(1);
         dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = 1;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
+        PoRepTypes.DealPayment memory payment = poRepMarketMock.getDealPayment(dealId);
+        payment.pricePer32GiBPerMonth = 1;
+        poRepMarketMock.setDealPayment(dealId, payment);
 
         vm.expectRevert(Validator.InvalidZeroAmount.selector);
         vm.prank(porepService);
@@ -780,9 +788,9 @@ contract ValidatorTest is Test {
         }
         dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
+        PoRepTypes.DealPayment memory payment = poRepMarketMock.getDealPayment(dealId);
+        payment.pricePer32GiBPerMonth = pricePerSectorPerMonth;
+        poRepMarketMock.setDealPayment(dealId, payment);
 
         uint256 expectedAmount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
         assertEq(expectedAmount, 0);
@@ -807,9 +815,9 @@ contract ValidatorTest is Test {
         }
         dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
-        PoRepTypes.DealProposal memory dealProposal = poRepMarketMock.getDealProposal(dealId);
-        dealProposal.terms.pricePerSectorPerMonth = pricePerSectorPerMonth;
-        poRepMarketMock.setDealProposal(dealId, dealProposal);
+        PoRepTypes.DealPayment memory payment = poRepMarketMock.getDealPayment(dealId);
+        payment.pricePer32GiBPerMonth = pricePerSectorPerMonth;
+        poRepMarketMock.setDealPayment(dealId, payment);
 
         uint256 expectedAmount = (pricePerSectorPerMonth * sectorCount) / EPOCHS_IN_MONTH;
         assertGt(expectedAmount, 0);

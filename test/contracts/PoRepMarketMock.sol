@@ -4,21 +4,39 @@
 pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../../src/types/SharedTypes.sol";
 
 contract PoRepMarketMock {
-    mapping(uint256 dealId => PoRepTypes.DealProposal deal) public deals;
+    mapping(uint256 dealId => PoRepTypes.Deal deal) public deals;
+    mapping(uint256 dealId => SharedTypes.SLIThresholds slis) public dealSLIs;
+    mapping(uint256 dealId => PoRepTypes.DealPayment payment) public dealPayments;
     uint256 public completeDealCallCount;
 
-    function setDealProposal(uint256 dealId, PoRepTypes.DealProposal calldata dealProposal) external {
-        deals[dealId] = dealProposal;
+    function setDeal(uint256 dealId, PoRepTypes.Deal calldata deal) external {
+        deals[dealId] = deal;
     }
 
-    function getDealProposal(uint256 dealId) external view returns (PoRepTypes.DealProposal memory) {
+    function setDealSLIs(uint256 dealId, SharedTypes.SLIThresholds calldata slis) external {
+        dealSLIs[dealId] = slis;
+    }
+
+    function setDealPayment(uint256 dealId, PoRepTypes.DealPayment calldata payment) external {
+        dealPayments[dealId] = payment;
+    }
+
+    function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory) {
         return deals[dealId];
     }
 
-    // solhint-disable-next-line no-empty-blocks
-    function completeDeal(uint256, uint256) external {
+    function getDealSLIs(uint256 dealId) external view returns (SharedTypes.SLIThresholds memory) {
+        return dealSLIs[dealId];
+    }
+
+    function getDealPayment(uint256 dealId) external view returns (PoRepTypes.DealPayment memory) {
+        return dealPayments[dealId];
+    }
+
+    function completeDeal(uint256) external {
         completeDealCallCount++;
     }
 

@@ -3,12 +3,10 @@
 pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {SharedTypes} from "./SharedTypes.sol";
-import {SLITypes} from "./SLITypes.sol";
 
 /**
  * @title PoRepMarket Types
- * @notice Shared types for PoRepMarket deal proposals and states
+ * @notice Shared types for PoRepMarket deals and states
  */
 library PoRepTypes {
     /**
@@ -33,31 +31,59 @@ library PoRepTypes {
     }
 
     /**
-     * @notice DealProposal struct
-     * @dev Represents a proposal for a PoRep deal, including all relevant details and terms
-     *      dealId: Unique identifier for the deal
-     *      client: Address of the client proposing the deal
-     *      provider: FilActor ID of the storage provider
-     *      requirements: SLI thresholds that the provider must meet for the deal
-     *      terms: Commercial terms of the deal, such as size, price, and duration
-     *      validator: Address of the validator responsible for validating the deal
-     *      state: Current state of the deal (Proposed, Accepted, Completed, Rejected, Terminated)
-     *      railId: ID of the payment rail associated with the deal
-     *      proposedAtBlock: Block number when the deal was proposed
-     *      manifestLocation: Location of the deal manifest
-     *      evidenceAdapter: Adapter used to process evidence for this deal
+     * @notice Core deal snapshot and lifecycle fields.
      */
-    struct DealProposal {
+    struct Deal {
         uint256 dealId;
         address client;
         CommonTypes.FilActorId provider;
-        SharedTypes.SLIThresholds requirements;
-        SLITypes.DealTerms terms;
-        address validator;
+        uint256 offerId;
         DealState state;
-        uint256 railId;
-        uint256 proposedAtBlock;
-        string manifestLocation;
         address evidenceAdapter;
+        address validator;
+        uint256 railId;
+    }
+
+    /**
+     * @notice Frozen size and duration terms for a deal.
+     */
+    struct DealTerms {
+        uint256 requestedSizeBytes;
+        uint64 durationEpochs;
+    }
+
+    /**
+     * @notice Proposal timing for expiry-related checks.
+     */
+    struct DealTiming {
+        CommonTypes.ChainEpoch proposedAtEpoch;
+        CommonTypes.ChainEpoch expiresAtEpoch;
+    }
+
+    /**
+     * @notice Service window established when storage activates.
+     */
+    struct DealService {
+        CommonTypes.ChainEpoch serviceStartEpoch;
+        CommonTypes.ChainEpoch serviceEndEpoch;
+    }
+
+    /**
+     * @notice Capacity reserved by proposal and committed at activation.
+     */
+    struct DealCapacity {
+        uint256 reservedBytes;
+        uint256 committedBytes;
+    }
+
+    /**
+     * @notice Payment terms and rail accounting values frozen for a deal.
+     */
+    struct DealPayment {
+        address paymentToken;
+        address payee;
+        uint256 pricePer32GiBPerMonth;
+        uint256 billed32GiBUnits;
+        uint256 railMaxRatePerEpoch;
     }
 }

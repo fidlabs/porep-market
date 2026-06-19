@@ -26,7 +26,6 @@ import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {DataCapEvidenceAdapterContractMock} from "./contracts/DataCapEvidenceAdapterContractMock.sol";
 import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
@@ -121,23 +120,16 @@ contract DataCapEvidenceAdapterTest is Test {
         resolveAddress.setAddress(hex"00C2A101", uint64(10000));
         dealId = 1;
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
@@ -779,23 +771,16 @@ contract DataCapEvidenceAdapterTest is Test {
     }
 
     function testShouldRevertTransferWhenDealIsNotInCorrectState() public {
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Completed,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
@@ -915,23 +900,16 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: 150,
                 client: clientAddress,
                 provider: SP2,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
@@ -961,23 +939,16 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapter dataCapEvidenceAdapterWithReentrancy =
             DataCapEvidenceAdapter(address(new ERC1967Proxy(address(impl), initData)));
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 state: PoRepTypes.DealState.Accepted,
                 validator: address(validatorMock),
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
@@ -1001,23 +972,16 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: 150,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
@@ -1265,23 +1229,16 @@ contract DataCapEvidenceAdapterTest is Test {
 
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 validator: address(0),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );
@@ -1406,23 +1363,16 @@ contract DataCapEvidenceAdapterTest is Test {
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: SP1,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({
-                    dealSizeBytes: totalDealSize, pricePerSectorPerMonth: pricePerSectorPerMonth, durationDays: 365
-                }),
+                offerId: 0,
                 validator: address(validatorMock),
                 state: PoRepTypes.DealState.Accepted,
                 railId: 0,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
         );

@@ -333,18 +333,18 @@ contract DataCapEvidenceAdapter is
      */
     function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external nonReentrant {
         DataCapEvidenceAdapterStorage storage $ = s();
-        PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
+        PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
 
-        if (proposal.state != PoRepTypes.DealState.Accepted) {
+        if (dealSnapshot.state != PoRepTypes.DealState.Accepted) {
             revert InvalidDealStateForTransfer();
         }
 
-        if (msg.sender != proposal.client) {
+        if (msg.sender != dealSnapshot.client) {
             revert InvalidClient();
         }
 
         if ($._deals[dealId].dealId == 0) {
-            _registerDeal(proposal);
+            _registerDeal(dealSnapshot);
         }
 
         Deal storage deal = $._deals[dealId];
@@ -447,8 +447,8 @@ contract DataCapEvidenceAdapter is
         onlyRole(RESCUE_ROLE)
     {
         DataCapEvidenceAdapterStorage storage $ = s();
-        PoRepTypes.DealProposal memory proposal = $._poRepMarketContract.getDealProposal(dealId);
-        if (proposal.state != PoRepTypes.DealState.Completed || $._deals[dealId].dealId == 0) {
+        PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
+        if (dealSnapshot.state != PoRepTypes.DealState.Completed || $._deals[dealId].dealId == 0) {
             revert InvalidDealStateForTransfer();
         }
 
@@ -621,21 +621,21 @@ contract DataCapEvidenceAdapter is
 
     /**
      * @notice Verifies and registers a deal.
-     * @param proposal The deal proposal.
+     * @param dealSnapshot The deal snapshot.
      */
-    function _registerDeal(PoRepTypes.DealProposal memory proposal) internal {
+    function _registerDeal(PoRepTypes.Deal memory dealSnapshot) internal {
         DataCapEvidenceAdapterStorage storage $ = s();
 
-        if (proposal.railId == 0) {
+        if (dealSnapshot.railId == 0) {
             revert InvalidRailId();
         }
 
-        Deal storage deal = $._deals[proposal.dealId];
-        deal.client = proposal.client;
-        deal.provider = proposal.provider;
-        deal.dealId = proposal.dealId;
-        deal.validator = proposal.validator;
-        deal.railId = proposal.railId;
+        Deal storage deal = $._deals[dealSnapshot.dealId];
+        deal.client = dealSnapshot.client;
+        deal.provider = dealSnapshot.provider;
+        deal.dealId = dealSnapshot.dealId;
+        deal.validator = dealSnapshot.validator;
+        deal.railId = dealSnapshot.railId;
     }
 
     /**
