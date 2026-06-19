@@ -1,0 +1,121 @@
+[
+  {
+    "type": "constructor",
+    "inputs": [
+      {
+        "name": "_poRepMarketContract",
+        "type": "address",
+        "internalType": "address"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "POREPMARKET_CONTRACT",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "address",
+        "internalType": "contract IPoRepMarket"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "multicall",
+    "inputs": [
+      {
+        "name": "data",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "results",
+        "type": "bytes[]",
+        "internalType": "bytes[]"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "validateSectorStatus",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "sector",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "enum SectorStatus"
+      },
+      {
+        "name": "deadline",
+        "type": "int64",
+        "internalType": "int64"
+      },
+      {
+        "name": "partition",
+        "type": "int64",
+        "internalType": "int64"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "valid",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "error",
+    "name": "AddressEmptyCode",
+    "inputs": [
+      {
+        "name": "target",
+        "type": "address",
+        "internalType": "address"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "FailedCall",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealId",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidPoRepMarketAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ValidateSectorStatusFailed",
+    "inputs": [
+      {
+        "name": "exitCode",
+        "type": "int256",
+        "internalType": "int256"
+      }
+    ]
+  }
+]

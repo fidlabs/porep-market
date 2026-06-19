@@ -15,8 +15,12 @@ contract ActorIdMock {
     uint256 internal constant IS_CONTROLLING_ADDRESS = 348244887;
     uint256 internal constant DATACAP_TRANSFER = 80475954;
     uint256 internal constant GET_OWNER = 3275365574;
+    uint256 internal constant VALIDATE_SECTOR_STATUS = 3092458564;
     uint64 internal constant VERIFREG_ACTOR_ID = 6;
     uint64 internal constant DATACAP_ACTOR_ID = 7;
+
+    int256 internal _validateSectorStatusExitCode;
+    bool internal _validateSectorStatusValid;
 
     error MethodNotFound(string mockName, uint256 methodNum, uint64 target);
     error InvalidOperatorData();
@@ -28,6 +32,11 @@ contract ActorIdMock {
 
     function setGetClaimsResult(bytes memory d) public {
         _getClaimsResult = d;
+    }
+
+    function setValidateSectorStatusResult(int256 exitCode, bool valid) public {
+        _validateSectorStatusExitCode = exitCode;
+        _validateSectorStatusValid = valid;
     }
 
     function setDataCapTransferResult(bytes memory d) public {
@@ -83,6 +92,8 @@ contract ActorIdMock {
             if (methodNum == DATACAP_TRANSFER) return _handleDatacapTransfer(data);
         }
 
+        if (methodNum == VALIDATE_SECTOR_STATUS) return _handleValidateSectorStatus();
+
         if (methodNum == GET_OWNER) return _handleGetOwnerReturn(target);
 
         if (methodNum == IS_CONTROLLING_ADDRESS) return _handleIsControllingAddress();
@@ -128,5 +139,9 @@ contract ActorIdMock {
 
     function _handleIsControllingAddress() internal pure returns (bytes memory) {
         return abi.encode(0, 0x51, hex"F5");
+    }
+
+    function _handleValidateSectorStatus() internal view returns (bytes memory) {
+        return abi.encode(_validateSectorStatusExitCode, 0x51, _validateSectorStatusValid ? hex"F5" : hex"F4");
     }
 }
