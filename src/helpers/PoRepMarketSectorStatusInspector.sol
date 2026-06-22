@@ -26,7 +26,7 @@ contract PoRepMarketSectorStatusInspector is Multicall {
     error InvalidPoRepMarketAddress();
 
     /**
-     * @notice PoRepMarket contract address used to fetch deal proposal details for a given deal ID
+     * @notice PoRepMarket contract address used to fetch deal details for a given deal ID
      */
     IPoRepMarket public immutable POREPMARKET_CONTRACT;
 
@@ -55,7 +55,7 @@ contract PoRepMarketSectorStatusInspector is Multicall {
         returns (bool valid)
     {
         if (dealId == 0) revert InvalidDealId();
-        PoRepTypes.DealProposal memory deal = POREPMARKET_CONTRACT.getDealProposal(dealId);
+        PoRepTypes.Deal memory deal = POREPMARKET_CONTRACT.getDeal(dealId);
         uint64 minerId = CommonTypes.FilActorId.unwrap(deal.provider);
         return FVMSector.validateSectorStatus(minerId, sector, status, deadline, partition);
     }

@@ -811,12 +811,12 @@ contract PoRepMarketTest is Test {
         porepMarekMock.setDeal(createDeal(ids[4], PoRepTypes.DealState.Rejected));
         porepMarekMock.setDealIdsReadyForPayment(ids);
 
-        PoRepTypes.Deal[] memory dealProposal = porepMarekMock.getCompletedDeals();
-        assertEq(dealProposal.length, 2);
-        assertEq(dealProposal[0].dealId, ids[0]);
-        assertTrue(dealProposal[0].state == PoRepTypes.DealState.Completed);
-        assertEq(dealProposal[1].dealId, ids[3]);
-        assertTrue(dealProposal[1].state == PoRepTypes.DealState.Completed);
+        PoRepTypes.Deal[] memory completedDeals = porepMarekMock.getCompletedDeals();
+        assertEq(completedDeals.length, 2);
+        assertEq(completedDeals[0].dealId, ids[0]);
+        assertTrue(completedDeals[0].state == PoRepTypes.DealState.Completed);
+        assertEq(completedDeals[1].dealId, ids[3]);
+        assertTrue(completedDeals[1].state == PoRepTypes.DealState.Completed);
     }
 
     function testProposeDealRevertsEmptyManifestLocation() public {
@@ -1281,8 +1281,8 @@ contract PoRepMarketTest is Test {
         vm.prank(adminAddress);
         poRepMarket.rejectAcceptedDeal(dealId);
 
-        PoRepTypes.Deal memory dealProposal = poRepMarket.getDeal(dealId);
-        assertTrue(dealProposal.state == PoRepTypes.DealState.Rejected);
+        PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
+        assertTrue(deal.state == PoRepTypes.DealState.Rejected);
     }
 
     function testRejectAcceptedDealRevertsWhenRailIdIsSet() public {
@@ -1303,7 +1303,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.rejectAcceptedDeal(dealId);
     }
 
-    function testSetNewDealProposalExpirationRevertsWhenCalledByNonAdmin() public {
+    function testSetNewDealExpirationRevertsWhenCalledByNonAdmin() public {
         address caller = vm.addr(0x999);
         bytes32 adminRole = poRepMarket.DEFAULT_ADMIN_ROLE();
 
@@ -1314,13 +1314,13 @@ contract PoRepMarketTest is Test {
         poRepMarket.setNewDealExpiration(1000);
     }
 
-    function testSetNewDealProposalExpirationRevertsWhenZero() public {
+    function testSetNewDealExpirationRevertsWhenZero() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealExpiration.selector));
         vm.prank(adminAddress);
         poRepMarket.setNewDealExpiration(0);
     }
 
-    function testSetNewDealProposalExpirationUpdatesExpiration() public {
+    function testSetNewDealExpirationUpdatesExpiration() public {
         uint256 newExpiration = 1000;
 
         vm.prank(adminAddress);
@@ -1480,11 +1480,11 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
     }
 
-    function testGetDealProposalExpirationReturnsDefault() public view {
+    function testGetDealExpirationReturnsDefault() public view {
         assertEq(poRepMarket.getDealExpiration(), EPOCHS_IN_TWO_DAYS);
     }
 
-    function testGetDealProposalExpirationReturnsUpdatedValue() public {
+    function testGetDealExpirationReturnsUpdatedValue() public {
         uint256 newDealExpiration = 1000;
 
         vm.prank(adminAddress);
@@ -1493,7 +1493,7 @@ contract PoRepMarketTest is Test {
         assertEq(poRepMarket.getDealExpiration(), newDealExpiration);
     }
 
-    function testSetNewDealProposalExpirationEmitsEvent() public {
+    function testSetNewDealExpirationEmitsEvent() public {
         uint256 newExpiration = 1000;
 
         vm.expectEmit(true, false, false, false);

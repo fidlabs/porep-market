@@ -482,11 +482,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
                 PoRepTypes.DealTerms({requestedSizeBytes: request.requestedSizeBytes, durationEpochs: durationEpochs});
         }
         {
-            uint64 proposedAtEpoch = uint64(block.number);
-            uint64 expiresAtEpoch = uint64(block.number + _getDealExpiration($));
+            int64 proposedAtEpoch = int64(uint64(block.number));
+            int64 expiresAtEpoch = int64(uint64(block.number + _getDealExpiration($)));
             $._dealTiming[dealId] = PoRepTypes.DealTiming({
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(int64(proposedAtEpoch)),
-                expiresAtEpoch: CommonTypes.ChainEpoch.wrap(int64(expiresAtEpoch))
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch),
+                expiresAtEpoch: CommonTypes.ChainEpoch.wrap(expiresAtEpoch)
             });
         }
         $._dealService[dealId] = PoRepTypes.DealService({

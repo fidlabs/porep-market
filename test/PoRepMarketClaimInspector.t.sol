@@ -191,7 +191,7 @@ contract PoRepMarketClaimInspectorTest is Test {
         porepMarketClaimInspector.getClaimForDeal(dealId);
     }
 
-    function testGetClaimsUsesProviderFromDealProposal() public {
+    function testGetClaimsUsesProviderFromDeal() public {
         CommonTypes.FilActorId customProvider = CommonTypes.FilActorId.wrap(uint64(20000));
         poRepMarketMock.setDeal(
             dealId,

@@ -13,8 +13,6 @@ import {MockProxy} from "./contracts/MockProxy.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
-import {SharedTypes} from "../src/types/SharedTypes.sol";
 
 contract PoRepMarketSectorStatusInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
@@ -34,8 +32,6 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
     PoRepMarketMock public poRepMarketMock;
     ValidatorMock public validatorMock;
 
-    string public expectedManifestLocation = "https://example.com/manifest";
-
     function setUp() public {
         clientAddress = address(0x123);
         dealId = 1;
@@ -50,21 +46,17 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
         vm.etch(address(5555), address(actorIdMock).code);
         actorIdMock = ActorIdMock(payable(address(5555)));
 
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: providerFilActorId,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
-                validator: address(validatorMock),
+                offerId: 0,
                 state: PoRepTypes.DealState.Accepted,
-                railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                evidenceAdapter: address(0),
+                validator: address(validatorMock),
+                railId: 1
             })
         );
 
@@ -112,23 +104,19 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
         porepMarketSectorStatusInspector.validateSectorStatus(dealId, SECTOR, SectorStatus.Active, DEADLINE, PARTITION);
     }
 
-    function testValidateSectorStatusUsesProviderFromDealProposal() public {
+    function testValidateSectorStatusUsesProviderFromDeal() public {
         uint64 customMinerId = 20000;
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: clientAddress,
                 provider: CommonTypes.FilActorId.wrap(customMinerId),
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1024, pricePerSectorPerMonth: 100, durationDays: 365}),
-                validator: address(validatorMock),
+                offerId: 0,
                 state: PoRepTypes.DealState.Accepted,
-                railId: 1,
-                proposedAtBlock: block.number,
-                manifestLocation: expectedManifestLocation
+                evidenceAdapter: address(0),
+                validator: address(validatorMock),
+                railId: 1
             })
         );
 
