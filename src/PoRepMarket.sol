@@ -93,7 +93,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.PoRepMarket")) - 1)) & ~bytes32(uint256(0xff))
     bytes32 private constant POREP_MARKET_STORAGE_LOCATION =
-        0xea093611145db18b250f1cd58e07fc50de512902beb662a10f8e6d1dd55f6700;
+        0x0abde292d09529f8839f1c315101bb9805017b92f1e5d27b754124ac2f3da000;
 
     // solhint-disable-next-line use-natspec
     function _getPoRepMarketStorage() private pure returns (PoRepMarketStorage storage $) {

@@ -13,7 +13,7 @@ contract PoRepMarketContractMock is PoRepMarket {
     function _getStorage() private pure returns (PoRepMarket.PoRepMarketStorage storage $) {
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
-            $.slot := 0xea093611145db18b250f1cd58e07fc50de512902beb662a10f8e6d1dd55f6700
+            $.slot := 0x0abde292d09529f8839f1c315101bb9805017b92f1e5d27b754124ac2f3da000
         }
     }
 
