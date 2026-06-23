@@ -240,6 +240,18 @@ contract DataCapEvidenceAdapter is
      */
     error CallerIsNotPoRepMarket();
 
+    /**
+     * @notice Error indicating that an invalid deal ID was provided
+     * @dev 0xb06db32a
+     */
+    error InvalidDealId();
+
+    /**
+     * @notice Error indicating a mismatch between the number of claims returned and the number of claim IDs processed
+     * @dev 0xe38fdaac
+     */
+    error ClaimIdsMismatch(uint256 claimsLength, uint256 claimIdsLength);
+
     struct Deal {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
@@ -740,6 +752,7 @@ contract DataCapEvidenceAdapter is
         returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfAllocations)
     {
         if (limit == 0) revert InvalidLimit();
+        if (dealId == 0) revert InvalidDealId();
         CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
         sumOfAllocations = allocationIds.length;
 
@@ -754,6 +767,64 @@ contract DataCapEvidenceAdapter is
 
         for (uint256 i = 0; i < count; i++) {
             ids[i] = allocationIds[offset + i];
+        }
+    }
+
+    /**
+     * @notice getter to retrieve claim ids for a deal with pagination
+     * @param dealId the id of the deal
+     * @param offset pagination offset for the claim ids
+     * @param limit pagination limit for the claim ids
+     * @return ids list of claim ids for the given deal
+     * @return total total number of claims for the given deal
+     */
+    function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 total)
+    {
+        if (limit == 0) revert InvalidLimit();
+        if (dealId == 0) revert InvalidDealId();
+
+        Deal storage deal = s()._deals[dealId];
+        CommonTypes.FilActorId[] memory allocationIds = deal.allocationIds;
+
+        VerifRegTypes.GetClaimsParams memory getClaimsParams =
+            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: allocationIds});
+
+        (int256 exitCode, VerifRegTypes.GetClaimsReturn memory result) = VerifRegAPI.getClaims(getClaimsParams);
+        if (exitCode != 0) revert GetClaimsCallFailed();
+
+        CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](result.claims.length);
+        uint256 failIterator = 0;
+        uint256 outIdx = 0;
+        for (uint256 i = 0; i < allocationIds.length; ++i) {
+            if (
+                result.batch_info.fail_codes.length > failIterator
+                    && i == result.batch_info.fail_codes[failIterator].idx
+            ) {
+                ++failIterator;
+                continue;
+            }
+            claimIds[outIdx++] = allocationIds[i];
+        }
+
+        if (outIdx != result.claims.length) {
+            revert ClaimIdsMismatch(result.claims.length, outIdx);
+        }
+
+        total = claimIds.length;
+
+        // solhint-disable-next-line gas-strict-inequalities
+        if (offset >= total) {
+            return (new CommonTypes.FilActorId[](0), total);
+        }
+
+        uint256 count = limit > total - offset ? total - offset : limit;
+        ids = new CommonTypes.FilActorId[](count);
+
+        for (uint256 i = 0; i < count; ++i) {
+            ids[i] = claimIds[offset + i];
         }
     }
 
