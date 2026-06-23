@@ -63,6 +63,19 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
         returns (CommonTypes.FilActorId[] memory ids, uint256 total);
 
     /**
+     * @notice getter to retrieve claim ids for a deal with pagination
+     * @param dealId the id of the deal
+     * @param offset pagination offset for the claim ids
+     * @param limit pagination limit for the claim ids
+     * @return ids list of claim ids for the given deal
+     * @return total total number of claims for the given deal
+     */
+    function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 total);
+
+    /**
      * @notice custom getter to check if claim is terminated
      * @param claimId the id of the claim
      * @return isTerminated whether the claim is terminated
