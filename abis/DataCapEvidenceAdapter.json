@@ -74,7 +74,7 @@
     "name": "activateEvidence",
     "inputs": [
       {
-        "name": "",
+        "name": "context",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -111,7 +111,7 @@
         ]
       },
       {
-        "name": "",
+        "name": "evidenceData",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -160,7 +160,7 @@
     "name": "currentEvidenceStatus",
     "inputs": [
       {
-        "name": "",
+        "name": "context",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -309,7 +309,7 @@
         "internalType": "CommonTypes.FilActorId[]"
       },
       {
-        "name": "total",
+        "name": "sumOfClaims",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -526,7 +526,7 @@
     "name": "refreshEvidenceStatus",
     "inputs": [
       {
-        "name": "",
+        "name": "context",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -563,7 +563,7 @@
         ]
       },
       {
-        "name": "",
+        "name": "evidenceData",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -748,7 +748,7 @@
     "name": "submitEvidenceBatch",
     "inputs": [
       {
-        "name": "",
+        "name": "context",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -785,7 +785,7 @@
         ]
       },
       {
-        "name": "",
+        "name": "evidenceData",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -814,7 +814,7 @@
         ]
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1090,22 +1090,6 @@
   },
   {
     "type": "error",
-    "name": "ClaimIdsMismatch",
-    "inputs": [
-      {
-        "name": "claimsLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "claimIdsLength",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -1148,6 +1132,11 @@
   {
     "type": "error",
     "name": "InvalidAllocationSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidBatchSize",
     "inputs": []
   },
   {

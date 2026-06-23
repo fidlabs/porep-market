@@ -262,13 +262,131 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(dataCapEvidenceAdapter.evidenceType(), EvidenceTypes.VERIF_REG_CLAIMS);
     }
 
-    function testSubmitEvidenceBatchReturnsDummyDecision() public view {
+    function testSubmitEvidenceBatchMovesAllClaimedAllocations() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        vm.prank(address(poRepMarketMock));
         SharedTypes.ActivationDecision memory decision =
-            dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), "");
+            mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        assertEq(decision.coveredBytes, 4096);
+        assertEq(decision.reasonCode, 0);
+        assertEq(decision.result, 0);
+        assertEq(mock.getDeal(dealId).claimedBytes, 4096);
+
+        assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 0);
+
+        (CommonTypes.FilActorId[] memory claimIds, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(total, 2);
+        _assertContainsAllocationId(claimIds, 1);
+        _assertContainsAllocationId(claimIds, 2);
+    }
+
+    function testSubmitEvidenceBatchLeavesUnclaimedAllocations() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282018182000681881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision =
+            mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        assertEq(decision.coveredBytes, 2048);
+        assertEq(mock.getDeal(dealId).claimedBytes, 2048);
+
+        CommonTypes.FilActorId[] memory remaining = mock.getAllAllocationIdsPerDeal(dealId);
+        assertEq(remaining.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(remaining[0]), 1);
+
+        (CommonTypes.FilActorId[] memory claimIds, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(total, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(claimIds[0]), 2);
+    }
+
+    function testSubmitEvidenceBatchMovesNothingWhenNoneClaimed() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(hex"8282008282000682010680");
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision =
+            mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        assertEq(decision.coveredBytes, 0);
+        assertEq(mock.getDeal(dealId).claimedBytes, 0);
+        assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 2);
+
+        (, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(total, 0);
+    }
+
+    function testSubmitEvidenceBatchRespectsBatchSizeAcrossCalls() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        bytes memory singleClaim =
+            hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000";
+
+        actorIdMock.setGetClaimsResult(singleClaim);
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory first =
+            mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(1)));
+        assertEq(first.coveredBytes, 2048);
+        assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 1);
+        assertEq(mock.getDeal(dealId).claimedBytes, 2048);
+        (, uint256 claimedAfterFirst) = mock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(claimedAfterFirst, 1);
+
+        actorIdMock.setGetClaimsResult(singleClaim);
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(1)));
+        assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 0);
+        assertEq(mock.getDeal(dealId).claimedBytes, 4096);
+        (, uint256 claimedAfterSecond) = mock.getClaimIds(dealId, 0, type(uint256).max);
+        assertEq(claimedAfterSecond, 2);
+    }
+
+    function testSubmitEvidenceBatchReturnsZeroWhenNoAllocations() public {
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision =
+            dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
 
         assertEq(decision.coveredBytes, 0);
         assertEq(decision.reasonCode, 0);
         assertEq(decision.result, 0);
+    }
+
+    function testSubmitEvidenceBatchRevertsWhenBatchSizeIsZero() public {
+        vm.prank(address(poRepMarketMock));
+        vm.expectRevert(DataCapEvidenceAdapter.InvalidBatchSize.selector);
+        dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), abi.encode(uint256(0)));
+    }
+
+    function testSubmitEvidenceBatchRevertsWhenCallerIsNotPoRepMarket() public {
+        vm.expectRevert(DataCapEvidenceAdapter.CallerIsNotPoRepMarket.selector);
+        dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+    }
+
+    function testSubmitEvidenceBatchRevertsWhenGetClaimsExitCodeNonZero() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+
+        ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
+        vm.etch(CALL_ACTOR_ID, address(failing).code);
+
+        vm.prank(address(poRepMarketMock));
+        vm.expectRevert(DataCapEvidenceAdapter.GetClaimsCallFailed.selector);
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
     }
 
     function testActivateEvidenceReturnsDummyDecision() public view {
@@ -1450,93 +1568,57 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapter.getClaimIds(0, 0, 1);
     }
 
-    function testGetClaimIdsReturnsEmptyWhenDealHasNoAllocations() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+    function testGetClaimIdsReturnsEmptyWhenDealHasNoClaims() public {
+        DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        actorIdMock.setGetClaimsResult(hex"8282008080");
 
-        (CommonTypes.FilActorId[] memory ids, uint256 total) =
-            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
+        (CommonTypes.FilActorId[] memory ids, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(total, 0);
         assertEq(ids.length, 0);
     }
 
-    function testGetClaimIdsReturnsSingleClaim() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+    function testGetClaimIdsReturnsClaimsAfterSubmit() public {
+        DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
+        _registerDealWithOneAllocation(mock);
         actorIdMock.setGetClaimsResult(
             hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
 
-        (CommonTypes.FilActorId[] memory ids, uint256 total) =
-            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
+        (CommonTypes.FilActorId[] memory ids, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(total, 1);
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
     }
 
     function testGetClaimIdsPaginates() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
+        DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
+        _registerDealWithTwoAllocations(mock);
         actorIdMock.setGetClaimsResult(
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
 
-        (CommonTypes.FilActorId[] memory firstPage, uint256 total) =
-            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, 1);
+        (CommonTypes.FilActorId[] memory firstPage, uint256 total) = mock.getClaimIds(dealId, 0, 1);
         assertEq(total, 2);
         assertEq(firstPage.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(firstPage[0]), 1);
 
-        (CommonTypes.FilActorId[] memory secondPage,) = dataCapEvidenceAdapterMock.getClaimIds(dealId, 1, 2);
+        (CommonTypes.FilActorId[] memory secondPage,) = mock.getClaimIds(dealId, 1, 2);
         assertEq(secondPage.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(secondPage[0]), 2);
 
-        (CommonTypes.FilActorId[] memory emptyPage, uint256 emptyTotal) =
-            dataCapEvidenceAdapterMock.getClaimIds(dealId, 2, 1);
+        CommonTypes.FilActorId[] memory both = new CommonTypes.FilActorId[](2);
+        both[0] = firstPage[0];
+        both[1] = secondPage[0];
+        _assertContainsAllocationId(both, 1);
+        _assertContainsAllocationId(both, 2);
+
+        (CommonTypes.FilActorId[] memory emptyPage, uint256 emptyTotal) = mock.getClaimIds(dealId, 2, 1);
         assertEq(emptyTotal, 2);
         assertEq(emptyPage.length, 0);
-    }
-
-    function testGetClaimIdsSkipsFailedClaimIds() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
-        actorIdMock.setGetClaimsResult(
-            hex"8282018182000681881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
-        );
-
-        (CommonTypes.FilActorId[] memory ids, uint256 total) =
-            dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
-        assertEq(total, 1);
-        assertEq(ids.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 2);
-    }
-
-    function testGetClaimIdsRevertsWhenGetClaimsExitCodeNonZero() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
-
-        ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
-        vm.etch(CALL_ACTOR_ID, address(failing).code);
-
-        vm.expectRevert(DataCapEvidenceAdapter.GetClaimsCallFailed.selector);
-        dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
-    }
-
-    function testGetClaimIdsRevertsOnClaimIdsMismatch() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        actorIdMock.setGetClaimsResult(
-            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.ClaimIdsMismatch.selector, 2, 1));
-        dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
     }
 
     function testIsOperationalReturnsTrueByDefault() public view {

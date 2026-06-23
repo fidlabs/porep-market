@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {SharedTypes as Types} from "../types/SharedTypes.sol";
+import {SharedTypes} from "../types/SharedTypes.sol";
 
 /**
  * @title Storage evidence adapter interface
@@ -25,15 +25,16 @@ interface IStorageEvidenceAdapter {
 
     /**
      * @notice Submit one bounded batch of adapter-specific evidence for a deal
+     * @dev Only callable by the PoRepMarket contract
      * @dev `evidenceData` is opaque to PoRepMarket; the selected adapter defines,
      * decodes, and validates its contents
      * @param context Activation context for the deal and market state
      * @param evidenceData Adapter-specific evidence payload
      * @return decision Activation decision for the submitted evidence batch
      */
-    function submitEvidenceBatch(Types.ActivationContext calldata context, bytes calldata evidenceData)
+    function submitEvidenceBatch(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        returns (Types.ActivationDecision memory decision);
+        returns (SharedTypes.ActivationDecision memory decision);
 
     /**
      * @notice Return the adapter's activation decision after submitted evidence
@@ -45,9 +46,9 @@ interface IStorageEvidenceAdapter {
      * @param evidenceData Adapter-specific evidence payload
      * @return decision Activation decision for the provided evidence
      */
-    function activateEvidence(Types.ActivationContext calldata context, bytes calldata evidenceData)
+    function activateEvidence(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        returns (Types.ActivationDecision memory decision);
+        returns (SharedTypes.ActivationDecision memory decision);
 
     /**
      * @notice Refresh current evidence health from adapter-specific source data
@@ -57,9 +58,9 @@ interface IStorageEvidenceAdapter {
      * @param evidenceData Bounded batch of evidence used to verify current status
      * @return status Updated evidence status
      */
-    function refreshEvidenceStatus(Types.ActivationContext calldata context, bytes calldata evidenceData)
+    function refreshEvidenceStatus(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        returns (Types.EvidenceStatus memory status);
+        returns (SharedTypes.EvidenceStatus memory status);
 
     /**
      * @notice Read current evidence status from adapter storage only
@@ -67,8 +68,8 @@ interface IStorageEvidenceAdapter {
      * @param context Activation context for the deal and market state
      * @return status Current adapter-local evidence status
      */
-    function currentEvidenceStatus(Types.ActivationContext calldata context)
+    function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
         view
-        returns (Types.EvidenceStatus memory status);
+        returns (SharedTypes.EvidenceStatus memory status);
 }
