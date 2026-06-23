@@ -105,6 +105,12 @@ interface IPoRepMarket {
     function completeDeal(uint256 dealId) external;
 
     /**
+     * @notice Activates payment for a completed deal
+     * @param dealId The id of the deal
+     */
+    function activatePayment(uint256 dealId) external;
+
+    /**
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal

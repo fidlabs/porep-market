@@ -164,6 +164,19 @@
   },
   {
     "type": "function",
+    "name": "activatePayment",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "completeDeal",
     "inputs": [
       {
@@ -1836,6 +1849,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidBilled32GiBUnits",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidDealDuration",
     "inputs": []
   },
@@ -1898,6 +1916,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidRailState",
+    "inputs": [
+      {
+        "name": "railStatus",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidRetrievabilityBps",
     "inputs": [
       {
@@ -1906,6 +1935,11 @@
         "internalType": "uint16"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidZeroAmount",
+    "inputs": []
   },
   {
     "type": "error",
