@@ -52,15 +52,15 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     /**
      * @notice getter to retrieve allocation ids for a deal with pagination
      * @param dealId the id of the deal
-     * @param offset pagination offset for the allocation ids
-     * @param limit pagination limit for the allocation ids
-     * @return ids list of allocation ids for the given deal
-     * @return total total number of allocations for the given deal
+     * @param offset index to start from
+     * @param limit max number of ids to return
+     * @return ids allocation ids for the deal
+     * @return sumOfAllocations total number of allocation ids for the deal
      */
     function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
         external
         view
-        returns (CommonTypes.FilActorId[] memory ids, uint256 total);
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfAllocations);
 
     /**
      * @notice getter to retrieve claim ids for a deal with pagination
@@ -68,12 +68,12 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
      * @param offset pagination offset for the claim ids
      * @param limit pagination limit for the claim ids
      * @return ids list of claim ids for the given deal
-     * @return total total number of claims for the given deal
+     * @return sumOfClaims total number of claims for the given deal
      */
     function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
         external
         view
-        returns (CommonTypes.FilActorId[] memory ids, uint256 total);
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims);
 
     /**
      * @notice custom getter to check if claim is terminated

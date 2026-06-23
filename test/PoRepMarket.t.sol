@@ -110,7 +110,9 @@ contract PoRepMarketTest is Test {
             dealId: _dealId,
             railId: railId,
             sizeOfAllocations: _allocationSize,
-            allocationIds: new CommonTypes.FilActorId[](0)
+            allocationIds: new CommonTypes.FilActorId[](0),
+            claimIds: new CommonTypes.FilActorId[](0),
+            claimedBytes: 0
         });
     }
 
