@@ -1538,4 +1538,45 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.ClaimIdsMismatch.selector, 2, 1));
         dataCapEvidenceAdapterMock.getClaimIds(dealId, 0, type(uint256).max);
     }
+
+    function testIsOperationalReturnsTrueByDefault() public view {
+        assertTrue(dataCapEvidenceAdapter.isOperational());
+    }
+
+    function testDisableAdapterMarksAdapterNotOperational() public {
+        dataCapEvidenceAdapter.disableAdapter();
+        assertFalse(dataCapEvidenceAdapter.isOperational());
+    }
+
+    function testDisableAdapterEmitsAdapterDisabled() public {
+        vm.expectEmit(true, false, false, true);
+        emit DataCapEvidenceAdapter.AdapterDisabled(address(this), block.number);
+        dataCapEvidenceAdapter.disableAdapter();
+    }
+
+    function testDisableAdapterRevertsWhenAlreadyDisabled() public {
+        dataCapEvidenceAdapter.disableAdapter();
+
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.AdapterAlreadyDisabled.selector));
+        dataCapEvidenceAdapter.disableAdapter();
+    }
+
+    function testDisableAdapterRevertsWhenCallerIsNotAdmin() public {
+        address unauthorized = vm.addr(0x524);
+        bytes32 adminRole = dataCapEvidenceAdapter.DEFAULT_ADMIN_ROLE();
+
+        vm.prank(unauthorized);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, adminRole)
+        );
+        dataCapEvidenceAdapter.disableAdapter();
+    }
+
+    function testSubmitDataCapBatchRevertsWhenAdapterDisabled() public {
+        dataCapEvidenceAdapter.disableAdapter();
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.AdapterNotOperational.selector));
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+    }
 }

@@ -42,6 +42,7 @@ contract DataCapEvidenceAdapter is
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
+        bool _disabled;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DataCapEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -110,6 +111,14 @@ contract DataCapEvidenceAdapter is
      * @param totalSize The total rescued allocation size.
      */
     event DealAllocationsRescued(uint256 indexed dealId, address indexed rescuer, uint256 totalSize);
+
+    /**
+     * @notice Emitted when the adapter is permanently disabled
+     * @param account The account that disabled the adapter
+     * @param disabledAtBlock The block number at which the adapter was disabled
+     */
+    event AdapterDisabled(address indexed account, uint256 disabledAtBlock);
+
     // solhint-enable gas-indexed-events
 
     /**
@@ -252,6 +261,18 @@ contract DataCapEvidenceAdapter is
      */
     error ClaimIdsMismatch(uint256 claimsLength, uint256 claimIdsLength);
 
+    /**
+     * @notice Error thrown when the adapter has already been disabled
+     * @dev 0x4503801a
+     */
+    error AdapterAlreadyDisabled();
+
+    /**
+     * @notice Error thrown when the adapter is disabled and can no longer process new evidence
+     * @dev 0x55637dd8
+     */
+    error AdapterNotOperational();
+
     struct Deal {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
@@ -346,6 +367,10 @@ contract DataCapEvidenceAdapter is
     function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external nonReentrant {
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
+
+        if ($._disabled) {
+            revert AdapterNotOperational();
+        }
 
         if (dealSnapshot.state != PoRepTypes.DealState.Accepted) {
             revert InvalidDealStateForTransfer();
@@ -445,6 +470,16 @@ contract DataCapEvidenceAdapter is
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
         });
+    }
+
+    /**
+     * @notice Returns whether the adapter can still process new evidence
+     * @dev Returns false when the adapter is no longer operational, for example
+     * when the DataCap adapter can no longer accept allocations or claims
+     * @return True if the adapter can process new evidence, false if it is no longer operational
+     */
+    function isOperational() external view returns (bool) {
+        return !s()._disabled;
     }
 
     // solhint-disable function-max-lines
@@ -984,5 +1019,18 @@ contract DataCapEvidenceAdapter is
      */
     function evidenceType() external pure returns (uint8) {
         return EvidenceTypes.VERIF_REG_CLAIMS;
+    }
+
+    /**
+     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already disabled.
+     * @dev Only callable by the admin
+     */
+    function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        DataCapEvidenceAdapterStorage storage $ = s();
+        if ($._disabled) {
+            revert AdapterAlreadyDisabled();
+        }
+        $._disabled = true;
+        emit AdapterDisabled(msg.sender, block.number);
     }
 }
