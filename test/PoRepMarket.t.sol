@@ -286,6 +286,19 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealStoresV2SelectionSnapshot() public {
+        uint256 reservedBytes = totalDealSize - 32;
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH + 10,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: reservedBytes
+            })
+        );
+
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
@@ -294,7 +307,7 @@ contract PoRepMarketTest is Test {
         assertEq(deal.offerId, selectedOfferId);
 
         PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
-        assertEq(capacity.reservedBytes, totalDealSize);
+        assertEq(capacity.reservedBytes, reservedBytes);
         assertEq(capacity.committedBytes, 0);
 
         PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
@@ -1379,8 +1392,13 @@ contract PoRepMarketTest is Test {
     }
 
     function testTerminateDealReleasesCommittedCapacityWithManifestHash() public {
+        uint256 allocatedSize = totalDealSize - 64;
+
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.prank(adminAddress);
+        poRepMarket.setDealCompletionPadding(1);
 
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
@@ -1388,7 +1406,7 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
-        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, totalDealSize));
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, allocatedSize));
         vm.prank(clientAddress);
         poRepMarket.completeDeal(dealId);
 
@@ -1396,7 +1414,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.terminateDeal(dealId, validatorAddress, block.number);
 
         assertEq(spRegistry.lastReleasedCapacityProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
-        assertEq(spRegistry.lastReleasedCapacityBytes(), totalDealSize);
+        assertEq(spRegistry.lastReleasedCapacityBytes(), allocatedSize);
         assertEq(spRegistry.lastReleasedCapacityManifestHash(), defaultManifestHash);
     }
 
