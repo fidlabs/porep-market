@@ -411,9 +411,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @notice Creates a payment rail with the specified parameters and set initial lockup period
      * @dev Only callable by the client
      * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
-     * @param token The ERC20 token to use for the payment rail
      */
-    function createRail(IERC20 token) external override {
+    function createRail(IERC20) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         PoRepTypes.Deal memory deal = IPoRepMarket($.poRepMarket).getDeal($.dealId);
         PoRepTypes.DealPayment memory payment = IPoRepMarket($.poRepMarket).getDealPayment($.dealId);
