@@ -8,6 +8,7 @@ import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {DealState} from "../src/types/DealState.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
@@ -77,7 +78,7 @@ contract ValidatorTest is Test {
                 client: admin,
                 provider: providerFilActorId,
                 offerId: 0,
-                state: PoRepTypes.DealState.Proposed,
+                state: DealState.PROPOSED,
                 evidenceAdapter: dataCapEvidenceAdapter,
                 validator: address(0),
                 railId: railId
@@ -438,9 +439,10 @@ contract ValidatorTest is Test {
         validator.updateLockupPeriod(newLockupPeriod);
     }
 
-    function testRailTerminatedEmitsRailTerminated() public {
+    function testRailTerminatedEmitsRailTerminatedWithoutChangingRailStatus() public {
         address terminator = address(0xBEEF);
         uint256 endEpoch = 777;
+        uint8 statusBefore = validator.getRailStatus();
 
         vm.expectEmit(true, true, false, true, address(validator));
         emit Validator.RailTerminated(railId, terminator, endEpoch);
@@ -448,7 +450,7 @@ contract ValidatorTest is Test {
         vm.prank(address(filecoinPayMock));
         validator.railTerminated(railId, terminator, endEpoch);
 
-        assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
+        assertEq(validator.getRailStatus(), statusBefore);
     }
 
     function testCreateRailRevertsWhenRailAlreadyCreated() public {
@@ -457,32 +459,52 @@ contract ValidatorTest is Test {
         validator.createRail(token);
     }
 
-    function testTerminateRailTerminatesFilecoinPayRailAsAnAdmin() public {
+    function testFinalizeDealTerminatesFilecoinPayRailAsAnAdmin() public {
         assertFalse(filecoinPayMock.terminated(railId));
+        vm.roll(100);
+        activateServiceUntil(100);
+        vm.roll(101);
+
+        vm.expectEmit(true, true, false, true, address(validator));
+        emit Validator.DealFinalized(dealId, railId);
         vm.prank(admin);
-        validator.terminateRail();
+        validator.finalizeDeal();
         assertTrue(filecoinPayMock.terminated(railId));
         assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
+        assertEq(poRepMarketMock.finalizeDealCallCount(), 1);
     }
 
-    function testTerminateRailTerminatesFilecoinPayRailAsPoRepService() public {
+    function testFinalizeDealTerminatesFilecoinPayRailAsPoRepService() public {
         assertFalse(filecoinPayMock.terminated(railId));
+        vm.roll(100);
+        activateServiceUntil(100);
+        vm.roll(101);
         vm.prank(porepService);
-        validator.terminateRail();
+        validator.finalizeDeal();
         assertTrue(filecoinPayMock.terminated(railId));
         assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
 
-    function testTerminateRailRevertsWhenCallerHasPoRepServiceRole() public {
-        vm.expectRevert(Validator.UnauthorizedCaller.selector);
-        vm.prank(address(123));
-        validator.terminateRail();
+    function testFinalizeDealRevertsBeforeServiceEnds() public {
+        vm.roll(100);
+        uint256 serviceEndEpoch = 101;
+        activateServiceUntil(101);
+
+        vm.expectRevert(abi.encodeWithSelector(Validator.ServiceNotEnded.selector, serviceEndEpoch, block.number));
+        vm.prank(porepService);
+        validator.finalizeDeal();
     }
 
-    function testTerminateRailRevertsWhenCallerHasAdminRole() public {
+    function testFinalizeDealRevertsWhenCallerIsNotPoRepServiceOrAdmin() public {
         vm.expectRevert(Validator.UnauthorizedCaller.selector);
         vm.prank(address(123));
-        validator.terminateRail();
+        validator.finalizeDeal();
+    }
+
+    function testFinalizeDealRevertsWhenCallerLacksAdminRole() public {
+        vm.expectRevert(Validator.UnauthorizedCaller.selector);
+        vm.prank(address(123));
+        validator.finalizeDeal();
     }
 
     function testValidatePaymentReturnsServiceEndedWhenFromEpochPastServiceEndEpoch() public {
@@ -610,8 +632,8 @@ contract ValidatorTest is Test {
         validator.modifyRailPayment(1);
     }
 
-    function testValidatePaymentRevertsWhenDealNotCompleted() public {
-        vm.expectRevert(abi.encodeWithSelector(Validator.DealNotCompleted.selector, dealId));
+    function testValidatePaymentRevertsWhenDealPaymentNotActivated() public {
+        vm.expectRevert(abi.encodeWithSelector(Validator.DealPaymentNotActivated.selector, dealId));
         vm.prank(address(filecoinPayMock));
         validator.validatePayment(railId, 100, 0, 86_400, 1);
     }
@@ -646,12 +668,12 @@ contract ValidatorTest is Test {
         assertEq(newValidator.getRailStatus(), RailStatus.PREPARED);
     }
 
-    function testDisableFutureRailPaymentsEmitsRailDisabled() public {
+    function testEarlyRailTerminationEmitsEarlyRailTerminated() public {
         vm.expectEmit(true, false, false, true, address(validator));
-        emit Validator.RailDisabled(railId);
+        emit Validator.EarlyRailTerminated(railId);
 
         vm.prank(porepService);
-        validator.disableFutureRailPayments();
+        validator.earlyRailTermination();
 
         assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
@@ -669,7 +691,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.prank(porepService);
-        validator.disableFutureRailPayments();
+        validator.earlyRailTermination();
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result =
@@ -693,7 +715,7 @@ contract ValidatorTest is Test {
         sliOracle.setSLI(dealId, defaultRequirements);
 
         vm.prank(porepService);
-        validator.disableFutureRailPayments();
+        validator.earlyRailTermination();
 
         vm.prank(address(filecoinPayMock));
         IFilecoinPayValidator.ValidationResult memory result =

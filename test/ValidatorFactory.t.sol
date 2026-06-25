@@ -14,6 +14,7 @@ import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {DealState} from "../src/types/DealState.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
@@ -53,7 +54,7 @@ contract ValidatorFactoryTest is Test {
                 client: client,
                 provider: provider,
                 offerId: 0,
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 evidenceAdapter: dataCapEvidenceAdapter,
                 validator: vm.addr(10),
                 railId: 200

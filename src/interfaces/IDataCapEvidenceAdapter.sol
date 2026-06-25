@@ -21,7 +21,7 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external;
 
     /**
-     * @notice Replaces all broken tracked allocations for a completed existing deal.
+     * @notice Replaces all broken tracked allocations for an active existing deal.
      * @dev Only callable by RESCUE_ROLE.
      * @param dealId The id of the deal to rescue.
      * @param params The DataCap transfer parameters that create replacement allocations.

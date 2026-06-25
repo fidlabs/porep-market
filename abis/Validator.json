@@ -45,7 +45,14 @@
   },
   {
     "type": "function",
-    "name": "disableFutureRailPayments",
+    "name": "earlyRailTermination",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "finalizeDeal",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
@@ -291,13 +298,6 @@
   },
   {
     "type": "function",
-    "name": "terminateRail",
-    "inputs": [],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "updateLockupPeriod",
     "inputs": [
       {
@@ -367,6 +367,38 @@
   },
   {
     "type": "event",
+    "name": "DealFinalized",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "EarlyRailTerminated",
+    "inputs": [
+      {
+        "name": "railId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "Initialized",
     "inputs": [
       {
@@ -411,19 +443,6 @@
         "name": "minTimeBetweenSettlementsInEpochs",
         "type": "uint256",
         "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "RailDisabled",
-    "inputs": [
-      {
-        "name": "railId",
-        "type": "uint256",
-        "indexed": true,
         "internalType": "uint256"
       }
     ],
@@ -591,7 +610,7 @@
   },
   {
     "type": "error",
-    "name": "DealNotCompleted",
+    "name": "DealPaymentNotActivated",
     "inputs": [
       {
         "name": "dealId",
@@ -705,6 +724,22 @@
     "type": "error",
     "name": "RailAlreadyCreated",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ServiceNotEnded",
+    "inputs": [
+      {
+        "name": "serviceEndEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
   },
   {
     "type": "error",

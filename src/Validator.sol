@@ -142,11 +142,11 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidZeroAmount();
 
     /**
-     * @notice Error indicating that the deal associated with this validator has not been completed yet
-     * @param dealId The ID of the deal that is not completed
+     * @notice Error indicating that the deal payment/service window has not been activated yet
+     * @param dealId The ID of the deal whose payment/service window is not active
      * @dev 0xe03f8b0e
      */
-    error DealNotCompleted(uint256 dealId);
+    error DealPaymentNotActivated(uint256 dealId);
 
     /**
      * @notice Error indicating that an invalid rail ID was provided
@@ -168,6 +168,13 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @dev 0xb0c81e57
      */
     error MinEpochsBetweenSettlementsExceeded();
+
+    /**
+     * @notice Error indicating that a deal is not ready to be finished
+     * @param serviceEndEpoch The epoch at which the deal service ends
+     * @param currentEpoch The current block epoch
+     */
+    error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
 
     // solhint-disable gas-indexed-events
     /**
@@ -193,10 +200,17 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     event RailPaymentModified(uint256 indexed railId, uint256 newRate);
 
     /**
-     * @notice Event emitted when a rail is disabled for future payments
-     * @param railId The ID of the rail that has been disabled
+     * @notice Event emitted when a rail is terminated early
+     * @param railId The ID of the rail that was terminated early
      */
-    event RailDisabled(uint256 indexed railId);
+    event EarlyRailTerminated(uint256 indexed railId);
+
+    /**
+     * @notice Event emitted when a deal and its payment rail are finished
+     * @param dealId The ID of the finalized deal
+     * @param railId The ID of the finished rail
+     */
+    event DealFinalized(uint256 indexed dealId, uint256 indexed railId);
 
     /**
      * @notice Event emitted when the minimum time between settlements is updated
@@ -340,7 +354,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 serviceEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch)));
 
         if (serviceEndEpoch == 0) {
-            revert DealNotCompleted($.dealId);
+            revert DealPaymentNotActivated($.dealId);
         }
 
         if ($.earlyTerminatedEpoch != 0 && $.earlyTerminatedEpoch < serviceEndEpoch) {
@@ -457,16 +471,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Disables future payments for a payment rail by terminating the rail
+     * @notice Terminates a payment rail early and terminates its deal
      * @dev Only callable by POREP_SERVICE bot
-     * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
      */
-    function disableFutureRailPayments() external override onlyRole(POREP_SERVICE_ROLE) {
+    function earlyRailTermination() external override onlyRole(POREP_SERVICE_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
-        $.earlyTerminatedEpoch = block.number;
-        $.railStatus = RailStatus.TERMINATED;
+        _terminateDeal();
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
-        emit RailDisabled($.railId);
+        emit EarlyRailTerminated($.railId);
     }
 
     /**
@@ -481,15 +493,35 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
+     * @notice Terminates the deal and its payment rail.
      */
-    function terminateRail() external override {
+    function finalizeDeal() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert UnauthorizedCaller();
         }
+
+        PoRepTypes.DealService memory service = IPoRepMarket($.poRepMarket).getDealService($.dealId);
+        uint256 serviceEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch)));
+        bool serviceEnded = serviceEndEpoch < block.number;
+        if (!serviceEnded) {
+            revert ServiceNotEnded(serviceEndEpoch, block.number);
+        }
+
         $.railStatus = RailStatus.TERMINATED;
+        IPoRepMarket($.poRepMarket).finalizeDeal($.dealId);
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
+        emit DealFinalized($.dealId, $.railId);
+    }
+
+    /**
+     * @notice Terminates the deal in PoRep Market and records the early termination epoch.
+     */
+    function _terminateDeal() internal {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        $.earlyTerminatedEpoch = block.number;
+        $.railStatus = RailStatus.TERMINATED;
+        IPoRepMarket($.poRepMarket).terminateDeal($.dealId, block.number);
     }
 
     /**
@@ -509,8 +541,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
             revert CallerIsNotFilecoinPay();
         }
 
-        $.railStatus = RailStatus.TERMINATED;
-        IPoRepMarket($.poRepMarket).terminateDeal($.dealId, terminator, endEpoch);
         emit RailTerminated(railId, terminator, endEpoch);
     }
 

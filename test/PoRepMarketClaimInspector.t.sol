@@ -13,6 +13,7 @@ import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {DealState} from "../src/types/DealState.sol";
 
 contract PoRepMarketClaimInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
@@ -60,7 +61,7 @@ contract PoRepMarketClaimInspectorTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
@@ -201,7 +202,7 @@ contract PoRepMarketClaimInspectorTest is Test {
                 provider: customProvider,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })
@@ -224,7 +225,7 @@ contract PoRepMarketClaimInspectorTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock)
             })

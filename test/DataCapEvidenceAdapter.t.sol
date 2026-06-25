@@ -27,6 +27,7 @@ import {DataCapEvidenceAdapterContractMock} from "./contracts/DataCapEvidenceAda
 import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {DealState} from "../src/types/DealState.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
@@ -128,7 +129,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
@@ -160,7 +161,7 @@ contract DataCapEvidenceAdapterTest is Test {
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
-        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+        poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
     }
 
     function _registerDealWithTwoAllocations(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
@@ -172,7 +173,7 @@ contract DataCapEvidenceAdapterTest is Test {
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
-        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+        poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
     }
 
     function _grantRescueRole(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock, address account) internal {
@@ -344,14 +345,13 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
     }
 
-    function testRescueDealAllocationsRejectsNonCompletedMarketDeal() public {
+    function testRescueDealAllocationsRejectsNonActiveMarketDeal() public {
         DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
 
-        PoRepTypes.DealState[3] memory states =
-            [PoRepTypes.DealState.Accepted, PoRepTypes.DealState.Rejected, PoRepTypes.DealState.Terminated];
+        uint8[3] memory states = [DealState.ACCEPTED, DealState.REJECTED, DealState.TERMINATED];
         for (uint256 i = 0; i < states.length; ++i) {
             poRepMarketMock.setDealState(dealId, states[i]);
             vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealStateForTransfer.selector));
@@ -363,7 +363,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+        poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
 
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealStateForTransfer.selector));
         dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
@@ -589,7 +589,7 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(secondProvider, CommonTypes.FilActorId.unwrap(SP1));
         assertEq(firstData, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
         assertEq(secondData, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
-        assertEq(poRepMarketMock.completeDealCallCount(), 0);
+        assertEq(poRepMarketMock.finalizeDealCallCount(), 0);
     }
 
     function testAuthorizeUpgradeRevert() public {
@@ -784,7 +784,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Completed,
+                state: DealState.ACTIVE,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
@@ -913,7 +913,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 provider: SP2,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
@@ -951,7 +951,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 client: clientAddress,
                 provider: SP1,
                 offerId: 0,
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 validator: address(validatorMock),
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
@@ -985,7 +985,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
@@ -1242,7 +1242,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(0),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })
@@ -1355,9 +1355,9 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 
-    function testTransferRevertsWhenDealAlreadyCompleted() public {
+    function testTransferRevertsWhenDealAlreadyActive() public {
         vm.startPrank(clientAddress);
-        poRepMarketMock.setDealState(dealId, PoRepTypes.DealState.Completed);
+        poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
 
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealStateForTransfer.selector));
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
@@ -1376,7 +1376,7 @@ contract DataCapEvidenceAdapterTest is Test {
                 provider: SP1,
                 offerId: 0,
                 validator: address(validatorMock),
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 railId: 0,
                 evidenceAdapter: address(dataCapEvidenceAdapter)
             })

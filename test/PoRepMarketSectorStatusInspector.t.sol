@@ -13,6 +13,7 @@ import {MockProxy} from "./contracts/MockProxy.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
+import {DealState} from "../src/types/DealState.sol";
 
 contract PoRepMarketSectorStatusInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
@@ -53,7 +54,7 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
                 client: clientAddress,
                 provider: providerFilActorId,
                 offerId: 0,
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 evidenceAdapter: address(0),
                 validator: address(validatorMock),
                 railId: 1
@@ -113,7 +114,7 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
                 client: clientAddress,
                 provider: CommonTypes.FilActorId.wrap(customMinerId),
                 offerId: 0,
-                state: PoRepTypes.DealState.Accepted,
+                state: DealState.ACCEPTED,
                 evidenceAdapter: address(0),
                 validator: address(validatorMock),
                 railId: 1
