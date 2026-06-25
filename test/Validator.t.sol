@@ -9,7 +9,6 @@ import {SLIScorer} from "../src/SLIScorer.sol";
 import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 

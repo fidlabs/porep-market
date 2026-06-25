@@ -874,7 +874,7 @@
   },
   {
     "type": "event",
-    "name": "AdapterDisabled",
+    "name": "AdapterNonOperational",
     "inputs": [
       {
         "name": "account",
@@ -883,7 +883,7 @@
         "internalType": "address"
       },
       {
-        "name": "disabledAtBlock",
+        "name": "setAtBlock",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1064,7 +1064,7 @@
   },
   {
     "type": "error",
-    "name": "AdapterAlreadyDisabled",
+    "name": "AdapterAlreadyNonOperational",
     "inputs": []
   },
   {

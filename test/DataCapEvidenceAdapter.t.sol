@@ -1548,16 +1548,16 @@ contract DataCapEvidenceAdapterTest is Test {
         assertFalse(dataCapEvidenceAdapter.isOperational());
     }
 
-    function testDisableAdapterEmitsAdapterDisabled() public {
+    function testDisableAdapterEmitsAdapterNonOperational() public {
         vm.expectEmit(true, false, false, true);
-        emit DataCapEvidenceAdapter.AdapterDisabled(address(this), block.number);
+        emit DataCapEvidenceAdapter.AdapterNonOperational(address(this), block.number);
         dataCapEvidenceAdapter.disableAdapter();
     }
 
-    function testDisableAdapterRevertsWhenAlreadyDisabled() public {
+    function testDisableAdapterRevertsWhenAlreadyNonOperational() public {
         dataCapEvidenceAdapter.disableAdapter();
 
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.AdapterAlreadyDisabled.selector));
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.AdapterAlreadyNonOperational.selector));
         dataCapEvidenceAdapter.disableAdapter();
     }
 
@@ -1572,7 +1572,7 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapter.disableAdapter();
     }
 
-    function testSubmitDataCapBatchRevertsWhenAdapterDisabled() public {
+    function testSubmitDataCapBatchRevertsWhenAdapterNonOperational() public {
         dataCapEvidenceAdapter.disableAdapter();
 
         vm.prank(clientAddress);

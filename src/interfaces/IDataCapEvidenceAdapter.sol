@@ -111,7 +111,7 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     function getPoRepMarketAddress() external view returns (address);
 
     /**
-     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already disabled.
+     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already non-operational
      * @dev Only callable by the admin
      */
     function disableAdapter() external;
