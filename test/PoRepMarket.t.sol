@@ -124,7 +124,8 @@ contract PoRepMarketTest is Test {
             allocatedBytes: _allocationSize,
             allocationIds: new CommonTypes.FilActorId[](0),
             claimIds: new CommonTypes.FilActorId[](0),
-            claimedBytes: 0
+            claimedBytes: 0,
+            activeClaimedBytes: 0
         });
     }
 

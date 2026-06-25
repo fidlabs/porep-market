@@ -285,6 +285,7 @@ contract DataCapEvidenceAdapter is
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
         uint256 claimedBytes;
+        uint256 activeClaimedBytes;
     }
 
     struct ProviderAllocation {
@@ -472,7 +473,7 @@ contract DataCapEvidenceAdapter is
 
         uint8 evidenceResult;
         if (result.claims.length == 0) {
-            evidenceResult = EvidenceResult.REJECTED;
+            evidenceResult = EvidenceResult.NONE;
         } else if (result.batch_info.fail_codes.length == 0) {
             evidenceResult = EvidenceResult.ACCEPTED;
         } else {
@@ -483,10 +484,10 @@ contract DataCapEvidenceAdapter is
     }
 
     // solhint-disable no-unused-vars
-    /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
      * @notice Return the adapter's activation decision after submitted evidence
      * covers enough bytes for the frozen deal
+     * @dev Only callable by the PoRepMarket contract
      * @dev This function does not set payment terms; PoRepMarket consumes the
      * returned covered bytes and derives committed bytes, billed units, service
      * start/end, rail ceiling, and deal state
@@ -496,12 +497,26 @@ contract DataCapEvidenceAdapter is
      */
     function activateEvidence(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        pure
+        onlyPoRepMarket
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        context;
+        /// NOTE: compiler's warning silenced for unused variable; evidenceData gonna be used potentially in the future
         evidenceData;
-        return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
+
+        Deal storage deal = _getStorageDeal(context.dealId);
+        uint256 threshold = context.requestedSizeBytes * context.activationToleranceBps / 10_000;
+
+        if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
+            return SharedTypes.ActivationDecision({
+                coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.REJECTED
+            });
+        }
+
+        deal.activeClaimedBytes = deal.claimedBytes;
+
+        return SharedTypes.ActivationDecision({
+            coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
+        });
     }
 
     /**
