@@ -464,6 +464,66 @@ contract ValidatorTest is Test {
         validator.createRail(token);
     }
 
+    function testCreateRailUsesFrozenDealPaymentTokenAndPayee() public {
+        FilecoinPayV1Mock freshFilecoinPay = new FilecoinPayV1Mock();
+        PoRepMarketMock freshMarket = new PoRepMarketMock();
+        SPRegistryMock freshRegistry = new SPRegistryMock();
+        Validator impl = new Validator();
+        Validator freshValidator = Validator(address(new ERC1967Proxy(address(impl), "")));
+
+        IERC20 callerToken = IERC20(vm.addr(0xCA11));
+        IERC20 frozenToken = IERC20(vm.addr(0xF007));
+        address frozenPayee = vm.addr(0xBEEF);
+        address livePayee = vm.addr(0xBAD);
+
+        freshMarket.setDeal(
+            dealId,
+            PoRepTypes.Deal({
+                dealId: dealId,
+                client: admin,
+                provider: providerFilActorId,
+                offerId: 123,
+                state: DealState.PROPOSED,
+                evidenceAdapter: dataCapEvidenceAdapter,
+                validator: address(0),
+                railId: 0
+            })
+        );
+        freshMarket.setDealSLIs(dealId, defaultRequirements);
+        freshMarket.setDealPayment(
+            dealId,
+            PoRepTypes.DealPayment({
+                paymentToken: address(frozenToken),
+                payee: frozenPayee,
+                pricePer32GiBPerMonth: 100,
+                billed32GiBUnits: 0,
+                railMaxRatePerEpoch: 0
+            })
+        );
+        freshRegistry.setPayee(providerFilActorId, livePayee);
+        freshFilecoinPay.setOperatorApproval(
+            frozenToken, admin, address(freshValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
+        );
+
+        freshValidator.initialize(
+            admin,
+            porepService,
+            address(freshFilecoinPay),
+            address(sliScorer),
+            dataCapEvidenceAdapter,
+            address(freshMarket),
+            address(freshRegistry),
+            dealId
+        );
+
+        vm.prank(admin);
+        freshValidator.createRail(callerToken);
+
+        (IERC20 railToken,, address railPayee,,,,,) = freshFilecoinPay.rails(1);
+        assertEq(address(railToken), address(frozenToken));
+        assertEq(railPayee, frozenPayee);
+    }
+
     function testFinalizeDealTerminatesFilecoinPayRailAsAnAdmin() public {
         assertFalse(filecoinPayMock.terminated(railId));
         vm.roll(100);

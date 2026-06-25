@@ -416,6 +416,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     function createRail(IERC20 token) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         PoRepTypes.Deal memory deal = IPoRepMarket($.poRepMarket).getDeal($.dealId);
+        PoRepTypes.DealPayment memory payment = IPoRepMarket($.poRepMarket).getDealPayment($.dealId);
+        IERC20 railToken = IERC20(payment.paymentToken);
 
         if (msg.sender != deal.client) {
             revert CallerIsNotClient();
@@ -426,7 +428,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
 
         (bool isApproved, uint256 rateAllowance, uint256 lockupAllowance,,, uint256 maxLockupPeriod) =
-            IFilecoinPayV1($.filecoinPay).operatorApprovals(token, deal.client, address(this));
+            IFilecoinPayV1($.filecoinPay).operatorApprovals(railToken, deal.client, address(this));
 
         if (!isApproved) {
             revert OperatorNotApproved();
@@ -444,9 +446,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
             revert InvalidRateAllowance();
         }
 
-        address payee = ISPRegistry($.SPRegistry).getPayee($.providerId);
-
-        uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, deal.client, payee, 0, address(0));
+        uint256 railId =
+            _createRail(IFilecoinPayV1($.filecoinPay), railToken, deal.client, payment.payee, 0, address(0));
         $.railStatus = RailStatus.PREPARED;
         $.railId = railId;
 
