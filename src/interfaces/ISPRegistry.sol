@@ -332,18 +332,45 @@ interface ISPRegistry {
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
-     * @notice Releases committed provider capacity.
+     * @notice Checks whether a provider is already assigned to a manifest.
+     * @param manifestHash Manifest hash used as data identity.
+     * @param provider Provider actor ID.
+     * @return True when provider is locked for the manifest.
+     */
+    function isManifestAssignedToProvider(bytes32 manifestHash, CommonTypes.FilActorId provider)
+        external
+        view
+        returns (bool);
+
+    /**
+     * @notice Legacy compatibility overload that releases committed provider capacity without clearing a manifest/provider assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Capacity to release.
      */
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
 
     /**
-     * @notice Releases pending provider capacity.
+     * @notice Releases committed provider capacity and clears the manifest/provider assignment.
+     * @param provider Provider actor ID.
+     * @param sizeBytes Capacity to release.
+     * @param manifestHash Manifest hash whose provider assignment should be cleared.
+     */
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
+
+    /**
+     * @notice Legacy compatibility overload that releases pending provider capacity without clearing a manifest/provider assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Pending capacity to release.
      */
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
+
+    /**
+     * @notice Releases pending provider capacity and clears the manifest/provider assignment.
+     * @param provider Provider actor ID.
+     * @param sizeBytes Pending capacity to release.
+     * @param manifestHash Manifest hash whose provider assignment should be cleared.
+     */
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
 
     /**
      * @notice Converts pending capacity into committed capacity.

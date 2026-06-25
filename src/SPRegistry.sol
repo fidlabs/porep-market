@@ -91,6 +91,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
         mapping(uint256 => mapping(address => RegistryOfferPayment)) _offerPayments;
         mapping(uint256 => EnumerableSet.AddressSet) _offerPaymentTokens;
+        mapping(bytes32 manifestHash => mapping(uint64 provider => bool)) _manifestAssignedToProvider;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SPRegistryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -786,6 +787,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
+    function isManifestAssignedToProvider(bytes32 manifestHash, CommonTypes.FilActorId provider)
+        external
+        view
+        returns (bool)
+    {
+        return _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)];
+    }
+
+    /// @inheritdoc ISPRegistry
     function reserveProviderForDeal(SharedTypes.DealRequest calldata request)
         external
         onlyRole(MARKET_ROLE)
@@ -794,6 +804,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         selection = _selectProviderForDeal(request);
         if (CommonTypes.FilActorId.unwrap(selection.provider) == 0) revert NoOfferMatched();
         _reservePending(selection.provider, selection.reservedBytes);
+        _getSPRegistryStorage()._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(
+            selection.provider
+        )] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -822,6 +835,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         (selection, reason) = _evaluateOffer(offerId, request);
         if (reason != OfferMatch.OK) revert OfferNotEligible(offerId, reason);
         _reservePending(selection.provider, selection.reservedBytes);
+        _getSPRegistryStorage()._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(
+            selection.provider
+        )] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -833,24 +849,28 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
-        _ensureProviderRegistered(provider);
+        _releaseCapacity(provider, sizeBytes, bytes32(0), false);
+    }
 
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
-        if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
-        c.committedBytes -= sizeBytes;
-
-        emit CapacityReleased(provider, sizeBytes);
+    /// @inheritdoc ISPRegistry
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+        external
+        onlyRole(MARKET_ROLE)
+    {
+        _releaseCapacity(provider, sizeBytes, manifestHash, true);
     }
 
     /// @inheritdoc ISPRegistry
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
-        _ensureProviderRegistered(provider);
+        _releasePendingCapacity(provider, sizeBytes, bytes32(0), false);
+    }
 
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
-        if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
-        c.pendingBytes -= sizeBytes;
-
-        emit PendingCapacityReleased(provider, sizeBytes);
+    /// @inheritdoc ISPRegistry
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+        external
+        onlyRole(MARKET_ROLE)
+    {
+        _releasePendingCapacity(provider, sizeBytes, manifestHash, true);
     }
 
     /// @inheritdoc ISPRegistry
@@ -1028,6 +1048,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         Provider storage providerInfo = $._providers[CommonTypes.FilActorId.unwrap(offer.provider)];
         if (providerInfo.blocked) return (selection, OfferMatch.PROVIDER_BLOCKED);
         if (providerInfo.paused) return (selection, OfferMatch.PROVIDER_PAUSED);
+        if ($._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(offer.provider)]) {
+            return (selection, OfferMatch.INSUFFICIENT_CAPACITY);
+        }
 
         SharedTypes.OfferTerms storage terms = $._offerTerms[offerId];
         if (
@@ -1092,6 +1115,41 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function _reservePending(CommonTypes.FilActorId provider, uint256 sizeBytes) internal {
         _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)].pendingBytes += sizeBytes;
         emit PendingCapacityReserved(provider, sizeBytes);
+    }
+
+    function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash, bool clearLock)
+        internal
+    {
+        _ensureProviderRegistered(provider);
+
+        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
+        c.committedBytes -= sizeBytes;
+        if (clearLock) {
+            _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
+                false;
+        }
+
+        emit CapacityReleased(provider, sizeBytes);
+    }
+
+    function _releasePendingCapacity(
+        CommonTypes.FilActorId provider,
+        uint256 sizeBytes,
+        bytes32 manifestHash,
+        bool clearLock
+    ) internal {
+        _ensureProviderRegistered(provider);
+
+        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
+        c.pendingBytes -= sizeBytes;
+        if (clearLock) {
+            _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
+                false;
+        }
+
+        emit PendingCapacityReleased(provider, sizeBytes);
     }
 
     function _remainingCapacity(CommonTypes.FilActorId provider) internal view returns (uint256) {

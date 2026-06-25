@@ -22,6 +22,10 @@ contract SPRegistryMock is ISPRegistry {
     mapping(uint64 => address) private _payees;
     uint64 public lastReleasedPendingProvider;
     uint256 public lastReleasedPendingBytes;
+    bytes32 public lastReleasedPendingManifestHash;
+    uint64 public lastReleasedProvider;
+    uint256 public lastReleasedBytes;
+    bytes32 public lastReleasedManifestHash;
 
     function setNextSelection(SharedTypes.ProviderDealSelection calldata selection) external {
         nextSelection = selection;
@@ -187,12 +191,34 @@ contract SPRegistryMock is ISPRegistry {
         return new uint256[](0);
     }
 
-    function releaseCapacity(CommonTypes.FilActorId, uint256) external {}
+    function isManifestAssignedToProvider(bytes32, CommonTypes.FilActorId) external pure returns (bool) {
+        return false;
+    }
+
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external {
+        lastReleasedProvider = CommonTypes.FilActorId.unwrap(provider);
+        lastReleasedBytes = sizeBytes;
+    }
+
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external {
+        lastReleasedProvider = CommonTypes.FilActorId.unwrap(provider);
+        lastReleasedBytes = sizeBytes;
+        lastReleasedManifestHash = manifestHash;
+    }
 
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external {
         lastReleasedPendingProvider = CommonTypes.FilActorId.unwrap(provider);
         lastReleasedPendingBytes = sizeBytes;
     }
+
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+        external
+    {
+        lastReleasedPendingProvider = CommonTypes.FilActorId.unwrap(provider);
+        lastReleasedPendingBytes = sizeBytes;
+        lastReleasedPendingManifestHash = manifestHash;
+    }
+
     function commitCapacity(CommonTypes.FilActorId, uint256, uint256) external {}
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}

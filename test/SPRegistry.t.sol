@@ -116,6 +116,23 @@ contract SPRegistryTest is Test {
         request.paymentToken = paymentToken;
     }
 
+    function _requestWithManifest(bytes32 manifestHash, uint256 maxPrice)
+        internal
+        view
+        returns (SharedTypes.DealRequest memory request)
+    {
+        request = _request(maxPrice);
+        request.manifestHash = manifestHash;
+    }
+
+    function _setupTwoProviderAutoMatch() internal returns (uint256 provider1Offer, uint256 provider2Offer) {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
+        provider1Offer = _createOffer(provider1, "p1", 90_000);
+        provider2Offer = _createOffer(provider2, "p2", 90_000);
+    }
+
     function _requestWithSLIs(SharedTypes.SLIThresholds memory slis)
         internal
         view
@@ -282,10 +299,75 @@ contract SPRegistryTest is Test {
 
         // Load the cheap provider; the idle provider2 is priced outside the 1% band and must be excluded.
         vm.prank(market);
-        spRegistry.reserveOfferForDeal(cheapOffer, _request(100_000));
+        spRegistry.reserveOfferForDeal(cheapOffer, _requestWithManifest(keccak256("manifest-a"), 100_000));
 
-        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(_request(100_000));
+        SharedTypes.ProviderDealSelection memory preview =
+            spRegistry.previewProviderForDeal(_requestWithManifest(keccak256("manifest-b"), 100_000));
         assertEq(preview.offerId, cheapOffer);
+    }
+
+    function testAutoMatchSkipsProviderAlreadyAssignedToManifest() public {
+        (, uint256 provider2Offer) = _setupTwoProviderAutoMatch();
+        bytes32 manifestHash = keccak256("same-manifest");
+        SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
+
+        vm.prank(market);
+        SharedTypes.ProviderDealSelection memory first = spRegistry.reserveProviderForDeal(request);
+        assertEq(CommonTypes.FilActorId.unwrap(first.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertTrue(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+
+        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(request);
+        assertEq(preview.offerId, provider2Offer);
+
+        vm.prank(market);
+        SharedTypes.ProviderDealSelection memory second = spRegistry.reserveProviderForDeal(request);
+        assertEq(CommonTypes.FilActorId.unwrap(second.provider), CommonTypes.FilActorId.unwrap(provider2));
+        assertTrue(spRegistry.isManifestAssignedToProvider(manifestHash, provider2));
+    }
+
+    function testAutoMatchRevertsWhenAllEligibleProvidersAlreadyAssignedToManifest() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _createOffer(provider1, "p1", 90_000);
+        bytes32 manifestHash = keccak256("same-manifest");
+        SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
+
+        vm.prank(market);
+        spRegistry.reserveProviderForDeal(request);
+
+        vm.prank(market);
+        vm.expectRevert(SPRegistry.NoOfferMatched.selector);
+        spRegistry.reserveProviderForDeal(request);
+    }
+
+    function testSameProviderCanMatchDifferentManifestHash() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "p1", 90_000);
+
+        vm.prank(market);
+        spRegistry.reserveProviderForDeal(_requestWithManifest(keccak256("manifest-a"), 100_000));
+
+        SharedTypes.ProviderDealSelection memory preview =
+            spRegistry.previewProviderForDeal(_requestWithManifest(keccak256("manifest-b"), 100_000));
+        assertEq(preview.offerId, offerId);
+    }
+
+    function testReserveOfferForDealRejectsProviderAlreadyAssignedToManifest() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "p1", 90_000);
+        bytes32 manifestHash = keccak256("same-manifest");
+        SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
+
+        vm.prank(market);
+        spRegistry.reserveProviderForDeal(request);
+
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.INSUFFICIENT_CAPACITY)
+        );
+        spRegistry.reserveOfferForDeal(offerId, request);
     }
 
     function testPreviewOfferReturnsReasonButReserveRevertsForInactiveOffer() public {
@@ -557,14 +639,14 @@ contract SPRegistryTest is Test {
         spRegistry.updateAvailableSpace(provider1, 1);
 
         vm.prank(market);
-        spRegistry.releasePendingCapacity(provider1, 400_000);
+        spRegistry.releasePendingCapacity(provider1, 400_000, bytes32(0));
         assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, 600_000);
 
         vm.prank(market);
         vm.expectRevert(
             abi.encodeWithSelector(SPRegistry.ReleasePendingExceedsPending.selector, provider1, 700_000, 600_000)
         );
-        spRegistry.releasePendingCapacity(provider1, 700_000);
+        spRegistry.releasePendingCapacity(provider1, 700_000, bytes32(0));
 
         vm.prank(market);
         spRegistry.commitCapacity(provider1, 1_000_000, 500_000);
@@ -574,14 +656,14 @@ contract SPRegistryTest is Test {
         assertEq(spRegistry.getCommittedProviders().length, 1);
 
         vm.prank(market);
-        spRegistry.releaseCapacity(provider1, 100_000);
+        spRegistry.releaseCapacity(provider1, 100_000, bytes32(0));
         assertEq(spRegistry.getProviderCapacity(provider1).committedBytes, 400_000);
 
         vm.prank(market);
         vm.expectRevert(
             abi.encodeWithSelector(SPRegistry.ReleaseExceedsCommitted.selector, provider1, 500_000, 400_000)
         );
-        spRegistry.releaseCapacity(provider1, 500_000);
+        spRegistry.releaseCapacity(provider1, 500_000, bytes32(0));
 
         vm.prank(market);
         vm.expectRevert(
@@ -604,6 +686,39 @@ contract SPRegistryTest is Test {
         ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
         assertEq(capacity.pendingBytes, 0);
         assertEq(capacity.committedBytes, 900_000);
+    }
+
+    function testReleasePendingCapacityClearsManifestProviderLock() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _createOffer(provider1, "p1", 90_000);
+        bytes32 manifestHash = keccak256("same-manifest");
+        SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
+
+        vm.prank(market);
+        spRegistry.reserveProviderForDeal(request);
+        assertTrue(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+
+        vm.prank(market);
+        spRegistry.releasePendingCapacity(provider1, request.requestedSizeBytes, manifestHash);
+        assertFalse(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+    }
+
+    function testReleaseCapacityClearsManifestProviderLock() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _createOffer(provider1, "p1", 90_000);
+        bytes32 manifestHash = keccak256("same-manifest");
+        SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
+
+        vm.prank(market);
+        spRegistry.reserveProviderForDeal(request);
+        vm.prank(market);
+        spRegistry.commitCapacity(provider1, request.requestedSizeBytes, request.requestedSizeBytes);
+
+        vm.prank(market);
+        spRegistry.releaseCapacity(provider1, request.requestedSizeBytes, manifestHash);
+        assertFalse(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
     }
 
     function testReserveValidationFailures() public {
