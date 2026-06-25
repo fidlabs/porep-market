@@ -523,8 +523,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._dealService[dealId] = PoRepTypes.DealService({
             serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0), serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0)
         });
-        $._dealCapacity[dealId] =
-            PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
+        $._dealCapacity[dealId] = PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
         $._dealPayments[dealId] = PoRepTypes.DealPayment({
             paymentToken: selection.paymentToken,
             payee: selection.payee,
@@ -779,9 +778,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(
-            deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash
-        );
+        $._SPRegistryContract
+            .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
         $._dealIdsReadyForPayment.remove(dealId);
 
         _changeDealState(dealId, DealState.TERMINATED);

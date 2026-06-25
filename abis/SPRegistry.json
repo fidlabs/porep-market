@@ -859,6 +859,30 @@
   },
   {
     "type": "function",
+    "name": "isManifestAssignedToProvider",
+    "inputs": [
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "isProviderRegistered",
     "inputs": [
       {
@@ -1227,6 +1251,11 @@
         "name": "sizeBytes",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -1245,6 +1274,11 @@
         "name": "sizeBytes",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],

@@ -13,7 +13,6 @@ import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
-import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
@@ -411,12 +410,14 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @notice Creates a payment rail with the specified parameters and set initial lockup period
      * @dev Only callable by the client
      * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
+     * @param token Kept for interface compatibility; the payment rail token is read from the frozen deal payment state
      */
-    function createRail(IERC20) external override {
+    function createRail(IERC20 token) external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         PoRepTypes.Deal memory deal = IPoRepMarket($.poRepMarket).getDeal($.dealId);
         PoRepTypes.DealPayment memory payment = IPoRepMarket($.poRepMarket).getDealPayment($.dealId);
         IERC20 railToken = IERC20(payment.paymentToken);
+        token;
 
         if (msg.sender != deal.client) {
             revert CallerIsNotClient();

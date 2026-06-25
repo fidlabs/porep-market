@@ -792,7 +792,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         view
         returns (bool)
     {
-        return _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)];
+        return
+            _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)];
     }
 
     /// @inheritdoc ISPRegistry
@@ -804,9 +805,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         selection = _selectProviderForDeal(request);
         if (CommonTypes.FilActorId.unwrap(selection.provider) == 0) revert NoOfferMatched();
         _reservePending(selection.provider, selection.reservedBytes);
-        _getSPRegistryStorage()._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(
-            selection.provider
-        )] = true;
+        _getSPRegistryStorage()
+        ._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(selection.provider)] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -835,9 +835,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         (selection, reason) = _evaluateOffer(offerId, request);
         if (reason != OfferMatch.OK) revert OfferNotEligible(offerId, reason);
         _reservePending(selection.provider, selection.reservedBytes);
-        _getSPRegistryStorage()._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(
-            selection.provider
-        )] = true;
+        _getSPRegistryStorage()
+        ._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(selection.provider)] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -1114,7 +1113,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
         c.committedBytes -= sizeBytes;
         _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
-            false;
+        false;
 
         emit CapacityReleased(provider, sizeBytes);
     }
@@ -1128,7 +1127,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
         c.pendingBytes -= sizeBytes;
         _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
-            false;
+        false;
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }

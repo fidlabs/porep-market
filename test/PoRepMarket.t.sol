@@ -335,7 +335,8 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenManifestHashIsZero() public {
-        SharedTypes.DealRequest memory request = dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
         request.manifestHash = bytes32(0);
 
         vm.prank(clientAddress);

@@ -10,7 +10,7 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 interface IOperator {
     /**
      * @notice Creates a payment rail
-     * @param token The ERC20 token to use for the payment rail
+     * @param token Kept for interface compatibility; the payment rail token is read from the frozen deal payment state
      */
     function createRail(IERC20 token) external;
 

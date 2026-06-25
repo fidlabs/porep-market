@@ -206,9 +206,7 @@ contract SPRegistryMock is ISPRegistry {
         lastReleasedCapacityManifestHash = manifestHash;
     }
 
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
-        external
-    {
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external {
         lastReleasedPendingProvider = CommonTypes.FilActorId.unwrap(provider);
         lastReleasedPendingBytes = sizeBytes;
         lastReleasedPendingManifestHash = manifestHash;

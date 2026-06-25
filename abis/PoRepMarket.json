@@ -1859,6 +1859,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidManifestHash",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidOrganizationAddress",
     "inputs": []
   },
