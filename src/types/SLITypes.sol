@@ -53,4 +53,3 @@ library SLITypes {
         SLIThresholds slis;
     }
 }
-

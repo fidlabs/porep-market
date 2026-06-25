@@ -65,21 +65,6 @@ library SharedTypes {
     }
 
     /**
-     * @notice OfferSelection struct represents the provider's selection of an offer
-     * @dev Selection is offer-centric. The market resolves provider/payee and freezes them into the deal snapshot
-     * @param offerId ID of the selected offer
-     * @param paymentToken token used for payments
-     * @param pricePer32GiBPerMonth price per 32GiB per month
-     * @param promisedSLIs service-level indicators promised by the provider
-     */
-    struct OfferSelection {
-        uint256 offerId;
-        address paymentToken;
-        uint256 pricePer32GiBPerMonth;
-        SLIThresholds promisedSLIs;
-    }
-
-    /**
      * @notice Provider offer terms that define immutable offer shape
      * @param minSizeBytes Minimum request size accepted by the offer
      * @param maxSizeBytes Maximum request size accepted by the offer (0 = no maximum)

@@ -29,13 +29,17 @@ library SharedTypes {
         SLITerms requiredSLIs;
     }
 
-    // Selection is offer-centric. The market resolves provider/payee and freezes
-    // them into the deal snapshot
-    struct OfferSelection {
+    // Selection is provider-and-offer centric. PoRepMarket freezes the returned
+    // provider, offer, payment token, payee, price, SLIs, and reserved bytes into
+    // the deal snapshot.
+    struct ProviderDealSelection {
+        CommonTypes.FilActorId provider;
         uint256 offerId;
         address paymentToken;
+        address payee;
         uint256 pricePer32GiBPerMonth;
         SLITerms promisedSLIs;
+        uint256 reservedBytes;
     }
 
     struct DealData {

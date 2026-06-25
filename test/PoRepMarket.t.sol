@@ -1390,19 +1390,7 @@ contract PoRepMarketTest is Test {
 
         spRegistry.setProviderInfo(
             providerFilActorId,
-            ISPRegistry.ProviderInfo({
-                organization: organization1,
-                payee: address(0),
-                paused: false,
-                blocked: false,
-                capabilities: defaultRequirements,
-                availableBytes: 0,
-                committedBytes: 0,
-                pendingBytes: 0,
-                pricePerSectorPerMonth: 0,
-                minDealDurationDays: 0,
-                maxDealDurationDays: 0
-            })
+            ISPRegistry.ProviderInfo({organization: organization1, payee: address(0), paused: false, blocked: false})
         );
 
         vm.prank(clientAddress);

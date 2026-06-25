@@ -8,6 +8,7 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
+import {OfferMatch} from "../src/types/OfferMatch.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {MockProxy} from "./contracts/MockProxy.sol";
@@ -79,10 +80,6 @@ contract SPRegistryTest is Test {
                 retrievabilityBps: 9000, bandwidthBytesPerSecond: 500, latencyMs: 150, indexingPct: 80
             })
         });
-    }
-
-    function _legacyTerms(uint256 maxPrice) internal pure returns (SLITypes.DealTerms memory) {
-        return SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: maxPrice, durationDays: 180});
     }
 
     function _registerProvider(CommonTypes.FilActorId provider, address owner) internal {
@@ -167,8 +164,8 @@ contract SPRegistryTest is Test {
         assertFalse(info.paused);
         assertFalse(info.blocked);
         assertEq(capacity.availableBytes, defaultAvailableBytes);
-        assertEq(capacity.pendingBytes, 0);
         assertEq(capacity.committedBytes, 0);
+        assertEq(capacity.pendingBytes, 0);
     }
 
     function testProviderOfferLifecycleEnforcesActiveCapAndReenable() public {
@@ -228,83 +225,53 @@ contract SPRegistryTest is Test {
         assertEq(afterReserve.pendingBytes, request.requestedSizeBytes);
     }
 
-    function testLegacyGetProviderForDealReturnsNoProviderWhenNoOfferMatches() public {
-        vm.prank(market);
-        (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
-            spRegistry.getProviderForDeal(defaultSLIs, _legacyTerms(100_000));
-
-        assertEq(CommonTypes.FilActorId.unwrap(provider), 0);
-        assertFalse(autoApprove);
-        assertEq(organization, address(0));
-    }
-
-    function testLegacyGetProviderForDealReservesSelectedOffer() public {
-        address token3 = vm.addr(0x102);
-        address token4 = vm.addr(0x103);
-
-        _allowToken(token, 1);
-        _allowToken(token2, 1);
-        _allowToken(token3, 1);
-        _allowToken(token4, 1);
-        _registerProvider(provider1, owner1);
-
-        SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](4);
-        rows[0] = SharedTypes.OfferPaymentInput({token: token, active: true, pricePer32GiBPerMonth: 100_000});
-        rows[1] = SharedTypes.OfferPaymentInput({token: token2, active: false, pricePer32GiBPerMonth: 1});
-        rows[2] = SharedTypes.OfferPaymentInput({token: token3, active: true, pricePer32GiBPerMonth: 90_000});
-        rows[3] = SharedTypes.OfferPaymentInput({token: token4, active: true, pricePer32GiBPerMonth: 95_000});
-
-        vm.prank(operator);
-        spRegistry.createOffer(provider1, "legacy", _terms(), defaultSLIs, rows);
-
-        vm.prank(market);
-        (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
-            spRegistry.getProviderForDeal(defaultSLIs, _legacyTerms(90_000));
-
-        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
-        assertEq(CommonTypes.FilActorId.unwrap(provider), CommonTypes.FilActorId.unwrap(provider1));
-        assertTrue(autoApprove);
-        assertEq(organization, owner1);
-        assertEq(capacity.pendingBytes, 1_000_000);
-    }
-
-    function testLegacyGetProviderForDealRejectsOutOfBoundsOffer() public {
+    function testLegacyGetProviderForDealRevertsAndDoesNotReserveCapacity() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         _createOffer(provider1, "standard", 90_000);
 
-        SLITypes.DealTerms memory tooSmall = _legacyTerms(100_000);
-        tooSmall.dealSizeBytes = 0;
+        ISPRegistry.ProviderCapacityInfo memory before = spRegistry.getProviderCapacity(provider1);
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100_000, durationDays: 180});
 
         vm.prank(market);
-        (CommonTypes.FilActorId provider,,) = spRegistry.getProviderForDeal(defaultSLIs, tooSmall);
+        vm.expectRevert(SPRegistry.LegacyProviderMatchingDisabled.selector);
+        spRegistry.getProviderForDeal(defaultSLIs, terms);
 
-        assertEq(CommonTypes.FilActorId.unwrap(provider), 0);
+        ISPRegistry.ProviderCapacityInfo memory afterCapacity = spRegistry.getProviderCapacity(provider1);
+        assertEq(afterCapacity.pendingBytes, before.pendingBytes);
+        assertEq(afterCapacity.committedBytes, before.committedBytes);
+        assertEq(afterCapacity.availableBytes, before.availableBytes);
     }
 
-    function testAutoMatchUsesLeastPendingProviderInsidePriceBand() public {
+    function testLegacyGetProviderForDealStillRequiresMarketRole() public {
+        SLITypes.DealTerms memory terms =
+            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100_000, durationDays: 180});
+
+        vm.expectRevert();
+        spRegistry.getProviderForDeal(defaultSLIs, terms);
+    }
+
+    function testAutoMatchPicksLeastLoadedProviderWithinBand() public {
         _allowToken();
-        vm.prank(admin);
-        spRegistry.setMatchPriceBandBps(100);
         _registerProvider(provider1, owner1);
         _registerProvider(provider2, owner2);
 
         vm.prank(operator);
-        spRegistry.createOffer(provider1, "p1", _terms(), defaultSLIs, _paymentRows(90_000));
+        uint256 provider1Offer = spRegistry.createOffer(provider1, "p1", _terms(), defaultSLIs, _paymentRows(90_000));
         vm.prank(operator);
         uint256 provider2Offer = spRegistry.createOffer(provider2, "p2", _terms(), defaultSLIs, _paymentRows(90_500));
 
+        // Load the cheaper provider; provider2 stays idle and is within the 1% band, so it wins on least-loaded.
         vm.prank(market);
-        spRegistry.reserveOfferForDeal(1, _request(100_000));
+        spRegistry.reserveOfferForDeal(provider1Offer, _request(100_000));
 
         SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(_request(100_000));
         assertEq(preview.offerId, provider2Offer);
     }
 
-    function testAutoMatchChoosesCheapestOutsidePriceBand() public {
+    function testAutoMatchExcludesIdleProviderPricedOutsideBand() public {
         _allowToken();
-        vm.prank(admin);
-        spRegistry.setMatchPriceBandBps(100);
         _registerProvider(provider1, owner1);
         _registerProvider(provider2, owner2);
 
@@ -313,11 +280,15 @@ contract SPRegistryTest is Test {
         vm.prank(operator);
         spRegistry.createOffer(provider2, "expensive", _terms(), defaultSLIs, _paymentRows(92_000));
 
+        // Load the cheap provider; the idle provider2 is priced outside the 1% band and must be excluded.
+        vm.prank(market);
+        spRegistry.reserveOfferForDeal(cheapOffer, _request(100_000));
+
         SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(_request(100_000));
         assertEq(preview.offerId, cheapOffer);
     }
 
-    function testPreviewOfferReturnsEmptyButReserveRevertsForInactiveOffer() public {
+    function testPreviewOfferReturnsReasonButReserveRevertsForInactiveOffer() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         vm.prank(operator);
@@ -325,13 +296,17 @@ contract SPRegistryTest is Test {
         vm.prank(operator);
         spRegistry.setOfferActive(offerId, false);
 
-        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        (SharedTypes.ProviderDealSelection memory preview, uint16 reason) =
+            spRegistry.previewOfferForDeal(offerId, _request(100_000));
 
         assertEq(CommonTypes.FilActorId.unwrap(preview.provider), 0);
         assertEq(preview.offerId, 0);
+        assertEq(reason, OfferMatch.OFFER_INACTIVE);
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferInactive.selector, offerId));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.OFFER_INACTIVE)
+        );
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
     }
 
@@ -385,16 +360,6 @@ contract SPRegistryTest is Test {
         assertFalse(spRegistry.getPaymentTokenConfig(token2).allowed);
         assertEq(spRegistry.getPaymentTokens().length, 0);
 
-        assertEq(spRegistry.getMatchPriceBandBps(), 100);
-        vm.prank(admin);
-        spRegistry.setMatchPriceBandBps(250);
-        assertEq(spRegistry.getMatchPriceBandBps(), 250);
-
-        assertEq(spRegistry.getToleranceBps(), 0);
-        vm.prank(admin);
-        spRegistry.setToleranceBps(500);
-        assertEq(spRegistry.getToleranceBps(), 500);
-
         assertTrue(spRegistry.isAuthorizedForProvider(admin, provider1));
         assertTrue(spRegistry.isAuthorizedForProvider(operator, provider1));
     }
@@ -435,14 +400,6 @@ contract SPRegistryTest is Test {
         vm.prank(operator);
         vm.expectRevert(SPRegistry.InvalidPayeeAddress.selector);
         spRegistry.setPayee(provider1, address(0));
-
-        vm.prank(admin);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MatchPriceBandTooHigh.selector, 10_001, 10_000));
-        spRegistry.setMatchPriceBandBps(10_001);
-
-        vm.prank(admin);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ToleranceBpsTooHigh.selector, 10_001, 10_000));
-        spRegistry.setToleranceBps(10_001);
 
         _installFalseControllingAddressMock();
         assertFalse(spRegistry.isAuthorizedForProvider(unauthorized, provider1));
@@ -631,14 +588,22 @@ contract SPRegistryTest is Test {
             abi.encodeWithSelector(SPRegistry.CommitExceedsAvailable.selector, provider1, 10_400_000, 10_000_000)
         );
         spRegistry.commitCapacity(provider1, 0, 10_000_000);
+    }
 
-        vm.prank(admin);
-        spRegistry.setToleranceBps(100);
+    function testCommitCapacityUsesActualBytesAndReleasesEstimatedPending() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, "standard", 90_000);
+
         vm.prank(market);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.ActualSizeExceedsTolerance.selector, provider1, 1_020_000, 1_010_000)
-        );
-        spRegistry.commitCapacity(provider1, 1_000_000, 1_020_000);
+        spRegistry.reserveOfferForDeal(offerId, _request(100_000));
+
+        vm.prank(market);
+        spRegistry.commitCapacity(provider1, 1_000_000, 900_000);
+
+        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+        assertEq(capacity.pendingBytes, 0);
+        assertEq(capacity.committedBytes, 900_000);
     }
 
     function testReserveValidationFailures() public {
@@ -647,47 +612,51 @@ contract SPRegistryTest is Test {
         uint256 offerId = _createOffer(provider1, "standard", 90_000);
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotFound.selector, 999));
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, 999, OfferMatch.OFFER_NOT_FOUND));
         spRegistry.reserveOfferForDeal(999, _request(100_000));
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.RequestSizeOutsideOfferBounds.selector, offerId, 0));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(0, 180, 100_000, token));
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.RequestSizeOutsideOfferBounds.selector, offerId, 10_000_001));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(10_000_001, 180, 100_000, token));
 
         vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.RequestDurationOutsideOfferBounds.selector, offerId, uint64(179 * SharedTypes.EPOCHS_IN_DAY)
-            )
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.DURATION_OUT_OF_BOUNDS)
         );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 179, 100_000, token));
 
         vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.RequestDurationOutsideOfferBounds.selector, offerId, uint64(361 * SharedTypes.EPOCHS_IN_DAY)
-            )
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.DURATION_OUT_OF_BOUNDS)
         );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 361, 100_000, token));
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PriceAboveClientMaximum.selector, 90_000, 89_999));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PRICE_ABOVE_CLIENT_MAX)
+        );
         spRegistry.reserveOfferForDeal(offerId, _request(89_999));
 
         address unallowedToken = vm.addr(0x102);
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, unallowedToken));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.TOKEN_NOT_ALLOWED)
+        );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, unallowedToken));
 
         vm.prank(operator);
         spRegistry.updateAvailableSpace(provider1, 500_000);
         vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.InsufficientProviderCapacity.selector, provider1, 1_000_000, 500_000)
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.INSUFFICIENT_CAPACITY)
         );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token));
     }
@@ -699,11 +668,15 @@ contract SPRegistryTest is Test {
 
         vm.prank(operator);
         spRegistry.pauseProvider(provider1);
-        SharedTypes.ProviderDealSelection memory preview = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        (SharedTypes.ProviderDealSelection memory preview, uint16 reason) =
+            spRegistry.previewOfferForDeal(offerId, _request(100_000));
         assertEq(CommonTypes.FilActorId.unwrap(preview.provider), 0);
+        assertEq(reason, OfferMatch.PROVIDER_PAUSED);
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsPaused.selector, provider1));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PROVIDER_PAUSED)
+        );
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
 
         vm.prank(operator);
@@ -712,26 +685,31 @@ contract SPRegistryTest is Test {
         spRegistry.blockProvider(provider1);
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsBlocked.selector, provider1));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PROVIDER_BLOCKED)
+        );
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
     }
 
-    function testPreviewValidationFailuresReturnEmptySelection() public {
+    function testPreviewValidationFailuresReturnReasonCodes() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         uint256 offerId = _createOffer(provider1, "standard", 90_000);
 
-        SharedTypes.ProviderDealSelection memory selection =
-            spRegistry.previewOfferForDeal(999, _requestWith(1_000_000, 180, 100_000, token));
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        SharedTypes.ProviderDealSelection memory selection;
+        uint16 reason;
 
-        selection = spRegistry.previewOfferForDeal(offerId, _requestWith(0, 180, 100_000, token));
+        (selection, reason) = spRegistry.previewOfferForDeal(999, _requestWith(1_000_000, 180, 100_000, token));
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.OFFER_NOT_FOUND);
 
-        selection = spRegistry.previewOfferForDeal(offerId, _requestWith(1_000_000, 179, 100_000, token));
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _requestWith(0, 180, 100_000, token));
+        assertEq(reason, OfferMatch.SIZE_OUT_OF_BOUNDS);
 
-        selection = spRegistry.previewOfferForDeal(
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _requestWith(1_000_000, 179, 100_000, token));
+        assertEq(reason, OfferMatch.DURATION_OUT_OF_BOUNDS);
+
+        (selection, reason) = spRegistry.previewOfferForDeal(
             offerId,
             _requestWithSLIs(
                 SharedTypes.SLIThresholds({
@@ -739,35 +717,36 @@ contract SPRegistryTest is Test {
                 })
             )
         );
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.SLIS_NOT_MET);
 
-        selection = spRegistry.previewOfferForDeal(offerId, _request(89_999));
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _request(89_999));
+        assertEq(reason, OfferMatch.PRICE_ABOVE_CLIENT_MAX);
 
         vm.prank(operator);
         spRegistry.updateAvailableSpace(provider1, 500_000);
-        selection = spRegistry.previewOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token));
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token));
+        assertEq(reason, OfferMatch.INSUFFICIENT_CAPACITY);
 
         vm.prank(operator);
         spRegistry.updateAvailableSpace(provider1, defaultAvailableBytes);
 
         vm.prank(admin);
         spRegistry.setPaymentToken(token, false, 86_400);
-        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(reason, OfferMatch.TOKEN_NOT_ALLOWED);
 
         vm.prank(admin);
         spRegistry.setPaymentToken(token, true, 91_000);
-        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        assertEq(reason, OfferMatch.PRICE_BELOW_TOKEN_MIN);
 
         vm.prank(admin);
         spRegistry.setPaymentToken(token, true, 86_400);
         vm.prank(operator);
         spRegistry.setOfferPayment(offerId, token, false, 90_000);
-        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _request(100_000));
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.TOKEN_NOT_ALLOWED);
     }
 
     function testPaymentAndSLIValidationFailures() public {
@@ -777,13 +756,17 @@ contract SPRegistryTest is Test {
         uint256 offerId = _createOffer(provider1, "standard", 90_000);
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, token2));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.TOKEN_NOT_ALLOWED)
+        );
         spRegistry.reserveOfferForDeal(offerId, _requestWith(1_000_000, 180, 100_000, token2));
 
         vm.prank(operator);
         spRegistry.setOfferPayment(offerId, token, false, 90_000);
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PaymentTokenNotAllowed.selector, token));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.TOKEN_NOT_ALLOWED)
+        );
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
 
         vm.prank(operator);
@@ -791,14 +774,16 @@ contract SPRegistryTest is Test {
         vm.prank(admin);
         spRegistry.setPaymentToken(token, true, 91_000);
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PriceBelowTokenMinimum.selector, token, 90_000, 91_000));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PRICE_BELOW_TOKEN_MIN)
+        );
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
 
         vm.prank(admin);
         spRegistry.setPaymentToken(token, true, 86_400);
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SLIS_NOT_MET));
         spRegistry.reserveOfferForDeal(
             offerId,
             _requestWithSLIs(
@@ -809,7 +794,7 @@ contract SPRegistryTest is Test {
         );
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SLIS_NOT_MET));
         spRegistry.reserveOfferForDeal(
             offerId,
             _requestWithSLIs(
@@ -820,7 +805,7 @@ contract SPRegistryTest is Test {
         );
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SLIS_NOT_MET));
         spRegistry.reserveOfferForDeal(
             offerId,
             _requestWithSLIs(
@@ -831,7 +816,7 @@ contract SPRegistryTest is Test {
         );
 
         vm.prank(market);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferSLIsNotMet.selector, offerId));
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SLIS_NOT_MET));
         spRegistry.reserveOfferForDeal(
             offerId,
             _requestWithSLIs(
@@ -842,23 +827,36 @@ contract SPRegistryTest is Test {
         );
     }
 
+    function testActiveOfferPaymentCannotHaveZeroPriceEvenWhenTokenMinimumIsZero() public {
+        vm.prank(admin);
+        spRegistry.setPaymentToken(token, true, 0);
+        _registerProvider(provider1, owner1);
+
+        SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](1);
+        rows[0] = SharedTypes.OfferPaymentInput({token: token, active: true, pricePer32GiBPerMonth: 0});
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.PriceBelowTokenMinimum.selector, token, 0, 1));
+        spRegistry.createOffer(provider1, "zero-active-price", _terms(), defaultSLIs, rows);
+    }
+
     function testLowPriceOfferRejectedWhenRequestedSizeWouldProduceZeroPerEpochPayment() public {
         _allowToken(token, 1);
         _registerProvider(provider1, owner1);
         uint256 offerId = _createOffer(provider1, "low-price", 1);
         SharedTypes.DealRequest memory request = _request(1);
 
-        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, request);
+        (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
+            spRegistry.previewOfferForDeal(offerId, request);
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.PER_EPOCH_FLOOR);
 
         selection = spRegistry.previewProviderForDeal(request);
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
 
         vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.OfferPriceBelowPerEpochMinimum.selector, 1, 1, SharedTypes.EPOCHS_IN_MONTH
-            )
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PER_EPOCH_FLOOR)
         );
         spRegistry.reserveOfferForDeal(offerId, request);
 
@@ -879,14 +877,14 @@ contract SPRegistryTest is Test {
 
         SharedTypes.DealRequest memory request = _requestWith(0, 180, 1, token);
 
-        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, request);
+        (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
+            spRegistry.previewOfferForDeal(offerId, request);
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.PER_EPOCH_FLOOR);
 
         vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(
-                SPRegistry.OfferPriceBelowPerEpochMinimum.selector, 1, 0, SharedTypes.EPOCHS_IN_MONTH
-            )
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PER_EPOCH_FLOOR)
         );
         spRegistry.reserveOfferForDeal(offerId, request);
     }
@@ -907,9 +905,11 @@ contract SPRegistryTest is Test {
 
         SharedTypes.DealRequest memory request = _requestWith(requestSize, 180, 1, token);
 
-        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, request);
+        (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
+            spRegistry.previewOfferForDeal(offerId, request);
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
         assertEq(selection.pricePer32GiBPerMonth, 1);
+        assertEq(reason, OfferMatch.OK);
 
         vm.prank(market);
         selection = spRegistry.reserveOfferForDeal(offerId, request);
@@ -924,8 +924,10 @@ contract SPRegistryTest is Test {
 
         vm.prank(operator);
         spRegistry.pauseProvider(provider1);
-        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
+            spRegistry.previewOfferForDeal(offerId, _request(100_000));
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.PROVIDER_PAUSED);
         selection = spRegistry.previewProviderForDeal(_request(100_000));
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
 
@@ -937,11 +939,12 @@ contract SPRegistryTest is Test {
         spRegistry.unpauseProvider(provider1);
         vm.prank(admin);
         spRegistry.blockProvider(provider1);
-        selection = spRegistry.previewOfferForDeal(offerId, _request(100_000));
+        (selection, reason) = spRegistry.previewOfferForDeal(offerId, _request(100_000));
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(reason, OfferMatch.PROVIDER_BLOCKED);
     }
 
-    function testSameProviderBestOfferSelectionTieBreaks() public {
+    function testSameProviderBestOfferTieBreaks() public {
         _allowToken();
         _registerProvider(provider1, owner1);
 
@@ -968,14 +971,13 @@ contract SPRegistryTest is Test {
         assertEq(selection.offerId, provider1Offer);
     }
 
-    function testFinalSelectionPrefersLowerPriceWithinWideBand() public {
+    function testFinalSelectionPrefersLowerPriceWhenEquallyLoaded() public {
         _allowToken();
-        vm.prank(admin);
-        spRegistry.setMatchPriceBandBps(10_000);
         _registerProvider(provider1, owner1);
         _registerProvider(provider2, owner2);
 
-        _createOffer(provider1, "p1", 91_000);
+        // Both idle and within the 1% band (90_900 <= 90_000 * 1.01); cheaper price breaks the tie.
+        _createOffer(provider1, "p1", 90_900);
         uint256 provider2Offer = _createOffer(provider2, "p2", 90_000);
 
         SharedTypes.ProviderDealSelection memory selection = spRegistry.previewProviderForDeal(_request(100_000));

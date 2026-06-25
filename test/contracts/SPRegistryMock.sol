@@ -3,6 +3,8 @@
 
 pragma solidity =0.8.30;
 
+// Real SPRegistry V2 disables that selector.
+
 import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
 import {SLITypes} from "../../src/types/SLITypes.sol";
@@ -119,9 +121,9 @@ contract SPRegistryMock is ISPRegistry {
     function previewOfferForDeal(uint256, SharedTypes.DealRequest calldata)
         external
         view
-        returns (SharedTypes.ProviderDealSelection memory)
+        returns (SharedTypes.ProviderDealSelection memory, uint16)
     {
-        return nextSelection;
+        return (nextSelection, 0);
     }
 
     function reserveOfferForDeal(uint256, SharedTypes.DealRequest calldata)
@@ -140,12 +142,6 @@ contract SPRegistryMock is ISPRegistry {
 
     function getPaymentTokenConfig(address) external pure returns (TokenConfig memory) {
         return TokenConfig({allowed: false, minPricePer32GiBPerMonth: 0});
-    }
-
-    function setMatchPriceBandBps(uint256) external {}
-
-    function getMatchPriceBandBps() external pure returns (uint256) {
-        return 0;
     }
 
     function createOffer(
@@ -203,9 +199,4 @@ contract SPRegistryMock is ISPRegistry {
     function blockProvider(CommonTypes.FilActorId) external {}
     function unblockProvider(CommonTypes.FilActorId) external {}
     function updateAvailableSpace(CommonTypes.FilActorId, uint256) external {}
-    function setToleranceBps(uint256) external {}
-
-    function getToleranceBps() external pure returns (uint256) {
-        return 0;
-    }
 }

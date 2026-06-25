@@ -11,32 +11,17 @@ import {SLITypes} from "../types/SLITypes.sol";
  */
 interface ISPRegistry {
     /**
-     * @notice Provider registration and compatibility data.
+     * @notice Provider registration data.
      * @param organization Address that owns the provider registration.
      * @param payee Address receiving provider payments.
      * @param paused True when the provider is temporarily excluded from matching.
      * @param blocked True when the provider is administratively blocked.
-     * @param capabilities Legacy provider-level SLI view. Offer SLIs are used for offer matching.
-     * @param availableBytes Total provider capacity available for deals.
-     * @param committedBytes Capacity already committed to activated deals.
-     * @param pendingBytes Capacity reserved by proposed deals.
-     * @param pricePerSectorPerMonth Legacy provider-level price view. Offer prices are used for offer matching.
-     * @param minDealDurationDays Legacy provider-level minimum duration view. Offer durations are used for matching.
-     * @param maxDealDurationDays Legacy provider-level maximum duration view. Offer durations are used for matching.
      */
-    // solhint-disable-next-line gas-struct-packing
     struct ProviderInfo {
         address organization;
         address payee;
         bool paused;
         bool blocked;
-        SharedTypes.SLIThresholds capabilities;
-        uint256 availableBytes;
-        uint256 committedBytes;
-        uint256 pendingBytes;
-        uint256 pricePerSectorPerMonth;
-        uint32 minDealDurationDays;
-        uint32 maxDealDurationDays;
     }
 
     /**
@@ -103,7 +88,7 @@ interface ISPRegistry {
     function getProvidersByOrganization(address organization) external view returns (CommonTypes.FilActorId[] memory);
 
     /**
-     * @notice Returns provider registration and compatibility data.
+     * @notice Returns provider registration data.
      * @param provider Provider actor ID.
      * @return info Provider registration data.
      */
@@ -201,18 +186,6 @@ interface ISPRegistry {
     function getPaymentTokenConfig(address token) external view returns (TokenConfig memory config);
 
     /**
-     * @notice Sets global price band used by automatic matching.
-     * @param bps Basis-point band above the cheapest matching offer.
-     */
-    function setMatchPriceBandBps(uint256 bps) external;
-
-    /**
-     * @notice Returns global price band used by automatic matching.
-     * @return Basis-point band above the cheapest matching offer.
-     */
-    function getMatchPriceBandBps() external view returns (uint256);
-
-    /**
      * @notice Creates an active provider offer.
      * @param provider Provider actor ID.
      * @param name Human-readable offer name.
@@ -305,13 +278,13 @@ interface ISPRegistry {
     function getActiveOffers() external view returns (uint256[] memory offerIds);
 
     /**
-     * @notice Legacy PoRepMarket matching entrypoint.
-     * @dev Reserves pending capacity when a provider is selected.
+     * @notice Disabled legacy PoRepMarket matching entrypoint kept for compile compatibility only.
+     * @dev Real implementations revert until PoRepMarket migrates to the V2 reserve APIs. Do not use this method for V2 proposal creation.
      * @param requirements Required deal SLIs.
      * @param terms Legacy deal terms.
-     * @return provider Selected provider, or zero actor ID when no offer matches.
-     * @return autoApprove True when selected offer price is less than or equal to requested price.
-     * @return organization Selected provider organization.
+     * @return provider Unused legacy return slot.
+     * @return autoApprove Unused legacy return slot.
+     * @return organization Unused legacy return slot.
      */
     function getProviderForDeal(SharedTypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
         external
@@ -341,11 +314,12 @@ interface ISPRegistry {
      * @param offerId Offer ID to validate.
      * @param request Client deal request.
      * @return selection Selected offer snapshot, or zero provider when the offer does not match.
+     * @return reason OfferMatch reason code; OfferMatch.OK when the offer is eligible.
      */
     function previewOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
         external
         view
-        returns (SharedTypes.ProviderDealSelection memory selection);
+        returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason);
 
     /**
      * @notice Validates a specific offer and reserves pending provider capacity.
@@ -372,27 +346,6 @@ interface ISPRegistry {
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
 
     /**
-     * @notice Check if address is authorized to act on behalf of a provider
-     * @dev Admin and OPERATOR_ROLE always return true. Otherwise checks MinerUtils.isControllingAddress.
-     * @param caller Address to check
-     * @param provider Provider to check against
-     * @return True if caller is authorized for provider
-     */
-    function isAuthorizedForProvider(address caller, CommonTypes.FilActorId provider) external view returns (bool);
-
-    /**
-     * @notice Block a provider (admin only, excluded from matching)
-     * @param provider The provider to block
-     */
-    function blockProvider(CommonTypes.FilActorId provider) external;
-
-    /**
-     * @notice Unblock a provider (admin only)
-     * @param provider The provider to unblock
-     */
-    function unblockProvider(CommonTypes.FilActorId provider) external;
-
-    /**
      * @notice Converts pending capacity into committed capacity.
      * @param provider Provider actor ID.
      * @param estimatedSizeBytes Pending bytes reserved by the deal request.
@@ -400,16 +353,4 @@ interface ISPRegistry {
      */
     function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
         external;
-
-    /**
-     * @notice Sets allowed activation padding tolerance.
-     * @param bps Tolerance in basis points.
-     */
-    function setToleranceBps(uint256 bps) external;
-
-    /**
-     * @notice Returns allowed activation padding tolerance.
-     * @return Tolerance in basis points.
-     */
-    function getToleranceBps() external view returns (uint256);
 }
