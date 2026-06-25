@@ -718,7 +718,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (msg.sender != deal.validator || deal.validator == address(0)) {
             revert CallerIsNotValidator(dealId, msg.sender);
         }
-        $._SPRegistryContract.releaseCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract.releaseCapacity(
+            deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash
+        );
         _changeDealState(dealId, DealState.FINALIZED);
         emit DealFinalized(dealId, msg.sender);
     }
@@ -775,7 +777,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract.releaseCapacity(
+            deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash
+        );
         $._dealIdsReadyForPayment.remove(dealId);
 
         _changeDealState(dealId, DealState.TERMINATED);
@@ -800,7 +804,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(
+            deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+        );
         _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);
     }
@@ -821,7 +827,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert DealNotRejectable(dealId);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(
+            deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+        );
         _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);
     }
@@ -845,7 +853,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         // solhint-enable  gas-strict-inequalities
 
-        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(
+            deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+        );
         _changeDealState(dealId, DealState.EXPIRED);
         emit DealExpired(dealId, block.number);
     }

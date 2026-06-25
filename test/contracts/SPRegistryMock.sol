@@ -195,20 +195,10 @@ contract SPRegistryMock is ISPRegistry {
         return false;
     }
 
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external {
-        lastReleasedProvider = CommonTypes.FilActorId.unwrap(provider);
-        lastReleasedBytes = sizeBytes;
-    }
-
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external {
         lastReleasedProvider = CommonTypes.FilActorId.unwrap(provider);
         lastReleasedBytes = sizeBytes;
         lastReleasedManifestHash = manifestHash;
-    }
-
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external {
-        lastReleasedPendingProvider = CommonTypes.FilActorId.unwrap(provider);
-        lastReleasedPendingBytes = sizeBytes;
     }
 
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)

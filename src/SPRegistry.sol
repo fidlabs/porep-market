@@ -848,21 +848,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
-        _releaseCapacity(provider, sizeBytes, bytes32(0), false);
-    }
-
-    /// @inheritdoc ISPRegistry
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
         external
         onlyRole(MARKET_ROLE)
     {
-        _releaseCapacity(provider, sizeBytes, manifestHash, true);
-    }
-
-    /// @inheritdoc ISPRegistry
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external onlyRole(MARKET_ROLE) {
-        _releasePendingCapacity(provider, sizeBytes, bytes32(0), false);
+        _releaseCapacity(provider, sizeBytes, manifestHash);
     }
 
     /// @inheritdoc ISPRegistry
@@ -870,7 +860,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         external
         onlyRole(MARKET_ROLE)
     {
-        _releasePendingCapacity(provider, sizeBytes, manifestHash, true);
+        _releasePendingCapacity(provider, sizeBytes, manifestHash);
     }
 
     /// @inheritdoc ISPRegistry
@@ -1117,37 +1107,28 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         emit PendingCapacityReserved(provider, sizeBytes);
     }
 
-    function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash, bool clearLock)
-        internal
-    {
+    function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) internal {
         _ensureProviderRegistered(provider);
 
         ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
         if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
         c.committedBytes -= sizeBytes;
-        if (clearLock) {
-            _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
-                false;
-        }
+        _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
+            false;
 
         emit CapacityReleased(provider, sizeBytes);
     }
 
-    function _releasePendingCapacity(
-        CommonTypes.FilActorId provider,
-        uint256 sizeBytes,
-        bytes32 manifestHash,
-        bool clearLock
-    ) internal {
+    function _releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+        internal
+    {
         _ensureProviderRegistered(provider);
 
         ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
         if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
         c.pendingBytes -= sizeBytes;
-        if (clearLock) {
-            _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
-                false;
-        }
+        _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
+            false;
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }

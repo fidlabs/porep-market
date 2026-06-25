@@ -343,26 +343,12 @@ interface ISPRegistry {
         returns (bool);
 
     /**
-     * @notice Legacy compatibility overload that releases committed provider capacity without clearing a manifest/provider assignment.
-     * @param provider Provider actor ID.
-     * @param sizeBytes Capacity to release.
-     */
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
-
-    /**
      * @notice Releases committed provider capacity and clears the manifest/provider assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Capacity to release.
      * @param manifestHash Manifest hash whose provider assignment should be cleared.
      */
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
-
-    /**
-     * @notice Legacy compatibility overload that releases pending provider capacity without clearing a manifest/provider assignment.
-     * @param provider Provider actor ID.
-     * @param sizeBytes Pending capacity to release.
-     */
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
 
     /**
      * @notice Releases pending provider capacity and clears the manifest/provider assignment.
