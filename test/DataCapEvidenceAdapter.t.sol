@@ -33,6 +33,7 @@ import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
+import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 
 // solhint-disable max-states-count
 contract DataCapEvidenceAdapterTest is Test {
@@ -394,15 +395,6 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.prank(address(poRepMarketMock));
         vm.expectRevert(DataCapEvidenceAdapter.GetClaimsCallFailed.selector);
         mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
-    }
-
-    function testActivateEvidenceReturnsDummyDecision() public view {
-        SharedTypes.ActivationDecision memory decision =
-            dataCapEvidenceAdapter.activateEvidence(_activationContext(), "");
-
-        assertEq(decision.coveredBytes, 0);
-        assertEq(decision.reasonCode, 0);
-        assertEq(decision.result, 0);
     }
 
     function testRefreshEvidenceStatusReturnsDummyStatus() public view {
@@ -1669,5 +1661,102 @@ contract DataCapEvidenceAdapterTest is Test {
         (CommonTypes.FilActorId[] memory emptyPage, uint256 emptyTotal) = mock.getClaimIds(dealId, 2, 1);
         assertEq(emptyTotal, 2);
         assertEq(emptyPage.length, 0);
+    }
+
+    function testActivateEvidenceAcceptsWhenFullyClaimed() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision = mock.activateEvidence(_activationContext(), "");
+
+        assertEq(decision.coveredBytes, 4096);
+        assertEq(decision.reasonCode, 0);
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(mock.getDeal(dealId).activeClaimedBytes, 4096);
+    }
+
+    function testActivateEvidenceAcceptsWhenCoveredBytesMeetThreshold() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        SharedTypes.ActivationContext memory context = SharedTypes.ActivationContext({
+            dealId: dealId,
+            requestedSizeBytes: 4096,
+            client: clientAddress,
+            durationEpochs: 0,
+            activationToleranceBps: 10_000,
+            provider: providerFilActorId
+        });
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision = mock.activateEvidence(context, "");
+
+        assertEq(decision.coveredBytes, 4096);
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(mock.getDeal(dealId).activeClaimedBytes, 4096);
+    }
+
+    function testActivateEvidenceRejectsWhenCoveredBytesBelowThreshold() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        SharedTypes.ActivationContext memory context = SharedTypes.ActivationContext({
+            dealId: dealId,
+            requestedSizeBytes: 8192,
+            client: clientAddress,
+            durationEpochs: 0,
+            activationToleranceBps: 10_000,
+            provider: providerFilActorId
+        });
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision = mock.activateEvidence(context, "");
+
+        assertEq(decision.coveredBytes, 4096);
+        assertEq(decision.result, EvidenceResult.REJECTED);
+        assertEq(mock.getDeal(dealId).activeClaimedBytes, 0);
+    }
+
+    function testActivateEvidenceRejectsWhenAllocationsRemain() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282018182000681881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.ActivationDecision memory decision = mock.activateEvidence(_activationContext(), "");
+
+        assertEq(decision.coveredBytes, 2048);
+        assertEq(decision.result, EvidenceResult.REJECTED);
+        assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 1);
+        assertEq(mock.getDeal(dealId).activeClaimedBytes, 0);
+    }
+
+    function testActivateEvidenceRevertsWhenCallerIsNotPoRepMarket() public {
+        vm.expectRevert(DataCapEvidenceAdapter.CallerIsNotPoRepMarket.selector);
+        dataCapEvidenceAdapter.activateEvidence(_activationContext(), "");
     }
 }
