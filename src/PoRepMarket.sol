@@ -370,7 +370,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Error thrown when trying to set a deal expiration that is invalid
-     * @dev 0xa6584311
+     * @dev 0x25d11a26
      */
     error InvalidDealExpiration();
 
