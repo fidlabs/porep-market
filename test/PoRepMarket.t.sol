@@ -1548,6 +1548,19 @@ contract PoRepMarketTest is Test {
     }
 
     function testRejectAcceptedDealByAdmin() public {
+        uint256 reservedBytes = totalDealSize - 96;
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH + 10,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: reservedBytes
+            })
+        );
+
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
@@ -1565,7 +1578,7 @@ contract PoRepMarketTest is Test {
         PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
         assertTrue(deal.state == DealState.REJECTED);
         assertEq(spRegistry.lastReleasedPendingProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
-        assertEq(spRegistry.lastReleasedPendingBytes(), totalDealSize);
+        assertEq(spRegistry.lastReleasedPendingBytes(), reservedBytes);
         assertEq(spRegistry.lastReleasedPendingManifestHash(), defaultManifestHash);
     }
 
