@@ -320,6 +320,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error EmptyManifestLocation();
 
     /**
+     * @notice Error thrown when a deal request has no manifest hash.
+     * @dev 0x03d0cf2a
+     */
+    error InvalidManifestHash();
+
+    /**
      * @notice Error thrown when manifest location is too long
      * @dev 0xa76fb58b
      */
@@ -464,6 +470,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     function proposeDeal(SharedTypes.DealRequest calldata request) external {
         _ensureCorrectManifestLocation(request.manifestLocation);
         _ensureCorrectRequirements(request.requiredSLIs);
+        if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
 
         PoRepMarketStorage storage $ = s();
         IStorageEvidenceAdapter evidenceAdapter = $._globalEvidenceAdapter;
@@ -471,9 +478,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert InvalidEvidenceAdapterAddress();
         }
 
-        CommonTypes.FilActorId provider;
-        bool autoApprove;
-        address organization;
         {
             SLITypes.DealTerms memory terms = SLITypes.DealTerms({
                 dealSizeBytes: request.requestedSizeBytes,
@@ -481,27 +485,28 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
                 durationDays: request.durationDays
             });
             _ensureCorrectTerms(terms);
-            (provider, autoApprove, organization) =
-                $._SPRegistryContract.getProviderForDeal(request.requiredSLIs, terms);
         }
+        SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
+        CommonTypes.FilActorId provider = selection.provider;
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
         }
+        address organization = $._SPRegistryContract.getProviderInfo(provider).organization;
 
         uint256 dealId = ++$._dealIdCounter;
-        uint8 initialState = autoApprove ? DealState.ACCEPTED : DealState.PROPOSED;
+        uint8 initialState = DealState.ACCEPTED;
 
         $._deals[dealId] = PoRepTypes.Deal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
-            offerId: 0,
+            offerId: selection.offerId,
             state: initialState,
             evidenceAdapter: address(evidenceAdapter),
             validator: address(0),
             railId: 0
         });
-        $._dealSLIs[dealId] = request.requiredSLIs;
+        $._dealSLIs[dealId] = selection.promisedSLIs;
         {
             uint64 durationEpochs = uint64(uint256(request.durationDays) * (EPOCHS_IN_MONTH / 30));
             $._dealTerms[dealId] =
@@ -519,11 +524,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0), serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0)
         });
         $._dealCapacity[dealId] =
-            PoRepTypes.DealCapacity({reservedBytes: request.requestedSizeBytes, committedBytes: 0});
+            PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
         $._dealPayments[dealId] = PoRepTypes.DealPayment({
-            paymentToken: request.paymentToken,
-            payee: address(0),
-            pricePer32GiBPerMonth: request.maxPricePer32GiBPerMonth,
+            paymentToken: selection.paymentToken,
+            payee: selection.payee,
+            pricePer32GiBPerMonth: selection.pricePer32GiBPerMonth,
             billed32GiBUnits: 0,
             railMaxRatePerEpoch: 0
         });
@@ -545,10 +550,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._dealIdsByClient[msg.sender].add(dealId);
         $._dealIdsByProvider[provider].add(dealId);
         $._dealIdsByState[initialState].add(dealId);
-
-        if (autoApprove) {
-            emit DealAccepted(dealId, msg.sender, provider);
-        }
+        emit DealAccepted(dealId, msg.sender, provider);
     }
 
     // solhint-enable function-max-lines

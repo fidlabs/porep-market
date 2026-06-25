@@ -22,13 +22,18 @@ contract SPRegistryMock is ISPRegistry {
     mapping(uint64 => address) private _payees;
     uint64 public lastReleasedPendingProvider;
     uint256 public lastReleasedPendingBytes;
+    SharedTypes.DealRequest private _lastReserveRequest;
+    uint64 public lastReleasedCapacityProvider;
+    uint256 public lastReleasedCapacityBytes;
+    bytes32 public lastReleasedCapacityManifestHash;
     bytes32 public lastReleasedPendingManifestHash;
-    uint64 public lastReleasedProvider;
-    uint256 public lastReleasedBytes;
-    bytes32 public lastReleasedManifestHash;
 
     function setNextSelection(SharedTypes.ProviderDealSelection calldata selection) external {
         nextSelection = selection;
+    }
+
+    function getLastReserveRequest() external view returns (SharedTypes.DealRequest memory) {
+        return _lastReserveRequest;
     }
 
     function setNextProvider(CommonTypes.FilActorId provider) external {
@@ -114,11 +119,11 @@ contract SPRegistryMock is ISPRegistry {
         return nextSelection;
     }
 
-    function reserveProviderForDeal(SharedTypes.DealRequest calldata)
+    function reserveProviderForDeal(SharedTypes.DealRequest calldata request)
         external
-        view
         returns (SharedTypes.ProviderDealSelection memory)
     {
+        _lastReserveRequest = request;
         return nextSelection;
     }
 
@@ -196,9 +201,9 @@ contract SPRegistryMock is ISPRegistry {
     }
 
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external {
-        lastReleasedProvider = CommonTypes.FilActorId.unwrap(provider);
-        lastReleasedBytes = sizeBytes;
-        lastReleasedManifestHash = manifestHash;
+        lastReleasedCapacityProvider = CommonTypes.FilActorId.unwrap(provider);
+        lastReleasedCapacityBytes = sizeBytes;
+        lastReleasedCapacityManifestHash = manifestHash;
     }
 
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
