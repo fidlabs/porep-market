@@ -13,8 +13,6 @@ import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
-import {SharedTypes} from "../src/types/SharedTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 
 contract ValidatorFactoryTest is Test {
@@ -48,22 +46,17 @@ contract ValidatorFactoryTest is Test {
         provider = CommonTypes.FilActorId.wrap(1);
         validatorAddress = address(new Validator());
         factoryImpl = new ValidatorFactory();
-        poRepMarketMock.setDealProposal(
+        poRepMarketMock.setDeal(
             dealId,
-            PoRepTypes.DealProposal({
+            PoRepTypes.Deal({
                 dealId: dealId,
                 client: client,
                 provider: provider,
-                requirements: SharedTypes.SLIThresholds({
-                    retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
-                }),
-                terms: SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100, durationDays: 365}),
-                validator: vm.addr(10),
+                offerId: 0,
                 state: PoRepTypes.DealState.Accepted,
-                railId: 200,
-                proposedAtBlock: block.number,
-                manifestLocation: "https://example.com/manifest",
-                evidenceAdapter: dataCapEvidenceAdapter
+                evidenceAdapter: dataCapEvidenceAdapter,
+                validator: vm.addr(10),
+                railId: 200
             })
         );
 

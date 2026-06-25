@@ -222,9 +222,9 @@
     "inputs": [],
     "outputs": [
       {
-        "name": "completedDeals",
+        "name": "activeDeals",
         "type": "tuple[]",
-        "internalType": "struct PoRepTypes.DealProposal[]",
+        "internalType": "struct PoRepTypes.Deal[]",
         "components": [
           {
             "name": "dealId",
@@ -242,58 +242,9 @@
             "internalType": "CommonTypes.FilActorId"
           },
           {
-            "name": "requirements",
-            "type": "tuple",
-            "internalType": "struct SharedTypes.SLIThresholds",
-            "components": [
-              {
-                "name": "retrievabilityBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "bandwidthBytesPerSecond",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "latencyMs",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "indexingPct",
-                "type": "uint8",
-                "internalType": "uint8"
-              }
-            ]
-          },
-          {
-            "name": "terms",
-            "type": "tuple",
-            "internalType": "struct SLITypes.DealTerms",
-            "components": [
-              {
-                "name": "dealSizeBytes",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "pricePerSectorPerMonth",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "durationDays",
-                "type": "uint32",
-                "internalType": "uint32"
-              }
-            ]
-          },
-          {
-            "name": "validator",
-            "type": "address",
-            "internalType": "address"
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "state",
@@ -301,24 +252,111 @@
             "internalType": "enum PoRepTypes.DealState"
           },
           {
+            "name": "evidenceAdapter",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "validator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
             "name": "railId",
             "type": "uint256",
             "internalType": "uint256"
-          },
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDeal",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "deal",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.Deal",
+        "components": [
           {
-            "name": "proposedAtBlock",
+            "name": "dealId",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "manifestLocation",
-            "type": "string",
-            "internalType": "string"
+            "name": "client",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "state",
+            "type": "uint8",
+            "internalType": "enum PoRepTypes.DealState"
           },
           {
             "name": "evidenceAdapter",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "validator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealCapacity",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "capacity",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.DealCapacity",
+        "components": [
+          {
+            "name": "reservedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "committedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -334,6 +372,37 @@
         "name": "",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealData",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "dealData",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.DealData",
+        "components": [
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -359,7 +428,20 @@
   },
   {
     "type": "function",
-    "name": "getDealProposal",
+    "name": "getDealExpiration",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "dealExpiration",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealPayment",
     "inputs": [
       {
         "name": "dealId",
@@ -369,103 +451,34 @@
     ],
     "outputs": [
       {
-        "name": "",
+        "name": "payment",
         "type": "tuple",
-        "internalType": "struct PoRepTypes.DealProposal",
+        "internalType": "struct PoRepTypes.DealPayment",
         "components": [
           {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "client",
+            "name": "paymentToken",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "provider",
-            "type": "uint64",
-            "internalType": "CommonTypes.FilActorId"
-          },
-          {
-            "name": "requirements",
-            "type": "tuple",
-            "internalType": "struct SharedTypes.SLIThresholds",
-            "components": [
-              {
-                "name": "retrievabilityBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "bandwidthBytesPerSecond",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "latencyMs",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "indexingPct",
-                "type": "uint8",
-                "internalType": "uint8"
-              }
-            ]
-          },
-          {
-            "name": "terms",
-            "type": "tuple",
-            "internalType": "struct SLITypes.DealTerms",
-            "components": [
-              {
-                "name": "dealSizeBytes",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "pricePerSectorPerMonth",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "durationDays",
-                "type": "uint32",
-                "internalType": "uint32"
-              }
-            ]
-          },
-          {
-            "name": "validator",
+            "name": "payee",
             "type": "address",
             "internalType": "address"
           },
           {
-            "name": "state",
-            "type": "uint8",
-            "internalType": "enum PoRepTypes.DealState"
-          },
-          {
-            "name": "railId",
+            "name": "pricePer32GiBPerMonth",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "proposedAtBlock",
+            "name": "billed32GiBUnits",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "manifestLocation",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "evidenceAdapter",
-            "type": "address",
-            "internalType": "address"
+            "name": "railMaxRatePerEpoch",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -474,13 +487,134 @@
   },
   {
     "type": "function",
-    "name": "getDealProposalExpiration",
-    "inputs": [],
-    "outputs": [
+    "name": "getDealSLIs",
+    "inputs": [
       {
-        "name": "",
+        "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "slis",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "bandwidthBytesPerSecond",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealService",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "service",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.DealService",
+        "components": [
+          {
+            "name": "serviceStartEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "serviceEndEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealTerms",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "terms",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.DealTerms",
+        "components": [
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "durationEpochs",
+            "type": "uint64",
+            "internalType": "uint64"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealTiming",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "timing",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.DealTiming",
+        "components": [
+          {
+            "name": "proposedAtEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          },
+          {
+            "name": "expiresAtEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -493,7 +627,7 @@
       {
         "name": "deals",
         "type": "tuple[]",
-        "internalType": "struct PoRepTypes.DealProposal[]",
+        "internalType": "struct PoRepTypes.Deal[]",
         "components": [
           {
             "name": "dealId",
@@ -511,58 +645,9 @@
             "internalType": "CommonTypes.FilActorId"
           },
           {
-            "name": "requirements",
-            "type": "tuple",
-            "internalType": "struct SharedTypes.SLIThresholds",
-            "components": [
-              {
-                "name": "retrievabilityBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "bandwidthBytesPerSecond",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "latencyMs",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "indexingPct",
-                "type": "uint8",
-                "internalType": "uint8"
-              }
-            ]
-          },
-          {
-            "name": "terms",
-            "type": "tuple",
-            "internalType": "struct SLITypes.DealTerms",
-            "components": [
-              {
-                "name": "dealSizeBytes",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "pricePerSectorPerMonth",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "durationDays",
-                "type": "uint32",
-                "internalType": "uint32"
-              }
-            ]
-          },
-          {
-            "name": "validator",
-            "type": "address",
-            "internalType": "address"
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "state",
@@ -570,24 +655,19 @@
             "internalType": "enum PoRepTypes.DealState"
           },
           {
-            "name": "railId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "proposedAtBlock",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "manifestLocation",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
             "name": "evidenceAdapter",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "validator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -613,7 +693,7 @@
       {
         "name": "deals",
         "type": "tuple[]",
-        "internalType": "struct PoRepTypes.DealProposal[]",
+        "internalType": "struct PoRepTypes.Deal[]",
         "components": [
           {
             "name": "dealId",
@@ -631,58 +711,9 @@
             "internalType": "CommonTypes.FilActorId"
           },
           {
-            "name": "requirements",
-            "type": "tuple",
-            "internalType": "struct SharedTypes.SLIThresholds",
-            "components": [
-              {
-                "name": "retrievabilityBps",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "bandwidthBytesPerSecond",
-                "type": "uint64",
-                "internalType": "uint64"
-              },
-              {
-                "name": "latencyMs",
-                "type": "uint16",
-                "internalType": "uint16"
-              },
-              {
-                "name": "indexingPct",
-                "type": "uint8",
-                "internalType": "uint8"
-              }
-            ]
-          },
-          {
-            "name": "terms",
-            "type": "tuple",
-            "internalType": "struct SLITypes.DealTerms",
-            "components": [
-              {
-                "name": "dealSizeBytes",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "pricePerSectorPerMonth",
-                "type": "uint256",
-                "internalType": "uint256"
-              },
-              {
-                "name": "durationDays",
-                "type": "uint32",
-                "internalType": "uint32"
-              }
-            ]
-          },
-          {
-            "name": "validator",
-            "type": "address",
-            "internalType": "address"
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
           },
           {
             "name": "state",
@@ -690,24 +721,19 @@
             "internalType": "enum PoRepTypes.DealState"
           },
           {
-            "name": "railId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "proposedAtBlock",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "manifestLocation",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
             "name": "evidenceAdapter",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "validator",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "railId",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
@@ -866,58 +892,68 @@
     "name": "proposeDeal",
     "inputs": [
       {
-        "name": "requirements",
+        "name": "request",
         "type": "tuple",
-        "internalType": "struct SharedTypes.SLIThresholds",
+        "internalType": "struct SharedTypes.DealRequest",
         "components": [
           {
-            "name": "retrievabilityBps",
-            "type": "uint16",
-            "internalType": "uint16"
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
           },
           {
-            "name": "bandwidthBytesPerSecond",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "latencyMs",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "indexingPct",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
-      },
-      {
-        "name": "terms",
-        "type": "tuple",
-        "internalType": "struct SLITypes.DealTerms",
-        "components": [
-          {
-            "name": "dealSizeBytes",
+            "name": "requestedSizeBytes",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "pricePerSectorPerMonth",
+            "name": "maxPricePer32GiBPerMonth",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
           },
           {
             "name": "durationDays",
             "type": "uint32",
             "internalType": "uint32"
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
           }
         ]
-      },
-      {
-        "name": "manifestLocation",
-        "type": "string",
-        "internalType": "string"
       }
     ],
     "outputs": [],
@@ -1085,10 +1121,10 @@
   },
   {
     "type": "function",
-    "name": "setNewDealProposalExpiration",
+    "name": "setNewDealExpiration",
     "inputs": [
       {
-        "name": "newDealProposalExpiration",
+        "name": "newDealExpiration",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1323,7 +1359,7 @@
   },
   {
     "type": "event",
-    "name": "DealProposalCreated",
+    "name": "DealCreated",
     "inputs": [
       {
         "name": "dealId",
@@ -1394,10 +1430,10 @@
   },
   {
     "type": "event",
-    "name": "DealProposalExpirationUpdated",
+    "name": "DealExpirationUpdated",
     "inputs": [
       {
-        "name": "newDealProposalExpiration",
+        "name": "newDealExpiration",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
@@ -1407,7 +1443,7 @@
   },
   {
     "type": "event",
-    "name": "DealProposalExpired",
+    "name": "DealExpired",
     "inputs": [
       {
         "name": "dealId",
@@ -1805,6 +1841,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidDealExpiration",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidDealPricePerSectorPerMonth",
     "inputs": [
       {
@@ -1818,11 +1859,6 @@
         "internalType": "uint256"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidDealProposalExpiration",
-    "inputs": []
   },
   {
     "type": "error",

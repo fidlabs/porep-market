@@ -19,7 +19,7 @@ import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
 /**
  * @title PoRepMarket contract
- * @dev PoRepMarket contract is a contract that allows users to create and manage deal proposals for PoRep deals
+ * @dev PoRepMarket contract is a contract that allows users to create and manage PoRep deals
  * @notice PoRepMarket contract
  */
 contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
@@ -51,7 +51,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 private constant MAX_DEAL_COMPLETION_PADDING = 100;
 
     /**
-     * @notice Default number of epochs after which a deal proposal expires if not accepted
+     * @notice Default number of epochs after which a proposed deal expires if not accepted
      * @dev 2 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 5_760 epochs
      */
     uint256 private constant DEFAULT_DEAL_PROPOSAL_EXPIRATION = 5_760;
@@ -67,43 +67,53 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     uint32 public constant MAX_DEAL_DURATION_DAYS = PoRepTypes.MAX_DEAL_DURATION_DAYS;
 
-    /// @custom:storage-location erc7201:porepmarket.storage.DealProposalsStorage
-    struct DealProposalsStorage {
-        mapping(uint256 dealId => PoRepTypes.DealProposal) _dealProposals;
+    /// @custom:storage-location erc7201:porepmarket.storage.PoRepMarket
+    struct PoRepMarketStorage {
+        mapping(uint256 dealId => PoRepTypes.Deal) _deals;
+        mapping(uint256 dealId => SharedTypes.DealData) _dealData;
+        mapping(uint256 dealId => PoRepTypes.DealTerms) _dealTerms;
+        mapping(uint256 dealId => PoRepTypes.DealTiming) _dealTiming;
+        mapping(uint256 dealId => PoRepTypes.DealService) _dealService;
+        mapping(uint256 dealId => PoRepTypes.DealCapacity) _dealCapacity;
+        mapping(uint256 dealId => PoRepTypes.DealPayment) _dealPayments;
+        mapping(uint256 dealId => SharedTypes.SLIThresholds) _dealSLIs;
         mapping(uint256 dealId => address organization) _dealOrganization;
         mapping(PoRepTypes.DealState state => mapping(address organization => EnumerableSet.UintSet dealIds))
             _dealIdsByStateByOrganization;
+        mapping(PoRepTypes.DealState state => EnumerableSet.UintSet dealIds) _dealIdsByState;
+        mapping(address client => EnumerableSet.UintSet dealIds) _dealIdsByClient;
+        mapping(CommonTypes.FilActorId provider => EnumerableSet.UintSet dealIds) _dealIdsByProvider;
         EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
         IStorageEvidenceAdapter _globalEvidenceAdapter;
         uint256 _dealIdCounter;
         uint256 _dealCompletionPadding;
-        uint256 _dealProposalExpiration;
+        uint256 _dealExpiration;
     }
-    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DealProposalsStorage")) - 1)) & ~bytes32(uint256(0xff))
-    bytes32 private constant DEAL_PROPOSALS_STORAGE_LOCATION =
-        0xea093611145db18b250f1cd58e07fc50de512902beb662a10f8e6d1dd55f6700;
+    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.PoRepMarket")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant POREP_MARKET_STORAGE_LOCATION =
+        0x0abde292d09529f8839f1c315101bb9805017b92f1e5d27b754124ac2f3da000;
 
     // solhint-disable-next-line use-natspec
-    function _getDealProposalsStorage() private pure returns (DealProposalsStorage storage $) {
+    function _getPoRepMarketStorage() private pure returns (PoRepMarketStorage storage $) {
         // solhint-disable-next-line no-inline-assembly
         assembly {
-            $.slot := DEAL_PROPOSALS_STORAGE_LOCATION
+            $.slot := POREP_MARKET_STORAGE_LOCATION
         }
     }
 
     /**
      * @notice function to allow acess to storage
-     * @return DealProposalsStorage storage struct
+     * @return PoRepMarketStorage storage struct
      */
-    function s() private pure returns (DealProposalsStorage storage) {
-        return _getDealProposalsStorage();
+    function s() private pure returns (PoRepMarketStorage storage) {
+        return _getPoRepMarketStorage();
     }
 
     /**
-     * @notice DealProposalCreated event
-     * @param dealId The id of the deal proposal
+     * @notice DealCreated event
+     * @param dealId The id of the deal
      * @param client The address of the client
      * @param provider The address of the provider
      * @param requirements The SLI thresholds for the deal
@@ -111,7 +121,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param totalDealSize The total size of the deal in bytes
      * @param proposedAtBlock The block number when the deal was proposed
      */
-    event DealProposalCreated(
+    event DealCreated(
         uint256 indexed dealId,
         address indexed client,
         CommonTypes.FilActorId indexed provider,
@@ -123,7 +133,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice DealAccepted event
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param owner The address of the owner
      * @param provider The address of the provider
      */
@@ -132,7 +142,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice ValidatorUpdated event
      * @dev ValidatorUpdated event is emitted when a validator is updated
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param validator The address of the validator
      */
     event ValidatorUpdated(uint256 indexed dealId, address indexed validator);
@@ -140,14 +150,14 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice RailIdUpdated event
      * @dev RailIdUpdated event is emitted when a rail id is updated
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param railId The id of the rail
      */
     event RailIdUpdated(uint256 indexed dealId, uint256 indexed railId);
 
     /**
      * @notice DealCompleted event
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param client The address of the client
      * @param actualSizeBytes The actual size of the data in bytes
      * @param provider The address of the provider
@@ -159,7 +169,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice DealTerminated event
      * @dev DealTerminated event is emitted when a deal is terminated
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param terminator The address that terminated the deal
      * @param endEpoch The Filecoin epoch at which the deal was terminated
      */
@@ -167,7 +177,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice DealRejected event
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param rejector The address of the rejector
      */
     event DealRejected(uint256 indexed dealId, address indexed rejector);
@@ -175,7 +185,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice ManifestLocationUpdated event
      * @dev ManifestLocationUpdated event is emitted when a manifest location is updated
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param oldManifestLocation The old manifest location
      * @param newManifestLocation The new manifest location
      */
@@ -197,19 +207,19 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     event DealCompletionPaddingUpdated(uint256 indexed oldPadding, uint256 indexed newPadding);
 
     /**
-     * @notice DealProposalExpired event
-     * @dev DealProposalExpired event is emitted when a deal proposal expires
-     * @param dealId The id of the deal proposal
-     * @param expiredAtBlock The block number at which the deal proposal expired
+     * @notice DealExpired event
+     * @dev DealExpired event is emitted when a deal expires
+     * @param dealId The id of the deal
+     * @param expiredAtBlock The block number at which the deal expired
      */
-    event DealProposalExpired(uint256 indexed dealId, uint256 indexed expiredAtBlock);
+    event DealExpired(uint256 indexed dealId, uint256 indexed expiredAtBlock);
 
     /**
-     * @notice DealProposalExpirationUpdated event
-     * @dev DealProposalExpirationUpdated event is emitted when the deal proposal expiration is updated
-     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     * @notice DealExpirationUpdated event
+     * @dev DealExpirationUpdated event is emitted when the deal expiration is updated
+     * @param newDealExpiration The new deal expiration in epochs
      */
-    event DealProposalExpirationUpdated(uint256 indexed newDealProposalExpiration);
+    event DealExpirationUpdated(uint256 indexed newDealExpiration);
 
     /**
      * @notice Error thrown when caller is not the registered validator for the deal
@@ -242,7 +252,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error CallerIsNotValidator(uint256 dealId, address caller);
 
     /**
-     * @notice Error thrown when a deal proposal does not exist for a given id
+     * @notice Error thrown when a deal does not exist for a given id
      * @dev 0xa72c631d
      */
     error DealDoesNotExist();
@@ -327,7 +337,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Error thrown when a deal is not in a state that allows it to be rejected
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @dev 0x507b3029
      */
     error DealNotRejectable(uint256 dealId);
@@ -359,10 +369,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error DealCompletionPaddingTooHigh(uint256 padding, uint256 maxPadding);
 
     /**
-     * @notice Error thrown when trying to set a deal proposal expiration that is invalid
-     * @dev 0xa6584311
+     * @notice Error thrown when trying to set a deal expiration that is invalid
+     * @dev 0x25d11a26
      */
-    error InvalidDealProposalExpiration();
+    error InvalidDealExpiration();
 
     /**
      * @notice Error thrown when trying to reject a deal that is not expired yet
@@ -388,18 +398,20 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         public
         initializer
     {
-        if (_globalEvidenceAdapter == address(0)) revert InvalidEvidenceAdapterAddress();
+        if (_globalEvidenceAdapter == address(0)) {
+            revert InvalidEvidenceAdapterAddress();
+        }
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
         _grantRole(POREP_SERVICE_ROLE, _admin);
 
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
-        $._dealProposalExpiration = DEFAULT_DEAL_PROPOSAL_EXPIRATION;
+        $._dealExpiration = DEFAULT_DEAL_PROPOSAL_EXPIRATION;
 
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
@@ -410,33 +422,42 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param _globalEvidenceAdapter The address of the global evidence adapter
      */
     function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) public onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_globalEvidenceAdapter == address(0)) revert InvalidEvidenceAdapterAddress();
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
+        if (_globalEvidenceAdapter == address(0)) {
+            revert InvalidEvidenceAdapterAddress();
+        }
+        PoRepMarketStorage storage $ = _getPoRepMarketStorage();
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
 
+    // solhint-disable function-max-lines
     /**
      * @notice Proposes a deal
-     * @param requirements The SLI thresholds for the deal
-     * @param terms The commercial terms for the deal
-     * @param manifestLocation The location of the manifest for the deal
+     * @param request The client deal request
      */
-    function proposeDeal(
-        SharedTypes.SLIThresholds calldata requirements,
-        SLITypes.DealTerms calldata terms,
-        string calldata manifestLocation
-    ) external {
-        _ensureCorrectManifestLocation(manifestLocation);
-        _ensureCorrectRequirements(requirements);
-        _ensureCorrectTerms(terms);
+    function proposeDeal(SharedTypes.DealRequest calldata request) external {
+        _ensureCorrectManifestLocation(request.manifestLocation);
+        _ensureCorrectRequirements(request.requiredSLIs);
 
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         IStorageEvidenceAdapter evidenceAdapter = $._globalEvidenceAdapter;
-        if (address(evidenceAdapter) == address(0)) revert InvalidEvidenceAdapterAddress();
+        if (address(evidenceAdapter) == address(0)) {
+            revert InvalidEvidenceAdapterAddress();
+        }
 
-        (CommonTypes.FilActorId provider, bool autoApprove, address organization) =
-            $._SPRegistryContract.getProviderForDeal(requirements, terms);
+        CommonTypes.FilActorId provider;
+        bool autoApprove;
+        address organization;
+        {
+            SLITypes.DealTerms memory terms = SLITypes.DealTerms({
+                dealSizeBytes: request.requestedSizeBytes,
+                pricePerSectorPerMonth: request.maxPricePer32GiBPerMonth,
+                durationDays: request.durationDays
+            });
+            _ensureCorrectTerms(terms);
+            (provider, autoApprove, organization) =
+                $._SPRegistryContract.getProviderForDeal(request.requiredSLIs, terms);
+        }
         if (CommonTypes.FilActorId.unwrap(provider) == 0) {
             revert NoProviderFoundForDeal();
         }
@@ -444,45 +465,80 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         uint256 dealId = ++$._dealIdCounter;
         PoRepTypes.DealState initialState = autoApprove ? PoRepTypes.DealState.Accepted : PoRepTypes.DealState.Proposed;
 
-        $._dealProposals[dealId] = PoRepTypes.DealProposal({
+        $._deals[dealId] = PoRepTypes.Deal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
-            requirements: requirements,
-            terms: terms,
-            validator: address(0),
+            offerId: 0,
             state: initialState,
-            railId: 0,
-            proposedAtBlock: block.number,
-            manifestLocation: manifestLocation,
-            evidenceAdapter: address(evidenceAdapter)
+            evidenceAdapter: address(evidenceAdapter),
+            validator: address(0),
+            railId: 0
         });
+        $._dealSLIs[dealId] = request.requiredSLIs;
         {
-            uint256 dealSizeBytes = terms.dealSizeBytes;
-            emit DealProposalCreated(
-                dealId, msg.sender, provider, requirements, manifestLocation, dealSizeBytes, block.number
+            uint64 durationEpochs = uint64(uint256(request.durationDays) * (EPOCHS_IN_MONTH / 30));
+            $._dealTerms[dealId] =
+                PoRepTypes.DealTerms({requestedSizeBytes: request.requestedSizeBytes, durationEpochs: durationEpochs});
+        }
+        {
+            int64 proposedAtEpoch = int64(uint64(block.number));
+            int64 expiresAtEpoch = int64(uint64(block.number + _getDealExpiration($)));
+            $._dealTiming[dealId] = PoRepTypes.DealTiming({
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch),
+                expiresAtEpoch: CommonTypes.ChainEpoch.wrap(expiresAtEpoch)
+            });
+        }
+        $._dealService[dealId] = PoRepTypes.DealService({
+            serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0), serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0)
+        });
+        $._dealCapacity[dealId] =
+            PoRepTypes.DealCapacity({reservedBytes: request.requestedSizeBytes, committedBytes: 0});
+        $._dealPayments[dealId] = PoRepTypes.DealPayment({
+            paymentToken: request.paymentToken,
+            payee: address(0),
+            pricePer32GiBPerMonth: request.maxPricePer32GiBPerMonth,
+            billed32GiBUnits: 0,
+            railMaxRatePerEpoch: 0
+        });
+        $._dealData[dealId] =
+            SharedTypes.DealData({manifestHash: request.manifestHash, manifestLocation: request.manifestLocation});
+        {
+            emit DealCreated(
+                dealId,
+                msg.sender,
+                provider,
+                request.requiredSLIs,
+                request.manifestLocation,
+                request.requestedSizeBytes,
+                block.number
             );
         }
         $._dealOrganization[dealId] = organization;
         $._dealIdsByStateByOrganization[initialState][organization].add(dealId);
+        $._dealIdsByClient[msg.sender].add(dealId);
+        $._dealIdsByProvider[provider].add(dealId);
+        $._dealIdsByState[initialState].add(dealId);
 
         if (autoApprove) {
             emit DealAccepted(dealId, msg.sender, provider);
         }
     }
 
+    // solhint-enable function-max-lines
+
     /**
-     * @notice Updates the validator for a deal proposal
-     * @param dealId The id of the deal proposal
+     * @notice Updates the validator for a deal
+     * @param dealId The id of the deal
      */
     function updateValidator(uint256 dealId) external {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Accepted);
 
-        if (dp.validator != address(0)) {
+        if (deal.validator != address(0)) {
             revert ValidatorAlreadySet(dealId);
         }
 
@@ -490,24 +546,24 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert NotTheRegisteredValidator(dealId, msg.sender);
         }
 
-        dp.validator = msg.sender;
+        deal.validator = msg.sender;
         emit ValidatorUpdated(dealId, msg.sender);
     }
 
     /**
-     * @notice Updates the rail id for a deal proposal
-     * @dev Updates the rail id for a deal proposal
-     * @param dealId The id of the deal proposal
+     * @notice Updates the rail id for a deal
+     * @dev Updates the rail id for a deal
+     * @param dealId The id of the deal
      * @param railId The id of the rail
      */
     function updateRailId(uint256 dealId, uint256 railId) external {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Accepted);
 
-        if (dp.railId != 0) {
+        if (deal.railId != 0) {
             revert RailIdAlreadySet();
         }
 
@@ -515,88 +571,159 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert InvalidRailId();
         }
 
-        if (dp.validator != msg.sender) {
+        if (deal.validator != msg.sender) {
             revert NotTheDealValidator(dealId, msg.sender);
         }
 
-        dp.railId = railId;
+        deal.railId = railId;
         emit RailIdUpdated(dealId, railId);
     }
 
     /**
-     * @notice Gets a deal proposal
-     * @param dealId The id of the deal proposal
-     * @return DealProposal The deal proposal
+     * @notice Gets a deal
+     * @param dealId The id of the deal
+     * @return deal The deal
      */
-    function getDealProposal(uint256 dealId) external view returns (PoRepTypes.DealProposal memory) {
-        DealProposalsStorage storage $ = s();
-        return $._dealProposals[dealId];
+    function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory deal) {
+        PoRepMarketStorage storage $ = s();
+        return $._deals[dealId];
+    }
+
+    /**
+     * @notice Gets the data fields for a deal
+     * @param dealId The id of the deal
+     * @return dealData The deal data
+     */
+    function getDealData(uint256 dealId) external view returns (SharedTypes.DealData memory dealData) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealData[dealId];
+    }
+
+    /**
+     * @notice Gets the frozen size and duration terms for a deal
+     * @param dealId The id of the deal
+     * @return terms The deal terms
+     */
+    function getDealTerms(uint256 dealId) external view returns (PoRepTypes.DealTerms memory terms) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealTerms[dealId];
+    }
+
+    /**
+     * @notice Gets the proposal timing for a deal
+     * @param dealId The id of the deal
+     * @return timing The deal timing
+     */
+    function getDealTiming(uint256 dealId) external view returns (PoRepTypes.DealTiming memory timing) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealTiming[dealId];
+    }
+
+    /**
+     * @notice Gets the service window for a deal
+     * @param dealId The id of the deal
+     * @return service The deal service window
+     */
+    function getDealService(uint256 dealId) external view returns (PoRepTypes.DealService memory service) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealService[dealId];
+    }
+
+    /**
+     * @notice Gets the reserved and committed capacity for a deal
+     * @param dealId The id of the deal
+     * @return capacity The deal capacity
+     */
+    function getDealCapacity(uint256 dealId) external view returns (PoRepTypes.DealCapacity memory capacity) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealCapacity[dealId];
+    }
+
+    /**
+     * @notice Gets payment terms and rail accounting for a deal
+     * @param dealId The id of the deal
+     * @return payment The deal payment data
+     */
+    function getDealPayment(uint256 dealId) external view returns (PoRepTypes.DealPayment memory payment) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealPayments[dealId];
+    }
+
+    /**
+     * @notice Gets SLI thresholds for a deal
+     * @param dealId The id of the deal
+     * @return slis The deal SLI thresholds
+     */
+    function getDealSLIs(uint256 dealId) external view returns (SharedTypes.SLIThresholds memory slis) {
+        PoRepMarketStorage storage $ = s();
+        return $._dealSLIs[dealId];
     }
 
     /**
      * @notice Accepts a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function acceptDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Proposed);
 
-        if (!$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)) {
-            revert NotTheControllingAddress(dealId, msg.sender, dp.provider);
+        if (!$._SPRegistryContract.isAuthorizedForProvider(msg.sender, deal.provider)) {
+            revert NotTheControllingAddress(dealId, msg.sender, deal.provider);
         }
 
         _changeDealState(dealId, PoRepTypes.DealState.Accepted);
-        emit DealAccepted(dealId, msg.sender, dp.provider);
+        emit DealAccepted(dealId, msg.sender, deal.provider);
     }
 
     /**
      * @notice Completes a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function completeDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Accepted);
 
-        if (msg.sender != dp.client) revert NotTheClientAddress();
+        if (msg.sender != deal.client) revert NotTheClientAddress();
         SharedTypes.EvidenceStatus memory status =
-            IStorageEvidenceAdapter(dp.evidenceAdapter).currentEvidenceStatus(_activationContext(dp));
+            IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
         uint256 allocatedSize = status.activeCoveredBytes;
-        uint256 proposedSize = dp.terms.dealSizeBytes;
+        uint256 proposedSize = $._dealTerms[dealId].requestedSizeBytes;
 
         _ensureAllocationSizeWithinTolerance(allocatedSize, proposedSize);
 
         $._dealIdsReadyForPayment.add(dealId);
-        $._SPRegistryContract.commitCapacity(dp.provider, proposedSize, allocatedSize);
+        $._SPRegistryContract.commitCapacity(deal.provider, proposedSize, allocatedSize);
+        $._dealCapacity[dealId].committedBytes = allocatedSize;
 
         _changeDealState(dealId, PoRepTypes.DealState.Completed);
-        emit DealCompleted(dealId, msg.sender, allocatedSize, dp.provider);
+        emit DealCompleted(dealId, msg.sender, allocatedSize, deal.provider);
     }
 
     /**
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param terminator The address that terminated the deal
      * @param endEpoch The Filecoin epoch at which the deal was terminated
      */
     function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external {
-        DealProposalsStorage storage $ = _getDealProposalsStorage();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = _getPoRepMarketStorage();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Completed);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Completed);
 
-        if (msg.sender != dp.validator || dp.validator == address(0)) {
+        if (msg.sender != deal.validator || deal.validator == address(0)) {
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releaseCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
         $._dealIdsReadyForPayment.remove(dealId);
 
         _changeDealState(dealId, PoRepTypes.DealState.Terminated);
@@ -605,23 +732,23 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Rejects a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function rejectDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Proposed);
 
         if (
-            msg.sender != dp.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, dp.provider)
+            msg.sender != deal.client && !$._SPRegistryContract.isAuthorizedForProvider(msg.sender, deal.provider)
                 && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)
         ) {
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
         _changeDealState(dealId, PoRepTypes.DealState.Rejected);
         emit DealRejected(dealId, msg.sender);
     }
@@ -629,86 +756,84 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Rejects a deal in Accepted state before rail is set
      * @dev Only callable by the admin
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      */
     function rejectAcceptedDeal(uint256 dealId) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Accepted);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Accepted);
 
-        if (dp.railId != 0) {
+        if (deal.railId != 0) {
             revert DealNotRejectable(dealId);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
         _changeDealState(dealId, PoRepTypes.DealState.Rejected);
         emit DealRejected(dealId, msg.sender);
     }
 
     /**
      * @notice Rejects expired deal
-     * @param dealId The id of the deal proposal
-     * @dev A deal proposal is considered expired if it has been in the proposed state for more than the dealProposalExpiration
-     * @dev Deal proposal expiration is set to 5_760 epochs (2 days) by default, but can be updated by the admin using setNewDealProposalExpiration function
+     * @param dealId The id of the deal
+     * @dev A deal is considered expired after its proposed-state expiration epoch
      */
     function rejectExpiredDeal(uint256 dealId) external {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
 
-        _ensureDealExists(dp);
-        _ensureDealCorrectState(dp, PoRepTypes.DealState.Proposed);
-
-        uint256 expiration = _getDealProposalExpiration($);
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Proposed);
 
         // solhint-disable  gas-strict-inequalities
-        if (block.number <= dp.proposedAtBlock + expiration) {
-            revert DealNotExpiredYet(dealId, block.number, dp.proposedAtBlock + expiration);
+        uint256 expiresAtBlock = uint256(uint64(CommonTypes.ChainEpoch.unwrap($._dealTiming[dealId].expiresAtEpoch)));
+        if (block.number <= expiresAtBlock) {
+            revert DealNotExpiredYet(dealId, block.number, expiresAtBlock);
         }
         // solhint-enable  gas-strict-inequalities
 
-        $._SPRegistryContract.releasePendingCapacity(dp.provider, dp.terms.dealSizeBytes);
+        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
         _changeDealState(dealId, PoRepTypes.DealState.Rejected);
-        emit DealProposalExpired(dealId, block.number);
+        emit DealExpired(dealId, block.number);
     }
 
     /**
-     * @notice Sets new deal proposal expiration
+     * @notice Sets new proposed deal expiration
      * @dev Only callable by the admin
-     * @param newDealProposalExpiration The new deal proposal expiration in epochs
+     * @param newDealExpiration The new proposed deal expiration in epochs
      */
-    function setNewDealProposalExpiration(uint256 newDealProposalExpiration) external onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (newDealProposalExpiration == 0) {
-            revert InvalidDealProposalExpiration();
+    function setNewDealExpiration(uint256 newDealExpiration) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (newDealExpiration == 0) {
+            revert InvalidDealExpiration();
         }
-        DealProposalsStorage storage $ = s();
-        $._dealProposalExpiration = newDealProposalExpiration;
+        PoRepMarketStorage storage $ = s();
+        $._dealExpiration = newDealExpiration;
 
-        emit DealProposalExpirationUpdated(newDealProposalExpiration);
+        emit DealExpirationUpdated(newDealExpiration);
     }
 
     /**
-     * @notice Gets all completed deals
-     * @return completedDeals Array of completed deal proposals
+     * @notice Gets all active deals
+     * @return activeDeals Array of active deals
      */
-    function getCompletedDeals() external view returns (PoRepTypes.DealProposal[] memory completedDeals) {
-        DealProposalsStorage storage $ = s();
-        uint256[] memory completedDealsIds = $._dealIdsReadyForPayment.values();
-        completedDeals = new PoRepTypes.DealProposal[](completedDealsIds.length);
+    function getCompletedDeals() external view returns (PoRepTypes.Deal[] memory activeDeals) {
+        PoRepMarketStorage storage $ = s();
+        uint256[] memory activeDealIds = $._dealIdsReadyForPayment.values();
+        activeDeals = new PoRepTypes.Deal[](activeDealIds.length);
         uint256 dealCounter = 0;
 
-        for (uint256 i = 0; i < completedDealsIds.length; i++) {
-            PoRepTypes.DealProposal memory dp = $._dealProposals[completedDealsIds[i]];
-            if (dp.state == PoRepTypes.DealState.Completed) {
-                completedDeals[dealCounter] = dp;
+        for (uint256 i = 0; i < activeDealIds.length; i++) {
+            PoRepTypes.Deal memory deal = $._deals[activeDealIds[i]];
+            if (deal.state == PoRepTypes.DealState.Completed) {
+                activeDeals[dealCounter] = deal;
                 dealCounter++;
             }
         }
 
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
-            mstore(completedDeals, dealCounter)
+            mstore(activeDeals, dealCounter)
         }
     }
 
@@ -716,39 +841,39 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Gets deals for a specific organization by state
      * @param organization The address of the organization
      * @param state The state of the deals to retrieve
-     * @return deals Array of deal proposals for the organization in the specified state (from all providers associated with the organization)
+     * @return deals Array of deals for the organization in the specified state (from all providers associated with the organization)
      */
     function getDealsForOrganizationByState(address organization, PoRepTypes.DealState state)
         external
         view
-        returns (PoRepTypes.DealProposal[] memory deals)
+        returns (PoRepTypes.Deal[] memory deals)
     {
         if (organization == address(0)) {
             revert InvalidOrganizationAddress();
         }
 
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         EnumerableSet.UintSet storage ids = $._dealIdsByStateByOrganization[state][organization];
 
         uint256 lengthOfDeals = ids.length();
-        deals = new PoRepTypes.DealProposal[](lengthOfDeals);
+        deals = new PoRepTypes.Deal[](lengthOfDeals);
 
         for (uint256 i = 0; i < lengthOfDeals; i++) {
-            deals[i] = $._dealProposals[ids.at(i)];
+            deals[i] = $._deals[ids.at(i)];
         }
     }
 
     /**
      * @notice Gets all deals
-     * @return deals Array of all deal proposals
+     * @return deals Array of all deals
      */
-    function getDeals() external view returns (PoRepTypes.DealProposal[] memory deals) {
-        DealProposalsStorage storage $ = s();
+    function getDeals() external view returns (PoRepTypes.Deal[] memory deals) {
+        PoRepMarketStorage storage $ = s();
         uint256 totalDeals = $._dealIdCounter;
-        deals = new PoRepTypes.DealProposal[](totalDeals);
+        deals = new PoRepTypes.Deal[](totalDeals);
 
         for (uint256 deal = 0; deal < totalDeals; deal++) {
-            deals[deal] = $._dealProposals[deal + 1];
+            deals[deal] = $._deals[deal + 1];
         }
     }
 
@@ -757,7 +882,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return ISPRegistry The SPRegistry contract address
      */
     function getSPRegistryContract() external view returns (address) {
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         return address($._SPRegistryContract);
     }
 
@@ -766,24 +891,24 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return The global evidence adapter address
      */
     function getGlobalEvidenceAdapter() external view returns (address) {
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         return address($._globalEvidenceAdapter);
     }
 
     /**
      * @notice Gets the evidence adapter address assigned to a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @return The evidence adapter address for the deal
      */
     function getDealEvidenceAdapter(uint256 dealId) external view returns (address) {
-        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
-        return dealProposal.evidenceAdapter;
+        PoRepTypes.Deal storage deal = s()._deals[dealId];
+        _ensureDealExists(deal);
+        return deal.evidenceAdapter;
     }
 
     /**
      * @notice Submit evidence to the adapter assigned to a deal
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param evidenceData Adapter-specific evidence payload
      * @return decision Adapter activation decision for the submitted batch
      */
@@ -792,16 +917,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         returns (SharedTypes.ActivationDecision memory decision)
     {
         _ensurePoRepServiceOrAdmin();
-        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
+        PoRepTypes.Deal storage deal = s()._deals[dealId];
+        _ensureDealExists(deal);
 
-        return IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
-            .submitEvidenceBatch(_activationContext(dealProposal), evidenceData);
+        return IStorageEvidenceAdapter(deal.evidenceAdapter).submitEvidenceBatch(_activationContext(deal), evidenceData);
     }
 
     /**
      * @notice Activate evidence for a deal through its assigned adapter
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param evidenceData Adapter-specific evidence payload
      * @return decision Adapter activation decision
      */
@@ -810,16 +934,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         returns (SharedTypes.ActivationDecision memory decision)
     {
         _ensurePoRepServiceOrAdmin();
-        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
+        PoRepTypes.Deal storage deal = s()._deals[dealId];
+        _ensureDealExists(deal);
 
-        return IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
-            .activateEvidence(_activationContext(dealProposal), evidenceData);
+        return IStorageEvidenceAdapter(deal.evidenceAdapter).activateEvidence(_activationContext(deal), evidenceData);
     }
 
     /**
      * @notice Refresh evidence status for a deal through its assigned adapter
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @param evidenceData Adapter-specific evidence payload
      * @return status Updated evidence status
      */
@@ -828,25 +951,23 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         returns (SharedTypes.EvidenceStatus memory status)
     {
         _ensurePoRepServiceOrAdmin();
-        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
+        PoRepTypes.Deal storage deal = s()._deals[dealId];
+        _ensureDealExists(deal);
 
-        return IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
-            .refreshEvidenceStatus(_activationContext(dealProposal), evidenceData);
+        return
+            IStorageEvidenceAdapter(deal.evidenceAdapter).refreshEvidenceStatus(_activationContext(deal), evidenceData);
     }
 
     /**
      * @notice Reads current evidence status for a deal through its assigned adapter
-     * @param dealId The id of the deal proposal
+     * @param dealId The id of the deal
      * @return status Current evidence status
      */
     function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status) {
-        PoRepTypes.DealProposal storage dealProposal = s()._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
+        PoRepTypes.Deal storage deal = s()._deals[dealId];
+        _ensureDealExists(deal);
 
-        return
-            IStorageEvidenceAdapter(dealProposal.evidenceAdapter)
-                .currentEvidenceStatus(_activationContext(dealProposal));
+        return IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
     }
 
     /**
@@ -854,44 +975,42 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return IValidatorFactory The validator factory contract address
      */
     function getValidatorFactoryContract() external view returns (address) {
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         return address($._validatorFactoryContract);
     }
 
     /**
-     * @notice Retrieves the manifest location URL for a specific deal proposal
-     * @param dealId The unique identifier of the deal proposal
-     * @return manifestLocation The manifest location URL for a specific deal proposal
+     * @notice Retrieves the manifest location URL for a specific deal
+     * @param dealId The unique identifier of the deal
+     * @return manifestLocation The manifest location URL for a specific deal
      */
     function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation) {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
-        return dealProposal.manifestLocation;
+        PoRepMarketStorage storage $ = s();
+        _ensureDealExists($._deals[dealId]);
+        return $._dealData[dealId].manifestLocation;
     }
 
     /**
-     * @notice Retrieves the deal proposal expiration
-     * @return dealProposalExpiration The deal proposal expiration in epochs
+     * @notice Retrieves the proposed deal expiration
+     * @return dealExpiration The proposed deal expiration in epochs
      */
-    function getDealProposalExpiration() external view returns (uint256) {
-        DealProposalsStorage storage $ = s();
-        return _getDealProposalExpiration($);
+    function getDealExpiration() external view returns (uint256 dealExpiration) {
+        PoRepMarketStorage storage $ = s();
+        return _getDealExpiration($);
     }
 
     /**
-     * @notice Updates the manifest location for a specific deal proposal
+     * @notice Updates the manifest location for a specific deal
      * @dev Only callable by the admin
-     * @param dealId The unique identifier of the deal proposal
-     * @param newManifestLocation The new manifest location URL to be updated for the deal proposal
+     * @param dealId The unique identifier of the deal
+     * @param newManifestLocation The new manifest location URL to be updated for the deal
      */
     function updateManifestLocation(uint256 dealId, string calldata newManifestLocation)
         external
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dealProposal = $._dealProposals[dealId];
-        _ensureDealExists(dealProposal);
+        PoRepMarketStorage storage $ = s();
+        _ensureDealExists($._deals[dealId]);
 
         if (bytes(newManifestLocation).length == 0) {
             revert EmptyManifestLocation();
@@ -901,8 +1020,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert TooLongManifestLocation();
         }
 
-        string memory oldManifestLocation = dealProposal.manifestLocation;
-        dealProposal.manifestLocation = newManifestLocation;
+        string memory oldManifestLocation = $._dealData[dealId].manifestLocation;
+        $._dealData[dealId].manifestLocation = newManifestLocation;
         emit ManifestLocationUpdated(dealId, oldManifestLocation, newManifestLocation);
     }
 
@@ -915,7 +1034,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert DealCompletionPaddingTooHigh(padding, MAX_DEAL_COMPLETION_PADDING);
         }
 
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         uint256 oldPadding = $._dealCompletionPadding;
         $._dealCompletionPadding = padding;
 
@@ -927,7 +1046,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return padding Current padding value
      */
     function getDealCompletionPadding() external view returns (uint256) {
-        DealProposalsStorage storage $ = s();
+        PoRepMarketStorage storage $ = s();
         return $._dealCompletionPadding;
     }
 
@@ -937,43 +1056,46 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param toState The new state of the deal
      */
     function _changeDealState(uint256 dealId, PoRepTypes.DealState toState) internal {
-        DealProposalsStorage storage $ = s();
-        PoRepTypes.DealProposal storage dp = $._dealProposals[dealId];
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
         address organization = $._dealOrganization[dealId];
 
-        $._dealIdsByStateByOrganization[dp.state][organization].remove(dealId);
+        $._dealIdsByStateByOrganization[deal.state][organization].remove(dealId);
         $._dealIdsByStateByOrganization[toState][organization].add(dealId);
-        dp.state = toState;
+        $._dealIdsByState[deal.state].remove(dealId);
+        $._dealIdsByState[toState].add(dealId);
+        deal.state = toState;
     }
 
     // solhint-disable
     /**
-     * @notice Gets the deal proposal expiration
-     * @dev If the deal proposal expiration is not set (contract already deployed), it returns the default deal proposal expiration
-     * @param $ The deal proposals storage
-     * @return The deal proposal expiration in epochs
+     * @notice Gets the proposed deal expiration
+     * @dev If the expiration is not set (contract already deployed), it returns the default expiration
+     * @param $ The market storage
+     * @return The proposed deal expiration in epochs
      */
-    function _getDealProposalExpiration(DealProposalsStorage storage $) internal view returns (uint256) {
-        return $._dealProposalExpiration == 0 ? DEFAULT_DEAL_PROPOSAL_EXPIRATION : $._dealProposalExpiration;
+    function _getDealExpiration(PoRepMarketStorage storage $) internal view returns (uint256) {
+        return $._dealExpiration == 0 ? DEFAULT_DEAL_PROPOSAL_EXPIRATION : $._dealExpiration;
     }
 
     /**
-     * @notice Builds adapter activation context for a deal proposal
-     * @param dp The deal proposal
+     * @notice Builds adapter activation context for a deal
+     * @param deal The deal
      * @return context The adapter activation context
      */
-    function _activationContext(PoRepTypes.DealProposal memory dp)
+    function _activationContext(PoRepTypes.Deal memory deal)
         internal
         view
         returns (SharedTypes.ActivationContext memory context)
     {
+        PoRepTypes.DealTerms memory terms = s()._dealTerms[deal.dealId];
         return SharedTypes.ActivationContext({
-            dealId: dp.dealId,
-            requestedSizeBytes: dp.terms.dealSizeBytes,
-            client: dp.client,
-            durationEpochs: uint64(uint256(dp.terms.durationDays) * SharedTypes.EPOCHS_IN_DAY),
+            dealId: deal.dealId,
+            requestedSizeBytes: terms.requestedSizeBytes,
+            client: deal.client,
+            durationEpochs: terms.durationEpochs,
             activationToleranceBps: uint16(s()._dealCompletionPadding),
-            provider: dp.provider
+            provider: deal.provider
         });
     }
 
@@ -990,22 +1112,21 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Ensures a deal exists
-     * @param dealProposal The id of the deal proposal
+     * @param deal The deal
      */
-    function _ensureDealExists(PoRepTypes.DealProposal memory dealProposal) internal pure {
-        if (dealProposal.dealId == 0) revert DealDoesNotExist();
+    function _ensureDealExists(PoRepTypes.Deal memory deal) internal pure {
+        if (deal.client == address(0)) revert DealDoesNotExist();
     }
 
     /**
      * @notice Ensures a deal is in the correct state
-     * @param dp The deal proposal
+     * @param deal The deal
      * @param expectedState The expected state
      */
-    function _ensureDealCorrectState(PoRepTypes.DealProposal memory dp, PoRepTypes.DealState expectedState)
-        internal
-        pure
-    {
-        if (dp.state != expectedState) revert DealNotInExpectedState(dp.dealId, dp.state, expectedState);
+    function _ensureDealCorrectState(PoRepTypes.Deal memory deal, PoRepTypes.DealState expectedState) internal pure {
+        if (deal.state != expectedState) {
+            revert DealNotInExpectedState(deal.dealId, deal.state, expectedState);
+        }
     }
 
     /**
@@ -1025,7 +1146,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Ensures the terms are correct
      * @param terms The terms for the deal
      */
-    function _ensureCorrectTerms(SLITypes.DealTerms calldata terms) internal pure {
+    function _ensureCorrectTerms(SLITypes.DealTerms memory terms) internal pure {
         if (terms.durationDays < MIN_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }

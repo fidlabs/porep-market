@@ -22,7 +22,7 @@ library SharedTypes {
     struct DealRequest {
         address paymentToken;
         // keccak256(manifest file bytes).
-        bytes32 pieceSetCommitment;
+        bytes32 manifestHash;
         uint256 requestedSizeBytes;
         uint32 durationDays; // Client-facing input; converted once before storage
         uint256 maxPricePer32GiBPerMonth;
@@ -39,7 +39,7 @@ library SharedTypes {
     }
 
     struct DealData {
-        bytes32 pieceSetCommitment;
+        bytes32 manifestHash;
         // URL or path for humans/tools; contracts do not fetch or trust it.
         string manifestLocation;
     }
@@ -48,7 +48,7 @@ library SharedTypes {
         uint256 dealId;
         address client;
         CommonTypes.FilActorId provider;
-        bytes32 pieceSetCommitment;
+        bytes32 manifestHash;
         uint256 requestedSizeBytes;
         uint16 activationToleranceBps;
         uint64 durationEpochs;

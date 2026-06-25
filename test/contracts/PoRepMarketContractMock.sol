@@ -10,15 +10,15 @@ import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet
 contract PoRepMarketContractMock is PoRepMarket {
     using EnumerableSet for EnumerableSet.UintSet;
 
-    function _getStorage() private pure returns (PoRepMarket.DealProposalsStorage storage $) {
+    function _getStorage() private pure returns (PoRepMarket.PoRepMarketStorage storage $) {
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
-            $.slot := 0xea093611145db18b250f1cd58e07fc50de512902beb662a10f8e6d1dd55f6700
+            $.slot := 0x0abde292d09529f8839f1c315101bb9805017b92f1e5d27b754124ac2f3da000
         }
     }
 
-    function setDealProposal(PoRepTypes.DealProposal calldata dealProposal) external {
-        _getStorage()._dealProposals[++_getStorage()._dealIdCounter] = dealProposal;
+    function setDeal(PoRepTypes.Deal calldata deal) external {
+        _getStorage()._deals[++_getStorage()._dealIdCounter] = deal;
     }
 
     function setDealIdsReadyForPayment(uint256[] calldata dealIds) external {
@@ -31,4 +31,3 @@ contract PoRepMarketContractMock is PoRepMarket {
         return _getStorage()._dealIdsReadyForPayment.values();
     }
 }
-

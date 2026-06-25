@@ -116,7 +116,7 @@ interface ISPRegistry {
      * @dev Releases estimated pending bytes, then commits actual bytes.
      *      Enforces sector padding tolerance if configured.
      * @param provider The provider whose capacity to commit
-     * @param estimatedSizeBytes Estimated size from the original deal proposal
+     * @param estimatedSizeBytes Estimated size from the original deal
      * @param actualSizeBytes Actual deal size from DDO allocation
      */
     function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
