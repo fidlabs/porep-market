@@ -218,7 +218,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address poRepMarket;
         address SPRegistry;
         CommonTypes.FilActorId providerId;
-        uint256 __reserved0; // delete this, that would be new contract not updatedet
         uint256 amountPerEpoch;
         uint256 earlyTerminatedEpoch;
         uint256 minTimeBetweenSettlementsInEpochs;

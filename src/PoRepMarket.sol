@@ -218,6 +218,21 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     event DealExpired(uint256 indexed dealId, uint256 indexed expiredAtBlock);
 
     /**
+     * @notice PaymentActivated event
+     * @dev Emitted when payment is activated for a deal
+     * @param dealId The id of the deal
+     * @param railMaxRatePerEpoch The maximum payment rate per epoch
+     * @param serviceStartEpoch The epoch at which service starts
+     * @param serviceEndEpoch The epoch at which service ends
+     */
+    event PaymentActivated(
+        uint256 indexed dealId,
+        uint256 indexed railMaxRatePerEpoch,
+        CommonTypes.ChainEpoch serviceStartEpoch,
+        CommonTypes.ChainEpoch serviceEndEpoch
+    );
+
+    /**
      * @notice DealExpirationUpdated event
      * @dev DealExpirationUpdated event is emitted when the deal expiration is updated
      * @param newDealExpiration The new deal expiration in epochs
@@ -759,6 +774,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             CommonTypes.ChainEpoch.wrap(serviceStartEpoch + int64(uint64($._dealTerms[dealId].durationEpochs)));
 
         IOperator(deal.validator).modifyRailPayment(railMaxRatePerEpoch);
+        emit PaymentActivated(dealId, railMaxRatePerEpoch, service.serviceStartEpoch, service.serviceEndEpoch);
     }
 
     /**
@@ -1173,8 +1189,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (payment.billed32GiBUnits == 0) {
             revert InvalidBilled32GiBUnits();
         }
-
-        amount = (payment.pricePer32GiBPerMonth * payment.billed32GiBUnits) / EPOCHS_IN_MONTH;
+        amount = Math.ceilDiv(payment.pricePer32GiBPerMonth * payment.billed32GiBUnits, EPOCHS_IN_MONTH);
         if (amount == 0) {
             revert InvalidZeroAmount();
         }

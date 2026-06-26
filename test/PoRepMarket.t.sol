@@ -521,6 +521,41 @@ contract PoRepMarketTest is Test {
         assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
     }
 
+    function testActivatePaymentEmitsPaymentActivatedEvent() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(providerOwnerAddress);
+        poRepMarket.acceptDeal(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateRailId(dealId, railId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        vm.prank(clientAddress);
+        poRepMarket.completeDeal(dealId);
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        CommonTypes.ChainEpoch expectedServiceStartEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
+        uint256 expectedBilledUnits = defaultTerms.dealSizeBytes / poRepMarket.SECTOR_SIZE();
+        uint256 expectedRate =
+            (defaultTerms.pricePerSectorPerMonth * expectedBilledUnits) / poRepMarket.EPOCHS_IN_MONTH();
+        CommonTypes.ChainEpoch expectedServiceEndEpoch = CommonTypes.ChainEpoch
+            .wrap(
+                CommonTypes.ChainEpoch.unwrap(expectedServiceStartEpoch)
+                    + int64(uint64(poRepMarket.getDealTerms(dealId).durationEpochs))
+            );
+
+        vm.expectEmit(true, true, true, true, address(poRepMarket));
+        emit PoRepMarket.PaymentActivated(dealId, expectedRate, expectedServiceStartEpoch, expectedServiceEndEpoch);
+
+        vm.prank(adminAddress);
+        poRepMarket.activatePayment(dealId);
+    }
+
     function testActivatePaymentRevertsWhenRailStateIsInvalid() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);
@@ -596,7 +631,7 @@ contract PoRepMarketTest is Test {
         market.activatePayment(dealId);
     }
 
-    function testActivatePaymentRevertsWhenCalculatedRateIsZero() public {
+    function testActivatePaymentRoundsUpRate() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);
         SLITypes.DealTerms memory terms = SLITypes.DealTerms({
@@ -619,9 +654,50 @@ contract PoRepMarketTest is Test {
         poRepMarket.completeDeal(dealId);
         validator.setRailStatus(RailStatus.PREPARED);
 
-        vm.expectRevert(PoRepMarket.InvalidZeroAmount.selector);
         vm.prank(adminAddress);
         poRepMarket.activatePayment(dealId);
+
+        assertEq(poRepMarket.getDealPayment(dealId).railMaxRatePerEpoch, 1);
+        assertEq(validator.lastNewRate(), 1);
+    }
+
+    function testActivatePaymentRevertsWhenCalculatedRateIsZero() public {
+        PoRepMarketContractMock impl = new PoRepMarketContractMock();
+        bytes memory initData = abi.encodeCall(
+            PoRepMarket.initialize,
+            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        PoRepMarketContractMock market = PoRepMarketContractMock(address(proxy));
+        ValidatorMock validator = new ValidatorMock();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        market.setDeal(
+            PoRepTypes.Deal({
+                dealId: dealId,
+                client: clientAddress,
+                provider: providerFilActorId,
+                offerId: 0,
+                state: PoRepTypes.DealState.Completed,
+                evidenceAdapter: address(dataCapEvidenceAdapterAddress),
+                validator: address(validator),
+                railId: railId
+            })
+        );
+        market.setDealPayment(
+            dealId,
+            PoRepTypes.DealPayment({
+                paymentToken: address(0),
+                payee: address(0),
+                pricePer32GiBPerMonth: 0,
+                billed32GiBUnits: 1,
+                railMaxRatePerEpoch: 0
+            })
+        );
+
+        vm.expectRevert(PoRepMarket.InvalidZeroAmount.selector);
+        vm.prank(adminAddress);
+        market.activatePayment(dealId);
     }
 
     function testCompleteDealEmitsDealCompletedEventWhenAtBottomPaddingValue() public {
