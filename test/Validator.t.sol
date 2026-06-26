@@ -126,7 +126,7 @@ contract ValidatorTest is Test {
         dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         vm.prank(admin);
-        validator.createRail(token);
+        validator.createRail();
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(dealId, defaultRequirements);
@@ -274,7 +274,7 @@ contract ValidatorTest is Test {
         address notClient = vm.addr(0xCAFE);
         vm.expectRevert(Validator.CallerIsNotClient.selector);
         vm.prank(notClient);
-        validator.createRail(token);
+        validator.createRail();
     }
 
     function testValidatePaymentInvalidRailIdRevert() public {
@@ -461,7 +461,7 @@ contract ValidatorTest is Test {
     function testCreateRailRevertsWhenRailAlreadyCreated() public {
         vm.expectRevert(Validator.RailAlreadyCreated.selector);
         vm.prank(admin);
-        validator.createRail(token);
+        validator.createRail();
     }
 
     function testCreateRailUsesFrozenDealPaymentTokenAndPayee() public {
@@ -471,7 +471,6 @@ contract ValidatorTest is Test {
         Validator impl = new Validator();
         Validator freshValidator = Validator(address(new ERC1967Proxy(address(impl), "")));
 
-        IERC20 callerToken = IERC20(vm.addr(0xCA11));
         IERC20 frozenToken = IERC20(vm.addr(0xF007));
         address frozenPayee = vm.addr(0xBEEF);
         address livePayee = vm.addr(0xBAD);
@@ -517,7 +516,7 @@ contract ValidatorTest is Test {
         );
 
         vm.prank(admin);
-        freshValidator.createRail(callerToken);
+        freshValidator.createRail();
 
         (IERC20 railToken,, address railPayee,,,,,) = freshFilecoinPay.rails(1);
         assertEq(address(railToken), address(frozenToken));
@@ -620,7 +619,7 @@ contract ValidatorTest is Test {
         );
 
         vm.expectRevert(Validator.OperatorNotApproved.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testCreateRailRevertsWhenMaxLockupPeriodLessThanMinimum() public {
@@ -644,7 +643,7 @@ contract ValidatorTest is Test {
         );
 
         vm.expectRevert(Validator.MaxLockupPeriodLessThanMinimum.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testCreateRailRevertsWhenLockupAllowanceIsZero() public {
@@ -666,7 +665,7 @@ contract ValidatorTest is Test {
         filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, 86_400);
 
         vm.expectRevert(Validator.InvalidLockupAllowance.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testCreateRailRevertsWhenRateAllowanceIsZero() public {
@@ -688,7 +687,7 @@ contract ValidatorTest is Test {
         filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, 86_400);
 
         vm.expectRevert(Validator.InvalidRateAllowance.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testModifyRailPaymentRevertsWhenCallerIsNotPoRepMarket() public {
@@ -728,7 +727,7 @@ contract ValidatorTest is Test {
         vm.expectEmit(true, false, false, true, address(newValidator));
         emit Validator.LockupPeriodUpdated(2, 86_400);
 
-        newValidator.createRail(token);
+        newValidator.createRail();
 
         assertEq(newValidator.getRailStatus(), RailStatus.PREPARED);
     }
