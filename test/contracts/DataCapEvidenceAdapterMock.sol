@@ -19,6 +19,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(uint256 dealId => bytes evidenceData) public activatedEvidence;
     mapping(uint256 dealId => bytes evidenceData) public refreshedEvidence;
     mapping(uint256 dealId => address caller) public submitEvidenceCaller;
+    bool public operational = true;
 
     function setValid(CommonTypes.FilActorId provider, bool ok) external {
         valid[provider] = ok;
@@ -79,6 +80,14 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
 
     function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
         return deals[dealId].sizeOfAllocations;
+    }
+
+    function setOperational(bool operational_) external {
+        operational = operational_;
+    }
+
+    function isOperational() external view returns (bool) {
+        return operational;
     }
 
     function evidenceType() external pure returns (uint8) {

@@ -230,6 +230,13 @@
   },
   {
     "type": "function",
+    "name": "disableAdapter",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "evidenceType",
     "inputs": [],
     "outputs": [
@@ -487,6 +494,19 @@
       }
     ],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isOperational",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -854,6 +874,25 @@
   },
   {
     "type": "event",
+    "name": "AdapterNonOperational",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "setAtBlock",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "DatacapSpent",
     "inputs": [
       {
@@ -1021,6 +1060,16 @@
   {
     "type": "error",
     "name": "ActorNotFound",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AdapterAlreadyNonOperational",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AdapterNotOperational",
     "inputs": []
   },
   {

@@ -15,13 +15,13 @@ interface IStorageEvidenceAdapter {
      */
     function evidenceType() external view returns (uint8);
 
-    // /**
-    //  * @notice Returns whether the adapter can still process new evidence
-    //  * @dev Returns false when the adapter is no longer operational, for example
-    //  * when the DataCap adapter can no longer accept allocations or claims
-    //  * @return True if the adapter can process new evidence, false if it is no longer operational
-    //  */
-    // function isOperational() external view returns (bool);
+    /**
+     * @notice Returns whether the adapter can still process new evidence
+     * @dev Returns false when the adapter is no longer operational, for example
+     * when the DataCap adapter can no longer accept allocations or claims
+     * @return True if the adapter can process new evidence, false if it is no longer operational
+     */
+    function isOperational() external view returns (bool);
 
     /**
      * @notice Submit one bounded batch of adapter-specific evidence for a deal
