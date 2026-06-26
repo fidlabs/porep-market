@@ -9,7 +9,6 @@ import {SPRegistry} from "../src/SPRegistry.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {OfferMatch} from "../src/types/OfferMatch.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {MockProxy} from "./contracts/MockProxy.sol";
 import {ResolveAddressPrecompileMock} from "./contracts/ResolveAddressPrecompileMock.sol";
@@ -240,33 +239,6 @@ contract SPRegistryTest is Test {
         assertEq(reserved.offerId, offerId);
         assertEq(beforeReserve.pendingBytes, 0);
         assertEq(afterReserve.pendingBytes, request.requestedSizeBytes);
-    }
-
-    function testLegacyGetProviderForDealRevertsAndDoesNotReserveCapacity() public {
-        _allowToken();
-        _registerProvider(provider1, owner1);
-        _createOffer(provider1, "standard", 90_000);
-
-        ISPRegistry.ProviderCapacityInfo memory before = spRegistry.getProviderCapacity(provider1);
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100_000, durationDays: 180});
-
-        vm.prank(market);
-        vm.expectRevert(SPRegistry.LegacyProviderMatchingDisabled.selector);
-        spRegistry.getProviderForDeal(defaultSLIs, terms);
-
-        ISPRegistry.ProviderCapacityInfo memory afterCapacity = spRegistry.getProviderCapacity(provider1);
-        assertEq(afterCapacity.pendingBytes, before.pendingBytes);
-        assertEq(afterCapacity.committedBytes, before.committedBytes);
-        assertEq(afterCapacity.availableBytes, before.availableBytes);
-    }
-
-    function testLegacyGetProviderForDealStillRequiresMarketRole() public {
-        SLITypes.DealTerms memory terms =
-            SLITypes.DealTerms({dealSizeBytes: 1_000_000, pricePerSectorPerMonth: 100_000, durationDays: 180});
-
-        vm.expectRevert();
-        spRegistry.getProviderForDeal(defaultSLIs, terms);
     }
 
     function testAutoMatchPicksLeastLoadedProviderWithinBand() public {

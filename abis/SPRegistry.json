@@ -602,79 +602,6 @@
   },
   {
     "type": "function",
-    "name": "getProviderForDeal",
-    "inputs": [
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct SharedTypes.SLIThresholds",
-        "components": [
-          {
-            "name": "retrievabilityBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "bandwidthBytesPerSecond",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "latencyMs",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "indexingPct",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
-      },
-      {
-        "name": "",
-        "type": "tuple",
-        "internalType": "struct SLITypes.DealTerms",
-        "components": [
-          {
-            "name": "dealSizeBytes",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "pricePerSectorPerMonth",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "durationDays",
-            "type": "uint32",
-            "internalType": "uint32"
-          }
-        ]
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      },
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getProviderInfo",
     "inputs": [
       {
@@ -2474,11 +2401,6 @@
         "internalType": "uint16"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "LegacyProviderMatchingDisabled",
-    "inputs": []
   },
   {
     "type": "error",

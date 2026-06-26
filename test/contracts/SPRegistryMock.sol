@@ -7,7 +7,6 @@ pragma solidity =0.8.30;
 
 import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
-import {SLITypes} from "../../src/types/SLITypes.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract SPRegistryMock is ISPRegistry {
@@ -34,6 +33,20 @@ contract SPRegistryMock is ISPRegistry {
 
     function getLastReserveRequest() external view returns (SharedTypes.DealRequest memory) {
         return _lastReserveRequest;
+    }
+
+    function registerProviderFor(
+        CommonTypes.FilActorId provider,
+        address organization,
+        uint256 availableBytes,
+        address payee
+    ) external {
+        address effectivePayee = payee == address(0) ? organization : payee;
+        _registered[CommonTypes.FilActorId.unwrap(provider)] = true;
+        _providerInfos[CommonTypes.FilActorId.unwrap(provider)] =
+            ProviderInfo({organization: organization, payee: effectivePayee, paused: false, blocked: false});
+        _providerCapacity[CommonTypes.FilActorId.unwrap(provider)] =
+            ProviderCapacityInfo({availableBytes: availableBytes, committedBytes: 0, pendingBytes: 0});
     }
 
     function setNextProvider(CommonTypes.FilActorId provider) external {
@@ -99,16 +112,6 @@ contract SPRegistryMock is ISPRegistry {
 
     function getPayee(CommonTypes.FilActorId provider) external view returns (address) {
         return _payees[CommonTypes.FilActorId.unwrap(provider)];
-    }
-
-    function getProviderForDeal(SharedTypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
-        external
-        view
-        returns (CommonTypes.FilActorId provider, bool autoApprove, address organization)
-    {
-        provider = nextSelection.provider;
-        autoApprove = nextAutoApprove;
-        organization = _providerInfos[CommonTypes.FilActorId.unwrap(provider)].organization;
     }
 
     function previewProviderForDeal(SharedTypes.DealRequest calldata)

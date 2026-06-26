@@ -12,7 +12,6 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {OfferMatch} from "./types/OfferMatch.sol";
-import {SLITypes} from "./types/SLITypes.sol";
 import {MinerUtils} from "./lib/MinerUtils.sol";
 
 /**
@@ -398,12 +397,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     error OfferNotEligible(uint256 offerId, uint16 reason);
 
-    /**
-     * @notice Legacy provider matching is disabled until PoRepMarket migrates to the V2 reserve APIs.
-     * @dev 0xb684468e
-     */
-    error LegacyProviderMatchingDisabled();
-
     constructor() {
         _disableInitializers();
     }
@@ -433,13 +426,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _grantRole(MARKET_ROLE, _poRepMarket);
     }
 
-    /**
-     * @notice Registers a provider for an organization.
-     * @param provider Provider actor ID.
-     * @param organization Organization address.
-     * @param availableBytes Initial available capacity in bytes.
-     * @param payee Provider payment recipient. Defaults to organization when zero.
-     */
+    /// @inheritdoc ISPRegistry
     function registerProviderFor(
         CommonTypes.FilActorId provider,
         address organization,
@@ -759,16 +746,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function getActiveOffers() external view returns (uint256[] memory offerIds) {
         return _toUintArray(_getSPRegistryStorage()._activeOfferIds);
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getProviderForDeal(SharedTypes.SLIThresholds calldata, SLITypes.DealTerms calldata)
-        external
-        view
-        onlyRole(MARKET_ROLE)
-        returns (CommonTypes.FilActorId, bool, address)
-    {
-        revert LegacyProviderMatchingDisabled();
     }
 
     /// @inheritdoc ISPRegistry

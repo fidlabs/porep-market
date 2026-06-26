@@ -3,7 +3,6 @@ pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
-import {SLITypes} from "../types/SLITypes.sol";
 
 /**
  * @title ISPRegistry
@@ -73,6 +72,20 @@ interface ISPRegistry {
         bool active;
         uint256 pricePer32GiBPerMonth;
     }
+
+    /**
+     * @notice Registers a provider on behalf of an organization (admin/operator only).
+     * @param provider Miner actor ID to register.
+     * @param organization Organization address that controls the provider.
+     * @param availableBytes Initial available capacity in bytes.
+     * @param payee Payout recipient; defaults to organization when zero.
+     */
+    function registerProviderFor(
+        CommonTypes.FilActorId provider,
+        address organization,
+        uint256 availableBytes,
+        address payee
+    ) external;
 
     /**
      * @notice Returns all registered provider actor IDs.
@@ -282,19 +295,6 @@ interface ISPRegistry {
      * @return offerIds Active offer IDs.
      */
     function getActiveOffers() external view returns (uint256[] memory offerIds);
-
-    /**
-     * @notice Disabled legacy PoRepMarket matching entrypoint kept for compile compatibility only.
-     * @dev Real implementations revert until PoRepMarket migrates to the V2 reserve APIs. Do not use this method for V2 proposal creation.
-     * @param requirements Required deal SLIs.
-     * @param terms Legacy deal terms.
-     * @return provider Unused legacy return slot.
-     * @return autoApprove Unused legacy return slot.
-     * @return organization Unused legacy return slot.
-     */
-    function getProviderForDeal(SharedTypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
-        external
-        returns (CommonTypes.FilActorId provider, bool autoApprove, address organization);
 
     /**
      * @notice Previews automatic offer matching without reserving capacity.
