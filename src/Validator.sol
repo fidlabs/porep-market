@@ -397,9 +397,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     // solhint-enable function-max-lines, gas-strict-inequalities
 
     /**
-     * @notice Creates a payment rail with the specified parameters and set initial lockup period
-     * @dev Only callable by the client
-     * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
+     * @notice Creates the FilecoinPay rail for this validator and sets the initial lockup period.
+     * @dev Only callable by the client.
+     * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID.
      */
     function createRail() external override {
         ValidatorStorage storage $ = _getValidatorStorage();

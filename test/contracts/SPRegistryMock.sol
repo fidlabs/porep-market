@@ -11,7 +11,6 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract SPRegistryMock is ISPRegistry {
     SharedTypes.ProviderDealSelection public nextSelection;
-    bool public nextAutoApprove;
     mapping(address => mapping(CommonTypes.FilActorId => bool)) public owners;
     CommonTypes.FilActorId[] private _providers;
     CommonTypes.FilActorId[] private _committedProviders;
@@ -51,10 +50,6 @@ contract SPRegistryMock is ISPRegistry {
 
     function setNextProvider(CommonTypes.FilActorId provider) external {
         nextSelection.provider = provider;
-    }
-
-    function setNextAutoApprove(bool autoApprove) external {
-        nextAutoApprove = autoApprove;
     }
 
     function isAuthorizedForProvider(address owner, CommonTypes.FilActorId provider) external view returns (bool) {

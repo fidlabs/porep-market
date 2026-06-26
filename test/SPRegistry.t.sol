@@ -2,7 +2,7 @@
 // solhint-disable use-natspec, function-max-lines, gas-strict-inequalities
 pragma solidity =0.8.30;
 
-import {Test} from "lib/forge-std/src/Test.sol";
+import {Test, Vm} from "lib/forge-std/src/Test.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
@@ -218,6 +218,25 @@ contract SPRegistryTest is Test {
         vm.prank(operator);
         spRegistry.setOfferActive(firstOfferId, true);
         assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 5);
+    }
+
+    function testSetOfferActiveNoOpDoesNotEmitOrMutate() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, "standard", _terms(), defaultSLIs, _paymentRows(90_000));
+
+        vm.recordLogs();
+        vm.prank(operator);
+        spRegistry.setOfferActive(offerId, true);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        assertEq(logs.length, 0);
+        assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 1);
+
+        ISPRegistry.OfferInfo memory offer = spRegistry.getOffer(offerId);
+        assertTrue(offer.active);
     }
 
     function testPreviewAndReserveProviderSelectSameOfferButOnlyReserveMutatesPending() public {

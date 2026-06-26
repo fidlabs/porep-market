@@ -58,7 +58,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Default number of epochs after which a proposed deal expires if not accepted
      * @dev 2 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 5_760 epochs
      */
-    uint256 private constant DEFAULT_DEAL_PROPOSAL_EXPIRATION = 5_760;
+    uint256 private constant DEFAULT_DEAL_EXPIRATION = 5_760;
 
     /**
      * @notice Minimum Filecoin deal duration equals 180 days (6 months)
@@ -108,7 +108,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
-     * @notice function to allow acess to storage
+     * @notice function to allow access to storage
      * @return PoRepMarketStorage storage struct
      */
     function s() private pure returns (PoRepMarketStorage storage) {
@@ -121,6 +121,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param client The address of the client
      * @param provider The address of the provider
      * @param requirements The SLI thresholds for the deal
+     * @param manifestHash The manifest hash for the deal
      * @param manifestLocation The location of the manifest for the deal
      * @param totalDealSize The total size of the deal in bytes
      * @param proposedAtBlock The block number when the deal was proposed
@@ -130,6 +131,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         address indexed client,
         CommonTypes.FilActorId indexed provider,
         SharedTypes.SLIThresholds requirements,
+        bytes32 manifestHash,
         string manifestLocation,
         uint256 totalDealSize,
         uint256 proposedAtBlock
@@ -437,7 +439,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
-        $._dealExpiration = DEFAULT_DEAL_PROPOSAL_EXPIRATION;
+        $._dealExpiration = DEFAULT_DEAL_EXPIRATION;
 
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
@@ -530,6 +532,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
                 msg.sender,
                 provider,
                 request.requiredSLIs,
+                request.manifestHash,
                 request.manifestLocation,
                 request.requestedSizeBytes,
                 block.number
@@ -1104,7 +1107,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return The proposed deal expiration in epochs
      */
     function _getDealExpiration(PoRepMarketStorage storage $) internal view returns (uint256) {
-        return $._dealExpiration == 0 ? DEFAULT_DEAL_PROPOSAL_EXPIRATION : $._dealExpiration;
+        return $._dealExpiration == 0 ? DEFAULT_DEAL_EXPIRATION : $._dealExpiration;
     }
 
     /**
@@ -1226,7 +1229,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Ensures if allocations size is within padding
      * @param actualDealSize size of the deal
-     * @param expectedDealSize expecetd size from proposal
+     * @param expectedDealSize expected size from proposal
      */
     function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal view {
         if (actualDealSize == 0) {

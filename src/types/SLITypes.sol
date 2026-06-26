@@ -3,7 +3,7 @@ pragma solidity =0.8.30;
 
 /**
  * @title SLI Types
- * @notice Shared types for SLI-based deal requirements, capabilities, and attestations
+ * @notice Shared types for SLI-based deal requirements and commercial terms
  */
 library SLITypes {
     /**
@@ -15,5 +15,4 @@ library SLITypes {
         uint256 pricePerSectorPerMonth;
         uint32 durationDays;
     }
-
 }

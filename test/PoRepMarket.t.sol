@@ -170,6 +170,7 @@ contract PoRepMarketTest is Test {
             clientAddress,
             providerFilActorId,
             defaultRequirements,
+            defaultManifestHash,
             expectedManifestLocation,
             totalDealSize,
             block.number

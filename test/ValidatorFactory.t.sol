@@ -106,15 +106,7 @@ contract ValidatorFactoryTest is Test {
                 address(factory.getBeacon()),
                 abi.encodeCall(
                     Validator.initialize,
-                    (
-                        admin_,
-                        poRepService,
-                        filecoinPay,
-                        sliScorer,
-                        dataCapEvidenceAdapter,
-                        poRepMarket,
-                        dealId_
-                    )
+                    (admin_, poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, dealId_)
                 )
             )
         );

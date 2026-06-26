@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable var-name-mixedcase, gas-strict-inequalities, function-max-lines, gas-indexed-events
+// solhint-disable var-name-mixedcase
 
 pragma solidity =0.8.30;
 
@@ -179,6 +179,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event PayeeUpdated(CommonTypes.FilActorId indexed provider, address indexed oldPayee, address indexed newPayee);
 
+    /* solhint-disable gas-indexed-events */
     /**
      * @notice Emitted when payment token policy changes.
      * @param token ERC20 token address.
@@ -186,6 +187,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param minPricePer32GiBPerMonth Minimum monthly price per 32 GiB in token smallest units.
      */
     event PaymentTokenUpdated(address indexed token, bool allowed, uint256 minPricePer32GiBPerMonth);
+    /* solhint-enable gas-indexed-events */
 
     /**
      * @notice Emitted when an offer is created.
@@ -195,12 +197,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event OfferCreated(uint256 indexed offerId, CommonTypes.FilActorId indexed provider, string name);
 
+    /* solhint-disable gas-indexed-events */
     /**
      * @notice Emitted when an offer is enabled or disabled.
      * @param offerId Offer ID.
      * @param active True when the offer is active.
      */
     event OfferActiveUpdated(uint256 indexed offerId, bool active);
+    /* solhint-enable gas-indexed-events */
 
     /**
      * @notice Emitted when an offer name changes.
@@ -210,6 +214,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event OfferNameUpdated(uint256 indexed offerId, string oldName, string newName);
 
+    /* solhint-disable gas-indexed-events */
     /**
      * @notice Emitted when an offer payment row changes.
      * @param offerId Offer ID.
@@ -220,6 +225,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     event OfferPaymentUpdated(
         uint256 indexed offerId, address indexed token, bool active, uint256 pricePer32GiBPerMonth
     );
+    /* solhint-enable gas-indexed-events */
 
     /**
      * @notice Emitted when matching reserves an offer for a deal request.
@@ -628,6 +634,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        // solhint-disable-next-line gas-strict-inequalities
         if ($._activeOfferIdsByProvider[providerId].length() >= $.maxActiveOffersPerProvider) {
             revert TooManyActiveOffers(provider, $.maxActiveOffersPerProvider);
         }
@@ -655,13 +662,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderNotBlocked(offer.provider);
         _onlyProviderControllerOrAdmin(offer.provider);
 
-        if (offer.active == active) {
-            emit OfferActiveUpdated(offerId, active);
-            return;
-        }
+        if (offer.active == active) return;
 
         uint64 providerId = CommonTypes.FilActorId.unwrap(offer.provider);
         if (active) {
+            // solhint-disable-next-line gas-strict-inequalities
             if ($._activeOfferIdsByProvider[providerId].length() >= $.maxActiveOffersPerProvider) {
                 revert TooManyActiveOffers(offer.provider, $.maxActiveOffersPerProvider);
             }
@@ -860,6 +865,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         emit CapacityCommitted(provider, actualSizeBytes);
     }
 
+    /**
+     * @notice Registers a provider and records its organization and payee.
+     * @param provider Provider actor ID to register.
+     * @param organization Organization that owns the provider.
+     * @param payee Address that receives provider payments. Falls back to organization when zero.
+     */
     function _registerProvider(CommonTypes.FilActorId provider, address organization, address payee) internal {
         if (CommonTypes.FilActorId.unwrap(provider) == 0) revert InvalidProviderActorId();
 
@@ -891,34 +902,58 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @notice Ensures the provider is registered.
+     * @param provider Provider actor ID to check.
+     */
     function _ensureProviderRegistered(CommonTypes.FilActorId provider) internal view {
         if (!_getSPRegistryStorage()._providerIds.contains(uint256(CommonTypes.FilActorId.unwrap(provider)))) {
             revert ProviderNotRegistered(provider);
         }
     }
 
+    /**
+     * @notice Ensures the provider is not blocked.
+     * @param provider Provider actor ID to check.
+     */
     function _ensureProviderNotBlocked(CommonTypes.FilActorId provider) internal view {
         if (_getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked) {
             revert ProviderIsBlocked(provider);
         }
     }
 
+    /**
+     * @notice Ensures the offer exists.
+     * @param offerId Offer ID to check.
+     */
     function _ensureOfferExists(uint256 offerId) internal view {
         if (offerId == 0 || CommonTypes.FilActorId.unwrap(_getSPRegistryStorage()._offers[offerId].provider) == 0) {
             revert OfferNotFound(offerId);
         }
     }
 
+    /**
+     * @notice Ensures SLI thresholds stay within allowed bounds.
+     * @param slis SLI thresholds to validate.
+     */
     function _ensureSLIsValid(SharedTypes.SLIThresholds memory slis) internal pure {
         if (slis.retrievabilityBps > MAX_BPS) revert InvalidRetrievabilityBps(slis.retrievabilityBps);
         if (slis.indexingPct > 100) revert InvalidIndexingPct(slis.indexingPct);
     }
 
+    /**
+     * @notice Ensures the offer name is non-empty and within the byte limit.
+     * @param name Offer name to validate.
+     */
     function _ensureOfferNameValid(string memory name) internal pure {
         uint256 length = bytes(name).length;
         if (length == 0 || length > MAX_OFFER_NAME_BYTES) revert InvalidOfferName();
     }
 
+    /**
+     * @notice Ensures offer size and duration bounds are internally consistent.
+     * @param terms Offer terms to validate.
+     */
     function _ensureOfferTermsValid(SharedTypes.OfferTerms memory terms) internal pure {
         if (terms.maxSizeBytes != 0 && terms.minSizeBytes > terms.maxSizeBytes) {
             revert InvalidOfferSizeBounds(terms.minSizeBytes, terms.maxSizeBytes);
@@ -946,6 +981,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         emit OfferPaymentUpdated(offerId, token, active, pricePer32GiBPerMonth);
     }
 
+    /**
+     * @notice Selects the best matching active offer for a deal request.
+     * @param request Deal request to evaluate.
+     * @return best Selected provider offer snapshot, or zeroed fields when no offer matches.
+     */
     function _selectProviderForDeal(SharedTypes.DealRequest calldata request)
         internal
         view
@@ -979,6 +1019,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         }
     }
 
+    /**
+     * @notice Compares the current best candidate against a new candidate.
+     * @param best Current best selection.
+     * @param bestPending Pending bytes for the current best selection.
+     * @param candidate New candidate selection.
+     * @param pending Pending bytes for the new candidate.
+     * @return True when the new candidate should replace the current best selection.
+     */
     function _isLeastLoaded(
         SharedTypes.ProviderDealSelection memory best,
         uint256 bestPending,
@@ -993,6 +1041,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         return candidate.offerId < best.offerId;
     }
 
+    /**
+     * @notice Evaluates a single offer against a deal request.
+     * @param offerId Offer ID to evaluate.
+     * @param request Deal request to evaluate against the offer.
+     * @return selection Offer snapshot returned when the offer is eligible.
+     * @return reason Match result code describing eligibility or the first rejection reason.
+     */
+    // solhint-disable-next-line function-max-lines
     function _evaluateOffer(uint256 offerId, SharedTypes.DealRequest calldata request)
         internal
         view
@@ -1035,7 +1091,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         RegistryTokenConfig storage config = $._tokenConfig[request.paymentToken];
         RegistryOfferPayment storage payment = $._offerPayments[offerId][request.paymentToken];
         if (!config.allowed || !payment.active) return (selection, OfferMatch.TOKEN_NOT_ALLOWED);
-        if (payment.pricePer32GiBPerMonth < config.minPricePer32GiBPerMonth) {
+        uint256 minimum = config.minPricePer32GiBPerMonth == 0 ? 1 : config.minPricePer32GiBPerMonth;
+        if (payment.pricePer32GiBPerMonth < minimum) {
             return (selection, OfferMatch.PRICE_BELOW_TOKEN_MIN);
         }
         if (payment.pricePer32GiBPerMonth > request.maxPricePer32GiBPerMonth) {
@@ -1062,6 +1119,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         reason = OfferMatch.OK;
     }
 
+    /**
+     * @notice Checks whether the monthly price keeps the per-epoch rate above zero.
+     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
+     * @param requestedSizeBytes Requested deal size in bytes.
+     * @return True when the implied per-epoch rate stays above zero.
+     */
     function _meetsPerEpochFloor(uint256 pricePer32GiBPerMonth, uint256 requestedSizeBytes)
         internal
         pure
@@ -1069,9 +1132,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     {
         uint256 estimatedSectorCount = Math.ceilDiv(requestedSizeBytes, SECTOR_SIZE);
         if (estimatedSectorCount == 0) return false;
+        // solhint-disable-next-line gas-strict-inequalities
         return pricePer32GiBPerMonth >= Math.ceilDiv(SharedTypes.EPOCHS_IN_MONTH, estimatedSectorCount);
     }
 
+    /**
+     * @notice Reserves pending capacity for a provider.
+     * @param provider Provider actor ID whose pending capacity increases.
+     * @param sizeBytes Bytes to reserve.
+     */
     function _reservePending(CommonTypes.FilActorId provider, uint256 sizeBytes) internal {
         _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)].pendingBytes += sizeBytes;
         emit PendingCapacityReserved(provider, sizeBytes);
