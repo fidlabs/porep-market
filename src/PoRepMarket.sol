@@ -1158,7 +1158,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Ensures a deal exists
      * @param deal The deal
      */
-    function _ensureDealExists(PoRepTypes.Deal memory deal) internal pure {
+    function _ensureDealExists(PoRepTypes.Deal storage deal) internal view {
         if (deal.client == address(0)) revert DealDoesNotExist();
     }
 
@@ -1167,7 +1167,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param deal The deal
      * @param expectedState The expected state
      */
-    function _ensureDealCorrectState(PoRepTypes.Deal memory deal, uint8 expectedState) internal pure {
+    function _ensureDealCorrectState(PoRepTypes.Deal storage deal, uint8 expectedState) internal view {
         if (deal.state != expectedState) {
             revert DealNotInExpectedState(deal.dealId, deal.state, expectedState);
         }
