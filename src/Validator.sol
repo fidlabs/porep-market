@@ -75,12 +75,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidPoRepServiceAddress();
 
     /**
-     * @notice Error indicating that the SPRegistry address provided during initialization is the zero address
-     * @dev 0xe6e262d1
-     */
-    error InvalidSPRegistryAddress();
-
-    /**
      * @notice Error indicating that the caller is not the client
      * @dev 0x370ce6d7
      */
@@ -229,7 +223,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address SLIScorer;
         address dataCapEvidenceAdapter;
         address poRepMarket;
-        address SPRegistry;
         CommonTypes.FilActorId providerId;
         uint256 amountPerEpoch;
         uint256 earlyTerminatedEpoch;
@@ -296,7 +289,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _SLIScorer Address of the SLIScorer contract
      * @param _dataCapEvidenceAdapter Address of the DataCap evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
-     * @param _SPRegistry Address of the SPRegistry contract
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
     function initialize(
@@ -306,11 +298,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _SLIScorer,
         address _dataCapEvidenceAdapter,
         address _poRepMarket,
-        address _SPRegistry,
         uint256 _dealId
     ) external initializer {
         _validateInitializeAddresses(
-            _admin, _porepService, _filecoinPay, _SLIScorer, _dataCapEvidenceAdapter, _SPRegistry, _poRepMarket
+            _admin, _porepService, _filecoinPay, _SLIScorer, _dataCapEvidenceAdapter, _poRepMarket
         );
 
         __AccessControl_init();
@@ -326,7 +317,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         $.SLIScorer = _SLIScorer;
         $.dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
         $.poRepMarket = _poRepMarket;
-        $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
         $.minTimeBetweenSettlementsInEpochs = EPOCHS_IN_MONTH;
 
@@ -618,7 +608,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLIScorer Address of the SLIScorer contract
      * @param _dataCapEvidenceAdapter Address of the DataCap evidence adapter
-     * @param _SPRegistry Address of the SPRegistry contract
      * @param _poRepMarket Address of the PoRepMarket contract
      */
     function _validateInitializeAddresses(
@@ -627,7 +616,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _filecoinPay,
         address _SLIScorer,
         address _dataCapEvidenceAdapter,
-        address _SPRegistry,
         address _poRepMarket
     ) internal pure {
         if (_admin == address(0)) {
@@ -644,9 +632,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
         if (_dataCapEvidenceAdapter == address(0)) {
             revert InvalidDataCapEvidenceAdapterAddress();
-        }
-        if (_SPRegistry == address(0)) {
-            revert InvalidSPRegistryAddress();
         }
         if (_poRepMarket == address(0)) {
             revert InvalidPoRepMarketAddress();

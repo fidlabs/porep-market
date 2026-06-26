@@ -32,7 +32,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         address _filecoinPay;
         address _sliScorer;
         address _poRepMarket;
-        address _SPRegistry;
         address _beacon;
         address _admin;
         address _upgraderRole;
@@ -106,12 +105,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
      * @dev 0xf234bc02
      */
     error InvalidSliScorerAddress();
-
-    /**
-     * @notice Error indicating that the provided SPRegistry address is invalid
-     * @dev 0xe6e262d1
-     */
-    error InvalidSPRegistryAddress();
 
     /**
      * @notice Error indicating that the provided implementation address is invalid
@@ -196,22 +189,19 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
      * @param _sliScorer The address of the SLIScorer contract
      * @param _dataCapEvidenceAdapter The address of the DataCapEvidenceAdapter contract
      * @param _poRepMarket The address of the PoRepMarket contract
-     * @param _SPRegistry The address of the SPRegistry contract
      */
     function initialize2(
         address _poRepService,
         address _filecoinPay,
         address _sliScorer,
         address _dataCapEvidenceAdapter,
-        address _poRepMarket,
-        address _SPRegistry
+        address _poRepMarket
     ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         if (_dataCapEvidenceAdapter == address(0)) revert InvalidDataCapEvidenceAdapterAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
         if (_sliScorer == address(0)) revert InvalidSliScorerAddress();
-        if (_SPRegistry == address(0)) revert InvalidSPRegistryAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
@@ -219,7 +209,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
         $._sliScorer = _sliScorer;
-        $._SPRegistry = _SPRegistry;
     }
 
     /**
@@ -248,7 +237,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
                         $._sliScorer,
                         $._dataCapEvidenceAdapter,
                         $._poRepMarket,
-                        $._SPRegistry,
                         dealId
                     )
                 )
