@@ -2,6 +2,7 @@
 pragma solidity =0.8.30;
 
 // DESIGN DRAFT ONLY
+// TODO: delete before release
 // Shared request/selection vocabulary. Storage and external views live in their
 // owning contract sketches
 
@@ -11,22 +12,23 @@ library SharedTypes {
     uint256 internal constant EPOCHS_IN_DAY = 2_880;
     uint256 internal constant EPOCHS_IN_MONTH = 86_400;
 
-    struct SLITerms {
+    struct SLIThresholds {
         uint16 retrievabilityBps;
-        // Reconsider when measurement/enforcement tooling exists
-        // uint64 bandwidthBytesPerSecond;
-        // uint32 latencyMilliseconds;
-        // uint16 indexingAvailabilityBps;
+        uint64 bandwidthBytesPerSecond;
+        uint16 latencyMs;
+        uint8 indexingPct;
     }
 
     struct DealRequest {
-        address paymentToken;
         // keccak256(manifest file bytes).
         bytes32 manifestHash;
         uint256 requestedSizeBytes;
-        uint32 durationDays; // Client-facing input; converted once before storage
         uint256 maxPricePer32GiBPerMonth;
-        SLITerms requiredSLIs;
+        // URL or path for humans/tools; contracts do not fetch or trust it.
+        string manifestLocation;
+        address paymentToken;
+        uint32 durationDays; // Client-facing input; converted once before storage
+        SLIThresholds requiredSLIs;
     }
 
     // Selection is provider-and-offer centric. PoRepMarket freezes the returned
@@ -38,7 +40,7 @@ library SharedTypes {
         address paymentToken;
         address payee;
         uint256 pricePer32GiBPerMonth;
-        SLITerms promisedSLIs;
+        SLIThresholds promisedSLIs;
         uint256 reservedBytes;
     }
 
@@ -50,12 +52,11 @@ library SharedTypes {
 
     struct ActivationContext {
         uint256 dealId;
-        address client;
-        CommonTypes.FilActorId provider;
-        bytes32 manifestHash;
         uint256 requestedSizeBytes;
-        uint16 activationToleranceBps;
+        address client;
         uint64 durationEpochs;
+        uint16 activationToleranceBps;
+        CommonTypes.FilActorId provider;
     }
 
     struct ActivationDecision {
