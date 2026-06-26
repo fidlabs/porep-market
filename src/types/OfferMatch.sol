@@ -22,4 +22,5 @@ library OfferMatch {
     // Per-epoch rate would truncate to zero in FilecoinPay for the requested size; see Validator rate math.
     uint16 internal constant PER_EPOCH_FLOOR = 11;
     uint16 internal constant INSUFFICIENT_CAPACITY = 12;
+    uint16 internal constant MANIFEST_ALREADY_ASSIGNED = 13;
 }

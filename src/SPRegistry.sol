@@ -1009,7 +1009,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         if (providerInfo.blocked) return (selection, OfferMatch.PROVIDER_BLOCKED);
         if (providerInfo.paused) return (selection, OfferMatch.PROVIDER_PAUSED);
         if ($._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(offer.provider)]) {
-            return (selection, OfferMatch.INSUFFICIENT_CAPACITY);
+            return (selection, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
         }
 
         SharedTypes.OfferTerms storage terms = $._offerTerms[offerId];

@@ -337,9 +337,28 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.INSUFFICIENT_CAPACITY)
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.MANIFEST_ALREADY_ASSIGNED)
         );
         spRegistry.reserveOfferForDeal(offerId, request);
+    }
+
+    function testPreviewOfferReturnsManifestAlreadyAssignedReasonForSameProviderAndManifest() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _createOffer(provider1, "p1", 90_000);
+        uint256 secondOfferId = _createOffer(provider1, "p2", 90_000);
+        bytes32 manifestHash = keccak256("same-manifest");
+        SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
+
+        vm.prank(market);
+        spRegistry.reserveProviderForDeal(request);
+
+        (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
+            spRegistry.previewOfferForDeal(secondOfferId, request);
+
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(selection.offerId, 0);
+        assertEq(reason, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
     }
 
     function testPreviewOfferReturnsReasonButReserveRevertsForInactiveOffer() public {
