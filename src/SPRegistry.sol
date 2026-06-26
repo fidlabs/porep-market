@@ -30,7 +30,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @notice Maximum number of registered providers.
-    uint256 public constant MAX_PROVIDERS = 500;
+    uint256 public constant MAX_PROVIDERS = 100;
     /// @notice Maximum active offers per provider.
     uint256 public constant MAX_ACTIVE_OFFERS_PER_PROVIDER = 5;
     /// @notice Price band above the cheapest matching offer within which auto-match balances load, in basis points.

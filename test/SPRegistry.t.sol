@@ -484,14 +484,36 @@ contract SPRegistryTest is Test {
     }
 
     function testMaxProviderLimitIsEnforced() public {
-        for (uint64 i = 1; i <= 500; i++) {
+        for (uint64 i = 1; i <= 100; i++) {
             vm.prank(admin);
             spRegistry.registerProviderFor(CommonTypes.FilActorId.wrap(i), owner1, 0, address(0));
         }
 
         vm.prank(admin);
-        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MaxProvidersReached.selector, 500));
-        spRegistry.registerProviderFor(CommonTypes.FilActorId.wrap(501), owner1, 0, address(0));
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.MaxProvidersReached.selector, 100));
+        spRegistry.registerProviderFor(CommonTypes.FilActorId.wrap(101), owner1, 0, address(0));
+    }
+
+    function testReserveProviderForDealSucceedsAtWorstCaseProviderCap() public {
+        _allowToken();
+
+        for (uint64 i = 1; i <= 100; i++) {
+            CommonTypes.FilActorId provider = CommonTypes.FilActorId.wrap(i);
+            _registerProvider(provider, vm.addr(uint256(i) + 0x1000));
+
+            for (uint256 j = 0; j < 5; j++) {
+                _createOffer(provider, string.concat("p", vm.toString(i), "-offer-", vm.toString(j)), 90_000 + j);
+            }
+        }
+
+        vm.prank(market);
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.reserveProviderForDeal(_request(100_000));
+
+        assertGt(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertGt(selection.offerId, 0);
+        assertEq(selection.paymentToken, token);
+        assertEq(selection.pricePer32GiBPerMonth, 90_000);
+        assertEq(selection.reservedBytes, 1_000_000);
     }
 
     function testOfferGettersAndMutableMarketFields() public {
