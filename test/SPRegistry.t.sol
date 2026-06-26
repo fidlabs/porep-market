@@ -336,7 +336,7 @@ contract SPRegistryTest is Test {
         spRegistry.reserveProviderForDeal(request);
 
         vm.prank(market);
-        vm.expectRevert(SPRegistry.NoOfferMatched.selector);
+        vm.expectRevert(ISPRegistry.NoOfferMatched.selector);
         spRegistry.reserveProviderForDeal(request);
     }
 
@@ -976,7 +976,7 @@ contract SPRegistryTest is Test {
         spRegistry.reserveOfferForDeal(offerId, request);
 
         vm.prank(market);
-        vm.expectRevert(SPRegistry.NoOfferMatched.selector);
+        vm.expectRevert(ISPRegistry.NoOfferMatched.selector);
         spRegistry.reserveProviderForDeal(request);
     }
 
@@ -1047,7 +1047,7 @@ contract SPRegistryTest is Test {
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
 
         vm.prank(market);
-        vm.expectRevert(SPRegistry.NoOfferMatched.selector);
+        vm.expectRevert(ISPRegistry.NoOfferMatched.selector);
         spRegistry.reserveProviderForDeal(_request(100_000));
 
         vm.prank(operator);

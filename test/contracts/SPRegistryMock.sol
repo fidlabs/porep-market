@@ -124,6 +124,7 @@ contract SPRegistryMock is ISPRegistry {
         returns (SharedTypes.ProviderDealSelection memory)
     {
         _lastReserveRequest = request;
+        if (CommonTypes.FilActorId.unwrap(nextSelection.provider) == 0) revert ISPRegistry.NoOfferMatched();
         return nextSelection;
     }
 

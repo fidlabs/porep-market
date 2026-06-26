@@ -399,12 +399,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error OfferNotEligible(uint256 offerId, uint16 reason);
 
     /**
-     * @notice Error thrown when no offer matches a deal request
-     * @dev 0xde89fa00
-     */
-    error NoOfferMatched();
-
-    /**
      * @notice Legacy provider matching is disabled until PoRepMarket migrates to the V2 reserve APIs.
      * @dev 0xb684468e
      */

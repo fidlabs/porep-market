@@ -11,6 +11,12 @@ import {SLITypes} from "../types/SLITypes.sol";
  */
 interface ISPRegistry {
     /**
+     * @notice Error thrown when no offer matches a deal request
+     * @dev 0xde89fa00
+     */
+    error NoOfferMatched();
+
+    /**
      * @notice Provider registration data.
      * @param organization Address that owns the provider registration.
      * @param payee Address receiving provider payments.

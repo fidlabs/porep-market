@@ -369,11 +369,11 @@ contract PoRepMarketTest is Test {
         assertEq(uint8(p.state), 0);
     }
 
-    function testProposeDealRevertsWhenNoProviderFoundForDeal() public {
+    function testProposeDealRevertsWhenNoOfferMatched() public {
         spRegistry.setNextProvider(CommonTypes.FilActorId.wrap(0));
 
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NoProviderFoundForDeal.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISPRegistry.NoOfferMatched.selector));
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
     }
 

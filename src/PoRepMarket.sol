@@ -278,12 +278,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error NotTheClientOrStorageProviderOrAdmin(uint256 dealId, address rejector);
 
     /**
-     * @notice Error thrown when no provider is found for the deal
-     * @dev 0x66dab3aa
-     */
-    error NoProviderFoundForDeal();
-
-    /**
      * @notice Error thrown when trying to set a validator that is already set for the deal
      * @dev 0xfb35e366
      */
@@ -488,9 +482,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
         CommonTypes.FilActorId provider = selection.provider;
-        if (CommonTypes.FilActorId.unwrap(provider) == 0) {
-            revert NoProviderFoundForDeal();
-        }
         address organization = $._SPRegistryContract.getProviderInfo(provider).organization;
 
         uint256 dealId = ++$._dealIdCounter;
