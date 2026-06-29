@@ -10,6 +10,19 @@ import {SharedTypes} from "../../src/types/SharedTypes.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract SPRegistryMock is ISPRegistry {
+    struct MockProviderState {
+        address organization;
+        address payee;
+        bool paused;
+        bool blocked;
+    }
+
+    struct MockCapacityState {
+        uint256 availableBytes;
+        uint256 committedBytes;
+        uint256 pendingBytes;
+    }
+
     SharedTypes.ProviderDealSelection public nextSelection;
     mapping(address => mapping(CommonTypes.FilActorId => bool)) public owners;
     address public defaultOwner = address(this);
@@ -96,7 +109,7 @@ contract SPRegistryMock is ISPRegistry {
         _registered[CommonTypes.FilActorId.unwrap(provider)] = true;
     }
 
-    function setProviderInfo(CommonTypes.FilActorId provider, ProviderInfo calldata info) external {
+    function setProviderState(CommonTypes.FilActorId provider, MockProviderState calldata info) external {
         uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
         ProviderView storage view_ = _providerViews[providerId];
         view_.provider = provider;
@@ -106,7 +119,7 @@ contract SPRegistryMock is ISPRegistry {
         view_.blocked = info.blocked;
     }
 
-    function setProviderCapacity(CommonTypes.FilActorId provider, ProviderCapacityInfo calldata info) external {
+    function setCapacityState(CommonTypes.FilActorId provider, MockCapacityState calldata info) external {
         uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
         ProviderView storage view_ = _providerViews[providerId];
         view_.provider = provider;

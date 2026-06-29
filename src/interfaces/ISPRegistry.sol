@@ -38,32 +38,6 @@ interface ISPRegistry {
     }
 
     /**
-     * @notice Deprecated provider registration subset kept for test helper compatibility.
-     * @param organization Address that owns the provider registration.
-     * @param payee Address receiving provider payments.
-     * @param paused True when the provider is temporarily excluded from matching.
-     * @param blocked True when the provider is administratively blocked.
-     */
-    struct ProviderInfo {
-        address organization;
-        address payee;
-        bool paused;
-        bool blocked;
-    }
-
-    /**
-     * @notice Deprecated provider capacity subset kept for test helper compatibility.
-     * @param availableBytes Total provider capacity available for deals.
-     * @param committedBytes Capacity already committed to activated deals.
-     * @param pendingBytes Capacity reserved by proposed deals.
-     */
-    struct ProviderCapacityInfo {
-        uint256 availableBytes;
-        uint256 committedBytes;
-        uint256 pendingBytes;
-    }
-
-    /**
      * @notice Payment token policy.
      * @param allowed True when offers may use the token.
      * @param minPricePer32GiBPerMonth Minimum monthly price per 32 GiB in token smallest units.

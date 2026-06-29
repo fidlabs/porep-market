@@ -1485,9 +1485,14 @@ contract PoRepMarketTest is Test {
         address organization1 = vm.addr(0x111);
         address organization2 = vm.addr(0x222);
 
-        spRegistry.setProviderInfo(
+        spRegistry.setProviderState(
             providerFilActorId,
-            ISPRegistry.ProviderInfo({organization: organization1, payee: address(0), paused: false, blocked: false})
+            SPRegistryMock.MockProviderState({
+                organization: organization1,
+                payee: address(0),
+                paused: false,
+                blocked: false
+            })
         );
 
         vm.prank(clientAddress);
