@@ -8,12 +8,15 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
+import {IOperator} from "./interfaces/IOperator.sol";
+import {IValidator} from "./interfaces/IValidator.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLITypes} from "./types/SLITypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
+import {RailStatus} from "./types/RailStatus.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 
@@ -215,6 +218,21 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     event DealExpired(uint256 indexed dealId, uint256 indexed expiredAtBlock);
 
     /**
+     * @notice PaymentActivated event
+     * @dev Emitted when payment is activated for a deal
+     * @param dealId The id of the deal
+     * @param railMaxRatePerEpoch The maximum payment rate per epoch
+     * @param serviceStartEpoch The epoch at which service starts
+     * @param serviceEndEpoch The epoch at which service ends
+     */
+    event PaymentActivated(
+        uint256 indexed dealId,
+        uint256 indexed railMaxRatePerEpoch,
+        CommonTypes.ChainEpoch serviceStartEpoch,
+        CommonTypes.ChainEpoch serviceEndEpoch
+    );
+
+    /**
      * @notice DealExpirationUpdated event
      * @dev DealExpirationUpdated event is emitted when the deal expiration is updated
      * @param newDealExpiration The new deal expiration in epochs
@@ -349,6 +367,24 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param epochsInMonth the divisor that would produce zero
      */
     error InvalidDealPricePerSectorPerMonth(uint256 totalPerMonth, uint256 epochsInMonth);
+
+    /**
+     * @notice Error thrown when there are no billable 32 GiB units for a deal
+     * @dev 0x418600bd
+     */
+    error InvalidBilled32GiBUnits();
+
+    /**
+     * @notice Error thrown when the calculated amount per epoch is zero
+     * @dev 0xdd484e70
+     */
+    error InvalidZeroAmount();
+
+    /**
+     * @notice Error thrown when trying to activate a payment rail that is not prepared
+     * @param railStatus Current rail status reported by the validator
+     */
+    error InvalidRailState(uint8 railStatus);
 
     /**
      * @notice Error indicating that the allocated size for a deal is too small to change its state to complete
@@ -700,9 +736,45 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._dealIdsReadyForPayment.add(dealId);
         $._SPRegistryContract.commitCapacity(deal.provider, proposedSize, allocatedSize);
         $._dealCapacity[dealId].committedBytes = allocatedSize;
+        $._dealPayments[dealId].billed32GiBUnits = Math.ceilDiv(allocatedSize, SECTOR_SIZE); // do not add this, it will be initialized in other function in fututre tasks
 
         _changeDealState(dealId, PoRepTypes.DealState.Completed);
         emit DealCompleted(dealId, msg.sender, allocatedSize, deal.provider);
+    }
+
+    /**
+     * @notice Activates payment for a completed deal
+     * @dev Calculates the rail max rate, initializes the service window, and asks the validator to update the rail.
+     * @param dealId The id of the deal
+     */
+    function activatePayment(uint256 dealId) external onlyRole(POREP_SERVICE_ROLE) {
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, PoRepTypes.DealState.Completed);
+
+        if (deal.railId == 0) {
+            revert InvalidRailId();
+        }
+
+        uint8 railStatus = IValidator(deal.validator).getRailStatus();
+        if (railStatus != RailStatus.PREPARED) {
+            revert InvalidRailState(railStatus);
+        }
+
+        PoRepTypes.DealPayment storage payment = $._dealPayments[dealId];
+        uint256 railMaxRatePerEpoch = _calculateAmountPerEpoch(payment);
+        payment.railMaxRatePerEpoch = railMaxRatePerEpoch;
+
+        PoRepTypes.DealService storage service = $._dealService[dealId];
+        int64 serviceStartEpoch = int64(uint64(block.number));
+        service.serviceStartEpoch = CommonTypes.ChainEpoch.wrap(serviceStartEpoch);
+        service.serviceEndEpoch =
+            CommonTypes.ChainEpoch.wrap(serviceStartEpoch + int64(uint64($._dealTerms[dealId].durationEpochs)));
+
+        IOperator(deal.validator).modifyRailPayment(railMaxRatePerEpoch);
+        emit PaymentActivated(dealId, railMaxRatePerEpoch, service.serviceStartEpoch, service.serviceEndEpoch);
     }
 
     /**
@@ -1105,6 +1177,21 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     function _ensurePoRepServiceOrAdmin() internal view {
         if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(POREP_SERVICE_ROLE, msg.sender)) {
             revert AccessControlUnauthorizedAccount(msg.sender, POREP_SERVICE_ROLE);
+        }
+    }
+
+    /**
+     * @notice Calculates the amount to be paid per epoch for a deal
+     * @param payment The deal payment data
+     * @return amount Amount to be paid per epoch
+     */
+    function _calculateAmountPerEpoch(PoRepTypes.DealPayment memory payment) internal pure returns (uint256 amount) {
+        if (payment.billed32GiBUnits == 0) {
+            revert InvalidBilled32GiBUnits();
+        }
+        amount = Math.ceilDiv(payment.pricePer32GiBPerMonth * payment.billed32GiBUnits, EPOCHS_IN_MONTH);
+        if (amount == 0) {
+            revert InvalidZeroAmount();
         }
     }
 

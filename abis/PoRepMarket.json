@@ -164,6 +164,19 @@
   },
   {
     "type": "function",
+    "name": "activatePayment",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "completeDeal",
     "inputs": [
       {
@@ -1557,6 +1570,37 @@
   },
   {
     "type": "event",
+    "name": "PaymentActivated",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "railMaxRatePerEpoch",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "serviceStartEpoch",
+        "type": "int64",
+        "indexed": false,
+        "internalType": "CommonTypes.ChainEpoch"
+      },
+      {
+        "name": "serviceEndEpoch",
+        "type": "int64",
+        "indexed": false,
+        "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "RailIdUpdated",
     "inputs": [
       {
@@ -1836,6 +1880,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidBilled32GiBUnits",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidDealDuration",
     "inputs": []
   },
@@ -1898,6 +1947,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidRailState",
+    "inputs": [
+      {
+        "name": "railStatus",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidRetrievabilityBps",
     "inputs": [
       {
@@ -1906,6 +1966,11 @@
         "internalType": "uint16"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "InvalidZeroAmount",
+    "inputs": []
   },
   {
     "type": "error",

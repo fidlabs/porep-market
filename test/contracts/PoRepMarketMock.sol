@@ -10,6 +10,7 @@ contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepTypes.Deal deal) public deals;
     mapping(uint256 dealId => SharedTypes.SLIThresholds slis) public dealSLIs;
     mapping(uint256 dealId => PoRepTypes.DealPayment payment) public dealPayments;
+    mapping(uint256 dealId => PoRepTypes.DealService service) public dealServices;
     uint256 public completeDealCallCount;
 
     function setDeal(uint256 dealId, PoRepTypes.Deal calldata deal) external {
@@ -24,6 +25,10 @@ contract PoRepMarketMock {
         dealPayments[dealId] = payment;
     }
 
+    function setDealService(uint256 dealId, PoRepTypes.DealService calldata service) external {
+        dealServices[dealId] = service;
+    }
+
     function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory) {
         return deals[dealId];
     }
@@ -34,6 +39,10 @@ contract PoRepMarketMock {
 
     function getDealPayment(uint256 dealId) external view returns (PoRepTypes.DealPayment memory) {
         return dealPayments[dealId];
+    }
+
+    function getDealService(uint256 dealId) external view returns (PoRepTypes.DealService memory) {
+        return dealServices[dealId];
     }
 
     function completeDeal(uint256) external {
