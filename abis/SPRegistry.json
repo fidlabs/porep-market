@@ -292,6 +292,16 @@
             "internalType": "uint256"
           },
           {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "active",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
             "name": "terms",
             "type": "tuple",
             "internalType": "struct SharedTypes.OfferTerms",
@@ -349,16 +359,6 @@
             "name": "paymentToken",
             "type": "address",
             "internalType": "address"
-          },
-          {
-            "name": "provider",
-            "type": "uint64",
-            "internalType": "CommonTypes.FilActorId"
-          },
-          {
-            "name": "active",
-            "type": "bool",
-            "internalType": "bool"
           },
           {
             "name": "paymentActive",
