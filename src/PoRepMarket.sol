@@ -476,7 +476,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensureCorrectTerms(request);
         SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
         CommonTypes.FilActorId provider = selection.provider;
-        address organization = $._SPRegistryContract.getProviderInfo(provider).organization;
+        address organization = $._SPRegistryContract.getProviderView(provider).organization;
 
         uint256 dealId = ++$._dealIdCounter;
         uint8 initialState = DealState.ACCEPTED;

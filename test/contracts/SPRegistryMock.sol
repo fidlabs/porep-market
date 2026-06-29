@@ -12,12 +12,10 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 contract SPRegistryMock is ISPRegistry {
     SharedTypes.ProviderDealSelection public nextSelection;
     mapping(address => mapping(CommonTypes.FilActorId => bool)) public owners;
+    address public defaultOwner = address(this);
     CommonTypes.FilActorId[] private _providers;
-    CommonTypes.FilActorId[] private _committedProviders;
-    mapping(uint64 => ProviderInfo) private _providerInfos;
-    mapping(uint64 => ProviderCapacityInfo) private _providerCapacity;
+    mapping(uint64 => ProviderView) private _providerViews;
     mapping(uint64 => bool) private _registered;
-    mapping(uint64 => address) private _payees;
     uint64 public lastReleasedPendingProvider;
     uint256 public lastReleasedPendingBytes;
     SharedTypes.DealRequest private _lastReserveRequest;
@@ -41,11 +39,18 @@ contract SPRegistryMock is ISPRegistry {
         address payee
     ) external {
         address effectivePayee = payee == address(0) ? organization : payee;
-        _registered[CommonTypes.FilActorId.unwrap(provider)] = true;
-        _providerInfos[CommonTypes.FilActorId.unwrap(provider)] =
-            ProviderInfo({organization: organization, payee: effectivePayee, paused: false, blocked: false});
-        _providerCapacity[CommonTypes.FilActorId.unwrap(provider)] =
-            ProviderCapacityInfo({availableBytes: availableBytes, committedBytes: 0, pendingBytes: 0});
+        uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        _registered[providerId] = true;
+        _providerViews[providerId] = ProviderView({
+            provider: provider,
+            organization: organization,
+            payee: effectivePayee,
+            paused: false,
+            blocked: false,
+            availableBytes: availableBytes,
+            committedBytes: 0,
+            pendingBytes: 0
+        });
     }
 
     function setNextProvider(CommonTypes.FilActorId provider) external {
@@ -64,20 +69,22 @@ contract SPRegistryMock is ISPRegistry {
         return _providers;
     }
 
-    function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory) {
-        return _committedProviders;
-    }
-
-    function getProvidersByOrganization(address) external pure returns (CommonTypes.FilActorId[] memory) {
-        return new CommonTypes.FilActorId[](0);
-    }
-
-    function getProviderInfo(CommonTypes.FilActorId provider) external view returns (ProviderInfo memory) {
-        return _providerInfos[CommonTypes.FilActorId.unwrap(provider)];
-    }
-
-    function getProviderCapacity(CommonTypes.FilActorId provider) external view returns (ProviderCapacityInfo memory) {
-        return _providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+    function getProviderView(CommonTypes.FilActorId provider) external view returns (ProviderView memory) {
+        uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        ProviderView memory view_ = _providerViews[providerId];
+        if (CommonTypes.FilActorId.unwrap(view_.provider) == 0) {
+            return ProviderView({
+                provider: provider,
+                organization: defaultOwner,
+                payee: defaultOwner,
+                paused: false,
+                blocked: false,
+                availableBytes: 0,
+                committedBytes: 0,
+                pendingBytes: 0
+            });
+        }
+        return view_;
     }
 
     function isProviderRegistered(CommonTypes.FilActorId provider) external view returns (bool) {
@@ -89,24 +96,29 @@ contract SPRegistryMock is ISPRegistry {
         _registered[CommonTypes.FilActorId.unwrap(provider)] = true;
     }
 
-    function addCommittedProvider(CommonTypes.FilActorId provider) external {
-        _committedProviders.push(provider);
-    }
-
     function setProviderInfo(CommonTypes.FilActorId provider, ProviderInfo calldata info) external {
-        _providerInfos[CommonTypes.FilActorId.unwrap(provider)] = info;
+        uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        ProviderView storage view_ = _providerViews[providerId];
+        view_.provider = provider;
+        view_.organization = info.organization;
+        view_.payee = info.payee;
+        view_.paused = info.paused;
+        view_.blocked = info.blocked;
     }
 
     function setProviderCapacity(CommonTypes.FilActorId provider, ProviderCapacityInfo calldata info) external {
-        _providerCapacity[CommonTypes.FilActorId.unwrap(provider)] = info;
+        uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        ProviderView storage view_ = _providerViews[providerId];
+        view_.provider = provider;
+        view_.availableBytes = info.availableBytes;
+        view_.committedBytes = info.committedBytes;
+        view_.pendingBytes = info.pendingBytes;
     }
 
     function setPayee(CommonTypes.FilActorId provider, address payee) external {
-        _payees[CommonTypes.FilActorId.unwrap(provider)] = payee;
-    }
-
-    function getPayee(CommonTypes.FilActorId provider) external view returns (address) {
-        return _payees[CommonTypes.FilActorId.unwrap(provider)];
+        uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        _providerViews[providerId].provider = provider;
+        _providerViews[providerId].payee = payee;
     }
 
     function previewProviderForDeal(SharedTypes.DealRequest calldata)
@@ -188,14 +200,6 @@ contract SPRegistryMock is ISPRegistry {
     }
 
     function getOffersByProvider(CommonTypes.FilActorId) external pure returns (uint256[] memory) {
-        return new uint256[](0);
-    }
-
-    function getActiveOffersByProvider(CommonTypes.FilActorId) external pure returns (uint256[] memory) {
-        return new uint256[](0);
-    }
-
-    function getActiveOffers() external pure returns (uint256[] memory) {
         return new uint256[](0);
     }
 

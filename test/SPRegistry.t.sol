@@ -166,19 +166,19 @@ contract SPRegistryTest is Test {
         freshRegistry.initialize2(address(0));
     }
 
-    function testGetProviderInfoAndCapacityAreSeparateViews() public {
+    function testGetProviderViewReturnsRegistrationAndCapacityData() public {
         _registerProvider(provider1, owner1);
 
-        ISPRegistry.ProviderInfo memory info = spRegistry.getProviderInfo(provider1);
-        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+        ISPRegistry.ProviderView memory view_ = spRegistry.getProviderView(provider1);
 
-        assertEq(info.organization, owner1);
-        assertEq(info.payee, owner1);
-        assertFalse(info.paused);
-        assertFalse(info.blocked);
-        assertEq(capacity.availableBytes, defaultAvailableBytes);
-        assertEq(capacity.committedBytes, 0);
-        assertEq(capacity.pendingBytes, 0);
+        assertEq(CommonTypes.FilActorId.unwrap(view_.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(view_.organization, owner1);
+        assertEq(view_.payee, owner1);
+        assertFalse(view_.paused);
+        assertFalse(view_.blocked);
+        assertEq(view_.availableBytes, defaultAvailableBytes);
+        assertEq(view_.committedBytes, 0);
+        assertEq(view_.pendingBytes, 0);
     }
 
     function testProviderOfferLifecycleEnforcesActiveCapAndReenable() public {
@@ -198,7 +198,14 @@ contract SPRegistryTest is Test {
 
         vm.prank(operator);
         spRegistry.setOfferActive(firstOfferId, false);
-        assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 4);
+        {
+            uint256[] memory offerIds = spRegistry.getOffersByProvider(provider1);
+            uint256 activeCount;
+            for (uint256 i = 0; i < offerIds.length; i++) {
+                if (spRegistry.getOfferView(offerIds[i], token).active) activeCount++;
+            }
+            assertEq(activeCount, 4);
+        }
 
         vm.prank(operator);
         spRegistry.createOffer(provider1, _terms(), defaultSLIs, _paymentRows(95_000));
@@ -212,7 +219,14 @@ contract SPRegistryTest is Test {
 
         vm.prank(operator);
         spRegistry.setOfferActive(firstOfferId, true);
-        assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 5);
+        {
+            uint256[] memory offerIds = spRegistry.getOffersByProvider(provider1);
+            uint256 activeCount;
+            for (uint256 i = 0; i < offerIds.length; i++) {
+                if (spRegistry.getOfferView(offerIds[i], token).active) activeCount++;
+            }
+            assertEq(activeCount, 5);
+        }
     }
 
     function testSetOfferActiveNoOpDoesNotEmitOrMutate() public {
@@ -228,7 +242,12 @@ contract SPRegistryTest is Test {
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
         assertEq(logs.length, 0);
-        assertEq(spRegistry.getActiveOffersByProvider(provider1).length, 1);
+        uint256[] memory offerIds = spRegistry.getOffersByProvider(provider1);
+        uint256 activeCount;
+        for (uint256 i = 0; i < offerIds.length; i++) {
+            if (spRegistry.getOfferView(offerIds[i], token).active) activeCount++;
+        }
+        assertEq(activeCount, 1);
 
         ISPRegistry.OfferView memory offer = spRegistry.getOfferView(offerId, token);
         assertTrue(offer.active);
@@ -243,11 +262,11 @@ contract SPRegistryTest is Test {
 
         SharedTypes.DealRequest memory request = _request(100_000);
         SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(request);
-        ISPRegistry.ProviderCapacityInfo memory beforeReserve = spRegistry.getProviderCapacity(provider1);
+        ISPRegistry.ProviderView memory beforeReserve = spRegistry.getProviderView(provider1);
 
         vm.prank(market);
         SharedTypes.ProviderDealSelection memory reserved = spRegistry.reserveProviderForDeal(request);
-        ISPRegistry.ProviderCapacityInfo memory afterReserve = spRegistry.getProviderCapacity(provider1);
+        ISPRegistry.ProviderView memory afterReserve = spRegistry.getProviderView(provider1);
 
         assertEq(preview.offerId, offerId);
         assertEq(reserved.offerId, offerId);
@@ -406,33 +425,35 @@ contract SPRegistryTest is Test {
 
         CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
         assertEq(providers.length, 2);
-        CommonTypes.FilActorId[] memory orgProviders = spRegistry.getProvidersByOrganization(owner1);
-        assertEq(orgProviders.length, 2);
-        assertEq(spRegistry.getCommittedProviders().length, 0);
+        uint256 committedCount;
+        for (uint256 i = 0; i < providers.length; i++) {
+            if (spRegistry.getProviderView(providers[i]).committedBytes > 0) committedCount++;
+        }
+        assertEq(committedCount, 0);
 
         vm.prank(operator);
         spRegistry.pauseProvider(provider1);
-        assertTrue(spRegistry.getProviderInfo(provider1).paused);
+        assertTrue(spRegistry.getProviderView(provider1).paused);
 
         vm.prank(operator);
         spRegistry.unpauseProvider(provider1);
-        assertFalse(spRegistry.getProviderInfo(provider1).paused);
+        assertFalse(spRegistry.getProviderView(provider1).paused);
 
         vm.prank(operator);
         spRegistry.setPayee(provider1, owner2);
-        assertEq(spRegistry.getPayee(provider1), owner2);
+        assertEq(spRegistry.getProviderView(provider1).payee, owner2);
 
         vm.prank(operator);
         spRegistry.updateAvailableSpace(provider1, defaultAvailableBytes + 1);
-        assertEq(spRegistry.getProviderCapacity(provider1).availableBytes, defaultAvailableBytes + 1);
+        assertEq(spRegistry.getProviderView(provider1).availableBytes, defaultAvailableBytes + 1);
 
         vm.prank(admin);
         spRegistry.blockProvider(provider1);
-        assertTrue(spRegistry.getProviderInfo(provider1).blocked);
+        assertTrue(spRegistry.getProviderView(provider1).blocked);
 
         vm.prank(admin);
         spRegistry.unblockProvider(provider1);
-        assertFalse(spRegistry.getProviderInfo(provider1).blocked);
+        assertFalse(spRegistry.getProviderView(provider1).blocked);
 
         _allowToken(token2, 123);
         ISPRegistry.TokenConfig memory tokenConfig = spRegistry.getPaymentTokenConfig(token2);
@@ -659,7 +680,7 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
-        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, 1_000_000);
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 1_000_000);
 
         vm.prank(operator);
         vm.expectRevert(
@@ -669,7 +690,7 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.releasePendingCapacity(provider1, 400_000, bytes32(0));
-        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, 600_000);
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 600_000);
 
         vm.prank(market);
         vm.expectRevert(
@@ -679,14 +700,19 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.commitCapacity(provider1, 1_000_000, 500_000);
-        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+        ISPRegistry.ProviderView memory capacity = spRegistry.getProviderView(provider1);
         assertEq(capacity.pendingBytes, 0);
         assertEq(capacity.committedBytes, 500_000);
-        assertEq(spRegistry.getCommittedProviders().length, 1);
+        CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
+        uint256 committedCount;
+        for (uint256 i = 0; i < providers.length; i++) {
+            if (spRegistry.getProviderView(providers[i]).committedBytes > 0) committedCount++;
+        }
+        assertEq(committedCount, 1);
 
         vm.prank(market);
         spRegistry.releaseCapacity(provider1, 100_000, bytes32(0));
-        assertEq(spRegistry.getProviderCapacity(provider1).committedBytes, 400_000);
+        assertEq(spRegistry.getProviderView(provider1).committedBytes, 400_000);
 
         vm.prank(market);
         vm.expectRevert(
@@ -712,7 +738,7 @@ contract SPRegistryTest is Test {
         vm.prank(market);
         spRegistry.commitCapacity(provider1, 1_000_000, 900_000);
 
-        ISPRegistry.ProviderCapacityInfo memory capacity = spRegistry.getProviderCapacity(provider1);
+        ISPRegistry.ProviderView memory capacity = spRegistry.getProviderView(provider1);
         assertEq(capacity.pendingBytes, 0);
         assertEq(capacity.committedBytes, 900_000);
     }
@@ -1006,7 +1032,7 @@ contract SPRegistryTest is Test {
         selection = spRegistry.reserveOfferForDeal(offerId, request);
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
         assertEq(selection.pricePer32GiBPerMonth, 1);
-        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, request.requestedSizeBytes);
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, request.requestedSizeBytes);
     }
 
     function testLowPositivePriceOfferAllowedForLargeRequestWhenItPassesAdmissibilityChecks() public {
@@ -1034,7 +1060,7 @@ contract SPRegistryTest is Test {
         vm.prank(market);
         selection = spRegistry.reserveOfferForDeal(offerId, request);
         assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
-        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, requestSize);
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, requestSize);
     }
 
     function testPausedBlockedAndNoMatchPreviewPaths() public {

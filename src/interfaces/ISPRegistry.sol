@@ -16,7 +16,29 @@ interface ISPRegistry {
     error NoOfferMatched();
 
     /**
-     * @notice Provider registration data.
+     * @notice Current provider registration and capacity data.
+     * @param provider Provider actor ID.
+     * @param organization Address that owns the provider registration.
+     * @param payee Address receiving provider payments.
+     * @param paused True when the provider is temporarily excluded from matching.
+     * @param blocked True when the provider is administratively blocked.
+     * @param availableBytes Total provider capacity available for deals.
+     * @param committedBytes Capacity already committed to activated deals.
+     * @param pendingBytes Capacity reserved by proposed deals.
+     */
+    struct ProviderView {
+        CommonTypes.FilActorId provider;
+        address organization;
+        address payee;
+        bool paused;
+        bool blocked;
+        uint256 availableBytes;
+        uint256 committedBytes;
+        uint256 pendingBytes;
+    }
+
+    /**
+     * @notice Deprecated provider registration subset kept for test helper compatibility.
      * @param organization Address that owns the provider registration.
      * @param payee Address receiving provider payments.
      * @param paused True when the provider is temporarily excluded from matching.
@@ -30,7 +52,7 @@ interface ISPRegistry {
     }
 
     /**
-     * @notice Provider capacity accounting.
+     * @notice Deprecated provider capacity subset kept for test helper compatibility.
      * @param availableBytes Total provider capacity available for deals.
      * @param committedBytes Capacity already committed to activated deals.
      * @param pendingBytes Capacity reserved by proposed deals.
@@ -94,34 +116,11 @@ interface ISPRegistry {
     function getProviders() external view returns (CommonTypes.FilActorId[] memory);
 
     /**
-     * @notice Returns provider actor IDs with committed capacity.
-     * @return Array of provider actor IDs where committedBytes is non-zero.
-     */
-    function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory);
-
-    /**
-     * @notice Returns all providers registered under an organization.
-     * @param organization Organization address.
-     * @return Array of provider actor IDs owned by the organization.
-     */
-    function getProvidersByOrganization(address organization) external view returns (CommonTypes.FilActorId[] memory);
-
-    /**
-     * @notice Returns provider registration data.
+     * @notice Returns current provider registration and capacity data.
      * @param provider Provider actor ID.
-     * @return info Provider registration data.
+     * @return view_ Current provider view.
      */
-    function getProviderInfo(CommonTypes.FilActorId provider) external view returns (ProviderInfo memory info);
-
-    /**
-     * @notice Returns provider capacity accounting.
-     * @param provider Provider actor ID.
-     * @return info Provider capacity data.
-     */
-    function getProviderCapacity(CommonTypes.FilActorId provider)
-        external
-        view
-        returns (ProviderCapacityInfo memory info);
+    function getProviderView(CommonTypes.FilActorId provider) external view returns (ProviderView memory view_);
 
     /**
      * @notice Checks whether a provider is registered.
@@ -175,13 +174,6 @@ interface ISPRegistry {
      * @param payee New payment recipient.
      */
     function setPayee(CommonTypes.FilActorId provider, address payee) external;
-
-    /**
-     * @notice Returns provider payment recipient.
-     * @param provider Provider actor ID.
-     * @return Provider payment recipient.
-     */
-    function getPayee(CommonTypes.FilActorId provider) external view returns (address);
 
     /**
      * @notice Sets whether a payment token can be used by offers.
@@ -249,22 +241,6 @@ interface ISPRegistry {
      * @return offerIds Offer IDs for the provider.
      */
     function getOffersByProvider(CommonTypes.FilActorId provider) external view returns (uint256[] memory offerIds);
-
-    /**
-     * @notice Returns active offer IDs for a provider.
-     * @param provider Provider actor ID.
-     * @return offerIds Active offer IDs for the provider.
-     */
-    function getActiveOffersByProvider(CommonTypes.FilActorId provider)
-        external
-        view
-        returns (uint256[] memory offerIds);
-
-    /**
-     * @notice Returns all active offer IDs.
-     * @return offerIds Active offer IDs.
-     */
-    function getActiveOffers() external view returns (uint256[] memory offerIds);
 
     /**
      * @notice Previews automatic offer matching without reserving capacity.

@@ -71,7 +71,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     // forge-lint: disable-next-line(pascal-case-struct)
     struct SPRegistryStorage {
         EnumerableSet.UintSet _providerIds;
-        mapping(address => EnumerableSet.UintSet) _orgProviders;
         mapping(uint64 => Provider) _providers;
         mapping(uint64 => ProviderCapacity) _providerCapacity;
         uint256 nextOfferId;
@@ -494,40 +493,21 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory) {
+    function getProviderView(CommonTypes.FilActorId provider) external view returns (ProviderView memory view_) {
+        uint64 id = CommonTypes.FilActorId.unwrap(provider);
         SPRegistryStorage storage $ = _getSPRegistryStorage();
-        uint256 length = $._providerIds.length();
-        uint256 count;
+        Provider storage p = $._providers[id];
+        ProviderCapacity storage c = $._providerCapacity[id];
 
-        for (uint256 i = 0; i < length; i++) {
-            uint64 id = uint64($._providerIds.at(i));
-            if ($._providerCapacity[id].committedBytes > 0) count++;
-        }
-
-        CommonTypes.FilActorId[] memory result = new CommonTypes.FilActorId[](count);
-        uint256 idx;
-        for (uint256 i = 0; i < length; i++) {
-            uint64 id = uint64($._providerIds.at(i));
-            if ($._providerCapacity[id].committedBytes > 0) result[idx++] = CommonTypes.FilActorId.wrap(id);
-        }
-        return result;
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getProviderInfo(CommonTypes.FilActorId provider) external view returns (ProviderInfo memory info) {
-        Provider storage p = _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)];
-        info = ProviderInfo({organization: p.organization, payee: p.payee, paused: p.paused, blocked: p.blocked});
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getProviderCapacity(CommonTypes.FilActorId provider)
-        external
-        view
-        returns (ProviderCapacityInfo memory info)
-    {
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
-        info = ProviderCapacityInfo({
-            availableBytes: c.availableBytes, committedBytes: c.committedBytes, pendingBytes: c.pendingBytes
+        view_ = ProviderView({
+            provider: provider,
+            organization: p.organization,
+            payee: p.payee,
+            paused: p.paused,
+            blocked: p.blocked,
+            availableBytes: c.availableBytes,
+            committedBytes: c.committedBytes,
+            pendingBytes: c.pendingBytes
         });
     }
 
@@ -543,11 +523,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function getProvidersByOrganization(address organization) external view returns (CommonTypes.FilActorId[] memory) {
-        return _toFilActorIdArray(_getSPRegistryStorage()._orgProviders[organization]);
-    }
-
-    /// @inheritdoc ISPRegistry
     function setPayee(CommonTypes.FilActorId provider, address payee) external {
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
@@ -560,11 +535,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         $._providers[id].payee = payee;
 
         emit PayeeUpdated(provider, oldPayee, payee);
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getPayee(CommonTypes.FilActorId provider) external view returns (address) {
-        return _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].payee;
     }
 
     /// @inheritdoc ISPRegistry
@@ -691,20 +661,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function getOffersByProvider(CommonTypes.FilActorId provider) external view returns (uint256[] memory offerIds) {
         return _toUintArray(_getSPRegistryStorage()._offerIdsByProvider[CommonTypes.FilActorId.unwrap(provider)]);
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getActiveOffersByProvider(CommonTypes.FilActorId provider)
-        external
-        view
-        returns (uint256[] memory offerIds)
-    {
-        return _toUintArray(_getSPRegistryStorage()._activeOfferIdsByProvider[CommonTypes.FilActorId.unwrap(provider)]);
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getActiveOffers() external view returns (uint256[] memory offerIds) {
-        return _toUintArray(_getSPRegistryStorage()._activeOfferIds);
     }
 
     /// @inheritdoc ISPRegistry
@@ -838,7 +794,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint64 id = CommonTypes.FilActorId.unwrap(provider);
         $._providers[id].organization = organization;
         $._providers[id].payee = payee == address(0) ? organization : payee;
-        $._orgProviders[organization].add(id256);
 
         emit ProviderRegistered(provider, organization);
     }
