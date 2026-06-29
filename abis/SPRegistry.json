@@ -267,51 +267,6 @@
   },
   {
     "type": "function",
-    "name": "getActiveOffers",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "offerIds",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getActiveOffersByProvider",
-    "inputs": [
-      {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "offerIds",
-        "type": "uint256[]",
-        "internalType": "uint256[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getCommittedProviders",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64[]",
-        "internalType": "CommonTypes.FilActorId[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getOfferView",
     "inputs": [
       {
@@ -441,25 +396,6 @@
   },
   {
     "type": "function",
-    "name": "getPayee",
-    "inputs": [
-      {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getPaymentTokenConfig",
     "inputs": [
       {
@@ -504,7 +440,7 @@
   },
   {
     "type": "function",
-    "name": "getProviderCapacity",
+    "name": "getProviderView",
     "inputs": [
       {
         "name": "provider",
@@ -514,10 +450,35 @@
     ],
     "outputs": [
       {
-        "name": "info",
+        "name": "view_",
         "type": "tuple",
-        "internalType": "struct ISPRegistry.ProviderCapacityInfo",
+        "internalType": "struct ISPRegistry.ProviderView",
         "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "organization",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "paused",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "blocked",
+            "type": "bool",
+            "internalType": "bool"
+          },
           {
             "name": "availableBytes",
             "type": "uint256",
@@ -540,68 +501,8 @@
   },
   {
     "type": "function",
-    "name": "getProviderInfo",
-    "inputs": [
-      {
-        "name": "provider",
-        "type": "uint64",
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "info",
-        "type": "tuple",
-        "internalType": "struct ISPRegistry.ProviderInfo",
-        "components": [
-          {
-            "name": "organization",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "payee",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "paused",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "blocked",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getProviders",
     "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint64[]",
-        "internalType": "CommonTypes.FilActorId[]"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getProvidersByOrganization",
-    "inputs": [
-      {
-        "name": "organization",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
     "outputs": [
       {
         "name": "",
