@@ -158,6 +158,11 @@ contract PoRepMarketTest is Test {
             / poRepMarket.EPOCHS_IN_MONTH();
     }
 
+    function chainEpochFromBlock(uint256 epoch) internal pure returns (CommonTypes.ChainEpoch) {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return CommonTypes.ChainEpoch.wrap(int64(uint64(epoch)));
+    }
+
     function proposeDefaultDeal() internal {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
@@ -204,8 +209,8 @@ contract PoRepMarketTest is Test {
         market.setDealTiming(
             dealId,
             PoRepTypes.DealTiming({
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),
-                expiresAtEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number + EPOCHS_IN_TWO_DAYS)))
+                proposedAtEpoch: chainEpochFromBlock(block.number),
+                expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
             })
         );
     }
@@ -1737,8 +1742,8 @@ contract PoRepMarketTest is Test {
         market.setDealTiming(
             dealId + 1,
             PoRepTypes.DealTiming({
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),
-                expiresAtEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number + EPOCHS_IN_TWO_DAYS)))
+                proposedAtEpoch: chainEpochFromBlock(block.number),
+                expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
             })
         );
 

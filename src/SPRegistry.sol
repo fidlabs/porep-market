@@ -36,6 +36,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     uint256 public constant MATCH_PRICE_BAND_BPS = 100;
     /// @notice One hundred percent in basis points.
     uint256 public constant MAX_BPS = 10_000;
+
     struct Provider {
         address organization;
         address payee;
