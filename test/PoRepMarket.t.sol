@@ -152,6 +152,12 @@ contract PoRepMarketTest is Test {
         });
     }
 
+    function expectedRailRate(uint256 _dealId) internal view returns (uint256) {
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(_dealId);
+        return (payment.pricePer32GiBPerMonth * payment.billed32GiBUnits + poRepMarket.EPOCHS_IN_MONTH() - 1)
+            / poRepMarket.EPOCHS_IN_MONTH();
+    }
+
     function proposeDefaultDeal() internal {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
@@ -588,8 +594,6 @@ contract PoRepMarketTest is Test {
 
         uint256 serviceStartEpoch = block.number;
         uint256 expectedBilledUnits = defaultTerms.dealSizeBytes / poRepMarket.SECTOR_SIZE();
-        uint256 expectedRate =
-            (defaultTerms.pricePerSectorPerMonth * expectedBilledUnits) / poRepMarket.EPOCHS_IN_MONTH();
 
         vm.prank(adminAddress);
         poRepMarket.activatePayment(dealId);
@@ -598,14 +602,14 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
 
         assertEq(payment.billed32GiBUnits, expectedBilledUnits);
-        assertEq(payment.railMaxRatePerEpoch, expectedRate);
+        assertEq(payment.railMaxRatePerEpoch, expectedRailRate(dealId));
         assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch))), serviceStartEpoch);
         assertEq(
             uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch))),
             serviceStartEpoch + poRepMarket.getDealTerms(dealId).durationEpochs
         );
         assertEq(validator.modifyRailPaymentCallCount(), 1);
-        assertEq(validator.lastNewRate(), expectedRate);
+        assertEq(validator.lastNewRate(), expectedRailRate(dealId));
         assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
     }
 
@@ -627,9 +631,7 @@ contract PoRepMarketTest is Test {
         validator.setRailStatus(RailStatus.PREPARED);
 
         CommonTypes.ChainEpoch expectedServiceStartEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
-        uint256 expectedBilledUnits = defaultTerms.dealSizeBytes / poRepMarket.SECTOR_SIZE();
-        uint256 expectedRate =
-            (defaultTerms.pricePerSectorPerMonth * expectedBilledUnits) / poRepMarket.EPOCHS_IN_MONTH();
+        uint256 expectedRate = expectedRailRate(dealId);
         CommonTypes.ChainEpoch expectedServiceEndEpoch = CommonTypes.ChainEpoch
             .wrap(
                 CommonTypes.ChainEpoch.unwrap(expectedServiceStartEpoch)
@@ -720,6 +722,17 @@ contract PoRepMarketTest is Test {
         RequestTerms memory terms = RequestTerms({
             dealSizeBytes: poRepMarket.SECTOR_SIZE() * 2, pricePerSectorPerMonth: 43_200, durationDays: 360
         });
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: terms.pricePerSectorPerMonth,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: terms.dealSizeBytes
+            })
+        );
 
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(50);
