@@ -441,29 +441,29 @@ contract DataCapEvidenceAdapter is
         if (batchSize == 0) revert InvalidBatchSize();
 
         Deal storage deal = _getStorageDeal(context.dealId);
-        CommonTypes.FilActorId[] memory batch = _loadAllocationBatch(deal.allocationIds, batchSize);
-        if (batch.length == 0) {
+        CommonTypes.FilActorId[] memory allocationsBatch = _loadAllocationBatch(deal.allocationIds, batchSize);
+        if (allocationsBatch.length == 0) {
             return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
         }
 
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
-            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: batch});
+            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: allocationsBatch});
         (int256 exitCode, VerifRegTypes.GetClaimsReturn memory result) = VerifRegAPI.getClaims(getClaimsParams);
         if (exitCode != 0) revert GetClaimsCallFailed();
 
         uint256 coveredBytes = 0;
-        uint256 failPtr = result.batch_info.fail_codes.length;
-        uint256 claimPtr = result.claims.length;
+        uint256 failPointer = result.batch_info.fail_codes.length;
+        uint256 claimPointer = result.claims.length;
 
-        for (uint256 i = batch.length; i > 0; i--) {
+        for (uint256 i = allocationsBatch.length; i > 0; i--) {
             uint256 idx = i - 1;
-            if (failPtr > 0 && result.batch_info.fail_codes[failPtr - 1].idx == idx) {
-                failPtr--;
+            if (failPointer > 0 && result.batch_info.fail_codes[failPointer - 1].idx == idx) {
+                failPointer--;
                 continue;
             }
-            claimPtr--;
-            deal.claimIds.push(batch[idx]);
-            coveredBytes += result.claims[claimPtr].size;
+            claimPointer--;
+            deal.claimIds.push(allocationsBatch[idx]);
+            coveredBytes += result.claims[claimPointer].size;
             _deleteDealAllocationIdByIndex(deal, idx);
         }
 
