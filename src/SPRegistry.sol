@@ -36,9 +36,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     uint256 public constant MATCH_PRICE_BAND_BPS = 100;
     /// @notice One hundred percent in basis points.
     uint256 public constant MAX_BPS = 10_000;
-    /// @notice Filecoin sector size used for per-epoch payment floor checks.
-    uint256 public constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
-
     struct Provider {
         address organization;
         address payee;

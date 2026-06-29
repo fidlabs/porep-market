@@ -4,7 +4,8 @@ pragma solidity =0.8.30;
 /**
  * @title OfferMatch
  * @notice Reason codes returned by SPRegistry offer matching
- * @dev OK (0) means the offer is eligible. Any nonzero value is the first failing check.
+ * @dev OK (0) means the offer is eligible. A returned nonzero value identifies the first failing check
+ *      in evaluation order. Numeric values are stable identifiers and are not sorted by evaluation order.
  *      Preview functions surface the code; reserve functions revert with it.
  */
 library OfferMatch {
