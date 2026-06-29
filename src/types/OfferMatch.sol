@@ -19,8 +19,6 @@ library OfferMatch {
     uint16 internal constant TOKEN_NOT_ALLOWED = 8;
     uint16 internal constant PRICE_BELOW_TOKEN_MIN = 9;
     uint16 internal constant PRICE_ABOVE_CLIENT_MAX = 10;
-    // Per-epoch rate would truncate to zero in FilecoinPay for the requested size; see Validator rate math.
-    uint16 internal constant PER_EPOCH_FLOOR = 11;
-    uint16 internal constant INSUFFICIENT_CAPACITY = 12;
-    uint16 internal constant MANIFEST_ALREADY_ASSIGNED = 13;
+    uint16 internal constant INSUFFICIENT_CAPACITY = 11;
+    uint16 internal constant MANIFEST_ALREADY_ASSIGNED = 12;
 }

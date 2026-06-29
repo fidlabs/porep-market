@@ -7,7 +7,6 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
-import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
@@ -1099,10 +1098,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             return (selection, OfferMatch.PRICE_ABOVE_CLIENT_MAX);
         }
 
-        if (!_meetsPerEpochFloor(payment.pricePer32GiBPerMonth, request.requestedSizeBytes)) {
-            return (selection, OfferMatch.PER_EPOCH_FLOOR);
-        }
-
         if (_remainingCapacity(offer.provider) < request.requestedSizeBytes) {
             return (selection, OfferMatch.INSUFFICIENT_CAPACITY);
         }
@@ -1117,23 +1112,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             reservedBytes: request.requestedSizeBytes
         });
         reason = OfferMatch.OK;
-    }
-
-    /**
-     * @notice Checks whether the monthly price keeps the per-epoch rate above zero.
-     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
-     * @param requestedSizeBytes Requested deal size in bytes.
-     * @return True when the implied per-epoch rate stays above zero.
-     */
-    function _meetsPerEpochFloor(uint256 pricePer32GiBPerMonth, uint256 requestedSizeBytes)
-        internal
-        pure
-        returns (bool)
-    {
-        uint256 estimatedSectorCount = Math.ceilDiv(requestedSizeBytes, SECTOR_SIZE);
-        if (estimatedSectorCount == 0) return false;
-        // solhint-disable-next-line gas-strict-inequalities
-        return pricePer32GiBPerMonth >= Math.ceilDiv(SharedTypes.EPOCHS_IN_MONTH, estimatedSectorCount);
     }
 
     /**

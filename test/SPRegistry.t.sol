@@ -987,56 +987,32 @@ contract SPRegistryTest is Test {
         spRegistry.createOffer(provider1, "zero-active-price", _terms(), defaultSLIs, rows);
     }
 
-    function testLowPriceOfferRejectedWhenRequestedSizeWouldProduceZeroPerEpochPayment() public {
+    function testLowPositivePriceOfferAllowedWhenItPassesTokenMinimumAndClientMaximum() public {
         _allowToken(token, 1);
         _registerProvider(provider1, owner1);
-        uint256 offerId = _createOffer(provider1, "low-price", 1);
+        uint256 offerId = _createOffer(provider1, "low-positive-price", 1);
         SharedTypes.DealRequest memory request = _request(1);
 
         (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
             spRegistry.previewOfferForDeal(offerId, request);
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
-        assertEq(reason, OfferMatch.PER_EPOCH_FLOOR);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(selection.offerId, offerId);
+        assertEq(selection.paymentToken, token);
+        assertEq(selection.pricePer32GiBPerMonth, 1);
+        assertEq(reason, OfferMatch.OK);
 
         selection = spRegistry.previewProviderForDeal(request);
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(selection.offerId, offerId);
 
         vm.prank(market);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PER_EPOCH_FLOOR)
-        );
-        spRegistry.reserveOfferForDeal(offerId, request);
-
-        vm.prank(market);
-        vm.expectRevert(ISPRegistry.NoOfferMatched.selector);
-        spRegistry.reserveProviderForDeal(request);
+        selection = spRegistry.reserveOfferForDeal(offerId, request);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider1));
+        assertEq(selection.pricePer32GiBPerMonth, 1);
+        assertEq(spRegistry.getProviderCapacity(provider1).pendingBytes, request.requestedSizeBytes);
     }
 
-    function testZeroSizeOfferRequestUsesPaymentFloorValidationInsteadOfPanic() public {
-        _allowToken(token, 1);
-        _registerProvider(provider1, owner1);
-
-        SharedTypes.OfferTerms memory terms = _terms();
-        terms.minSizeBytes = 0;
-        terms.maxSizeBytes = 0;
-        vm.prank(operator);
-        uint256 offerId = spRegistry.createOffer(provider1, "zero-min", terms, defaultSLIs, _paymentRows(1));
-
-        SharedTypes.DealRequest memory request = _requestWith(0, 180, 1, token);
-
-        (SharedTypes.ProviderDealSelection memory selection, uint16 reason) =
-            spRegistry.previewOfferForDeal(offerId, request);
-        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), 0);
-        assertEq(reason, OfferMatch.PER_EPOCH_FLOOR);
-
-        vm.prank(market);
-        vm.expectRevert(
-            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.PER_EPOCH_FLOOR)
-        );
-        spRegistry.reserveOfferForDeal(offerId, request);
-    }
-
-    function testLowPriceOfferAllowedWhenLargeRequestProducesNonZeroPerEpochPayment() public {
+    function testLowPositivePriceOfferAllowedForLargeRequestWhenItPassesAdmissibilityChecks() public {
         uint256 sectorSize = 32 * 1024 * 1024 * 1024;
         uint256 requestSize = ((SharedTypes.EPOCHS_IN_MONTH - 1) * sectorSize) + 1;
 
