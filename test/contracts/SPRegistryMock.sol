@@ -195,16 +195,10 @@ contract SPRegistryMock is ISPRegistry {
             provider: CommonTypes.FilActorId.wrap(0),
             active: false,
             terms: SharedTypes.OfferTerms({
-                minSizeBytes: 0,
-                maxSizeBytes: 0,
-                minDurationEpochs: 0,
-                maxDurationEpochs: 0
+                minSizeBytes: 0, maxSizeBytes: 0, minDurationEpochs: 0, maxDurationEpochs: 0
             }),
             slis: SharedTypes.SLIThresholds({
-                retrievabilityBps: 0,
-                bandwidthBytesPerSecond: 0,
-                latencyMs: 0,
-                indexingPct: 0
+                retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0
             }),
             paymentToken: paymentToken,
             paymentActive: false,

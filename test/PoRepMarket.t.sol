@@ -1488,10 +1488,7 @@ contract PoRepMarketTest is Test {
         spRegistry.setProviderState(
             providerFilActorId,
             SPRegistryMock.MockProviderState({
-                organization: organization1,
-                payee: address(0),
-                paused: false,
-                blocked: false
+                organization: organization1, payee: address(0), paused: false, blocked: false
             })
         );
 
