@@ -162,6 +162,12 @@ contract ValidatorTest is Test {
         validator.railTerminated(1, address(this), 0);
     }
 
+    function testRailTerminatedInvalidTerminatorRevert() public {
+        vm.expectRevert(Validator.InvalidTerminator.selector);
+        vm.prank(address(filecoinPayMock));
+        validator.railTerminated(railId, address(0xBEEF), 0);
+    }
+
     function testUpdateLockupPeriodUpdatesFilecoinPayRail() public {
         uint256 newLockup = 123;
 
@@ -439,7 +445,7 @@ contract ValidatorTest is Test {
     }
 
     function testRailTerminatedEmitsRailTerminatedWithoutChangingRailStatus() public {
-        address terminator = address(0xBEEF);
+        address terminator = address(validator);
         uint256 endEpoch = 777;
         uint8 statusBefore = validator.getRailStatus();
 

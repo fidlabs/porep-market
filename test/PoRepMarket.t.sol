@@ -1030,29 +1030,6 @@ contract PoRepMarketTest is Test {
         assertTrue(p.state == DealState.PROPOSED);
     }
 
-    function testGetActiveDealsReturnsOnlyActiveDeals() public {
-        PoRepMarketContractMock porepMarekMock = new PoRepMarketContractMock();
-        uint256[] memory ids = new uint256[](5);
-        ids[0] = 1;
-        ids[1] = 2;
-        ids[2] = 3;
-        ids[3] = 4;
-        ids[4] = 5;
-        porepMarekMock.setDeal(createDeal(ids[0], DealState.ACTIVE));
-        porepMarekMock.setDeal(createDeal(ids[1], DealState.ACCEPTED));
-        porepMarekMock.setDeal(createDeal(ids[2], DealState.PROPOSED));
-        porepMarekMock.setDeal(createDeal(ids[3], DealState.ACTIVE));
-        porepMarekMock.setDeal(createDeal(ids[4], DealState.REJECTED));
-        porepMarekMock.setDealIdsReadyForPayment(ids);
-
-        PoRepTypes.Deal[] memory activeDeals = porepMarekMock.getActiveDeals();
-        assertEq(activeDeals.length, 2);
-        assertEq(activeDeals[0].dealId, ids[0]);
-        assertTrue(activeDeals[0].state == DealState.ACTIVE);
-        assertEq(activeDeals[1].dealId, ids[3]);
-        assertTrue(activeDeals[1].state == DealState.ACTIVE);
-    }
-
     function testProposeDealRevertsEmptyManifestLocation() public {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EmptyManifestLocation.selector, ""));

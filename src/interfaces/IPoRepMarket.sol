@@ -132,12 +132,6 @@ interface IPoRepMarket {
     function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
-     * @notice Gets all active deals
-     * @return activeDeals Array of active deals
-     */
-    function getActiveDeals() external view returns (PoRepTypes.Deal[] memory activeDeals);
-
-    /**
      * @notice Retrieves the manifest location URL for a specific deal
      * @param dealId The unique identifier of the deal
      * @return manifestLocation The manifest location URL for a specific deal

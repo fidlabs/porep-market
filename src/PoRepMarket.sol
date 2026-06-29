@@ -162,9 +162,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice DealFinalized event
      * @param dealId The id of the deal
-     * @param client The address of the client
+     * @param validator The address of the validator
      */
-    event DealFinalized(uint256 indexed dealId, address indexed client);
+    event DealFinalized(uint256 indexed dealId, address indexed validator);
 
     /**
      * @notice DealTerminated event
@@ -264,11 +264,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 0xd325131b
      */
     error CallerIsNotValidator(uint256 dealId, address caller);
-
-    /**
-     * @notice Error thrown when a caller is not the evidence adapter assigned to a deal
-     */
-    error CallerIsNotEvidenceAdapter(uint256 dealId, address caller);
 
     /**
      * @notice Error thrown when a deal does not exist for a given id
@@ -868,30 +863,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._dealExpiration = newDealExpiration;
 
         emit DealExpirationUpdated(newDealExpiration);
-    }
-
-    /**
-     * @notice Gets all active deals
-     * @return activeDeals Array of active deals
-     */
-    function getActiveDeals() external view returns (PoRepTypes.Deal[] memory activeDeals) {
-        PoRepMarketStorage storage $ = s();
-        uint256[] memory activeDealIds = $._dealIdsReadyForPayment.values();
-        activeDeals = new PoRepTypes.Deal[](activeDealIds.length);
-        uint256 dealCounter = 0;
-
-        for (uint256 i = 0; i < activeDealIds.length; i++) {
-            PoRepTypes.Deal memory deal = $._deals[activeDealIds[i]];
-            if (deal.state == DealState.ACTIVE) {
-                activeDeals[dealCounter] = deal;
-                dealCounter++;
-            }
-        }
-
-        // solhint-disable-next-line no-inline-assembly
-        assembly ("memory-safe") {
-            mstore(activeDeals, dealCounter)
-        }
     }
 
     /**

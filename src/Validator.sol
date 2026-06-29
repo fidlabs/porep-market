@@ -34,12 +34,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error CallerIsNotFilecoinPay();
 
     /**
-     * @notice Error indicating that the caller is not the DataCap Evidence Adapter
-     * @dev 0xd7232b64
-     */
-    error CallerIsNotDataCapEvidenceAdapter();
-
-    /**
      * @notice Error indicating that the caller is not the PoRepMarket contract
      * @dev 0x9dd45c94
      */
@@ -175,6 +169,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param currentEpoch The current block epoch
      */
     error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
+
+    /**
+     * @notice Error indicating that an invalid terminator address was provided
+     * @dev 0xee5ab23e
+     */
+    error InvalidTerminator();
 
     // solhint-disable gas-indexed-events
     /**
@@ -538,6 +538,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
             revert CallerIsNotFilecoinPay();
+        }
+
+        if (terminator != address(this)) {
+            revert InvalidTerminator();
         }
 
         emit RailTerminated(railId, terminator, endEpoch);
