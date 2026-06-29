@@ -13,7 +13,6 @@ import {IValidator} from "./interfaces/IValidator.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {SLITypes} from "./types/SLITypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -474,14 +473,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert InvalidEvidenceAdapterAddress();
         }
 
-        {
-            SLITypes.DealTerms memory terms = SLITypes.DealTerms({
-                dealSizeBytes: request.requestedSizeBytes,
-                pricePerSectorPerMonth: request.maxPricePer32GiBPerMonth,
-                durationDays: request.durationDays
-            });
-            _ensureCorrectTerms(terms);
-        }
+        _ensureCorrectTerms(request);
         SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
         CommonTypes.FilActorId provider = selection.provider;
         address organization = $._SPRegistryContract.getProviderInfo(provider).organization;
@@ -1191,23 +1183,23 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Ensures the terms are correct
-     * @param terms The terms for the deal
+     * @param request The client deal request
      */
-    function _ensureCorrectTerms(SLITypes.DealTerms memory terms) internal pure {
-        if (terms.durationDays < MIN_DEAL_DURATION_DAYS) {
+    function _ensureCorrectTerms(SharedTypes.DealRequest calldata request) internal pure {
+        if (request.durationDays < MIN_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
-        if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {
+        if (request.durationDays > MAX_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
-        if (terms.durationDays % 30 != 0) {
+        if (request.durationDays % 30 != 0) {
             revert InvalidDealDuration();
         }
-        if (terms.dealSizeBytes == 0) {
+        if (request.requestedSizeBytes == 0) {
             revert InvalidDealSize();
         }
-        uint256 minSectors = Math.ceilDiv(terms.dealSizeBytes, SECTOR_SIZE);
-        uint256 totalPerMonth = terms.pricePerSectorPerMonth * minSectors;
+        uint256 minSectors = Math.ceilDiv(request.requestedSizeBytes, SECTOR_SIZE);
+        uint256 totalPerMonth = request.maxPricePer32GiBPerMonth * minSectors;
         if (totalPerMonth < EPOCHS_IN_MONTH) {
             revert InvalidDealPricePerSectorPerMonth(totalPerMonth, EPOCHS_IN_MONTH);
         }

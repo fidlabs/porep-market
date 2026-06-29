@@ -10,7 +10,6 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
@@ -23,6 +22,12 @@ import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
+    struct RequestTerms {
+        uint256 dealSizeBytes;
+        uint256 pricePerSectorPerMonth;
+        uint32 durationDays;
+    }
+
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
@@ -36,7 +41,7 @@ contract PoRepMarketTest is Test {
     uint256 public dealId;
     uint256 public totalDealSize;
     SharedTypes.SLIThresholds internal defaultRequirements;
-    SLITypes.DealTerms internal defaultTerms;
+    RequestTerms internal defaultTerms;
 
     uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
     uint256 public constant EPOCHS_IN_TWO_DAYS = 5_760;
@@ -71,7 +76,7 @@ contract PoRepMarketTest is Test {
         defaultRequirements = SharedTypes.SLIThresholds({
             retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
         });
-        defaultTerms = SLITypes.DealTerms({
+        defaultTerms = RequestTerms({
             dealSizeBytes: totalDealSize, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
         });
 
@@ -114,7 +119,7 @@ contract PoRepMarketTest is Test {
 
     function dealRequest(
         SharedTypes.SLIThresholds memory requirements,
-        SLITypes.DealTerms memory terms,
+        RequestTerms memory terms,
         string memory manifestLocation
     ) public view returns (SharedTypes.DealRequest memory) {
         return SharedTypes.DealRequest({
@@ -1113,7 +1118,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealDurationIsBelowMinimum() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() - 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
@@ -1122,7 +1127,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealDurationIsNotMultiplicatioveOf30() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() + 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
@@ -1131,7 +1136,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealDurationExceedsMaximum() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 12, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
@@ -1519,8 +1524,8 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealSizeIsZero() public {
-        SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 360, dealSizeBytes: 0, pricePerSectorPerMonth: 100_000});
+        RequestTerms memory badTerms =
+            RequestTerms({durationDays: 360, dealSizeBytes: 0, pricePerSectorPerMonth: 100_000});
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealSize.selector));
@@ -1528,7 +1533,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenPriceTimeSectorsIsBelowEpochsInMonth() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH - 1
         });
 
@@ -1541,7 +1546,7 @@ contract PoRepMarketTest is Test {
         uint256 oneTebibyteInBytes = 1024 * 1024 * 1024 * 1024;
         uint256 pricePerSector = 62_500;
 
-        SLITypes.DealTerms memory terms = SLITypes.DealTerms({
+        RequestTerms memory terms = RequestTerms({
             durationDays: 360, dealSizeBytes: oneTebibyteInBytes, pricePerSectorPerMonth: pricePerSector
         });
 
