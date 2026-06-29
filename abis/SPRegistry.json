@@ -71,19 +71,6 @@
   },
   {
     "type": "function",
-    "name": "MAX_OFFER_NAME_BYTES",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "MAX_PROVIDERS",
     "inputs": [],
     "outputs": [
@@ -191,11 +178,6 @@
         "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
       },
       {
         "name": "terms",
@@ -330,43 +312,7 @@
   },
   {
     "type": "function",
-    "name": "getOffer",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "info",
-        "type": "tuple",
-        "internalType": "struct ISPRegistry.OfferInfo",
-        "components": [
-          {
-            "name": "provider",
-            "type": "uint64",
-            "internalType": "CommonTypes.FilActorId"
-          },
-          {
-            "name": "name",
-            "type": "string",
-            "internalType": "string"
-          },
-          {
-            "name": "active",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getOfferPayment",
+    "name": "getOfferView",
     "inputs": [
       {
         "name": "offerId",
@@ -374,19 +320,93 @@
         "internalType": "uint256"
       },
       {
-        "name": "token",
+        "name": "paymentToken",
         "type": "address",
         "internalType": "address"
       }
     ],
     "outputs": [
       {
-        "name": "payment",
+        "name": "view_",
         "type": "tuple",
-        "internalType": "struct ISPRegistry.OfferPayment",
+        "internalType": "struct ISPRegistry.OfferView",
         "components": [
           {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
             "name": "active",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "terms",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.OfferTerms",
+            "components": [
+              {
+                "name": "minSizeBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "maxSizeBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "minDurationEpochs",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "maxDurationEpochs",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "slis",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "paymentActive",
             "type": "bool",
             "internalType": "bool"
           },
@@ -394,88 +414,6 @@
             "name": "pricePer32GiBPerMonth",
             "type": "uint256",
             "internalType": "uint256"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getOfferSLIs",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "slis",
-        "type": "tuple",
-        "internalType": "struct SharedTypes.SLIThresholds",
-        "components": [
-          {
-            "name": "retrievabilityBps",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "bandwidthBytesPerSecond",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "latencyMs",
-            "type": "uint16",
-            "internalType": "uint16"
-          },
-          {
-            "name": "indexingPct",
-            "type": "uint8",
-            "internalType": "uint8"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getOfferTerms",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "terms",
-        "type": "tuple",
-        "internalType": "struct SharedTypes.OfferTerms",
-        "components": [
-          {
-            "name": "minSizeBytes",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "maxSizeBytes",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "minDurationEpochs",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "maxDurationEpochs",
-            "type": "uint64",
-            "internalType": "uint64"
           }
         ]
       }
@@ -1546,24 +1484,6 @@
   },
   {
     "type": "function",
-    "name": "setOfferName",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "setOfferPayment",
     "inputs": [
       {
@@ -1816,37 +1736,6 @@
         "type": "uint64",
         "indexed": true,
         "internalType": "CommonTypes.FilActorId"
-      },
-      {
-        "name": "name",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "OfferNameUpdated",
-    "inputs": [
-      {
-        "name": "offerId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "oldName",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
-      },
-      {
-        "name": "newName",
-        "type": "string",
-        "indexed": false,
-        "internalType": "string"
       }
     ],
     "anonymous": false
@@ -2339,11 +2228,6 @@
         "internalType": "uint64"
       }
     ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidOfferName",
-    "inputs": []
   },
   {
     "type": "error",
