@@ -992,7 +992,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     {
         SPRegistryStorage storage $ = _getSPRegistryStorage();
         uint256 length = $._activeOfferIds.length();
-        SharedTypes.ProviderDealSelection[] memory eligible = new SharedTypes.ProviderDealSelection[](length);
+        uint256[] memory eligibleOfferIds = new uint256[](length);
+        CommonTypes.FilActorId[] memory eligibleProviders = new CommonTypes.FilActorId[](length);
+        uint256[] memory eligiblePrices = new uint256[](length);
         uint256 count;
         uint256 cheapest = type(uint256).max;
 
@@ -1000,44 +1002,58 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             (SharedTypes.ProviderDealSelection memory candidate, uint16 reason) =
                 _evaluateOffer($._activeOfferIds.at(i), request);
             if (reason != OfferMatch.OK) continue;
-            eligible[count++] = candidate;
+            eligibleOfferIds[count] = candidate.offerId;
+            eligibleProviders[count] = candidate.provider;
+            eligiblePrices[count++] = candidate.pricePer32GiBPerMonth;
             if (candidate.pricePer32GiBPerMonth < cheapest) cheapest = candidate.pricePer32GiBPerMonth;
         }
         if (count == 0) return best;
 
         uint256 maxBandPrice = (cheapest * (MAX_BPS + MATCH_PRICE_BAND_BPS)) / MAX_BPS;
-        uint256 bestPending = type(uint256).max;
+        CommonTypes.FilActorId bestProvider;
+        uint256 bestOfferId;
+        uint256 bestPrice;
+        uint256 bestLoad = type(uint256).max;
         for (uint256 i = 0; i < count; i++) {
-            SharedTypes.ProviderDealSelection memory candidate = eligible[i];
-            if (candidate.pricePer32GiBPerMonth > maxBandPrice) continue;
-            uint256 pending = _pendingCapacity(candidate.provider);
-            if (_isLeastLoaded(best, bestPending, candidate, pending)) {
-                best = candidate;
-                bestPending = pending;
+            uint256 price = eligiblePrices[i];
+            if (price > maxBandPrice) continue;
+            CommonTypes.FilActorId provider = eligibleProviders[i];
+            uint256 offerId = eligibleOfferIds[i];
+            uint256 load = _matchLoad(provider);
+            if (_isLeastLoaded(bestProvider, bestLoad, bestPrice, bestOfferId, load, price, offerId)) {
+                bestProvider = provider;
+                bestLoad = load;
+                bestPrice = price;
+                bestOfferId = offerId;
             }
         }
+        (best,) = _evaluateOffer(bestOfferId, request);
     }
 
     /**
      * @notice Compares the current best candidate against a new candidate.
-     * @param best Current best selection.
-     * @param bestPending Pending bytes for the current best selection.
-     * @param candidate New candidate selection.
-     * @param pending Pending bytes for the new candidate.
+     * @param bestProvider Current best provider.
+     * @param bestLoad Match load for the current best selection.
+     * @param bestPrice Current best price.
+     * @param bestOfferId Current best offer ID.
+     * @param load Match load for the new candidate.
+     * @param price New candidate price.
+     * @param offerId New candidate offer ID.
      * @return True when the new candidate should replace the current best selection.
      */
     function _isLeastLoaded(
-        SharedTypes.ProviderDealSelection memory best,
-        uint256 bestPending,
-        SharedTypes.ProviderDealSelection memory candidate,
-        uint256 pending
+        CommonTypes.FilActorId bestProvider,
+        uint256 bestLoad,
+        uint256 bestPrice,
+        uint256 bestOfferId,
+        uint256 load,
+        uint256 price,
+        uint256 offerId
     ) internal pure returns (bool) {
-        if (CommonTypes.FilActorId.unwrap(best.provider) == 0) return true;
-        if (pending != bestPending) return pending < bestPending;
-        if (candidate.pricePer32GiBPerMonth != best.pricePer32GiBPerMonth) {
-            return candidate.pricePer32GiBPerMonth < best.pricePer32GiBPerMonth;
-        }
-        return candidate.offerId < best.offerId;
+        if (CommonTypes.FilActorId.unwrap(bestProvider) == 0) return true;
+        if (load != bestLoad) return load < bestLoad;
+        if (price != bestPrice) return price < bestPrice;
+        return offerId < bestOfferId;
     }
 
     /**
@@ -1156,7 +1172,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         return c.availableBytes > used ? c.availableBytes - used : 0;
     }
 
-    function _pendingCapacity(CommonTypes.FilActorId provider) internal view returns (uint256) {
+    function _matchLoad(CommonTypes.FilActorId provider) internal view returns (uint256) {
         return _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)].pendingBytes;
     }
 

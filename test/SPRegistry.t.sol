@@ -1107,6 +1107,39 @@ contract SPRegistryTest is Test {
         assertEq(selection.offerId, provider2Offer);
     }
 
+    function testFinalSelectionUsesFinalCheapestPriceBand() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
+
+        _createOffer(provider1, "first-outside-final-band", 91_000);
+        uint256 cheaperOffer = _createOffer(provider2, "later-cheapest", 90_000);
+
+        SharedTypes.ProviderDealSelection memory selection = spRegistry.previewProviderForDeal(_request(100_000));
+        assertEq(selection.offerId, cheaperOffer);
+    }
+
+    function testAutoMatchLoadUsesPendingBytesNotCommittedBytes() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
+
+        uint256 provider1Offer = _createOffer(provider1, "committed-only", 90_000);
+        uint256 provider2Offer = _createOffer(provider2, "pending", 90_000);
+
+        vm.prank(market);
+        spRegistry.reserveOfferForDeal(provider1Offer, _requestWithManifest(keccak256("provider-1"), 100_000));
+        vm.prank(market);
+        spRegistry.commitCapacity(provider1, 1_000_000, 1_000_000);
+
+        vm.prank(market);
+        spRegistry.reserveOfferForDeal(provider2Offer, _requestWithManifest(keccak256("provider-2"), 100_000));
+
+        SharedTypes.ProviderDealSelection memory selection =
+            spRegistry.previewProviderForDeal(_requestWithManifest(keccak256("provider-3"), 100_000));
+        assertEq(selection.offerId, provider1Offer);
+    }
+
     function testUpgradeAuthorizationSuccessCoversAuthorizeUpgrade() public {
         SPRegistry newImpl = new SPRegistry();
 
