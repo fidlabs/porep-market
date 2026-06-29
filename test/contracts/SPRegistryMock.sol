@@ -154,7 +154,6 @@ contract SPRegistryMock is ISPRegistry {
 
     function createOffer(
         CommonTypes.FilActorId,
-        string calldata,
         SharedTypes.OfferTerms calldata,
         SharedTypes.SLIThresholds calldata,
         SharedTypes.OfferPaymentInput[] calldata
@@ -163,24 +162,29 @@ contract SPRegistryMock is ISPRegistry {
     }
 
     function setOfferActive(uint256, bool) external {}
-    function setOfferName(uint256, string calldata) external {}
     function setOfferPayment(uint256, address, bool, uint256) external {}
 
-    function getOffer(uint256) external pure returns (OfferInfo memory) {
-        return OfferInfo({provider: CommonTypes.FilActorId.wrap(0), name: "", active: false});
-    }
-
-    function getOfferTerms(uint256) external pure returns (SharedTypes.OfferTerms memory) {
-        return SharedTypes.OfferTerms({minSizeBytes: 0, maxSizeBytes: 0, minDurationEpochs: 0, maxDurationEpochs: 0});
-    }
-
-    function getOfferSLIs(uint256) external pure returns (SharedTypes.SLIThresholds memory) {
-        return
-            SharedTypes.SLIThresholds({retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0});
-    }
-
-    function getOfferPayment(uint256, address) external pure returns (OfferPayment memory) {
-        return OfferPayment({active: false, pricePer32GiBPerMonth: 0});
+    function getOfferView(uint256 offerId, address paymentToken) external pure returns (OfferView memory) {
+        return OfferView({
+            offerId: offerId,
+            provider: CommonTypes.FilActorId.wrap(0),
+            active: false,
+            terms: SharedTypes.OfferTerms({
+                minSizeBytes: 0,
+                maxSizeBytes: 0,
+                minDurationEpochs: 0,
+                maxDurationEpochs: 0
+            }),
+            slis: SharedTypes.SLIThresholds({
+                retrievabilityBps: 0,
+                bandwidthBytesPerSecond: 0,
+                latencyMs: 0,
+                indexingPct: 0
+            }),
+            paymentToken: paymentToken,
+            paymentActive: false,
+            pricePer32GiBPerMonth: 0
+        });
     }
 
     function getOffersByProvider(CommonTypes.FilActorId) external pure returns (uint256[] memory) {

@@ -36,8 +36,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     uint256 public constant MATCH_PRICE_BAND_BPS = 100;
     /// @notice One hundred percent in basis points.
     uint256 public constant MAX_BPS = 10_000;
-    /// @notice Maximum UTF-8 byte length for offer names.
-    uint256 public constant MAX_OFFER_NAME_BYTES = 64;
     /// @notice Filecoin sector size used for per-epoch payment floor checks.
     uint256 public constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
@@ -61,7 +59,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     struct Offer {
         CommonTypes.FilActorId provider;
-        string name;
         bool active;
     }
 
@@ -88,7 +85,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint256 => SharedTypes.OfferTerms) _offerTerms;
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
         mapping(uint256 => mapping(address => RegistryOfferPayment)) _offerPayments;
-        mapping(uint256 => EnumerableSet.AddressSet) _offerPaymentTokens;
         mapping(bytes32 manifestHash => mapping(uint64 provider => bool)) _manifestAssignedToProvider;
     }
 
@@ -192,9 +188,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @notice Emitted when an offer is created.
      * @param offerId Created offer ID.
      * @param provider Provider actor ID that owns the offer.
-     * @param name Offer name.
      */
-    event OfferCreated(uint256 indexed offerId, CommonTypes.FilActorId indexed provider, string name);
+    event OfferCreated(uint256 indexed offerId, CommonTypes.FilActorId indexed provider);
 
     /* solhint-disable gas-indexed-events */
     /**
@@ -204,14 +199,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      */
     event OfferActiveUpdated(uint256 indexed offerId, bool active);
     /* solhint-enable gas-indexed-events */
-
-    /**
-     * @notice Emitted when an offer name changes.
-     * @param offerId Offer ID.
-     * @param oldName Previous offer name.
-     * @param newName New offer name.
-     */
-    event OfferNameUpdated(uint256 indexed offerId, string oldName, string newName);
 
     /* solhint-disable gas-indexed-events */
     /**
@@ -375,12 +362,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @dev 0x01da340d
      */
     error TooManyActiveOffers(CommonTypes.FilActorId provider, uint256 maxOffers);
-
-    /**
-     * @notice Error thrown when an offer name is invalid
-     * @dev 0x078aaee3
-     */
-    error InvalidOfferName();
 
     /**
      * @notice Error thrown when offer size bounds are invalid
@@ -619,7 +600,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function createOffer(
         CommonTypes.FilActorId provider,
-        string calldata name,
         SharedTypes.OfferTerms calldata terms,
         SharedTypes.SLIThresholds calldata slis,
         SharedTypes.OfferPaymentInput[] calldata payments
@@ -627,7 +607,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
-        _ensureOfferNameValid(name);
         _ensureOfferTermsValid(terms);
         _ensureSLIsValid(slis);
 
@@ -639,7 +618,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         }
 
         offerId = ++$.nextOfferId;
-        $._offers[offerId] = Offer({provider: provider, name: name, active: true});
+        $._offers[offerId] = Offer({provider: provider, active: true});
         $._offerTerms[offerId] = terms;
         $._offerSLIs[offerId] = slis;
         $._offerIdsByProvider[providerId].add(offerId);
@@ -650,7 +629,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             _setOfferPayment(offerId, payments[i].token, payments[i].active, payments[i].pricePer32GiBPerMonth);
         }
 
-        emit OfferCreated(offerId, provider, name);
+        emit OfferCreated(offerId, provider);
     }
 
     /// @inheritdoc ISPRegistry
@@ -681,22 +660,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function setOfferName(uint256 offerId, string calldata name) external {
-        _ensureOfferExists(offerId);
-        _ensureOfferNameValid(name);
-
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        Offer storage offer = $._offers[offerId];
-        _ensureProviderNotBlocked(offer.provider);
-        _onlyProviderControllerOrAdmin(offer.provider);
-
-        string memory oldName = offer.name;
-        offer.name = name;
-
-        emit OfferNameUpdated(offerId, oldName, name);
-    }
-
-    /// @inheritdoc ISPRegistry
     function setOfferPayment(uint256 offerId, address token, bool active, uint256 pricePer32GiBPerMonth) external {
         _ensureOfferExists(offerId);
 
@@ -708,29 +671,21 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function getOffer(uint256 offerId) external view returns (OfferInfo memory info) {
-        Offer storage offer = _getSPRegistryStorage()._offers[offerId];
-        info = OfferInfo({provider: offer.provider, name: offer.name, active: offer.active});
-    }
+    function getOfferView(uint256 offerId, address paymentToken) external view returns (OfferView memory view_) {
+        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        Offer storage offer = $._offers[offerId];
+        RegistryOfferPayment storage payment = $._offerPayments[offerId][paymentToken];
 
-    /// @inheritdoc ISPRegistry
-    function getOfferTerms(uint256 offerId) external view returns (SharedTypes.OfferTerms memory terms) {
-        return _getSPRegistryStorage()._offerTerms[offerId];
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getOfferSLIs(uint256 offerId) external view returns (SharedTypes.SLIThresholds memory slis) {
-        return _getSPRegistryStorage()._offerSLIs[offerId];
-    }
-
-    /// @inheritdoc ISPRegistry
-    function getOfferPayment(uint256 offerId, address token)
-        external
-        view
-        returns (ISPRegistry.OfferPayment memory payment)
-    {
-        RegistryOfferPayment storage row = _getSPRegistryStorage()._offerPayments[offerId][token];
-        payment = ISPRegistry.OfferPayment({active: row.active, pricePer32GiBPerMonth: row.pricePer32GiBPerMonth});
+        view_ = OfferView({
+            offerId: offerId,
+            provider: offer.provider,
+            active: offer.active,
+            terms: $._offerTerms[offerId],
+            slis: $._offerSLIs[offerId],
+            paymentToken: paymentToken,
+            paymentActive: payment.active,
+            pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth
+        });
     }
 
     /// @inheritdoc ISPRegistry
@@ -941,15 +896,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @notice Ensures the offer name is non-empty and within the byte limit.
-     * @param name Offer name to validate.
-     */
-    function _ensureOfferNameValid(string memory name) internal pure {
-        uint256 length = bytes(name).length;
-        if (length == 0 || length > MAX_OFFER_NAME_BYTES) revert InvalidOfferName();
-    }
-
-    /**
      * @notice Ensures offer size and duration bounds are internally consistent.
      * @param terms Offer terms to validate.
      */
@@ -975,7 +921,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         $._offerPayments[offerId][token] =
             RegistryOfferPayment({active: active, pricePer32GiBPerMonth: pricePer32GiBPerMonth});
-        $._offerPaymentTokens[offerId].add(token);
 
         emit OfferPaymentUpdated(offerId, token, active, pricePer32GiBPerMonth);
     }

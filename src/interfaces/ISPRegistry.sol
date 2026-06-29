@@ -52,24 +52,24 @@ interface ISPRegistry {
     }
 
     /**
-     * @notice Provider offer metadata.
+     * @notice Current offer data plus the payment row for one token.
+     * @param offerId Offer ID.
      * @param provider Provider actor ID that owns the offer.
-     * @param name Human-readable offer name.
      * @param active True when the offer participates in matching.
-     */
-    struct OfferInfo {
-        CommonTypes.FilActorId provider;
-        string name;
-        bool active;
-    }
-
-    /**
-     * @notice Payment row for one offer token.
-     * @param active True when this token row can be selected.
+     * @param terms Offer size and duration bounds.
+     * @param slis Promised offer SLIs.
+     * @param paymentToken ERC20 token address used for the payment row.
+     * @param paymentActive True when this token row can be selected.
      * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
      */
-    struct OfferPayment {
+    struct OfferView {
+        uint256 offerId;
+        CommonTypes.FilActorId provider;
         bool active;
+        SharedTypes.OfferTerms terms;
+        SharedTypes.SLIThresholds slis;
+        address paymentToken;
+        bool paymentActive;
         uint256 pricePer32GiBPerMonth;
     }
 
@@ -207,7 +207,6 @@ interface ISPRegistry {
     /**
      * @notice Creates an active provider offer.
      * @param provider Provider actor ID.
-     * @param name Human-readable offer name.
      * @param terms Immutable offer size and duration bounds.
      * @param slis Immutable promised SLIs.
      * @param payments Initial payment rows.
@@ -215,7 +214,6 @@ interface ISPRegistry {
      */
     function createOffer(
         CommonTypes.FilActorId provider,
-        string calldata name,
         SharedTypes.OfferTerms calldata terms,
         SharedTypes.SLIThresholds calldata slis,
         SharedTypes.OfferPaymentInput[] calldata payments
@@ -229,13 +227,6 @@ interface ISPRegistry {
     function setOfferActive(uint256 offerId, bool active) external;
 
     /**
-     * @notice Updates mutable offer name.
-     * @param offerId Offer ID.
-     * @param name New human-readable offer name.
-     */
-    function setOfferName(uint256 offerId, string calldata name) external;
-
-    /**
      * @notice Updates or adds a mutable offer payment row.
      * @param offerId Offer ID.
      * @param token ERC20 token address.
@@ -245,33 +236,12 @@ interface ISPRegistry {
     function setOfferPayment(uint256 offerId, address token, bool active, uint256 pricePer32GiBPerMonth) external;
 
     /**
-     * @notice Returns offer metadata.
+     * @notice Returns offer data plus the payment row for one token.
      * @param offerId Offer ID.
-     * @return info Offer metadata.
+     * @param paymentToken ERC20 token address to read from the offer payment map.
+     * @return view_ Current offer view for the requested payment token.
      */
-    function getOffer(uint256 offerId) external view returns (OfferInfo memory info);
-
-    /**
-     * @notice Returns immutable offer size and duration bounds.
-     * @param offerId Offer ID.
-     * @return terms Offer terms.
-     */
-    function getOfferTerms(uint256 offerId) external view returns (SharedTypes.OfferTerms memory terms);
-
-    /**
-     * @notice Returns immutable promised offer SLIs.
-     * @param offerId Offer ID.
-     * @return slis Promised offer SLIs.
-     */
-    function getOfferSLIs(uint256 offerId) external view returns (SharedTypes.SLIThresholds memory slis);
-
-    /**
-     * @notice Returns payment row for an offer and token.
-     * @param offerId Offer ID.
-     * @param token ERC20 token address.
-     * @return payment Offer payment row.
-     */
-    function getOfferPayment(uint256 offerId, address token) external view returns (OfferPayment memory payment);
+    function getOfferView(uint256 offerId, address paymentToken) external view returns (OfferView memory view_);
 
     /**
      * @notice Returns all offer IDs created by a provider.
