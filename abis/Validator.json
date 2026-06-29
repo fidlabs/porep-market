@@ -595,11 +595,6 @@
   },
   {
     "type": "error",
-    "name": "CallerIsNotDataCapEvidenceAdapter",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "CallerIsNotFilecoinPay",
     "inputs": []
   },
@@ -693,6 +688,11 @@
   {
     "type": "error",
     "name": "InvalidSPRegistryAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTerminator",
     "inputs": []
   },
   {
