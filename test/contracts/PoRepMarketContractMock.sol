@@ -21,6 +21,10 @@ contract PoRepMarketContractMock is PoRepMarket {
         _getStorage()._deals[++_getStorage()._dealIdCounter] = deal;
     }
 
+    function setDealState(uint256 dealId, uint8 state) external {
+        _getStorage()._deals[dealId].state = state;
+    }
+
     function setDealPayment(uint256 dealId, PoRepTypes.DealPayment calldata payment) external {
         _getStorage()._dealPayments[dealId] = payment;
     }
@@ -31,7 +35,11 @@ contract PoRepMarketContractMock is PoRepMarket {
         }
     }
 
-    function getCompletedDealsIds() public view returns (uint256[] memory) {
+    function getActiveDealIdsReadyForPayment() public view returns (uint256[] memory) {
         return _getStorage()._dealIdsReadyForPayment.values();
+    }
+
+    function ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) external view {
+        _ensureAllocationSizeWithinTolerance(actualDealSize, expectedDealSize);
     }
 }

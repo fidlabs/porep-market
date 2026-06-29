@@ -15,6 +15,7 @@ import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
+import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
@@ -373,7 +374,7 @@ contract DataCapEvidenceAdapter is
             revert AdapterNotOperational();
         }
 
-        if (dealSnapshot.state != PoRepTypes.DealState.Accepted) {
+        if (dealSnapshot.state != DealState.ACCEPTED) {
             revert InvalidDealStateForTransfer();
         }
 
@@ -485,7 +486,7 @@ contract DataCapEvidenceAdapter is
 
     // solhint-disable function-max-lines
     /**
-     * @notice Replaces all broken tracked allocations for a completed existing deal.
+     * @notice Replaces all broken tracked allocations for an active existing deal.
      * @param dealId The id of the deal to rescue.
      * @param params The DataCap transfer parameters that create replacement allocations.
      */
@@ -496,7 +497,7 @@ contract DataCapEvidenceAdapter is
     {
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
-        if (dealSnapshot.state != PoRepTypes.DealState.Completed || $._deals[dealId].dealId == 0) {
+        if (dealSnapshot.state != DealState.ACTIVE || $._deals[dealId].dealId == 0) {
             revert InvalidDealStateForTransfer();
         }
 

@@ -99,13 +99,13 @@ interface IPoRepMarket {
     function acceptDeal(uint256 dealId) external;
 
     /**
-     * @notice Completes a deal
+     * @notice Finalizes a deal after its assigned evidence adapter accepts its evidence
      * @param dealId The id of the deal
      */
-    function completeDeal(uint256 dealId) external;
+    function finalizeDeal(uint256 dealId) external;
 
     /**
-     * @notice Activates payment for a completed deal
+     * @notice Activates payment for an active deal
      * @param dealId The id of the deal
      */
     function activatePayment(uint256 dealId) external;
@@ -114,10 +114,9 @@ interface IPoRepMarket {
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal
-     * @param terminator The address that terminated the deal
      * @param endEpoch The Filecoin epoch at which the deal was terminated
      */
-    function terminateDeal(uint256 dealId, address terminator, uint256 endEpoch) external;
+    function terminateDeal(uint256 dealId, uint256 endEpoch) external;
 
     /**
      * @notice Rejects a deal
@@ -133,10 +132,10 @@ interface IPoRepMarket {
     function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
-     * @notice Gets all completed deals
+     * @notice Gets all active deals
      * @return activeDeals Array of active deals
      */
-    function getCompletedDeals() external view returns (PoRepTypes.Deal[] memory activeDeals);
+    function getActiveDeals() external view returns (PoRepTypes.Deal[] memory activeDeals);
 
     /**
      * @notice Retrieves the manifest location URL for a specific deal
@@ -159,7 +158,7 @@ interface IPoRepMarket {
      * @param state The state of the deals to retrieve
      * @return deals Array of deals for the organization in the specified state (from all providers associated with the organization)
      */
-    function getDealsForOrganizationByState(address organization, PoRepTypes.DealState state)
+    function getDealsForOrganizationByState(address organization, uint8 state)
         external
         view
         returns (PoRepTypes.Deal[] memory deals);

@@ -4,6 +4,7 @@
 pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
+import {DealState} from "../../src/types/DealState.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
 
 contract PoRepMarketMock {
@@ -11,7 +12,7 @@ contract PoRepMarketMock {
     mapping(uint256 dealId => SharedTypes.SLIThresholds slis) public dealSLIs;
     mapping(uint256 dealId => PoRepTypes.DealPayment payment) public dealPayments;
     mapping(uint256 dealId => PoRepTypes.DealService service) public dealServices;
-    uint256 public completeDealCallCount;
+    uint256 public finalizeDealCallCount;
 
     function setDeal(uint256 dealId, PoRepTypes.Deal calldata deal) external {
         deals[dealId] = deal;
@@ -45,11 +46,11 @@ contract PoRepMarketMock {
         return dealServices[dealId];
     }
 
-    function completeDeal(uint256) external {
-        completeDealCallCount++;
+    function finalizeDeal(uint256) external {
+        finalizeDealCallCount++;
     }
 
-    function setDealState(uint256 dealId, PoRepTypes.DealState state) external {
+    function setDealState(uint256 dealId, uint8 state) external {
         deals[dealId].state = state;
     }
 
@@ -61,7 +62,7 @@ contract PoRepMarketMock {
         deals[dealId].railId = newRailId;
     }
 
-    function terminateDeal(uint256 dealId, address, uint256) external {
-        deals[dealId].state = PoRepTypes.DealState.Terminated;
+    function terminateDeal(uint256 dealId, uint256) external {
+        deals[dealId].state = DealState.TERMINATED;
     }
 }
