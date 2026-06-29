@@ -34,5 +34,7 @@ contract ValidatorMock is IOperator {
         return railStatus;
     }
 
-    function terminateRail() external {}
+    function earlyRailTermination() external {}
+
+    function finalizeDeal() external {}
 }

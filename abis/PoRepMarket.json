@@ -177,19 +177,6 @@
   },
   {
     "type": "function",
-    "name": "completeDeal",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "currentEvidenceStatus",
     "inputs": [
       {
@@ -231,58 +218,16 @@
   },
   {
     "type": "function",
-    "name": "getCompletedDeals",
-    "inputs": [],
-    "outputs": [
+    "name": "finalizeDeal",
+    "inputs": [
       {
-        "name": "activeDeals",
-        "type": "tuple[]",
-        "internalType": "struct PoRepTypes.Deal[]",
-        "components": [
-          {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "client",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "provider",
-            "type": "uint64",
-            "internalType": "CommonTypes.FilActorId"
-          },
-          {
-            "name": "offerId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
-            "name": "state",
-            "type": "uint8",
-            "internalType": "enum PoRepTypes.DealState"
-          },
-          {
-            "name": "evidenceAdapter",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "validator",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "railId",
-            "type": "uint256",
-            "internalType": "uint256"
-          }
-        ]
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
-    "stateMutability": "view"
+    "outputs": [],
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -323,7 +268,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepTypes.DealState"
+            "internalType": "uint8"
           },
           {
             "name": "evidenceAdapter",
@@ -341,6 +286,19 @@
             "internalType": "uint256"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealActivationPadding",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -372,19 +330,6 @@
             "internalType": "uint256"
           }
         ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getDealCompletionPadding",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -665,7 +610,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepTypes.DealState"
+            "internalType": "uint8"
           },
           {
             "name": "evidenceAdapter",
@@ -699,7 +644,7 @@
       {
         "name": "state",
         "type": "uint8",
-        "internalType": "enum PoRepTypes.DealState"
+        "internalType": "uint8"
       }
     ],
     "outputs": [
@@ -731,7 +676,7 @@
           {
             "name": "state",
             "type": "uint8",
-            "internalType": "enum PoRepTypes.DealState"
+            "internalType": "uint8"
           },
           {
             "name": "evidenceAdapter",
@@ -1108,7 +1053,7 @@
   },
   {
     "type": "function",
-    "name": "setDealCompletionPadding",
+    "name": "setDealActivationPadding",
     "inputs": [
       {
         "name": "padding",
@@ -1215,11 +1160,6 @@
         "internalType": "uint256"
       },
       {
-        "name": "terminator",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "endEpoch",
         "type": "uint256",
         "internalType": "uint256"
@@ -1322,38 +1262,7 @@
   },
   {
     "type": "event",
-    "name": "DealCompleted",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "client",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
-      },
-      {
-        "name": "actualSizeBytes",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      },
-      {
-        "name": "provider",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "CommonTypes.FilActorId"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "DealCompletionPaddingUpdated",
+    "name": "DealActivationPaddingUpdated",
     "inputs": [
       {
         "name": "oldPadding",
@@ -1475,6 +1384,25 @@
   },
   {
     "type": "event",
+    "name": "DealFinalized",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "validator",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "DealRejected",
     "inputs": [
       {
@@ -1501,12 +1429,6 @@
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
-      },
-      {
-        "name": "terminator",
-        "type": "address",
-        "indexed": true,
-        "internalType": "address"
       },
       {
         "name": "endEpoch",
@@ -1775,7 +1697,7 @@
   },
   {
     "type": "error",
-    "name": "DealCompletionPaddingTooHigh",
+    "name": "DealActivationPaddingTooHigh",
     "inputs": [
       {
         "name": "padding",
@@ -1827,12 +1749,12 @@
       {
         "name": "currentState",
         "type": "uint8",
-        "internalType": "enum PoRepTypes.DealState"
+        "internalType": "uint8"
       },
       {
         "name": "expectedState",
         "type": "uint8",
-        "internalType": "enum PoRepTypes.DealState"
+        "internalType": "uint8"
       }
     ]
   },
@@ -1875,7 +1797,7 @@
   },
   {
     "type": "error",
-    "name": "InvalidAllocationSizeForDealCompletion",
+    "name": "InvalidAllocationSizeForDealActivation",
     "inputs": []
   },
   {
@@ -1980,11 +1902,6 @@
   {
     "type": "error",
     "name": "NotInitializing",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotTheClientAddress",
     "inputs": []
   },
   {

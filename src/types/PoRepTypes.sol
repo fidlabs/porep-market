@@ -19,18 +19,6 @@ library PoRepTypes {
     uint32 internal constant MAX_DEAL_DURATION_DAYS = 1278;
 
     /**
-     * @notice DealState enum
-     * @dev Represents the various states a deal can be
-     */
-    enum DealState {
-        Proposed,
-        Accepted,
-        Completed,
-        Rejected,
-        Terminated
-    }
-
-    /**
      * @notice Core deal snapshot and lifecycle fields.
      */
     struct Deal {
@@ -38,7 +26,7 @@ library PoRepTypes {
         address client;
         CommonTypes.FilActorId provider;
         uint256 offerId;
-        DealState state;
+        uint8 state;
         address evidenceAdapter;
         address validator;
         uint256 railId;
