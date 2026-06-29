@@ -50,21 +50,22 @@ interface ISPRegistry {
     /**
      * @notice Current offer data plus the payment row for one token.
      * @param offerId Offer ID.
-     * @param provider Provider actor ID that owns the offer.
-     * @param active True when the offer participates in matching.
      * @param terms Offer size and duration bounds.
      * @param slis Promised offer SLIs.
      * @param paymentToken ERC20 token address used for the payment row.
+     * @param provider Provider actor ID that owns the offer.
+     * @param active True when the offer participates in matching.
      * @param paymentActive True when this token row can be selected.
      * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
      */
+    // solhint-disable-next-line gas-struct-packing
     struct OfferView {
         uint256 offerId;
-        CommonTypes.FilActorId provider;
-        bool active;
         SharedTypes.OfferTerms terms;
         SharedTypes.SLIThresholds slis;
         address paymentToken;
+        CommonTypes.FilActorId provider;
+        bool active;
         bool paymentActive;
         uint256 pricePer32GiBPerMonth;
     }
