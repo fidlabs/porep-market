@@ -199,11 +199,6 @@
         "internalType": "address"
       },
       {
-        "name": "_SPRegistry",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_dealId",
         "type": "uint256",
         "internalType": "uint256"
@@ -703,11 +698,6 @@
   {
     "type": "error",
     "name": "InvalidSLIScorerAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSPRegistryAddress",
     "inputs": []
   },
   {

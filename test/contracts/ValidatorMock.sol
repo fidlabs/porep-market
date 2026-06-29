@@ -3,7 +3,6 @@
 
 pragma solidity =0.8.30;
 
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {IOperator} from "../../src/interfaces/IOperator.sol";
 import {RailStatus} from "../../src/types/RailStatus.sol";
 
@@ -12,7 +11,7 @@ contract ValidatorMock is IOperator {
     uint256 public lastNewRate;
     uint8 public railStatus;
 
-    function createRail(IERC20) external {}
+    function createRail() external {}
 
     function updateLockupPeriod(uint256) external {}
 

@@ -717,7 +717,7 @@ contract PoRepMarketTest is Test {
     function testActivatePaymentRoundsUpRate() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);
-        SLITypes.DealTerms memory terms = SLITypes.DealTerms({
+        RequestTerms memory terms = RequestTerms({
             dealSizeBytes: poRepMarket.SECTOR_SIZE() * 2, pricePerSectorPerMonth: 43_200, durationDays: 360
         });
 
