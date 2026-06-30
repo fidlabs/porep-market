@@ -512,16 +512,11 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
-        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
-        vm.prank(clientAddress);
-        poRepMarket.completeDeal(dealId);
+        setDealActive(dealId);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.DealNotInExpectedState.selector,
-                dealId,
-                DealState.ACTIVE,
-                DealState.ACCEPTED
+                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACTIVE, DealState.ACCEPTED
             )
         );
         vm.prank(validatorAddress);
@@ -1129,6 +1124,7 @@ contract PoRepMarketTest is Test {
             clientAddress,
             providerFilActorId,
             defaultRequirements,
+            defaultManifestHash,
             expectedManifestLocation,
             totalDealSize,
             block.number
@@ -1437,18 +1433,17 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
-        vm.prank(adminAddress);
-        poRepMarket.setDealCompletionPadding(1);
-
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
-        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, allocatedSize));
-        vm.prank(clientAddress);
-        poRepMarket.completeDeal(dealId);
+        PoRepMarketContractMock(address(poRepMarket))
+            .setDealCapacity(
+                dealId, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: allocatedSize})
+            );
+        setDealActive(dealId);
 
         vm.prank(validatorAddress);
-        poRepMarket.terminateDeal(dealId, validatorAddress, block.number);
+        poRepMarket.terminateDeal(dealId, block.number);
 
         assertEq(spRegistry.lastReleasedCapacityProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
         assertEq(spRegistry.lastReleasedCapacityBytes(), allocatedSize);
@@ -1466,10 +1461,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.DealNotInExpectedState.selector,
-                dealId,
-                DealState.ACCEPTED,
-                DealState.ACTIVE
+                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACCEPTED, DealState.ACTIVE
             )
         );
         vm.prank(validatorAddress);
