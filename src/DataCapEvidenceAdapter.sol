@@ -281,7 +281,6 @@ contract DataCapEvidenceAdapter is
         CommonTypes.FilActorId provider;
         uint256 dealId;
         uint256 railId;
-        uint256 allocationCount;
         uint256 allocatedBytes;
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
@@ -442,7 +441,7 @@ contract DataCapEvidenceAdapter is
         uint256 batchSize = abi.decode(evidenceData, (uint256));
         if (batchSize == 0) revert InvalidBatchSize();
 
-        Deal storage deal = _getStorageDeal(context.dealId);
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
         /// TODO: add check is postingFinished == true from finishDataCapPosting's task when it's ready
 
@@ -500,10 +499,11 @@ contract DataCapEvidenceAdapter is
         pure
         returns (SharedTypes.ActivationDecision memory decision)
     {
+        context;
+        evidenceData;
         return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
     }
 
-    /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
      * @notice Refresh current evidence health from adapter-specific source data
      * @dev The caller supplies only the bounded batch to check; the adapter
@@ -517,12 +517,13 @@ contract DataCapEvidenceAdapter is
         pure
         returns (SharedTypes.EvidenceStatus memory status)
     {
+        context;
+        evidenceData;
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
         });
     }
 
-    /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
      * @notice Read current evidence status from adapter storage only
      * @dev Must not call Filecoin actors or refresh live state
@@ -534,6 +535,7 @@ contract DataCapEvidenceAdapter is
         pure
         returns (SharedTypes.EvidenceStatus memory status)
     {
+        context;
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
         });
