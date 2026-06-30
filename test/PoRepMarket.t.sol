@@ -112,19 +112,18 @@ contract PoRepMarketTest is Test {
     function createClientDealWithAllocationSize(uint256 _dealId, uint256 _allocationSize)
         public
         view
-        returns (DataCapEvidenceAdapter.Deal memory)
+        returns (DataCapEvidenceAdapter.DataCapDealEvidence memory)
     {
-        return DataCapEvidenceAdapter.Deal({
+        return DataCapEvidenceAdapter.DataCapDealEvidence({
             completed: false,
             client: clientAddress,
             validator: validatorAddress,
             provider: providerFilActorId,
             dealId: _dealId,
             railId: railId,
-            sizeOfAllocations: _allocationSize,
-            allocationIds: new CommonTypes.FilActorId[](0),
-            claimIds: new CommonTypes.FilActorId[](0),
-            claimedBytes: 0
+            allocationCount: 0,
+            allocatedBytes: _allocationSize,
+            allocationIds: new CommonTypes.FilActorId[](0)
         });
     }
 

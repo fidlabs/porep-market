@@ -148,9 +148,9 @@ contract DataCapEvidenceAdapterTest is Test {
     }
 
     function testDealStructRetainsDeprecatedCompletedCompatibilitySlot() public pure {
-        DataCapEvidenceAdapter.Deal memory deal;
+        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence;
 
-        assertFalse(deal.completed);
+        assertFalse(dealEvidence.completed);
     }
 
     function _registerDealWithOneAllocation(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
@@ -240,8 +240,8 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
 
-        DataCapEvidenceAdapter.Deal memory deal = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(deal.sizeOfAllocations, 2048);
+        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
+        assertEq(dealEvidence.allocatedBytes, 2048);
     }
 
     function testIsAdminSet() public view {
@@ -662,13 +662,13 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 42);
 
-        DataCapEvidenceAdapter.Deal memory deal = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(deal.sizeOfAllocations, 2048);
-        assertEq(deal.dealId, dealId);
-        assertEq(deal.client, clientAddress);
-        assertEq(CommonTypes.FilActorId.unwrap(deal.provider), CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(deal.validator, address(validatorMock));
-        assertEq(deal.railId, 1);
+        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
+        assertEq(dealEvidence.allocatedBytes, 2048);
+        assertEq(dealEvidence.dealId, dealId);
+        assertEq(dealEvidence.client, clientAddress);
+        assertEq(CommonTypes.FilActorId.unwrap(dealEvidence.provider), CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(dealEvidence.validator, address(validatorMock));
+        assertEq(dealEvidence.railId, 1);
 
         (uint64 provider, bytes memory data,,,,) = actorIdMock.lastDataCapTransferAllocation(0);
         assertEq(provider, CommonTypes.FilActorId.unwrap(SP1));
@@ -691,8 +691,8 @@ contract DataCapEvidenceAdapterTest is Test {
         _assertContainsAllocationId(ids, 42);
         _assertContainsAllocationId(ids, 43);
 
-        DataCapEvidenceAdapter.Deal memory deal = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(deal.sizeOfAllocations, 6144);
+        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
+        assertEq(dealEvidence.allocatedBytes, 6144);
 
         (uint64 firstProvider, bytes memory firstData,,,,) = actorIdMock.lastDataCapTransferAllocation(0);
         (uint64 secondProvider, bytes memory secondData,,,,) = actorIdMock.lastDataCapTransferAllocation(1);
@@ -1037,12 +1037,12 @@ contract DataCapEvidenceAdapterTest is Test {
         emit DataCapEvidenceAdapter.DatacapSpent(clientAddress, 24576);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        DataCapEvidenceAdapter.Deal memory deal = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.provider) == CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(deal.dealId, dealId);
-        assertEq(deal.validator, address(validatorMock));
-        assertEq(deal.railId, 1);
-        assertEq(deal.client, clientAddress);
+        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
+        assertTrue(CommonTypes.FilActorId.unwrap(dealEvidence.provider) == CommonTypes.FilActorId.unwrap(SP1));
+        assertEq(dealEvidence.dealId, dealId);
+        assertEq(dealEvidence.validator, address(validatorMock));
+        assertEq(dealEvidence.railId, 1);
+        assertEq(dealEvidence.client, clientAddress);
     }
 
     function testReentryAttemptWillThrowInvalidClientError() public {
@@ -1111,12 +1111,12 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
 
-        DataCapEvidenceAdapter.Deal memory deal = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(deal.allocationIds.length, 4);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[0]) == 3);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[1]) == 1);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[2]) == 4);
-        assertTrue(CommonTypes.FilActorId.unwrap(deal.allocationIds[3]) == 2);
+        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
+        assertEq(dealEvidence.allocationIds.length, 4);
+        assertTrue(CommonTypes.FilActorId.unwrap(dealEvidence.allocationIds[0]) == 3);
+        assertTrue(CommonTypes.FilActorId.unwrap(dealEvidence.allocationIds[1]) == 1);
+        assertTrue(CommonTypes.FilActorId.unwrap(dealEvidence.allocationIds[2]) == 4);
+        assertTrue(CommonTypes.FilActorId.unwrap(dealEvidence.allocationIds[3]) == 2);
     }
 
     function testIsDataSizeMatchingHappyPath() public {
@@ -1506,22 +1506,22 @@ contract DataCapEvidenceAdapterTest is Test {
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(sizeOfTransfer * 3));
 
         // 2 * 2048 from allocations and 2048 from claims
-        uint256 sizeOfAllocations;
+        uint256 allocatedBytes;
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
-        sizeOfAllocations = dataCapEvidenceAdapterMock.getSizeOfAllocations(dealId);
-        assertEq(sizeOfAllocations, sizeOfTransfer);
+        allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
+        assertEq(allocatedBytes, sizeOfTransfer);
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
-        sizeOfAllocations = dataCapEvidenceAdapterMock.getSizeOfAllocations(dealId);
-        assertEq(sizeOfAllocations, sizeOfTransfer * 2);
+        allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
+        assertEq(allocatedBytes, sizeOfTransfer * 2);
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
-        sizeOfAllocations = dataCapEvidenceAdapterMock.getSizeOfAllocations(dealId);
-        assertEq(sizeOfAllocations, sizeOfTransfer * 3);
+        allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
+        assertEq(allocatedBytes, sizeOfTransfer * 3);
     }
 
     function testTransferRevertsWhenAllocationSizeExceedsSector() public {

@@ -98,11 +98,11 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     function claimsTerminatedEarly(uint64[] calldata claims) external;
 
     /**
-     * @notice custom getter to retrieve allocated size in deal
+     * @notice custom getter to retrieve allocated bytes in deal
      * @param dealId The id of the deal
-     * @return sizeOfAllocations size of allocations for the selected deal
+     * @return allocatedBytes allocated bytes for the selected deal
      */
-    function getSizeOfAllocations(uint256 dealId) external view returns (uint256);
+    function getAllocatedBytes(uint256 dealId) external view returns (uint256);
 
     /**
      * @notice Getter for the PoRepMarket contract address
