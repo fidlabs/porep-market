@@ -28,6 +28,7 @@ import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
@@ -276,7 +277,7 @@ contract DataCapEvidenceAdapterTest is Test {
 
         assertEq(decision.coveredBytes, 4096);
         assertEq(decision.reasonCode, 0);
-        assertEq(decision.result, 0);
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
         assertEq(mock.getDeal(dealId).claimedBytes, 4096);
 
         assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 0);
@@ -300,6 +301,7 @@ contract DataCapEvidenceAdapterTest is Test {
             mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
 
         assertEq(decision.coveredBytes, 2048);
+        assertEq(decision.result, EvidenceResult.PARTIAL);
         assertEq(mock.getDeal(dealId).claimedBytes, 2048);
 
         CommonTypes.FilActorId[] memory remaining = mock.getAllAllocationIdsPerDeal(dealId);
@@ -322,6 +324,7 @@ contract DataCapEvidenceAdapterTest is Test {
             mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
 
         assertEq(decision.coveredBytes, 0);
+        assertEq(decision.result, EvidenceResult.REJECTED);
         assertEq(mock.getDeal(dealId).claimedBytes, 0);
         assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 2);
 
@@ -355,14 +358,10 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(claimedAfterSecond, 2);
     }
 
-    function testSubmitEvidenceBatchReturnsZeroWhenNoAllocations() public {
+    function testSubmitEvidenceBatchRevertsWhenNoAllocations() public {
         vm.prank(address(poRepMarketMock));
-        SharedTypes.ActivationDecision memory decision =
-            dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
-
-        assertEq(decision.coveredBytes, 0);
-        assertEq(decision.reasonCode, 0);
-        assertEq(decision.result, 0);
+        vm.expectRevert(DataCapEvidenceAdapter.InvalidAllocationLength.selector);
+        dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
     }
 
     function testSubmitEvidenceBatchRevertsWhenBatchSizeIsZero() public {

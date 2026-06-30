@@ -21,6 +21,7 @@ import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
 import {EvidenceTypes} from "./types/EvidenceTypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
+import {EvidenceResult} from "./types/EvidenceResult.sol";
 
 /**
  * @title DataCapEvidenceAdapter
@@ -272,6 +273,12 @@ contract DataCapEvidenceAdapter is
      */
     error AdapterNotOperational();
 
+    /**
+     * @notice Error thrown when the allocations length is invalid
+     * @dev 0xd0f7551e
+     */
+    error InvalidAllocationLength();
+
     struct Deal {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
@@ -441,10 +448,13 @@ contract DataCapEvidenceAdapter is
         if (batchSize == 0) revert InvalidBatchSize();
 
         Deal storage deal = _getStorageDeal(context.dealId);
-        CommonTypes.FilActorId[] memory allocationsBatch = _loadAllocationBatch(deal.allocationIds, batchSize);
-        if (allocationsBatch.length == 0) {
-            return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
+
+        /// TODO: add check for finishDataCapPosting when it's ready
+
+        if (deal.allocationIds.length == 0) {
+            revert InvalidAllocationLength();
         }
+        CommonTypes.FilActorId[] memory allocationsBatch = _loadAllocationBatch(deal.allocationIds, batchSize);
 
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
             VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: allocationsBatch});
@@ -469,7 +479,16 @@ contract DataCapEvidenceAdapter is
 
         deal.claimedBytes += coveredBytes;
 
-        return SharedTypes.ActivationDecision({coveredBytes: coveredBytes, reasonCode: 0, result: 0});
+        uint8 evidenceResult;
+        if (result.claims.length == 0) {
+            evidenceResult = EvidenceResult.REJECTED;
+        } else if (result.batch_info.fail_codes.length == 0) {
+            evidenceResult = EvidenceResult.ACCEPTED;
+        } else {
+            evidenceResult = EvidenceResult.PARTIAL;
+        }
+
+        return SharedTypes.ActivationDecision({coveredBytes: coveredBytes, reasonCode: 0, result: evidenceResult});
     }
 
     // solhint-disable no-unused-vars

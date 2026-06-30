@@ -1126,6 +1126,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidAllocationLength",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidAllocationRequest",
     "inputs": []
   },
