@@ -358,12 +358,6 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(claimedAfterSecond, 2);
     }
 
-    function testSubmitEvidenceBatchRevertsWhenNoAllocations() public {
-        vm.prank(address(poRepMarketMock));
-        vm.expectRevert(DataCapEvidenceAdapter.InvalidAllocationLength.selector);
-        dataCapEvidenceAdapter.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
-    }
-
     function testSubmitEvidenceBatchRevertsWhenBatchSizeIsZero() public {
         vm.prank(address(poRepMarketMock));
         vm.expectRevert(DataCapEvidenceAdapter.InvalidBatchSize.selector);

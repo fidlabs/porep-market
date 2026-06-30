@@ -273,12 +273,6 @@ contract DataCapEvidenceAdapter is
      */
     error AdapterNotOperational();
 
-    /**
-     * @notice Error thrown when the allocations length is invalid
-     * @dev 0xd0f7551e
-     */
-    error InvalidAllocationLength();
-
     struct Deal {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
@@ -449,11 +443,8 @@ contract DataCapEvidenceAdapter is
 
         Deal storage deal = _getStorageDeal(context.dealId);
 
-        /// TODO: add check for finishDataCapPosting when it's ready
+        /// TODO: add check is postingFinished == true from finishDataCapPosting's task when it's ready
 
-        if (deal.allocationIds.length == 0) {
-            revert InvalidAllocationLength();
-        }
         CommonTypes.FilActorId[] memory allocationsBatch = _loadAllocationBatch(deal.allocationIds, batchSize);
 
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
