@@ -140,7 +140,7 @@
         ]
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",

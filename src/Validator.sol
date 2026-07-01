@@ -243,6 +243,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     /**
+     * @notice Name of the validator
+     */
+    string public constant NAME = "FCSS";
+
+    /**
+     * @notice Description of the validator
+     */
+    string public constant DESCRIPTION = "Filecoin Cold Storage Service";
+
+    /**
      * @notice Number of epochs in one month
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
