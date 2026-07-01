@@ -469,10 +469,10 @@ contract PoRepMarketTest is Test {
         assertEq(view_.providerOrganization, providerOwnerAddress);
     }
 
-    function assertDealViewPayment(PoRepTypes.DealViewPayment memory viewPayment, PoRepTypes.DealPayment memory payment)
-        internal
-        pure
-    {
+    function assertDealViewPayment(
+        PoRepTypes.DealViewPayment memory viewPayment,
+        PoRepTypes.DealPayment memory payment
+    ) internal pure {
         assertEq(viewPayment.paymentToken, payment.paymentToken);
         assertEq(viewPayment.pricePer32GiBPerMonth, payment.pricePer32GiBPerMonth);
         assertEq(viewPayment.billed32GiBUnits, payment.billed32GiBUnits);
