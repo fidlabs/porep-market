@@ -119,10 +119,7 @@ interface IPoRepMarket {
      * @return dealIds Page of deal IDs in creation order.
      * @return total Total number of created deal IDs at call time.
      */
-    function getDealIds(uint256 offset, uint256 limit)
-        external
-        view
-        returns (uint256[] memory dealIds, uint256 total);
+    function getDealIds(uint256 offset, uint256 limit) external view returns (uint256[] memory dealIds, uint256 total);
 
     /**
      * @notice Gets a page of deal IDs for one lifecycle state.
