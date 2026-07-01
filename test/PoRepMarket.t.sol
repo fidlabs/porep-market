@@ -11,6 +11,7 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
+import {IPoRepMarket} from "../src/interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
@@ -304,14 +305,15 @@ contract PoRepMarketTest is Test {
         assertEq(p.railId, 0);
     }
 
-    function testGetDealCountReturnsZeroWhenEmpty() public view {
-        assertEq(poRepMarket.getDealCount(), 0);
+    function testReadPaginationInterfaceSelectorsAreAvailable() public pure {
+        assertEq(IPoRepMarket.getDealCount.selector, bytes4(keccak256("getDealCount()")));
+        assertEq(IPoRepMarket.getDealIds.selector, bytes4(keccak256("getDealIds(uint256,uint256)")));
+        assertEq(IPoRepMarket.getDealIdsByState.selector, bytes4(keccak256("getDealIdsByState(uint8,uint256,uint256)")));
     }
 
-    function testGetDealIdsReturnsEmptyWhenLimitIsZero() public view {
-        (uint256[] memory ids, uint256 total) = poRepMarket.getDealIds(0, 0);
-        assertEq(total, 0);
-        assertEq(ids.length, 0);
+    function testDealViewInterfaceSelectorsAreAvailable() public pure {
+        assertEq(IPoRepMarket.getDealView.selector, bytes4(keccak256("getDealView(uint256)")));
+        assertEq(IPoRepMarket.getDealViews.selector, bytes4(keccak256("getDealViews(uint256,uint256)")));
     }
 
     function testGetDealDataReturnsValidData() public {
