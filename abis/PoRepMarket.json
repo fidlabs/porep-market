@@ -336,6 +336,19 @@
   },
   {
     "type": "function",
+    "name": "getDealCount",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "count",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getDealData",
     "inputs": [
       {
@@ -391,6 +404,69 @@
     "outputs": [
       {
         "name": "dealExpiration",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealIds",
+    "inputs": [
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "dealIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "total",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealIdsByState",
+    "inputs": [
+      {
+        "name": "state",
+        "type": "uint8",
+        "internalType": "uint8"
+      },
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "dealIds",
+        "type": "uint256[]",
+        "internalType": "uint256[]"
+      },
+      {
+        "name": "total",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -588,6 +664,504 @@
             "internalType": "CommonTypes.ChainEpoch"
           }
         ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealView",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "dealView",
+        "type": "tuple",
+        "internalType": "struct PoRepTypes.DealView",
+        "components": [
+          {
+            "name": "deal",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.Deal",
+            "components": [
+              {
+                "name": "dealId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "client",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "provider",
+                "type": "uint64",
+                "internalType": "CommonTypes.FilActorId"
+              },
+              {
+                "name": "offerId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "state",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "evidenceAdapter",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "validator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "railId",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "data",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.DealData",
+            "components": [
+              {
+                "name": "manifestHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "manifestLocation",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "terms",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealTerms",
+            "components": [
+              {
+                "name": "requestedSizeBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "durationEpochs",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "timing",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealTiming",
+            "components": [
+              {
+                "name": "proposedAtEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "expiresAtEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              }
+            ]
+          },
+          {
+            "name": "service",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealService",
+            "components": [
+              {
+                "name": "serviceStartEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "serviceEndEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              }
+            ]
+          },
+          {
+            "name": "capacity",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealCapacity",
+            "components": [
+              {
+                "name": "reservedBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "committedBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "payment",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealPayment",
+            "components": [
+              {
+                "name": "paymentToken",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "payee",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "pricePer32GiBPerMonth",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "billed32GiBUnits",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "railMaxRatePerEpoch",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "providerOrganization",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "evidenceStatus",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.EvidenceStatus",
+            "components": [
+              {
+                "name": "activeCoveredBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "lastEvidenceRefreshEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "reasonCode",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "result",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealViews",
+    "inputs": [
+      {
+        "name": "offset",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "limit",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "dealViews",
+        "type": "tuple[]",
+        "internalType": "struct PoRepTypes.DealView[]",
+        "components": [
+          {
+            "name": "deal",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.Deal",
+            "components": [
+              {
+                "name": "dealId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "client",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "provider",
+                "type": "uint64",
+                "internalType": "CommonTypes.FilActorId"
+              },
+              {
+                "name": "offerId",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "state",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
+                "name": "evidenceAdapter",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "validator",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "railId",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "data",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.DealData",
+            "components": [
+              {
+                "name": "manifestHash",
+                "type": "bytes32",
+                "internalType": "bytes32"
+              },
+              {
+                "name": "manifestLocation",
+                "type": "string",
+                "internalType": "string"
+              }
+            ]
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "terms",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealTerms",
+            "components": [
+              {
+                "name": "requestedSizeBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "durationEpochs",
+                "type": "uint64",
+                "internalType": "uint64"
+              }
+            ]
+          },
+          {
+            "name": "timing",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealTiming",
+            "components": [
+              {
+                "name": "proposedAtEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "expiresAtEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              }
+            ]
+          },
+          {
+            "name": "service",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealService",
+            "components": [
+              {
+                "name": "serviceStartEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "serviceEndEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              }
+            ]
+          },
+          {
+            "name": "capacity",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealCapacity",
+            "components": [
+              {
+                "name": "reservedBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "committedBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "payment",
+            "type": "tuple",
+            "internalType": "struct PoRepTypes.DealPayment",
+            "components": [
+              {
+                "name": "paymentToken",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "payee",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "pricePer32GiBPerMonth",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "billed32GiBUnits",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "railMaxRatePerEpoch",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
+          },
+          {
+            "name": "providerOrganization",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "evidenceStatus",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.EvidenceStatus",
+            "components": [
+              {
+                "name": "activeCoveredBytes",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "lastEvidenceRefreshEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "reasonCode",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "result",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "name": "total",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"

@@ -308,7 +308,10 @@ contract PoRepMarketTest is Test {
     function testReadPaginationInterfaceSelectorsAreAvailable() public pure {
         assertEq(IPoRepMarket.getDealCount.selector, bytes4(keccak256("getDealCount()")));
         assertEq(IPoRepMarket.getDealIds.selector, bytes4(keccak256("getDealIds(uint256,uint256)")));
-        assertEq(IPoRepMarket.getDealIdsByState.selector, bytes4(keccak256("getDealIdsByState(uint8,uint256,uint256)")));
+        assertEq(
+            IPoRepMarket.getDealIdsByState.selector,
+            bytes4(keccak256(abi.encodePacked("getDealIdsByState(", "uint8,uint256,uint256)")))
+        );
     }
 
     function testDealViewInterfaceSelectorsAreAvailable() public pure {
@@ -329,7 +332,7 @@ contract PoRepMarketTest is Test {
     function testGetDealCountReturnsCreatedDealCount() public {
         proposeDefaultDeal();
         vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, "https://example.com/manifest-2.json"));
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, "https://e.com/m2.json"));
 
         assertEq(poRepMarket.getDealCount(), 2);
     }
