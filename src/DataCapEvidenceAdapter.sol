@@ -19,16 +19,15 @@ import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
-import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {EvidenceTypes} from "./types/EvidenceTypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
+import {EvidenceResult} from "./types/EvidenceResult.sol";
 
 /**
  * @title DataCapEvidenceAdapter
  * @notice Contract for handling DataCap evidence interactions
  */
 contract DataCapEvidenceAdapter is
-    IStorageEvidenceAdapter,
     IDataCapEvidenceAdapter,
     Initializable,
     AccessControlUpgradeable,
@@ -257,10 +256,10 @@ contract DataCapEvidenceAdapter is
     error InvalidDealId();
 
     /**
-     * @notice Error indicating a mismatch between the number of claims returned and the number of claim IDs processed
-     * @dev 0xe38fdaac
+     * @notice Error indicating batch size is invalid
+     * @dev 0x7862e959
      */
-    error ClaimIdsMismatch(uint256 claimsLength, uint256 claimIdsLength);
+    error InvalidBatchSize();
 
     /**
      * @notice Error thrown when the adapter has already been set non-operational
@@ -284,6 +283,8 @@ contract DataCapEvidenceAdapter is
         uint256 railId;
         uint256 sizeOfAllocations;
         CommonTypes.FilActorId[] allocationIds;
+        CommonTypes.FilActorId[] claimIds;
+        uint256 claimedBytes;
     }
 
     struct ProviderAllocation {
@@ -297,6 +298,14 @@ contract DataCapEvidenceAdapter is
     struct ProviderClaim {
         CommonTypes.FilActorId provider;
         CommonTypes.FilActorId claim;
+    }
+
+    /**
+     * @notice Modifier to check that the caller is the PoRepMarket contract before executing the function
+     */
+    modifier onlyPoRepMarket() {
+        _onlyPoRepMarket();
+        _;
     }
 
     /**
@@ -414,13 +423,78 @@ contract DataCapEvidenceAdapter is
         deal.sizeOfAllocations += allocationsAndClaimsSize;
     }
 
+    /**
+     * @notice Submit one bounded batch of adapter-specific evidence for a deal
+     * @dev Only callable by the PoRepMarket contract
+     * @dev `evidenceData` is opaque to PoRepMarket; the selected adapter defines,
+     * decodes, and validates its contents
+     * @param context Activation context for the deal and market state
+     * @param evidenceData Adapter-specific evidence payload
+     * @return decision Activation decision for the submitted evidence batch
+     */
+    function submitEvidenceBatch(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
+        external
+        nonReentrant
+        onlyPoRepMarket
+        returns (SharedTypes.ActivationDecision memory decision)
+    {
+        uint256 batchSize = abi.decode(evidenceData, (uint256));
+        if (batchSize == 0) revert InvalidBatchSize();
+
+        Deal storage deal = _getStorageDeal(context.dealId);
+
+        /// TODO: add check is postingFinished == true from finishDataCapPosting's task when it's ready
+
+        CommonTypes.FilActorId[] memory allocationsBatch = _loadAllocationBatch(deal.allocationIds, batchSize);
+
+        VerifRegTypes.GetClaimsParams memory getClaimsParams =
+            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: allocationsBatch});
+        (int256 exitCode, VerifRegTypes.GetClaimsReturn memory result) = VerifRegAPI.getClaims(getClaimsParams);
+        if (exitCode != 0) revert GetClaimsCallFailed();
+
+        uint256 coveredBytes = 0;
+        uint256 failPointer = result.batch_info.fail_codes.length;
+        uint256 claimPointer = result.claims.length;
+
+        for (uint256 i = allocationsBatch.length; i > 0; i--) {
+            uint256 idx = i - 1;
+            if (failPointer > 0 && result.batch_info.fail_codes[failPointer - 1].idx == idx) {
+                failPointer--;
+                continue;
+            }
+            claimPointer--;
+            deal.claimIds.push(allocationsBatch[idx]);
+            coveredBytes += result.claims[claimPointer].size;
+            _deleteDealAllocationIdByIndex(deal, idx);
+        }
+
+        deal.claimedBytes += coveredBytes;
+
+        uint8 evidenceResult;
+        if (result.claims.length == 0) {
+            evidenceResult = EvidenceResult.REJECTED;
+        } else if (result.batch_info.fail_codes.length == 0) {
+            evidenceResult = EvidenceResult.ACCEPTED;
+        } else {
+            evidenceResult = EvidenceResult.PARTIAL;
+        }
+
+        return SharedTypes.ActivationDecision({coveredBytes: coveredBytes, reasonCode: 0, result: evidenceResult});
+    }
+
+    // solhint-disable no-unused-vars
     /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
-     * @notice Submits a batch of storage evidence.
-     * @dev This function is only added for testing purpose, will be implemented in the future.
-     * @return decision Dummy activation decision.
+     * @notice Return the adapter's activation decision after submitted evidence
+     * covers enough bytes for the frozen deal
+     * @dev This function does not set payment terms; PoRepMarket consumes the
+     * returned covered bytes and derives committed bytes, billed units, service
+     * start/end, rail ceiling, and deal state
+     * @param context Activation context for the deal and market state
+     * @param evidenceData Adapter-specific evidence payload
+     * @return decision Activation decision for the provided evidence
      */
-    function submitEvidenceBatch(SharedTypes.ActivationContext calldata, bytes calldata)
+    function activateEvidence(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
         pure
         returns (SharedTypes.ActivationDecision memory decision)
@@ -430,25 +504,14 @@ contract DataCapEvidenceAdapter is
 
     /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
-     * @notice Activates submitted storage evidence.
-     * @dev This function is only added for testing purpose, will be implemented in the future.
-     * @return decision Dummy activation decision.
+     * @notice Refresh current evidence health from adapter-specific source data
+     * @dev The caller supplies only the bounded batch to check; the adapter
+     * verifies state itself before updating stored active covered bytes
+     * @param context Activation context for the deal and market state
+     * @param evidenceData Bounded batch of evidence used to verify current status
+     * @return status Updated evidence status
      */
-    function activateEvidence(SharedTypes.ActivationContext calldata, bytes calldata)
-        external
-        pure
-        returns (SharedTypes.ActivationDecision memory decision)
-    {
-        return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
-    }
-
-    /// Note: this function is only added for testing purpose, will be implemented in the future
-    /**
-     * @notice Refreshes the current storage evidence status.
-     * @dev This function is only added for testing purpose, will be implemented in the future.
-     * @return status Dummy evidence status.
-     */
-    function refreshEvidenceStatus(SharedTypes.ActivationContext calldata, bytes calldata)
+    function refreshEvidenceStatus(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
         pure
         returns (SharedTypes.EvidenceStatus memory status)
@@ -460,11 +523,12 @@ contract DataCapEvidenceAdapter is
 
     /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
-     * @notice Gets the current storage evidence status.
-     * @dev This function is only added for testing purpose, will be implemented in the future.
-     * @return status Dummy evidence status.
+     * @notice Read current evidence status from adapter storage only
+     * @dev Must not call Filecoin actors or refresh live state
+     * @param context Activation context for the deal and market state
+     * @return status Current adapter-local evidence status
      */
-    function currentEvidenceStatus(SharedTypes.ActivationContext calldata)
+    function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
         pure
         returns (SharedTypes.EvidenceStatus memory status)
@@ -776,6 +840,24 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
+     * @notice Copies up to `batchSize` allocation ids from the front of a deal's allocation list
+     * @param allocationIds The deal's stored allocation ids
+     * @param batchSize The maximum number of ids to copy
+     * @return batch A memory array with the leading ids
+     */
+    function _loadAllocationBatch(CommonTypes.FilActorId[] storage allocationIds, uint256 batchSize)
+        internal
+        view
+        returns (CommonTypes.FilActorId[] memory batch)
+    {
+        uint256 batchCount = batchSize > allocationIds.length ? allocationIds.length : batchSize;
+        batch = new CommonTypes.FilActorId[](batchCount);
+        for (uint256 i = 0; i < batchCount; ++i) {
+            batch[i] = allocationIds[i];
+        }
+    }
+
+    /**
      * @notice getter to retrieve allocation ids for a deal with pagination
      * @param dealId the id of the deal
      * @param offset index to start from
@@ -813,51 +895,25 @@ contract DataCapEvidenceAdapter is
      * @param offset pagination offset for the claim ids
      * @param limit pagination limit for the claim ids
      * @return ids list of claim ids for the given deal
-     * @return total total number of claims for the given deal
+     * @return sumOfClaims total number of claims for the given deal
      */
     function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
         external
         view
-        returns (CommonTypes.FilActorId[] memory ids, uint256 total)
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
     {
         if (limit == 0) revert InvalidLimit();
         if (dealId == 0) revert InvalidDealId();
-
-        Deal storage deal = s()._deals[dealId];
-        CommonTypes.FilActorId[] memory allocationIds = deal.allocationIds;
-
-        VerifRegTypes.GetClaimsParams memory getClaimsParams =
-            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: allocationIds});
-
-        (int256 exitCode, VerifRegTypes.GetClaimsReturn memory result) = VerifRegAPI.getClaims(getClaimsParams);
-        if (exitCode != 0) revert GetClaimsCallFailed();
-
-        CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](result.claims.length);
-        uint256 failIterator = 0;
-        uint256 outIdx = 0;
-        for (uint256 i = 0; i < allocationIds.length; ++i) {
-            if (
-                result.batch_info.fail_codes.length > failIterator
-                    && i == result.batch_info.fail_codes[failIterator].idx
-            ) {
-                ++failIterator;
-                continue;
-            }
-            claimIds[outIdx++] = allocationIds[i];
-        }
-
-        if (outIdx != result.claims.length) {
-            revert ClaimIdsMismatch(result.claims.length, outIdx);
-        }
-
-        total = claimIds.length;
+        CommonTypes.FilActorId[] storage claimIds = s()._deals[dealId].claimIds;
+        sumOfClaims = claimIds.length;
 
         // solhint-disable-next-line gas-strict-inequalities
-        if (offset >= total) {
-            return (new CommonTypes.FilActorId[](0), total);
+        if (offset >= sumOfClaims) {
+            return (new CommonTypes.FilActorId[](0), sumOfClaims);
         }
 
-        uint256 count = limit > total - offset ? total - offset : limit;
+        uint256 remaining = sumOfClaims - offset;
+        uint256 count = limit > remaining ? remaining : limit;
         ids = new CommonTypes.FilActorId[](count);
 
         for (uint256 i = 0; i < count; ++i) {
@@ -990,30 +1046,21 @@ contract DataCapEvidenceAdapter is
         }
     }
 
-    /// TODO: in future change visibility to external
     /**
      * @notice Getter for the PoRepMarket contract address
      * @return Address of the PoRepMarket contract
      */
-    function getPoRepMarketAddress() public view returns (address) {
+    function getPoRepMarketAddress() external view returns (address) {
         return address(s()._poRepMarketContract);
     }
 
-    /// Note: Will be implemented in the future
-    // /**
-    //  * @notice Ensures the caller is the PoRepMarket contract
-    //  */
-    // function _onlyPoRepMarket() internal view {
-    //     if (msg.sender != getPoRepMarketAddress()) revert CallerIsNotPoRepMarket();
-    // }
-
-    // /**
-    //  * @notice Modifier to check that the caller is the PoRepMarket contract before executing the function
-    //  */
-    // modifier onlyPoRepMarket() {
-    //     _onlyPoRepMarket();
-    //     _;
-    // }
+    /**
+     * @notice Ensures the caller is the PoRepMarket contract
+     */
+    function _onlyPoRepMarket() internal view {
+        address poRepMarketAddress = address(s()._poRepMarketContract);
+        if (msg.sender != poRepMarketAddress) revert CallerIsNotPoRepMarket();
+    }
 
     /**
      * @notice Getter for the evidence type
