@@ -304,6 +304,16 @@ contract PoRepMarketTest is Test {
         assertEq(p.railId, 0);
     }
 
+    function testGetDealCountReturnsZeroWhenEmpty() public view {
+        assertEq(poRepMarket.getDealCount(), 0);
+    }
+
+    function testGetDealIdsReturnsEmptyWhenLimitIsZero() public view {
+        (uint256[] memory ids, uint256 total) = poRepMarket.getDealIds(0, 0);
+        assertEq(total, 0);
+        assertEq(ids.length, 0);
+    }
+
     function testGetDealDataReturnsValidData() public {
         proposeDefaultDeal();
 

@@ -719,6 +719,112 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
+     * @notice Gets the number of deals created by PoRepMarket.
+     * @return count Total number of created deal IDs.
+     */
+    function getDealCount() external view returns (uint256 count) {
+        return s()._dealIdCounter;
+    }
+
+    /**
+     * @notice Gets a creation-order page of deal IDs.
+     * @param offset Zero-based index in the creation-order deal ID list.
+     * @param limit Maximum number of deal IDs to return.
+     * @return dealIds Page of deal IDs in creation order.
+     * @return total Total number of created deal IDs at call time.
+     */
+    function getDealIds(uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory dealIds, uint256 total)
+    {
+        PoRepMarketStorage storage $ = s();
+        total = $._dealIdCounter;
+        if (offset >= total || limit == 0) {
+            return (new uint256[](0), total);
+        }
+
+        uint256 end = Math.min(total, offset + limit);
+        uint256 length = end - offset;
+        dealIds = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            dealIds[i] = offset + i + 1;
+        }
+    }
+
+    /**
+     * @notice Gets a page of deal IDs for one lifecycle state.
+     * @param state Deal lifecycle state code.
+     * @param offset Zero-based index in the state's deal ID list.
+     * @param limit Maximum number of deal IDs to return.
+     * @return dealIds Page of deal IDs in the state's existing index order.
+     * @return total Total number of deal IDs in this state at call time.
+     */
+    function getDealIdsByState(uint8 state, uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory dealIds, uint256 total)
+    {
+        PoRepMarketStorage storage $ = s();
+        EnumerableSet.UintSet storage ids = $._dealIdsByState[state];
+        total = ids.length();
+        if (offset >= total || limit == 0) {
+            return (new uint256[](0), total);
+        }
+
+        uint256 end = Math.min(total, offset + limit);
+        uint256 length = end - offset;
+        dealIds = new uint256[](length);
+        for (uint256 i = 0; i < length; i++) {
+            dealIds[i] = ids.at(offset + i);
+        }
+    }
+
+    /**
+     * @notice Gets the complete generic read model for one deal.
+     * @param dealId The id of the deal.
+     * @return dealView Complete generic deal snapshot.
+     */
+    function getDealView(uint256 dealId) public view returns (PoRepTypes.DealView memory dealView) {
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal memory deal = $._deals[dealId];
+        _ensureDealExists(deal);
+
+        dealView = PoRepTypes.DealView({
+            deal: deal,
+            data: $._dealData[dealId],
+            requiredSLIs: $._dealSLIs[dealId],
+            terms: $._dealTerms[dealId],
+            timing: $._dealTiming[dealId],
+            service: $._dealService[dealId],
+            capacity: $._dealCapacity[dealId],
+            payment: $._dealPayments[dealId],
+            providerOrganization: $._dealOrganization[dealId],
+            evidenceStatus: IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal))
+        });
+    }
+
+    /**
+     * @notice Gets a caller-sized page of complete generic deal views.
+     * @param offset Zero-based index in the creation-order deal ID list.
+     * @param limit Maximum number of deal views to return.
+     * @return dealViews Page of complete generic deal snapshots.
+     * @return total Total number of created deal IDs at call time.
+     */
+    function getDealViews(uint256 offset, uint256 limit)
+        external
+        view
+        returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
+    {
+        (uint256[] memory dealIds, uint256 dealTotal) = this.getDealIds(offset, limit);
+        total = dealTotal;
+        dealViews = new PoRepTypes.DealView[](dealIds.length);
+        for (uint256 i = 0; i < dealIds.length; i++) {
+            dealViews[i] = getDealView(dealIds[i]);
+        }
+    }
+
+    /**
      * @notice Accepts a deal
      * @param dealId The id of the deal
      */
