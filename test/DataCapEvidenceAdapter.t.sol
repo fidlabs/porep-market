@@ -1742,4 +1742,21 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.expectRevert(DataCapEvidenceAdapter.CallerIsNotPoRepMarket.selector);
         dataCapEvidenceAdapter.activateEvidence(_activationContext(), "");
     }
+
+    function testActivateEvidenceEmitsDealEvidenceReady() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+        actorIdMock.setGetClaimsResult(
+            hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+        vm.prank(address(poRepMarketMock));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+
+        vm.expectEmit(true, true, false, false, address(mock));
+        emit DataCapEvidenceAdapter.DealEvidenceReady(dealId, address(mock));
+
+        vm.prank(address(poRepMarketMock));
+        mock.activateEvidence(_activationContext(), "");
+    }
 }

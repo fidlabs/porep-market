@@ -91,6 +91,11 @@ contract DataCapEvidenceAdapter is
     uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
+     * @notice Denominator for basis points calculations
+     */
+    uint256 private constant BPS_DENOMINATOR = 10_000;
+
+    /**
      * @notice Minimum allowed allocation claim window in epochs.
      * @dev 4 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 11_520 epochs
      */
@@ -118,6 +123,13 @@ contract DataCapEvidenceAdapter is
      * @param setAtBlock The block number at which the adapter was set non-operational
      */
     event AdapterNonOperational(address indexed account, uint256 setAtBlock);
+
+    /**
+     * @notice Emitted when deal evidence is ready
+     * @param dealId The deal id
+     * @param evidenceAdapter The address of the evidence adapter
+     */
+    event DealEvidenceReady(uint256 indexed dealId, address indexed evidenceAdapter);
 
     // solhint-enable gas-indexed-events
 
@@ -504,7 +516,7 @@ contract DataCapEvidenceAdapter is
         evidenceData;
 
         Deal storage deal = _getStorageDeal(context.dealId);
-        uint256 threshold = context.requestedSizeBytes * context.activationToleranceBps / 10_000;
+        uint256 threshold = context.requestedSizeBytes * context.activationToleranceBps / BPS_DENOMINATOR;
 
         if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
             return SharedTypes.ActivationDecision({
@@ -513,6 +525,8 @@ contract DataCapEvidenceAdapter is
         }
 
         deal.activeClaimedBytes = deal.claimedBytes;
+
+        emit DealEvidenceReady(context.dealId, address(this));
 
         return SharedTypes.ActivationDecision({
             coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
