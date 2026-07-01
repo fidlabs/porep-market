@@ -1401,6 +1401,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
         }
 
+        PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
+
         dealView = PoRepTypes.DealView({
             deal: deal,
             data: $._dealData[dealId],
@@ -1409,7 +1411,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             timing: $._dealTiming[dealId],
             service: $._dealService[dealId],
             capacity: $._dealCapacity[dealId],
-            payment: $._dealPayments[dealId],
+            payment: PoRepTypes.DealViewPayment({
+                paymentToken: payment.paymentToken,
+                pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth,
+                billed32GiBUnits: payment.billed32GiBUnits,
+                railMaxRatePerEpoch: payment.railMaxRatePerEpoch
+            }),
             providerOrganization: $._dealOrganization[dealId],
             evidenceStatus: evidenceStatus
         });

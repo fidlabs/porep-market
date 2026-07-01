@@ -329,6 +329,15 @@ contract PoRepMarketTest is Test {
         assertEq(ids.length, 0);
     }
 
+    function testGetDealIdsReturnsEmptyWhenLimitIsZeroAfterDealsExist() public {
+        proposeDefaultDeal();
+
+        (uint256[] memory ids, uint256 total) = poRepMarket.getDealIds(0, 0);
+
+        assertEq(total, 1);
+        assertEq(ids.length, 0);
+    }
+
     function testGetDealCountReturnsCreatedDealCount() public {
         proposeDefaultDeal();
         vm.prank(clientAddress);
@@ -400,6 +409,15 @@ contract PoRepMarketTest is Test {
         assertEq(acceptedIds[0], dealId);
     }
 
+    function testGetDealIdsByStateReturnsEmptyWhenOffsetPastTotal() public {
+        proposeDefaultDeal();
+
+        (uint256[] memory ids, uint256 total) = poRepMarket.getDealIdsByState(DealState.PROPOSED, 1, 10);
+
+        assertEq(total, 1);
+        assertEq(ids.length, 0);
+    }
+
     function testGetDealViewMatchesPrimitiveGetters() public {
         spRegistry.setProviderInfo(
             providerFilActorId,
@@ -447,8 +465,18 @@ contract PoRepMarketTest is Test {
             CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch)
         );
         assertEq(view_.capacity.reservedBytes, capacity.reservedBytes);
-        assertEq(view_.payment.paymentToken, payment.paymentToken);
+        assertDealViewPayment(view_.payment, payment);
         assertEq(view_.providerOrganization, providerOwnerAddress);
+    }
+
+    function assertDealViewPayment(PoRepTypes.DealViewPayment memory viewPayment, PoRepTypes.DealPayment memory payment)
+        internal
+        pure
+    {
+        assertEq(viewPayment.paymentToken, payment.paymentToken);
+        assertEq(viewPayment.pricePer32GiBPerMonth, payment.pricePer32GiBPerMonth);
+        assertEq(viewPayment.billed32GiBUnits, payment.billed32GiBUnits);
+        assertEq(viewPayment.railMaxRatePerEpoch, payment.railMaxRatePerEpoch);
     }
 
     function testGetDealViewReturnsEvidenceStatus() public {
@@ -492,6 +520,15 @@ contract PoRepMarketTest is Test {
         assertEq(views[1].deal.dealId, poRepMarket.getDealView(3).deal.dealId);
         assertEq(views[0].data.manifestLocation, poRepMarket.getDealView(2).data.manifestLocation);
         assertEq(views[1].data.manifestLocation, poRepMarket.getDealView(3).data.manifestLocation);
+    }
+
+    function testGetDealViewsReturnsEmptyWhenOffsetPastTotal() public {
+        proposeDefaultDeal();
+
+        (PoRepTypes.DealView[] memory views, uint256 total) = poRepMarket.getDealViews(1, 10);
+
+        assertEq(total, 1);
+        assertEq(views.length, 0);
     }
 
     function testGetDealDataReturnsValidData() public {

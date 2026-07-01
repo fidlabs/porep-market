@@ -846,15 +846,10 @@
           {
             "name": "payment",
             "type": "tuple",
-            "internalType": "struct PoRepTypes.DealPayment",
+            "internalType": "struct PoRepTypes.DealViewPayment",
             "components": [
               {
                 "name": "paymentToken",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "payee",
                 "type": "address",
                 "internalType": "address"
               },
@@ -1095,15 +1090,10 @@
           {
             "name": "payment",
             "type": "tuple",
-            "internalType": "struct PoRepTypes.DealPayment",
+            "internalType": "struct PoRepTypes.DealViewPayment",
             "components": [
               {
                 "name": "paymentToken",
-                "type": "address",
-                "internalType": "address"
-              },
-              {
-                "name": "payee",
                 "type": "address",
                 "internalType": "address"
               },

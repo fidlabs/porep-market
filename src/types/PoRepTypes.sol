@@ -80,6 +80,16 @@ library PoRepTypes {
     }
 
     /**
+     * @notice Payment fields exposed through DealView.
+     */
+    struct DealViewPayment {
+        address paymentToken;
+        uint256 pricePer32GiBPerMonth;
+        uint256 billed32GiBUnits;
+        uint256 railMaxRatePerEpoch;
+    }
+
+    /**
      * @notice Complete generic read model for one PoRepMarket deal.
      * @dev This is for offchain tools, oracles, CLIs, and RPC consumers that need
      * PoRepMarket-owned or PoRepMarket-frozen deal facts in one bounded response.
@@ -92,7 +102,7 @@ library PoRepTypes {
      * @param timing Proposal and expiry epochs.
      * @param service Service start and end epochs.
      * @param capacity Reserved and committed bytes.
-     * @param payment Frozen payment token, payee, price, billing units, and rail ceiling.
+     * @param payment Frozen payment token, price, billing units, and rail ceiling.
      * @param providerOrganization Organization selected for the provider at proposal time.
      * @param evidenceStatus Adapter-local stored evidence status; this view does not refresh Filecoin actor state.
      */
@@ -104,7 +114,7 @@ library PoRepTypes {
         DealTiming timing;
         DealService service;
         DealCapacity capacity;
-        DealPayment payment;
+        DealViewPayment payment;
         address providerOrganization;
         SharedTypes.EvidenceStatus evidenceStatus;
     }
