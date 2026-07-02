@@ -250,11 +250,7 @@
   },
   {
     "type": "function",
-<<<<<<< HEAD
-    "name": "getAllocatedBytes",
-=======
     "name": "finishDataCapPosting",
->>>>>>> 6dbe387 (feat: datacap allocation status per deal)
     "inputs": [
       {
         "name": "dealId",
@@ -262,7 +258,19 @@
         "internalType": "uint256"
       }
     ],
-<<<<<<< HEAD
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "getAllocatedBytes",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
     "outputs": [
       {
         "name": "",
@@ -271,10 +279,6 @@
       }
     ],
     "stateMutability": "view"
-=======
-    "outputs": [],
-    "stateMutability": "nonpayable"
->>>>>>> 6dbe387 (feat: datacap allocation status per deal)
   },
   {
     "type": "function",
