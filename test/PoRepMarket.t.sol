@@ -639,7 +639,7 @@ contract PoRepMarketTest is Test {
         });
 
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(50);
+        poRepMarket.setDealActivationPadding(5000);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, terms, expectedManifestLocation));
         vm.prank(providerOwnerAddress);
@@ -705,7 +705,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(10);
+        poRepMarket.setDealActivationPadding(1000);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -723,7 +723,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(10);
+        poRepMarket.setDealActivationPadding(1000);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -741,7 +741,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(100);
+        poRepMarket.setDealActivationPadding(10000);
 
         dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
         vm.prank(clientAddress);
@@ -759,7 +759,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(10);
+        poRepMarket.setDealActivationPadding(1000);
 
         uint256 dealAllocationSizeAtTheBottomLimit =
             defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100 - 1;
@@ -782,7 +782,7 @@ contract PoRepMarketTest is Test {
         vm.prank(providerOwnerAddress);
         poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(10);
+        poRepMarket.setDealActivationPadding(1000);
 
         uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100 + 1;
 
@@ -1624,9 +1624,9 @@ contract PoRepMarketTest is Test {
     }
 
     function testSetDealActivationPaddingRevertsWhenPaddingTooHigh() public {
-        uint256 newPadding = 101;
+        uint256 newPadding = 10_001;
 
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealActivationPaddingTooHigh.selector, newPadding, 100));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealActivationPaddingTooHigh.selector, newPadding, 10_000));
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(newPadding);
     }
@@ -1664,24 +1664,24 @@ contract PoRepMarketTest is Test {
     function testEnsureAllocationSizeWithinToleranceAcceptsSizesInsideActivationPadding() public {
         PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
         uint256 expectedDealSize = defaultTerms.dealSizeBytes;
-        uint256 padding = 10;
+        uint256 padding = 1000;
 
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(padding);
 
         market.ensureAllocationSizeWithinTolerance(
-            expectedDealSize - (expectedDealSize * padding) / 100, expectedDealSize
+            expectedDealSize - (expectedDealSize * padding) / 10_000, expectedDealSize
         );
         market.ensureAllocationSizeWithinTolerance(
-            expectedDealSize + (expectedDealSize * padding) / 100, expectedDealSize
+            expectedDealSize + (expectedDealSize * padding) / 10_000, expectedDealSize
         );
     }
 
     function testEnsureAllocationSizeWithinToleranceRevertsWhenSizeIsOutsideActivationPadding() public {
         PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
         uint256 expectedDealSize = defaultTerms.dealSizeBytes;
-        uint256 padding = 10;
-        uint256 actualDealSize = expectedDealSize + (expectedDealSize * padding) / 100 + 1;
+        uint256 padding = 1000;
+        uint256 actualDealSize = expectedDealSize + (expectedDealSize * padding) / 10_000 + 1;
 
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(padding);

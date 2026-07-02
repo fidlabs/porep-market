@@ -491,7 +491,7 @@ contract DataCapEvidenceAdapter is
         } else {
             evidenceResult = EvidenceResult.PARTIAL;
         }
-
+        // TODO: add custom reasonCode
         return SharedTypes.ActivationDecision({coveredBytes: coveredBytes, reasonCode: 0, result: evidenceResult});
     }
 
@@ -515,10 +515,12 @@ contract DataCapEvidenceAdapter is
         /// NOTE: compiler's warning silenced for unused variable; evidenceData gonna be used potentially in the future
         evidenceData;
 
-        Deal storage deal = _getStorageDeal(context.dealId);
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
+
         uint256 threshold = context.requestedSizeBytes * context.activationToleranceBps / BPS_DENOMINATOR;
 
         if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
+            // TODO: add custom reasonCode
             return SharedTypes.ActivationDecision({
                 coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.REJECTED
             });
@@ -528,6 +530,7 @@ contract DataCapEvidenceAdapter is
 
         emit DealEvidenceReady(context.dealId, address(this));
 
+        // TODO: add custom reasonCode
         return SharedTypes.ActivationDecision({
             coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
         });
