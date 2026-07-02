@@ -6,7 +6,7 @@ import {DataCapEvidenceAdapter} from "../../src/DataCapEvidenceAdapter.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 contract DataCapEvidenceAdapterContractMock is DataCapEvidenceAdapter {
-    function getDeal(uint256 dealId) public view returns (DataCapEvidenceAdapter.Deal memory) {
+    function getDeal(uint256 dealId) public view returns (DataCapEvidenceAdapter.DataCapDealEvidence memory) {
         return s()._deals[dealId];
     }
 
@@ -15,7 +15,7 @@ contract DataCapEvidenceAdapterContractMock is DataCapEvidenceAdapter {
     }
 
     function deleteDealAllocationIdByIndex(uint256 dealId, uint64 index) external {
-        Deal storage deal = s()._deals[dealId];
-        _deleteDealAllocationIdByIndex(deal, index);
+        DataCapDealEvidence storage dealEvidence = s()._deals[dealId];
+        _deleteDealAllocationIdByIndex(dealEvidence, index);
     }
 }

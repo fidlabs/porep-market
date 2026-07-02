@@ -13,7 +13,7 @@ import {SharedTypes} from "../../src/types/SharedTypes.sol";
 contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(CommonTypes.FilActorId provider => bool ok) public valid;
     mapping(uint256 dealId => bool matches) public dataSizeMatches;
-    mapping(uint256 dealId => DataCapEvidenceAdapter.Deal deal) public deals;
+    mapping(uint256 dealId => DataCapEvidenceAdapter.DataCapDealEvidence dealEvidence) public deals;
     mapping(uint256 dealId => CommonTypes.FilActorId[] ids) internal allocationIds;
     mapping(uint256 dealId => bytes evidenceData) public submittedEvidence;
     mapping(uint256 dealId => bytes evidenceData) public activatedEvidence;
@@ -36,7 +36,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     function getDataCapEvidenceAdapterDealInfo(uint256 dealId)
         external
         view
-        returns (DataCapEvidenceAdapter.Deal memory)
+        returns (DataCapEvidenceAdapter.DataCapDealEvidence memory)
     {
         return deals[dealId];
     }
@@ -74,12 +74,12 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         }
     }
 
-    function setDeal(DataCapEvidenceAdapter.Deal memory deal) external {
-        deals[deal.dealId] = deal;
+    function setDeal(DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence) external {
+        deals[dealEvidence.dealId] = dealEvidence;
     }
 
-    function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
-        return deals[dealId].sizeOfAllocations;
+    function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
+        return deals[dealId].allocatedBytes;
     }
 
     function setOperational(bool operational_) external {
@@ -101,7 +101,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         submittedEvidence[context.dealId] = evidenceData;
         submitEvidenceCaller[context.dealId] = msg.sender;
         return SharedTypes.ActivationDecision({
-            coveredBytes: deals[context.dealId].sizeOfAllocations, reasonCode: 0, result: EvidenceResult.ACCEPTED
+            coveredBytes: deals[context.dealId].allocatedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
         });
     }
 
@@ -111,7 +111,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     {
         activatedEvidence[context.dealId] = evidenceData;
         return SharedTypes.ActivationDecision({
-            coveredBytes: deals[context.dealId].sizeOfAllocations, reasonCode: 0, result: EvidenceResult.ACCEPTED
+            coveredBytes: deals[context.dealId].allocatedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
         });
     }
 
@@ -128,7 +128,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         view
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        uint256 activeCoveredBytes = deals[context.dealId].sizeOfAllocations;
+        uint256 activeCoveredBytes = deals[context.dealId].allocatedBytes;
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: activeCoveredBytes,
             lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),

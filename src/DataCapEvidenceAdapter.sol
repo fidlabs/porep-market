@@ -38,7 +38,7 @@ contract DataCapEvidenceAdapter is
 
     // @custom:storage-location erc7201:porepmarket.storage.DataCapEvidenceAdapterStorage
     struct DataCapEvidenceAdapterStorage {
-        mapping(uint256 dealId => Deal deal) _deals;
+        mapping(uint256 dealId => DataCapDealEvidence dealEvidence) _deals;
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
@@ -273,7 +273,7 @@ contract DataCapEvidenceAdapter is
      */
     error AdapterNotOperational();
 
-    struct Deal {
+    struct DataCapDealEvidence {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
         address client;
@@ -281,7 +281,7 @@ contract DataCapEvidenceAdapter is
         CommonTypes.FilActorId provider;
         uint256 dealId;
         uint256 railId;
-        uint256 sizeOfAllocations;
+        uint256 allocatedBytes;
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
         uint256 claimedBytes;
@@ -395,14 +395,14 @@ contract DataCapEvidenceAdapter is
             _registerDeal(dealSnapshot);
         }
 
-        Deal storage deal = $._deals[dealId];
+        DataCapDealEvidence storage dealEvidence = $._deals[dealId];
 
         (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
             _deserializeVerifregOperatorData(params.operator_data);
 
-        uint256 sizeOfAllocations = _verifyAndRegisterAllocations(dealId, allocations);
+        uint256 allocatedBytes = _verifyAndRegisterAllocations(dealId, allocations);
         uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
-        uint256 allocationsAndClaimsSize = sizeOfAllocations + sizeOfClaims;
+        uint256 allocationsAndClaimsSize = allocatedBytes + sizeOfClaims;
 
         $._metaAllocatorContract
             .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
@@ -417,10 +417,10 @@ contract DataCapEvidenceAdapter is
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
             for (uint256 i = 0; i < allocationIds.length; i++) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
-                deal.allocationIds.push(allocId);
+                dealEvidence.allocationIds.push(allocId);
             }
         }
-        deal.sizeOfAllocations += allocationsAndClaimsSize;
+        dealEvidence.allocatedBytes += allocationsAndClaimsSize;
     }
 
     /**
@@ -441,7 +441,7 @@ contract DataCapEvidenceAdapter is
         uint256 batchSize = abi.decode(evidenceData, (uint256));
         if (batchSize == 0) revert InvalidBatchSize();
 
-        Deal storage deal = _getStorageDeal(context.dealId);
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
         /// TODO: add check is postingFinished == true from finishDataCapPosting's task when it's ready
 
@@ -499,10 +499,11 @@ contract DataCapEvidenceAdapter is
         pure
         returns (SharedTypes.ActivationDecision memory decision)
     {
+        context;
+        evidenceData;
         return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
     }
 
-    /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
      * @notice Refresh current evidence health from adapter-specific source data
      * @dev The caller supplies only the bounded batch to check; the adapter
@@ -516,12 +517,13 @@ contract DataCapEvidenceAdapter is
         pure
         returns (SharedTypes.EvidenceStatus memory status)
     {
+        context;
+        evidenceData;
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
         });
     }
 
-    /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
      * @notice Read current evidence status from adapter storage only
      * @dev Must not call Filecoin actors or refresh live state
@@ -533,6 +535,7 @@ contract DataCapEvidenceAdapter is
         pure
         returns (SharedTypes.EvidenceStatus memory status)
     {
+        context;
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
         });
@@ -565,8 +568,8 @@ contract DataCapEvidenceAdapter is
             revert InvalidDealStateForTransfer();
         }
 
-        Deal storage deal = $._deals[dealId];
-        CommonTypes.FilActorId[] memory oldAllocationIds = deal.allocationIds;
+        DataCapDealEvidence storage dealEvidence = $._deals[dealId];
+        CommonTypes.FilActorId[] memory oldAllocationIds = dealEvidence.allocationIds;
         if (oldAllocationIds.length == 0 || params.amount.neg) revert InvalidAllocationRequest();
 
         if (
@@ -585,7 +588,7 @@ contract DataCapEvidenceAdapter is
         uint256 totalSize;
         for (uint256 i = 0; i < allocations.length; i++) {
             ProviderAllocation memory alloc = allocations[i];
-            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
+            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(dealEvidence.provider)) {
                 revert InvalidProvider();
             }
             _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
@@ -596,15 +599,15 @@ contract DataCapEvidenceAdapter is
         }
 
         if (
-            totalSize != deal.sizeOfAllocations
+            totalSize != dealEvidence.allocatedBytes
                 || keccak256(params.amount.val) != keccak256(abi.encodePacked(totalSize * 1 ether))
         ) {
             revert InvalidAllocationRequest();
         }
 
         $._metaAllocatorContract
-            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, deal.sizeOfAllocations);
-        emit DatacapSpent(deal.client, deal.sizeOfAllocations);
+            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, dealEvidence.allocatedBytes);
+        emit DatacapSpent(dealEvidence.client, dealEvidence.allocatedBytes);
 
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
         (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
@@ -616,9 +619,9 @@ contract DataCapEvidenceAdapter is
         if (newAllocationIds.length != oldAllocationIds.length) {
             revert InvalidAllocationRequest();
         }
-        delete deal.allocationIds;
+        delete dealEvidence.allocationIds;
         for (uint256 i = 0; i < newAllocationIds.length; ++i) {
-            deal.allocationIds.push(newAllocationIds[i]);
+            dealEvidence.allocationIds.push(newAllocationIds[i]);
         }
 
         emit DealAllocationsRescued(dealId, msg.sender, totalSize);
@@ -743,29 +746,29 @@ contract DataCapEvidenceAdapter is
             revert InvalidRailId();
         }
 
-        Deal storage deal = $._deals[dealSnapshot.dealId];
-        deal.client = dealSnapshot.client;
-        deal.provider = dealSnapshot.provider;
-        deal.dealId = dealSnapshot.dealId;
-        deal.validator = dealSnapshot.validator;
-        deal.railId = dealSnapshot.railId;
+        DataCapDealEvidence storage dealEvidence = $._deals[dealSnapshot.dealId];
+        dealEvidence.client = dealSnapshot.client;
+        dealEvidence.provider = dealSnapshot.provider;
+        dealEvidence.dealId = dealSnapshot.dealId;
+        dealEvidence.validator = dealSnapshot.validator;
+        dealEvidence.railId = dealSnapshot.railId;
     }
 
     /**
      * @notice Verifies and registers allocations.
      * @param dealId The deal id.
      * @param allocations The array of provider allocations.
-     * @return sizeOfAllocations The total size of allocations
+     * @return allocatedBytes The total size of allocations
      */
     function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations)
         internal
         view
-        returns (uint256 sizeOfAllocations)
+        returns (uint256 allocatedBytes)
     {
-        Deal storage deal = _getStorageDeal(dealId);
+        DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
         for (uint256 i = 0; i < allocations.length; i++) {
             ProviderAllocation memory alloc = allocations[i];
-            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(deal.provider)) {
+            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(dealEvidence.provider)) {
                 revert InvalidProvider();
             }
 
@@ -778,7 +781,7 @@ contract DataCapEvidenceAdapter is
                 revert InvalidAllocationSize();
             }
 
-            sizeOfAllocations += alloc.size;
+            allocatedBytes += alloc.size;
         }
     }
 
@@ -808,9 +811,9 @@ contract DataCapEvidenceAdapter is
         internal
         returns (uint256 sizeOfClaims)
     {
-        Deal storage deal = _getStorageDeal(dealId);
+        DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
         CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](claimExtensions.length);
-        CommonTypes.FilActorId dealProvider = deal.provider;
+        CommonTypes.FilActorId dealProvider = dealEvidence.provider;
 
         for (uint256 i = 0; i < claimExtensions.length; i++) {
             ProviderClaim memory claim = claimExtensions[i];
@@ -833,7 +836,7 @@ contract DataCapEvidenceAdapter is
 
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
-                deal.allocationIds.push(claimIds[i]);
+                dealEvidence.allocationIds.push(claimIds[i]);
                 sizeOfClaims += claim.size;
             }
         }
@@ -931,12 +934,12 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
-     * @notice custom getter to retrieve allocated size in deal
+     * @notice custom getter to retrieve allocated bytes in deal
      * @param dealId The id of the deal
-     * @return sizeOfAllocations size of allocations for the selected deal
+     * @return allocatedBytes allocated bytes for the selected deal
      */
-    function getSizeOfAllocations(uint256 dealId) external view returns (uint256) {
-        return s()._deals[dealId].sizeOfAllocations;
+    function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
+        return s()._deals[dealId].allocatedBytes;
     }
 
     /**
@@ -944,7 +947,7 @@ contract DataCapEvidenceAdapter is
      * @param dealId The id of the deal
      * @return deal The storage deal
      */
-    function _getStorageDeal(uint256 dealId) internal view returns (Deal storage) {
+    function _getStorageDeal(uint256 dealId) internal view returns (DataCapDealEvidence storage) {
         return s()._deals[dealId];
     }
 
@@ -963,21 +966,21 @@ contract DataCapEvidenceAdapter is
      * @return totalSizePerSp The total active data size for the client with the specified provider
      */
     function isDataSizeMatching(uint256 dealId) external nonReentrant returns (bool) {
-        Deal storage deal = _getStorageDeal(dealId);
+        DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
         DataCapEvidenceAdapterStorage storage $ = s();
 
-        if (deal.validator == address(0)) {
+        if (dealEvidence.validator == address(0)) {
             revert ValidatorNotSet(dealId);
         }
 
-        if (msg.sender != deal.validator) {
-            revert InvalidCaller(msg.sender, deal.validator);
+        if (msg.sender != dealEvidence.validator) {
+            revert InvalidCaller(msg.sender, dealEvidence.validator);
         }
 
-        CommonTypes.FilActorId[] memory ids = deal.allocationIds;
+        CommonTypes.FilActorId[] memory ids = dealEvidence.allocationIds;
 
         VerifRegTypes.GetClaimsParams memory getClaimsParams =
-            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: ids});
+            VerifRegTypes.GetClaimsParams({provider: dealEvidence.provider, claim_ids: ids});
 
         (int256 getClaimsExitCode, VerifRegTypes.GetClaimsReturn memory getClaimsResult) =
             VerifRegAPI.getClaims(getClaimsParams);
@@ -1016,19 +1019,19 @@ contract DataCapEvidenceAdapter is
 
         for (uint256 i = deleteCount; i > 0; --i) {
             uint256 idx = toDelete[i - 1];
-            _deleteDealAllocationIdByIndex(deal, idx);
+            _deleteDealAllocationIdByIndex(dealEvidence, idx);
         }
 
-        return activeSize == deal.sizeOfAllocations;
+        return activeSize == dealEvidence.allocatedBytes;
     }
 
     /**
      * @notice Internal function to delete an allocation ID from a deal by its index
-     * @param deal The storage reference to the deal
+     * @param dealEvidence The storage reference to the deal
      * @param index The index of the allocation ID to delete
      */
-    function _deleteDealAllocationIdByIndex(Deal storage deal, uint256 index) internal {
-        CommonTypes.FilActorId[] storage ids = deal.allocationIds;
+    function _deleteDealAllocationIdByIndex(DataCapDealEvidence storage dealEvidence, uint256 index) internal {
+        CommonTypes.FilActorId[] storage ids = dealEvidence.allocationIds;
         uint256 last = ids.length - 1;
         if (index != last) ids[index] = ids[last];
         ids.pop();
