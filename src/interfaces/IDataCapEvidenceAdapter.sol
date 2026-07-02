@@ -21,6 +21,27 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     function submitDataCapBatch(DataCapTypes.TransferParams calldata params, uint256 dealId) external;
 
     /**
+     * @notice Closes DataCap posting for a deal in a separate transaction
+     * @dev Only callable by the deal client while the deal is Accepted and posting is open
+     * @param dealId The id of the deal
+     */
+    function finishDataCapPosting(uint256 dealId) external;
+
+    /**
+     * @notice Returns whether DataCap posting has been finished for a deal
+     * @param dealId The id of the deal
+     * @return True if posting is finished, false otherwise
+     */
+    function isDataCapPostingFinished(uint256 dealId) external view returns (bool);
+
+    /**
+     * @notice Getter to retrieve the lifecycle status of a deal's DataCap allocations
+     * @param dealId The id of the deal
+     * @return status The allocation status as defined in DataCapAllocationStatus
+     */
+    function getDealAllocationStatus(uint256 dealId) external view returns (uint8 status);
+
+    /**
      * @notice Replaces all broken tracked allocations for an active existing deal.
      * @dev Only callable by RESCUE_ROLE.
      * @param dealId The id of the deal to rescue.

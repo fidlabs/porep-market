@@ -22,6 +22,7 @@ import {IMetaAllocator} from "./interfaces/IMetaAllocator.sol";
 import {EvidenceTypes} from "./types/EvidenceTypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {EvidenceResult} from "./types/EvidenceResult.sol";
+import {DataCapAllocationStatus} from "./types/DataCapAllocationStatus.sol";
 
 /**
  * @title DataCapEvidenceAdapter
@@ -40,6 +41,7 @@ contract DataCapEvidenceAdapter is
     struct DataCapEvidenceAdapterStorage {
         mapping(uint256 dealId => DataCapDealEvidence dealEvidence) _deals;
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
+        mapping(uint256 dealId => uint8 status) _allocationStatusPerDeal;
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
         bool _operational;
@@ -130,6 +132,20 @@ contract DataCapEvidenceAdapter is
      * @param evidenceAdapter The address of the evidence adapter
      */
     event DealEvidenceReady(uint256 indexed dealId, address indexed evidenceAdapter);
+
+    /**
+     * @notice Emitted when DataCap posting has been finished for a deal
+     * @param dealId The id of the deal
+     * @param allocatedBytes The total amount of DataCap allocated
+     */
+    event DataCapPostingFinished(uint256 indexed dealId, uint256 allocatedBytes);
+
+    /**
+     * @notice Emitted when a batch of DataCap allocations has been submitted for a deal
+     * @param dealId The id of the deal
+     * @param allocatedBytes The total amount of DataCap allocated
+     */
+    event DataCapBatchSubmitted(uint256 indexed dealId, uint256 allocatedBytes);
 
     // solhint-enable gas-indexed-events
 
@@ -285,9 +301,28 @@ contract DataCapEvidenceAdapter is
      */
     error AdapterNotOperational();
 
+    /**
+     * @notice Error thrown when DataCap posting has already been finished for the deal
+     * @dev 0xd12572b1
+     */
+    error PostingAlreadyFinished();
+
+    /**
+     * @notice Error thrown when DataCap posting has not been finished for the deal
+     * @dev 0xaa6d8a1c
+     */
+    error PostingNotFinished();
+
+    /**
+     * @notice Error thrown when the allocated bytes do not cover the deal's requested size
+     * @dev 0xfc4988b6
+     */
+    error InvalidAllocatedBytes();
+
     struct DataCapDealEvidence {
         // Deprecated; retained to preserve the deployed storage layout.
         bool completed;
+        bool postingFinished;
         address client;
         address validator;
         CommonTypes.FilActorId provider;
@@ -392,16 +427,16 @@ contract DataCapEvidenceAdapter is
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
 
-        if ($._operational == false) {
-            revert AdapterNotOperational();
-        }
-
         if (dealSnapshot.state != DealState.ACCEPTED) {
             revert InvalidDealStateForTransfer();
         }
 
         if (msg.sender != dealSnapshot.client) {
             revert InvalidClient();
+        }
+
+        if ($._deals[dealId].postingFinished) {
+            revert PostingAlreadyFinished();
         }
 
         if ($._deals[dealId].dealId == 0) {
@@ -433,9 +468,11 @@ contract DataCapEvidenceAdapter is
                 dealEvidence.allocationIds.push(allocId);
             }
         }
+        emit DataCapBatchSubmitted(dealId, allocationsAndClaimsSize);
         dealEvidence.allocatedBytes += allocationsAndClaimsSize;
     }
 
+    // solhint-disable function-max-lines
     /**
      * @notice Submit one bounded batch of adapter-specific evidence for a deal
      * @dev Only callable by the PoRepMarket contract
@@ -456,7 +493,9 @@ contract DataCapEvidenceAdapter is
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
-        /// TODO: add check is postingFinished == true from finishDataCapPosting's task when it's ready
+        if (deal.postingFinished == false) {
+            revert PostingNotFinished();
+        }
 
         CommonTypes.FilActorId[] memory allocationsBatch = _loadAllocationBatch(deal.allocationIds, batchSize);
 
@@ -483,6 +522,10 @@ contract DataCapEvidenceAdapter is
 
         deal.claimedBytes += coveredBytes;
 
+        if (deal.allocationIds.length == 0) {
+            s()._allocationStatusPerDeal[context.dealId] = DataCapAllocationStatus.CLAIMED;
+        }
+
         uint8 evidenceResult;
         if (result.claims.length == 0) {
             evidenceResult = EvidenceResult.NONE;
@@ -494,6 +537,8 @@ contract DataCapEvidenceAdapter is
         // TODO: add custom reasonCode
         return SharedTypes.ActivationDecision({coveredBytes: coveredBytes, reasonCode: 0, result: evidenceResult});
     }
+
+    //solhint-enable function-max-lines
 
     // solhint-disable no-unused-vars
     /**
@@ -973,6 +1018,57 @@ contract DataCapEvidenceAdapter is
      */
     function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
         return s()._deals[dealId].allocatedBytes;
+    }
+
+    /**
+     * @notice Getter to retrieve the lifecycle status of a deal's DataCap allocations
+     * @param dealId The id of the deal
+     * @return status The allocation status as defined in DataCapAllocationStatus
+     */
+    function getDealAllocationStatus(uint256 dealId) external view returns (uint8 status) {
+        return s()._allocationStatusPerDeal[dealId];
+    }
+
+    /**
+     * @notice Closes DataCap posting for a deal in a separate transaction
+     * @dev Only callable by the deal client while the deal is Accepted and posting is open
+     * @param dealId The id of the deal
+     */
+    function finishDataCapPosting(uint256 dealId) external {
+        DataCapEvidenceAdapterStorage storage $ = s();
+        PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
+
+        if (dealSnapshot.state != DealState.ACCEPTED) {
+            revert InvalidDealStateForTransfer();
+        }
+
+        if (msg.sender != dealSnapshot.client) {
+            revert InvalidClient();
+        }
+
+        DataCapDealEvidence storage deal = $._deals[dealId];
+        if (deal.postingFinished) {
+            revert PostingAlreadyFinished();
+        }
+
+        PoRepTypes.DealTerms memory dealTerms = $._poRepMarketContract.getDealTerms(dealId);
+        if (deal.allocatedBytes < dealTerms.requestedSizeBytes) {
+            revert InvalidAllocatedBytes();
+        }
+
+        deal.postingFinished = true;
+        $._allocationStatusPerDeal[dealId] = DataCapAllocationStatus.ALLOCATED;
+
+        emit DataCapPostingFinished(dealId, deal.allocatedBytes);
+    }
+
+    /**
+     * @notice Returns whether DataCap posting has been finished for a deal
+     * @param dealId The id of the deal
+     * @return True if posting is finished, false otherwise
+     */
+    function isDataCapPostingFinished(uint256 dealId) external view returns (bool) {
+        return s()._deals[dealId].postingFinished;
     }
 
     /**

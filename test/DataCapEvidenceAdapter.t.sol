@@ -28,6 +28,7 @@ import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {DataCapAllocationStatus} from "../src/types/DataCapAllocationStatus.sol";
 import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
@@ -177,6 +178,13 @@ contract DataCapEvidenceAdapterTest is Test {
         poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
     }
 
+    function _finishPosting(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
+        poRepMarketMock.setDealState(dealId, DealState.ACCEPTED);
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapterMock.finishDataCapPosting(dealId);
+        poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
+    }
+
     function _grantRescueRole(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock, address account) internal {
         vm.prank(address(this));
         dataCapEvidenceAdapterMock.grantRole(dataCapEvidenceAdapterMock.RESCUE_ROLE(), account);
@@ -267,6 +275,8 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(mock);
+        _finishPosting(mock);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.ALLOCATED);
         actorIdMock.setGetClaimsResult(
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
@@ -281,6 +291,7 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(mock.getDeal(dealId).claimedBytes, 4096);
 
         assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 0);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.CLAIMED);
 
         (CommonTypes.FilActorId[] memory claimIds, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(total, 2);
@@ -292,6 +303,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(mock);
+        _finishPosting(mock);
         actorIdMock.setGetClaimsResult(
             hex"8282018182000681881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
@@ -307,6 +319,7 @@ contract DataCapEvidenceAdapterTest is Test {
         CommonTypes.FilActorId[] memory remaining = mock.getAllAllocationIdsPerDeal(dealId);
         assertEq(remaining.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(remaining[0]), 1);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.ALLOCATED);
 
         (CommonTypes.FilActorId[] memory claimIds, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(total, 1);
@@ -317,6 +330,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(mock);
+        _finishPosting(mock);
         actorIdMock.setGetClaimsResult(hex"8282008282000682010680");
 
         vm.prank(address(poRepMarketMock));
@@ -327,6 +341,7 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(decision.result, EvidenceResult.NONE);
         assertEq(mock.getDeal(dealId).claimedBytes, 0);
         assertEq(mock.getAllAllocationIdsPerDeal(dealId).length, 2);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.ALLOCATED);
 
         (, uint256 total) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(total, 0);
@@ -336,6 +351,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(mock);
+        _finishPosting(mock);
         bytes memory singleClaim =
             hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000";
 
@@ -348,6 +364,7 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(mock.getDeal(dealId).claimedBytes, 2048);
         (, uint256 claimedAfterFirst) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(claimedAfterFirst, 1);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.ALLOCATED);
 
         actorIdMock.setGetClaimsResult(singleClaim);
         vm.prank(address(poRepMarketMock));
@@ -356,6 +373,7 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(mock.getDeal(dealId).claimedBytes, 4096);
         (, uint256 claimedAfterSecond) = mock.getClaimIds(dealId, 0, type(uint256).max);
         assertEq(claimedAfterSecond, 2);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.CLAIMED);
     }
 
     function testSubmitEvidenceBatchRevertsWhenBatchSizeIsZero() public {
@@ -373,6 +391,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(mock);
+        _finishPosting(mock);
 
         ActorIdExitCodeErrorFailingMock failing = new ActorIdExitCodeErrorFailingMock();
         vm.etch(CALL_ACTOR_ID, address(failing).code);
@@ -1565,6 +1584,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithOneAllocation(mock);
+        _finishPosting(mock);
         actorIdMock.setGetClaimsResult(
             hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
@@ -1575,12 +1595,14 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(total, 1);
         assertEq(ids.length, 1);
         assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
+        assertEq(mock.getDealAllocationStatus(dealId), DataCapAllocationStatus.CLAIMED);
     }
 
     function testGetClaimIdsPaginates() public {
         DataCapEvidenceAdapterContractMock mock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
         _registerDealWithTwoAllocations(mock);
+        _finishPosting(mock);
         actorIdMock.setGetClaimsResult(
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
@@ -1758,5 +1780,107 @@ contract DataCapEvidenceAdapterTest is Test {
 
         vm.prank(address(poRepMarketMock));
         mock.activateEvidence(_activationContext(), "");
+    }
+
+    function testIsDataCapPostingFinishedDefaultsToFalse() public view {
+        assertFalse(dataCapEvidenceAdapter.isDataCapPostingFinished(dealId));
+    }
+
+    function testFinishDataCapPostingMarksFinishedAndEmits() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        vm.expectEmit(true, false, false, true);
+        emit DataCapEvidenceAdapter.DataCapPostingFinished(dealId, dataCapEvidenceAdapter.getAllocatedBytes(dealId));
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+
+        assertTrue(dataCapEvidenceAdapter.isDataCapPostingFinished(dealId));
+    }
+
+    function testFinishDataCapPostingRevertsWhenCallerNotClient() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        vm.prank(address(0xBEEF));
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClient.selector));
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+    }
+
+    function testFinishDataCapPostingRevertsWhenDealNotAccepted() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        poRepMarketMock.setDealState(dealId, DealState.FINALIZED);
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealStateForTransfer.selector));
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+    }
+
+    function testFinishDataCapPostingRevertsWhenAlreadyFinished() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.PostingAlreadyFinished.selector));
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+    }
+
+    function testSubmitDataCapBatchRevertsWhenPostingAlreadyFinished() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808101");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.PostingAlreadyFinished.selector));
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+    }
+
+    function testSubmitEvidenceBatchRevertsWhenPostingNotFinished() public {
+        DataCapEvidenceAdapterContractMock mock =
+            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
+        _registerDealWithTwoAllocations(mock);
+
+        vm.prank(address(poRepMarketMock));
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.PostingNotFinished.selector));
+        mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
+    }
+
+    function testSubmitDataCapBatchEmitsDataCapBatchSubmitted() public {
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
+
+        vm.expectEmit(true, false, false, true);
+        emit DataCapEvidenceAdapter.DataCapBatchSubmitted(dealId, 4096);
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 }

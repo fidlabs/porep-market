@@ -250,7 +250,11 @@
   },
   {
     "type": "function",
+<<<<<<< HEAD
     "name": "getAllocatedBytes",
+=======
+    "name": "finishDataCapPosting",
+>>>>>>> 6dbe387 (feat: datacap allocation status per deal)
     "inputs": [
       {
         "name": "dealId",
@@ -258,6 +262,7 @@
         "internalType": "uint256"
       }
     ],
+<<<<<<< HEAD
     "outputs": [
       {
         "name": "",
@@ -266,6 +271,10 @@
       }
     ],
     "stateMutability": "view"
+=======
+    "outputs": [],
+    "stateMutability": "nonpayable"
+>>>>>>> 6dbe387 (feat: datacap allocation status per deal)
   },
   {
     "type": "function",
@@ -331,6 +340,25 @@
         "name": "sumOfClaims",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealAllocationStatus",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "stateMutability": "view"
@@ -475,6 +503,25 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isDataCapPostingFinished",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -884,6 +931,44 @@
       },
       {
         "name": "setAtBlock",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DataCapBatchSubmitted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "allocatedBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DataCapPostingFinished",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "allocatedBytes",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -1327,6 +1412,16 @@
   {
     "type": "error",
     "name": "NotInitializing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PostingAlreadyFinished",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PostingNotFinished",
     "inputs": []
   },
   {
