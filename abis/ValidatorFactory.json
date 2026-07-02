@@ -182,11 +182,6 @@
         "internalType": "address"
       },
       {
-        "name": "_sliScorer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_dataCapEvidenceAdapter",
         "type": "address",
         "internalType": "address"
@@ -614,6 +609,11 @@
   {
     "type": "error",
     "name": "InvalidSliScorerAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidSPRegistryAddress",
     "inputs": []
   },
   {

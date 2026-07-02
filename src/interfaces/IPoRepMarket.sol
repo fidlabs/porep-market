@@ -3,6 +3,7 @@ pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 /**
  * @title IPoRepMarket interface
@@ -72,6 +73,13 @@ interface IPoRepMarket {
     function getDealService(uint256 dealId) external view returns (PoRepTypes.DealService memory service);
 
     /**
+     * @notice Sets the minimum time between settlements for a deal
+     * @param dealId The id of the deal
+     * @param minEpochs Minimum time between settlements in epochs
+     */
+    function setMinEpochsBetweenSettlements(uint256 dealId, uint256 minEpochs) external;
+
+    /**
      * @notice Gets the reserved and committed capacity for a deal
      * @param dealId The id of the deal
      * @return capacity The deal capacity
@@ -114,9 +122,9 @@ interface IPoRepMarket {
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal
-     * @param endEpoch The Filecoin epoch at which the deal was terminated
+     * @param earlyTerminationEpoch The Filecoin epoch at which the deal was terminated
      */
-    function terminateDeal(uint256 dealId, uint256 endEpoch) external;
+    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external;
 
     /**
      * @notice Rejects a deal
@@ -244,4 +252,15 @@ interface IPoRepMarket {
      * @return dealExpiration The proposed deal expiration in epochs
      */
     function getDealExpiration() external view returns (uint256);
+
+    /**
+     * @notice Validates deal settlement for a deal
+     * @param dealId The id of the deal
+     * @param fromEpoch The starting epoch for settlement validation
+     * @param toEpoch The ending epoch for settlement validation
+     * @return decision Settlement decision based on evidence and deal terms
+     */
+    function validateDealSettlement(uint256 dealId, uint256 fromEpoch, uint256 toEpoch)
+        external
+        returns (SharedTypes.SettlementDecision memory decision);
 }

@@ -30,7 +30,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         address _dataCapEvidenceAdapter;
         address _poRepService;
         address _filecoinPay;
-        address _sliScorer;
         address _poRepMarket;
         address _beacon;
         address _admin;
@@ -95,16 +94,10 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     error InvalidFilecoinPayAddress();
 
     /**
-     * @notice Error indicating that the provided SLIScorer address is invalid
+     * @notice Error indicating that the provided PoRep service address is invalid
      * @dev 0x7725d473
      */
     error InvalidPoRepServiceAddress();
-
-    /**
-     * @notice Error indicating that the provided SLIScorer address is invalid
-     * @dev 0xf234bc02
-     */
-    error InvalidSliScorerAddress();
 
     /**
      * @notice Error indicating that the provided implementation address is invalid
@@ -186,14 +179,12 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
      * @dev This function is called after the contract is initialized with the admin and implementation addresses
      * @param _poRepService The address of the PoRepService contract
      * @param _filecoinPay The address of the FilecoinPay contract
-     * @param _sliScorer The address of the SLIScorer contract
      * @param _dataCapEvidenceAdapter The address of the DataCapEvidenceAdapter contract
      * @param _poRepMarket The address of the PoRepMarket contract
      */
     function initialize2(
         address _poRepService,
         address _filecoinPay,
-        address _sliScorer,
         address _dataCapEvidenceAdapter,
         address _poRepMarket
     ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -201,14 +192,12 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
         if (_dataCapEvidenceAdapter == address(0)) revert InvalidDataCapEvidenceAdapterAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
-        if (_sliScorer == address(0)) revert InvalidSliScorerAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
         $._dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
         $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
-        $._sliScorer = _sliScorer;
     }
 
     /**
@@ -234,7 +223,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
                         $._admin,
                         $._poRepService,
                         $._filecoinPay,
-                        $._sliScorer,
                         $._dataCapEvidenceAdapter,
                         $._poRepMarket,
                         dealId

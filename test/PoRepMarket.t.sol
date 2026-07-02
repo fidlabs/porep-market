@@ -14,11 +14,14 @@ import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
+import {SettlementReason} from "../src/types/SettlementReason.sol";
+import {SettlementResult} from "../src/types/SettlementResult.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
+import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -33,6 +36,7 @@ contract PoRepMarketTest is Test {
     ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
     DataCapEvidenceAdapterMock public dataCapEvidenceAdapterAddress;
+    SLIScorerMock public sliScorer;
     address public clientAddress;
     address public providerOwnerAddress;
     address public operatorAddress;
@@ -59,6 +63,7 @@ contract PoRepMarketTest is Test {
         validatorFactory = new ValidatorFactoryMock();
         validatorAddress = vm.addr(0x001);
         dataCapEvidenceAdapterAddress = new DataCapEvidenceAdapterMock();
+        sliScorer = new SLIScorerMock();
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
         operatorAddress = vm.addr(0x005);
@@ -82,7 +87,13 @@ contract PoRepMarketTest is Test {
 
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
-            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+            (
+                adminAddress,
+                address(validatorFactory),
+                address(spRegistry),
+                address(dataCapEvidenceAdapterAddress),
+                address(sliScorer)
+            )
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         poRepMarket = PoRepMarketContractMock(address(proxy));
@@ -184,7 +195,13 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
-            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+            (
+                adminAddress,
+                address(validatorFactory),
+                address(spRegistry),
+                address(dataCapEvidenceAdapterAddress),
+                address(sliScorer)
+            )
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return PoRepMarketContractMock(address(proxy));
@@ -215,6 +232,10 @@ contract PoRepMarketTest is Test {
                 expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
             })
         );
+    }
+
+    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256) {
+        return uint256(uint64(CommonTypes.ChainEpoch.unwrap(epoch)));
     }
 
     function testProposeDealEmitsEvent() public {
@@ -313,6 +334,8 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealService memory service = poRepMarket.getDealService(1);
         assertEq(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch), 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch), 0);
+        assertEq(service.minTimeBetweenSettlementsInEpochs, poRepMarket.EPOCHS_IN_MONTH());
+        assertEq(CommonTypes.ChainEpoch.unwrap(service.lastSettledEpoch), 0);
     }
 
     function testGetDealCapacityReturnsValidCapacity() public {
@@ -436,7 +459,6 @@ contract PoRepMarketTest is Test {
 
         p = poRepMarket.getDeal(proposalsCount + 1);
         assertEq(p.dealId, 0);
-        assertEq(p.dealId, 0);
         assertEq(p.client, address(0));
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), 0);
         assertEq(p.validator, address(0));
@@ -525,7 +547,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateRailId(dealId, railId);
     }
 
-    function testUpdateRaildIdRevertsWhenDealDoesntExist() public {
+    function testUpdateRailIdRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         vm.prank(validatorAddress);
         poRepMarket.updateRailId(dealId, railId);
@@ -733,7 +755,13 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
-            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+            (
+                adminAddress,
+                address(validatorFactory),
+                address(spRegistry),
+                address(dataCapEvidenceAdapterAddress),
+                address(sliScorer)
+            )
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock market = PoRepMarketContractMock(address(proxy));
@@ -800,7 +828,13 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
-            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+            (
+                adminAddress,
+                address(validatorFactory),
+                address(spRegistry),
+                address(dataCapEvidenceAdapterAddress),
+                address(sliScorer)
+            )
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock market = PoRepMarketContractMock(address(proxy));
@@ -928,11 +962,12 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
         // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
-            "initialize(address,address,address,address)",
+            "initialize(address,address,address,address,address)",
             adminAddress,
             address(validatorFactory),
             address(spRegistry),
-            address(dataCapEvidenceAdapterAddress)
+            address(dataCapEvidenceAdapterAddress),
+            address(sliScorer)
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
@@ -1160,7 +1195,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, badTerms, expectedManifestLocation));
     }
 
-    function testProposeDealRevertsWhenDealDurationIsNotMultiplicatioveOf30() public {
+    function testProposeDealRevertsWhenDealDurationIsNotMultipleOf30() public {
         RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() + 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
@@ -1185,7 +1220,7 @@ contract PoRepMarketTest is Test {
         assertEq(manifestLocation, expectedManifestLocation);
     }
 
-    function testManifestLocationIsUpdateCorrectly() public {
+    function testManifestLocationIsUpdatedCorrectly() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         string memory manifestLocation = poRepMarket.getManifestLocation(dealId);
@@ -1197,7 +1232,7 @@ contract PoRepMarketTest is Test {
         assertEq(manifestLocation, updatedManifestLocation);
     }
 
-    function testManifestLocationUpdateEmitEvent() public {
+    function testManifestLocationUpdateEmitsEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         string memory updatedManifestLocation = "updatedManifestLocation";
@@ -1226,10 +1261,28 @@ contract PoRepMarketTest is Test {
     function testInitializeRevertsWhenGlobalEvidenceAdapterIsZero() public {
         PoRepMarket impl = new PoRepMarket();
         bytes memory initData = abi.encodeCall(
-            PoRepMarket.initialize, (adminAddress, address(validatorFactory), address(spRegistry), address(0))
+            PoRepMarket.initialize,
+            (adminAddress, address(validatorFactory), address(spRegistry), address(0), address(sliScorer))
         );
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidEvidenceAdapterAddress.selector));
+        new ERC1967Proxy(address(impl), initData);
+    }
+
+    function testInitializeRevertsWhenSLIScorerIsZero() public {
+        PoRepMarket impl = new PoRepMarket();
+        bytes memory initData = abi.encodeCall(
+            PoRepMarket.initialize,
+            (
+                adminAddress,
+                address(validatorFactory),
+                address(spRegistry),
+                address(dataCapEvidenceAdapterAddress),
+                address(0)
+            )
+        );
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidSLIScorerAddress.selector));
         new ERC1967Proxy(address(impl), initData);
     }
 
@@ -1406,9 +1459,345 @@ contract PoRepMarketTest is Test {
         assertEq(status.activeCoveredBytes, coveredBytes);
     }
 
-    function testTerminateDealEmitsEventAndSetsState() public {
-        uint256 endEpoch = 12345;
+    function testValidateDealSettlementUsesCumulativePaymentMath() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 settlementEndEpoch = _epochToUint(service.serviceStartEpoch) + poRepMarket.EPOCHS_IN_MONTH();
+        vm.roll(settlementEndEpoch);
 
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), settlementEndEpoch);
+
+        assertEq(decision.settlementAmount, 259_200);
+        assertEq(decision.settleUpto, settlementEndEpoch);
+        assertEq(decision.reasonCode, SettlementReason.OK);
+        assertEq(decision.result, SettlementResult.ACCEPTED);
+        assertEq(decision.note, "payment validated successfully");
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 settlementEndChainEpoch = int64(uint64(settlementEndEpoch));
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealService(dealId).lastSettledEpoch), settlementEndChainEpoch
+        );
+    }
+
+    function testValidateDealSettlementUpdatesLastSettledEpochAcrossSettlements() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 firstSettlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
+        uint256 secondSettlementEndEpoch = firstSettlementEndEpoch + poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.prank(validatorAddress);
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, firstSettlementEndEpoch);
+
+        int64 firstSettlementEndChainEpoch = int64(uint64(firstSettlementEndEpoch));
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealService(dealId).lastSettledEpoch),
+            firstSettlementEndChainEpoch
+        );
+
+        vm.prank(validatorAddress);
+        poRepMarket.validateDealSettlement(dealId, firstSettlementEndEpoch, secondSettlementEndEpoch);
+
+        // casting to 'int64' is safe because settlement epochs in this test are bounded by the deal duration.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 secondSettlementEndChainEpoch = int64(uint64(secondSettlementEndEpoch));
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealService(dealId).lastSettledEpoch),
+            secondSettlementEndChainEpoch
+        );
+    }
+
+    function testValidateDealSettlementRevertsWhenCallerIsNotValidator() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        address caller = vm.addr(0x999);
+        uint256 settlementEndEpoch = _epochToUint(service.serviceStartEpoch) + poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
+        vm.prank(caller);
+        poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), settlementEndEpoch);
+    }
+
+    function testValidateDealSettlementRevertsWhenServiceNotStarted() public {
+        proposeDefaultDeal();
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        uint256 settlementEndEpoch = poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealServiceNotStarted.selector, dealId));
+        vm.prank(validatorAddress);
+        poRepMarket.validateDealSettlement(dealId, 0, settlementEndEpoch);
+    }
+
+    function testValidateDealSettlementReturnsTooEarlyBeforeMinimumSettlementWindow() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), 200);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, _epochToUint(service.serviceStartEpoch));
+        assertEq(decision.reasonCode, SettlementReason.TOO_EARLY);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.note, "too early for settlement");
+    }
+
+    function testValidateDealSettlementReturnsScoreFailureNote() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 99);
+        uint256 settlementEndEpoch = _epochToUint(service.serviceStartEpoch) + poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), settlementEndEpoch);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.reasonCode, SettlementReason.SCORE_BELOW_THRESHOLD);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.note, "score below required threshold");
+    }
+
+    function testValidateDealSettlementReturnsEvidenceFailureNote() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
+        uint256 settlementEndEpoch = _epochToUint(service.serviceStartEpoch) + poRepMarket.EPOCHS_IN_MONTH();
+        vm.roll(settlementEndEpoch);
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), settlementEndEpoch);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        // solhint-disable-next-line gas-small-strings
+        assertEq(decision.note, "data size does not match the deal");
+    }
+
+    function testValidateDealSettlementRejectsWhenSettlementStartsAfterServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch + 1;
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch + 100);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, fromEpoch);
+        assertEq(decision.reasonCode, SettlementReason.DEAL_ENDED);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.note, "deal ended");
+    }
+
+    function testValidateDealSettlementSkipsMinimumWindowAfterEarlyTermination() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 earlyTerminationEpoch = _epochToUint(service.serviceStartEpoch) + 100;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 earlyTerminationChainEpoch = int64(uint64(earlyTerminationEpoch));
+        PoRepMarketContractMock(address(poRepMarket))
+            .setDealService(
+                dealId,
+                PoRepTypes.DealService({
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(earlyTerminationChainEpoch),
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: service.lastSettledEpoch
+            })
+            );
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), earlyTerminationEpoch);
+
+        assertEq(decision.settlementAmount, 300);
+        assertEq(decision.settleUpto, earlyTerminationEpoch);
+        assertEq(decision.reasonCode, SettlementReason.OK);
+        assertEq(decision.result, SettlementResult.ACCEPTED);
+        assertEq(decision.note, "payment validated successfully");
+    }
+
+    function testValidateDealSettlementRejectsWhenSettlementStartsAfterEarlyTermination() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        uint256 earlyTerminationEpoch = _epochToUint(service.serviceStartEpoch) + 100;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 earlyTerminationEpochValue = int64(uint64(earlyTerminationEpoch));
+        CommonTypes.ChainEpoch earlyTerminationChainEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpochValue);
+        PoRepMarketContractMock(address(poRepMarket))
+            .setDealService(
+                dealId,
+                PoRepTypes.DealService({
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: earlyTerminationChainEpoch,
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: earlyTerminationChainEpoch
+            })
+            );
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, earlyTerminationEpoch, earlyTerminationEpoch + 100);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, earlyTerminationEpoch);
+        assertEq(decision.reasonCode, SettlementReason.DEAL_TERMINATED);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.note, "deal terminated");
+    }
+
+    function testValidateDealSettlementReturnsModifiedResultWhenCappedToEarlyTermination() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 earlyTerminationEpoch = settlementStartEpoch + 100;
+        uint256 requestedEndEpoch = earlyTerminationEpoch + 100;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 earlyTerminationChainEpoch = int64(uint64(earlyTerminationEpoch));
+        PoRepMarketContractMock(address(poRepMarket))
+            .setDealService(
+                dealId,
+                PoRepTypes.DealService({
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(earlyTerminationChainEpoch),
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: service.lastSettledEpoch
+            })
+            );
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, requestedEndEpoch);
+
+        assertEq(decision.settlementAmount, 300);
+        assertEq(decision.settleUpto, earlyTerminationEpoch);
+        assertEq(decision.reasonCode, SettlementReason.OK);
+        assertEq(decision.result, SettlementResult.MODIFIED);
+        // solhint-disable-next-line gas-small-strings
+        assertEq(decision.note, "payment limited to deal termination epoch");
+    }
+
+    function testValidateDealSettlementReturnsModifiedResultWhenCappedToServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 settlementStartEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+        uint256 requestedEndEpoch = serviceEndEpoch + 100;
+        // forge-lint: disable-next-line(unsafe-typecast)
+        int64 settlementStartChainEpoch = int64(uint64(settlementStartEpoch));
+        PoRepMarketContractMock(address(poRepMarket))
+            .setDealService(
+                dealId,
+                PoRepTypes.DealService({
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: service.earlyTerminationEpoch,
+                minTimeBetweenSettlementsInEpochs: service.minTimeBetweenSettlementsInEpochs,
+                lastSettledEpoch: CommonTypes.ChainEpoch.wrap(settlementStartChainEpoch)
+            })
+            );
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, requestedEndEpoch);
+
+        assertEq(decision.settlementAmount, poRepMarket.EPOCHS_IN_MONTH() * 3);
+        assertEq(decision.settleUpto, serviceEndEpoch);
+        assertEq(decision.reasonCode, SettlementReason.OK);
+        assertEq(decision.result, SettlementResult.MODIFIED);
+        assertEq(decision.note, "payment limited to deal endepoch");
+    }
+
+    function testSetMinEpochsBetweenSettlementsUpdatesDealService() public {
+        proposeDefaultDeal();
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectEmit(true, false, false, true);
+        emit PoRepMarket.MinEpochsBetweenSettlementsUpdated(dealId, 1000);
+        vm.prank(validatorAddress);
+        poRepMarket.setMinEpochsBetweenSettlements(dealId, 1000);
+
+        assertEq(poRepMarket.getDealService(dealId).minTimeBetweenSettlementsInEpochs, 1000);
+    }
+
+    function testSetMinEpochsBetweenSettlementsRevertsForZeroValue() public {
+        proposeDefaultDeal();
+
+        vm.expectRevert(PoRepMarket.InvalidMinEpochsBetweenSettlements.selector);
+        vm.prank(validatorAddress);
+        poRepMarket.setMinEpochsBetweenSettlements(dealId, 0);
+    }
+
+    function testSetMinEpochsBetweenSettlementsRevertsAboveOneYear() public {
+        proposeDefaultDeal();
+
+        vm.expectRevert(PoRepMarket.MinEpochsBetweenSettlementsExceeded.selector);
+        vm.prank(validatorAddress);
+        poRepMarket.setMinEpochsBetweenSettlements(dealId, 1_051_201);
+    }
+
+    function testSetMinEpochsBetweenSettlementsRevertsWhenCallerIsNotValidator() public {
+        proposeDefaultDeal();
+        address caller = vm.addr(0x999);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
+        vm.prank(caller);
+        poRepMarket.setMinEpochsBetweenSettlements(dealId, 1000);
+    }
+
+    function _completeDefaultDealForSettlement() internal returns (PoRepTypes.DealService memory service) {
+        vm.roll(100);
+        proposeDefaultDeal();
+
+        vm.startPrank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes));
+        PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
+        market.setDealState(dealId, DealState.ACTIVE);
+        market.setDealCapacity(
+            dealId,
+            PoRepTypes.DealCapacity({
+                reservedBytes: defaultTerms.dealSizeBytes, committedBytes: defaultTerms.dealSizeBytes
+            })
+        );
+        market.setDealPayment(
+            dealId,
+            PoRepTypes.DealPayment({
+                paymentToken: address(0),
+                payee: address(0),
+                pricePer32GiBPerMonth: defaultTerms.pricePerSectorPerMonth,
+                billed32GiBUnits: 3,
+                railMaxRatePerEpoch: 3
+            })
+        );
+        market.setDealService(
+            dealId,
+            PoRepTypes.DealService({
+                serviceStartEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),
+                serviceEndEpoch: CommonTypes.ChainEpoch
+                    .wrap(
+                        int64(uint64(block.number + defaultTerms.durationDays * (poRepMarket.EPOCHS_IN_MONTH() / 30)))
+                    ),
+                earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(0),
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: CommonTypes.ChainEpoch.wrap(0)
+            })
+        );
+        return poRepMarket.getDealService(dealId);
+    }
+
+    function testTerminateDealEmitsEventAndSetsState() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
@@ -1420,10 +1809,10 @@ contract PoRepMarketTest is Test {
         setDealActive(dealId);
 
         vm.expectEmit(true, true, true, true);
-
-        emit PoRepMarket.DealTerminated(dealId, endEpoch);
+        int64 endEpoch = 12345;
+        emit PoRepMarket.DealTerminated(dealId, CommonTypes.ChainEpoch.wrap(endEpoch));
         vm.prank(validatorAddress);
-        poRepMarket.terminateDeal(dealId, endEpoch);
+        poRepMarket.terminateDeal(dealId, CommonTypes.ChainEpoch.wrap(endEpoch));
 
         PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
         assertTrue(p.state == DealState.TERMINATED);
@@ -1445,7 +1834,7 @@ contract PoRepMarketTest is Test {
         setDealActive(dealId);
 
         vm.prank(validatorAddress);
-        poRepMarket.terminateDeal(dealId, block.number);
+        poRepMarket.terminateDeal(dealId, chainEpochFromBlock(block.number));
 
         assertEq(spRegistry.lastReleasedCapacityProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
         assertEq(spRegistry.lastReleasedCapacityBytes(), allocatedSize);
@@ -1454,7 +1843,7 @@ contract PoRepMarketTest is Test {
 
     function testTerminateDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
-        poRepMarket.terminateDeal(dealId, 1);
+        poRepMarket.terminateDeal(dealId, CommonTypes.ChainEpoch.wrap(int64(uint64(1))));
     }
 
     function testTerminateDealRevertsWhenDealIsNotActive() public {
@@ -1467,7 +1856,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(validatorAddress);
-        poRepMarket.terminateDeal(dealId, 2);
+        poRepMarket.terminateDeal(dealId, CommonTypes.ChainEpoch.wrap(int64(uint64(2))));
     }
 
     function testTerminateDealRevertsWhenValidatorNotSet() public {
@@ -1479,7 +1868,7 @@ contract PoRepMarketTest is Test {
         address caller = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
         vm.prank(caller);
-        poRepMarket.terminateDeal(dealId, 3);
+        poRepMarket.terminateDeal(dealId, CommonTypes.ChainEpoch.wrap(int64(uint64(3))));
     }
 
     function testTerminateDealRevertsWhenCallerIsNotValidator() public {
@@ -1494,7 +1883,7 @@ contract PoRepMarketTest is Test {
         address caller = vm.addr(0x999);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
         vm.prank(caller);
-        poRepMarket.terminateDeal(dealId, 4);
+        poRepMarket.terminateDeal(dealId, CommonTypes.ChainEpoch.wrap(int64(uint64(4))));
     }
 
     function testGetDealsForOrganizationByStateZeroAddressOfOrganizationReverts() public {

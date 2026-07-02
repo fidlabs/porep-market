@@ -79,19 +79,6 @@
   },
   {
     "type": "function",
-    "name": "getMinEpochsBetweenSettlements",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "minTimeBetweenSettlementsInEpochs",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getRailStatus",
     "inputs": [],
     "outputs": [
@@ -184,12 +171,7 @@
         "internalType": "address"
       },
       {
-        "name": "_SLIScorer",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_dataCapEvidenceAdapter",
+        "name": "_evidenceAdapter",
         "type": "address",
         "internalType": "address"
       },
@@ -281,19 +263,6 @@
   },
   {
     "type": "function",
-    "name": "setMinEpochsBetweenSettlements",
-    "inputs": [
-      {
-        "name": "minEpochs",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "supportsInterface",
     "inputs": [
       {
@@ -349,7 +318,7 @@
         "internalType": "uint256"
       },
       {
-        "name": "rate",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -437,25 +406,6 @@
       },
       {
         "name": "newLockupPeriod",
-        "type": "uint256",
-        "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "MinEpochsBetweenSettlementsUpdated",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "minTimeBetweenSettlementsInEpochs",
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
@@ -620,28 +570,17 @@
   },
   {
     "type": "error",
-    "name": "DealPaymentNotActivated",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "InvalidAdminAddress",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidDataCapEvidenceAdapterAddress",
+    "name": "InvalidDealId",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "InvalidDealId",
+    "name": "InvalidEvidenceAdapterAddress",
     "inputs": []
   },
   {
@@ -657,11 +596,6 @@
   {
     "type": "error",
     "name": "InvalidLockupAllowance",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidMinEpochsBetweenSettlements",
     "inputs": []
   },
   {
@@ -702,6 +636,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidSPRegistryAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidTerminator",
     "inputs": []
   },
@@ -713,11 +652,6 @@
   {
     "type": "error",
     "name": "MaxLockupPeriodLessThanMinimum",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "MinEpochsBetweenSettlementsExceeded",
     "inputs": []
   },
   {

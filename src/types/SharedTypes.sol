@@ -168,15 +168,16 @@ library SharedTypes {
     /**
      * @notice SettlementDecision struct represents the decision for deal settlement
      * @param settlementAmount amount to be settled based on evidence and deal terms
-     * @param settleUptoEpoch epoch up to which the settlement is calculated
+     * @param settleUpto epoch up to which the settlement is calculated
      * @param reasonCode code representing the reason for the settlement decision
      * @param result settlement result code
      */
     struct SettlementDecision {
         uint256 settlementAmount;
-        CommonTypes.ChainEpoch settleUptoEpoch;
+        uint256 settleUpto;
         uint16 reasonCode;
         uint8 result;
+        string note;
     }
 
     /**
