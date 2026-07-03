@@ -50,11 +50,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 pendingBytes;
     }
 
-    struct RegistryTokenConfig {
-        bool allowed;
-        uint256 minPricePer32GiBPerMonth;
-    }
-
     struct Offer {
         CommonTypes.FilActorId provider;
         bool active;
@@ -72,12 +67,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint64 => Provider) _providers;
         mapping(uint64 => ProviderCapacity) _providerCapacity;
         uint256 nextOfferId;
-        uint256 maxActiveOffersPerProvider;
         EnumerableSet.UintSet _activeOfferIds;
         EnumerableSet.AddressSet _paymentTokens;
-        mapping(address => RegistryTokenConfig) _tokenConfig;
+        mapping(address => ISPRegistry.TokenConfig) _tokenConfig;
         mapping(uint64 => EnumerableSet.UintSet) _offerIdsByProvider;
-        mapping(uint64 => EnumerableSet.UintSet) _activeOfferIdsByProvider;
+        mapping(uint64 => uint256) _activeOfferCountByProvider;
         mapping(uint256 => Offer) _offers;
         mapping(uint256 => SharedTypes.OfferTerms) _offerTerms;
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
@@ -95,6 +89,15 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         assembly {
             $.slot := SP_REGISTRY_STORAGE_LOCATION
         }
+    }
+
+    // solhint-disable-next-line use-natspec
+    function s() internal pure returns (SPRegistryStorage storage) {
+        return _getSPRegistryStorage();
+    }
+
+    function _providerId(CommonTypes.FilActorId provider) internal pure returns (uint64) {
+        return CommonTypes.FilActorId.unwrap(provider);
     }
 
     /**
@@ -394,9 +397,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
-
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        $.maxActiveOffersPerProvider = MAX_ACTIVE_OFFERS_PER_PROVIDER;
     }
 
     /**
@@ -421,8 +421,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         _registerProvider(provider, organization, payee);
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        $._providerCapacity[CommonTypes.FilActorId.unwrap(provider)].availableBytes = availableBytes;
+        SPRegistryStorage storage $ = s();
+        $._providerCapacity[_providerId(provider)].availableBytes = availableBytes;
 
         emit AvailableSpaceUpdated(provider, availableBytes);
     }
@@ -433,7 +433,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
 
-        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = true;
+        s()._providers[_providerId(provider)].paused = true;
 
         emit ProviderPaused(provider);
     }
@@ -444,7 +444,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
 
-        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].paused = false;
+        s()._providers[_providerId(provider)].paused = false;
 
         emit ProviderUnpaused(provider);
     }
@@ -453,7 +453,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function blockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _ensureProviderRegistered(provider);
 
-        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked = true;
+        s()._providers[_providerId(provider)].blocked = true;
 
         emit ProviderBlocked(provider);
     }
@@ -462,7 +462,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function unblockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _ensureProviderRegistered(provider);
 
-        _getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked = false;
+        s()._providers[_providerId(provider)].blocked = false;
 
         emit ProviderUnblocked(provider);
     }
@@ -473,8 +473,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureProviderNotBlocked(provider);
         _onlyProviderControllerOrAdmin(provider);
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        ProviderCapacity storage c = $._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        SPRegistryStorage storage $ = s();
+        ProviderCapacity storage c = $._providerCapacity[_providerId(provider)];
 
         uint256 minRequired = c.committedBytes + c.pendingBytes;
         if (availableBytes < minRequired) {
@@ -487,13 +487,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function getProviders() external view returns (CommonTypes.FilActorId[] memory) {
-        return _toFilActorIdArray(_getSPRegistryStorage()._providerIds);
+        return _toFilActorIdArray(s()._providerIds);
     }
 
     /// @inheritdoc ISPRegistry
     function getProviderView(CommonTypes.FilActorId provider) external view returns (ProviderView memory view_) {
-        uint64 id = CommonTypes.FilActorId.unwrap(provider);
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        uint64 id = _providerId(provider);
+        SPRegistryStorage storage $ = s();
         Provider storage p = $._providers[id];
         ProviderCapacity storage c = $._providerCapacity[id];
 
@@ -511,7 +511,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function isProviderRegistered(CommonTypes.FilActorId provider) external view returns (bool) {
-        return _getSPRegistryStorage()._providerIds.contains(uint256(CommonTypes.FilActorId.unwrap(provider)));
+        return s()._providerIds.contains(uint256(_providerId(provider)));
     }
 
     /// @inheritdoc ISPRegistry
@@ -527,8 +527,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _onlyProviderControllerOrAdmin(provider);
         if (payee == address(0)) revert InvalidPayeeAddress();
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        uint64 id = CommonTypes.FilActorId.unwrap(provider);
+        SPRegistryStorage storage $ = s();
+        uint64 id = _providerId(provider);
         address oldPayee = $._providers[id].payee;
         $._providers[id].payee = payee;
 
@@ -542,9 +542,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     {
         if (token == address(0)) revert InvalidPaymentToken();
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        SPRegistryStorage storage $ = s();
         $._tokenConfig[token] =
-            RegistryTokenConfig({allowed: allowed, minPricePer32GiBPerMonth: minPricePer32GiBPerMonth});
+            ISPRegistry.TokenConfig({allowed: allowed, minPricePer32GiBPerMonth: minPricePer32GiBPerMonth});
         if (allowed) {
             $._paymentTokens.add(token);
         } else {
@@ -556,13 +556,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function getPaymentTokenConfig(address token) external view returns (ISPRegistry.TokenConfig memory config) {
-        RegistryTokenConfig storage c = _getSPRegistryStorage()._tokenConfig[token];
-        config = ISPRegistry.TokenConfig({allowed: c.allowed, minPricePer32GiBPerMonth: c.minPricePer32GiBPerMonth});
+        return s()._tokenConfig[token];
     }
 
     /// @inheritdoc ISPRegistry
     function getPaymentTokens() external view returns (address[] memory tokens) {
-        return _getSPRegistryStorage()._paymentTokens.values();
+        return s()._paymentTokens.values();
     }
 
     /// @inheritdoc ISPRegistry
@@ -578,11 +577,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _ensureOfferTermsValid(terms);
         _ensureSLIsValid(slis);
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        uint64 providerId = CommonTypes.FilActorId.unwrap(provider);
+        SPRegistryStorage storage $ = s();
+        uint64 providerId = _providerId(provider);
         // solhint-disable-next-line gas-strict-inequalities
-        if ($._activeOfferIdsByProvider[providerId].length() >= $.maxActiveOffersPerProvider) {
-            revert TooManyActiveOffers(provider, $.maxActiveOffersPerProvider);
+        if ($._activeOfferCountByProvider[providerId] >= MAX_ACTIVE_OFFERS_PER_PROVIDER) {
+            revert TooManyActiveOffers(provider, MAX_ACTIVE_OFFERS_PER_PROVIDER);
         }
 
         offerId = ++$.nextOfferId;
@@ -590,7 +589,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         $._offerTerms[offerId] = terms;
         $._offerSLIs[offerId] = slis;
         $._offerIdsByProvider[providerId].add(offerId);
-        $._activeOfferIdsByProvider[providerId].add(offerId);
+        $._activeOfferCountByProvider[providerId]++;
         $._activeOfferIds.add(offerId);
 
         for (uint256 i = 0; i < payments.length; i++) {
@@ -602,7 +601,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function setOfferActive(uint256 offerId, bool active) external {
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        SPRegistryStorage storage $ = s();
         Offer storage offer = $._offers[offerId];
         _ensureOfferExists(offerId);
         _ensureProviderNotBlocked(offer.provider);
@@ -610,16 +609,16 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         if (offer.active == active) return;
 
-        uint64 providerId = CommonTypes.FilActorId.unwrap(offer.provider);
+        uint64 providerId = _providerId(offer.provider);
         if (active) {
             // solhint-disable-next-line gas-strict-inequalities
-            if ($._activeOfferIdsByProvider[providerId].length() >= $.maxActiveOffersPerProvider) {
-                revert TooManyActiveOffers(offer.provider, $.maxActiveOffersPerProvider);
+            if ($._activeOfferCountByProvider[providerId] >= MAX_ACTIVE_OFFERS_PER_PROVIDER) {
+                revert TooManyActiveOffers(offer.provider, MAX_ACTIVE_OFFERS_PER_PROVIDER);
             }
-            $._activeOfferIdsByProvider[providerId].add(offerId);
+            $._activeOfferCountByProvider[providerId]++;
             $._activeOfferIds.add(offerId);
         } else {
-            $._activeOfferIdsByProvider[providerId].remove(offerId);
+            $._activeOfferCountByProvider[providerId]--;
             $._activeOfferIds.remove(offerId);
         }
 
@@ -631,7 +630,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function setOfferPayment(uint256 offerId, address token, bool active, uint256 pricePer32GiBPerMonth) external {
         _ensureOfferExists(offerId);
 
-        Offer storage offer = _getSPRegistryStorage()._offers[offerId];
+        Offer storage offer = s()._offers[offerId];
         _ensureProviderNotBlocked(offer.provider);
         _onlyProviderControllerOrAdmin(offer.provider);
 
@@ -640,7 +639,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function getOfferView(uint256 offerId, address paymentToken) external view returns (OfferView memory view_) {
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        SPRegistryStorage storage $ = s();
         Offer storage offer = $._offers[offerId];
         RegistryOfferPayment storage payment = $._offerPayments[offerId][paymentToken];
 
@@ -658,7 +657,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function getOffersByProvider(CommonTypes.FilActorId provider) external view returns (uint256[] memory offerIds) {
-        return _toUintArray(_getSPRegistryStorage()._offerIdsByProvider[CommonTypes.FilActorId.unwrap(provider)]);
+        return s()._offerIdsByProvider[_providerId(provider)].values();
     }
 
     /// @inheritdoc ISPRegistry
@@ -676,8 +675,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         view
         returns (bool)
     {
-        return
-            _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)];
+        return s()._manifestAssignedToProvider[manifestHash][_providerId(provider)];
     }
 
     /// @inheritdoc ISPRegistry
@@ -687,17 +685,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
         selection = _selectProviderForDeal(request);
-        if (CommonTypes.FilActorId.unwrap(selection.provider) == 0) revert NoOfferMatched();
-        _reservePending(selection.provider, selection.reservedBytes);
-        _getSPRegistryStorage()
-        ._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(selection.provider)] = true;
-        emit OfferSelected(
-            selection.offerId,
-            selection.provider,
-            selection.paymentToken,
-            selection.pricePer32GiBPerMonth,
-            selection.reservedBytes
-        );
+        if (_providerId(selection.provider) == 0) revert NoOfferMatched();
+        _reserveSelection(request.manifestHash, selection);
     }
 
     /// @inheritdoc ISPRegistry
@@ -718,16 +707,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint16 reason;
         (selection, reason) = _evaluateOffer(offerId, request);
         if (reason != OfferMatch.OK) revert OfferNotEligible(offerId, reason);
-        _reservePending(selection.provider, selection.reservedBytes);
-        _getSPRegistryStorage()
-        ._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(selection.provider)] = true;
-        emit OfferSelected(
-            selection.offerId,
-            selection.provider,
-            selection.paymentToken,
-            selection.pricePer32GiBPerMonth,
-            selection.reservedBytes
-        );
+        _reserveSelection(request.manifestHash, selection);
     }
 
     /// @inheritdoc ISPRegistry
@@ -753,7 +733,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     {
         _ensureProviderRegistered(provider);
 
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        ProviderCapacity storage c = s()._providerCapacity[_providerId(provider)];
 
         uint256 pendingReleased;
         // solhint-disable-next-line gas-strict-inequalities
@@ -780,16 +760,16 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param payee Address that receives provider payments. Falls back to organization when zero.
      */
     function _registerProvider(CommonTypes.FilActorId provider, address organization, address payee) internal {
-        if (CommonTypes.FilActorId.unwrap(provider) == 0) revert InvalidProviderActorId();
+        if (_providerId(provider) == 0) revert InvalidProviderActorId();
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        SPRegistryStorage storage $ = s();
         // solhint-disable-next-line gas-strict-inequalities
         if ($._providerIds.length() >= MAX_PROVIDERS) revert MaxProvidersReached(MAX_PROVIDERS);
 
-        uint256 id256 = uint256(CommonTypes.FilActorId.unwrap(provider));
+        uint64 id = _providerId(provider);
+        uint256 id256 = uint256(id);
         if (!$._providerIds.add(id256)) revert ProviderAlreadyRegistered(provider);
 
-        uint64 id = CommonTypes.FilActorId.unwrap(provider);
         $._providers[id].organization = organization;
         $._providers[id].payee = payee == address(0) ? organization : payee;
 
@@ -814,7 +794,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param provider Provider actor ID to check.
      */
     function _ensureProviderRegistered(CommonTypes.FilActorId provider) internal view {
-        if (!_getSPRegistryStorage()._providerIds.contains(uint256(CommonTypes.FilActorId.unwrap(provider)))) {
+        if (!s()._providerIds.contains(uint256(_providerId(provider)))) {
             revert ProviderNotRegistered(provider);
         }
     }
@@ -824,7 +804,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param provider Provider actor ID to check.
      */
     function _ensureProviderNotBlocked(CommonTypes.FilActorId provider) internal view {
-        if (_getSPRegistryStorage()._providers[CommonTypes.FilActorId.unwrap(provider)].blocked) {
+        if (s()._providers[_providerId(provider)].blocked) {
             revert ProviderIsBlocked(provider);
         }
     }
@@ -834,7 +814,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param offerId Offer ID to check.
      */
     function _ensureOfferExists(uint256 offerId) internal view {
-        if (offerId == 0 || CommonTypes.FilActorId.unwrap(_getSPRegistryStorage()._offers[offerId].provider) == 0) {
+        if (offerId == 0 || _providerId(s()._offers[offerId].provider) == 0) {
             revert OfferNotFound(offerId);
         }
     }
@@ -864,8 +844,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function _setOfferPayment(uint256 offerId, address token, bool active, uint256 pricePer32GiBPerMonth) internal {
         if (token == address(0)) revert InvalidPaymentToken();
 
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
-        RegistryTokenConfig storage config = $._tokenConfig[token];
+        SPRegistryStorage storage $ = s();
+        ISPRegistry.TokenConfig storage config = $._tokenConfig[token];
         if (!config.allowed) revert PaymentTokenNotAllowed(token);
         uint256 minimum = config.minPricePer32GiBPerMonth == 0 ? 1 : config.minPricePer32GiBPerMonth;
         if (active && pricePer32GiBPerMonth < minimum) {
@@ -888,7 +868,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         view
         returns (SharedTypes.ProviderDealSelection memory best)
     {
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        SPRegistryStorage storage $ = s();
         uint256 length = $._activeOfferIds.length();
         uint256[] memory eligibleOfferIds = new uint256[](length);
         CommonTypes.FilActorId[] memory eligibleProviders = new CommonTypes.FilActorId[](length);
@@ -948,7 +928,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 price,
         uint256 offerId
     ) internal pure returns (bool) {
-        if (CommonTypes.FilActorId.unwrap(bestProvider) == 0) return true;
+        if (_providerId(bestProvider) == 0) return true;
         if (load != bestLoad) return load < bestLoad;
         if (price != bestPrice) return price < bestPrice;
         return offerId < bestOfferId;
@@ -967,17 +947,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         view
         returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason)
     {
-        SPRegistryStorage storage $ = _getSPRegistryStorage();
+        SPRegistryStorage storage $ = s();
         Offer storage offer = $._offers[offerId];
-        if (offerId == 0 || CommonTypes.FilActorId.unwrap(offer.provider) == 0) {
+        if (offerId == 0 || _providerId(offer.provider) == 0) {
             return (selection, OfferMatch.OFFER_NOT_FOUND);
         }
         if (!offer.active) return (selection, OfferMatch.OFFER_INACTIVE);
 
-        Provider storage providerInfo = $._providers[CommonTypes.FilActorId.unwrap(offer.provider)];
+        Provider storage providerInfo = $._providers[_providerId(offer.provider)];
         if (providerInfo.blocked) return (selection, OfferMatch.PROVIDER_BLOCKED);
         if (providerInfo.paused) return (selection, OfferMatch.PROVIDER_PAUSED);
-        if ($._manifestAssignedToProvider[request.manifestHash][CommonTypes.FilActorId.unwrap(offer.provider)]) {
+        if ($._manifestAssignedToProvider[request.manifestHash][_providerId(offer.provider)]) {
             return (selection, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
         }
 
@@ -1001,7 +981,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             return (selection, OfferMatch.SLIS_NOT_MET);
         }
 
-        RegistryTokenConfig storage config = $._tokenConfig[request.paymentToken];
+        ISPRegistry.TokenConfig storage config = $._tokenConfig[request.paymentToken];
         RegistryOfferPayment storage payment = $._offerPayments[offerId][request.paymentToken];
         if (!config.allowed || !payment.active) return (selection, OfferMatch.TOKEN_NOT_ALLOWED);
         uint256 minimum = config.minPricePer32GiBPerMonth == 0 ? 1 : config.minPricePer32GiBPerMonth;
@@ -1034,18 +1014,29 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param sizeBytes Bytes to reserve.
      */
     function _reservePending(CommonTypes.FilActorId provider, uint256 sizeBytes) internal {
-        _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)].pendingBytes += sizeBytes;
+        s()._providerCapacity[_providerId(provider)].pendingBytes += sizeBytes;
         emit PendingCapacityReserved(provider, sizeBytes);
+    }
+
+    function _reserveSelection(bytes32 manifestHash, SharedTypes.ProviderDealSelection memory selection) internal {
+        _reservePending(selection.provider, selection.reservedBytes);
+        s()._manifestAssignedToProvider[manifestHash][_providerId(selection.provider)] = true;
+        emit OfferSelected(
+            selection.offerId,
+            selection.provider,
+            selection.paymentToken,
+            selection.pricePer32GiBPerMonth,
+            selection.reservedBytes
+        );
     }
 
     function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) internal {
         _ensureProviderRegistered(provider);
 
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        ProviderCapacity storage c = s()._providerCapacity[_providerId(provider)];
         if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
         c.committedBytes -= sizeBytes;
-        _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
-        false;
+        s()._manifestAssignedToProvider[manifestHash][_providerId(provider)] = false;
 
         emit CapacityReleased(provider, sizeBytes);
     }
@@ -1055,23 +1046,22 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     {
         _ensureProviderRegistered(provider);
 
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        ProviderCapacity storage c = s()._providerCapacity[_providerId(provider)];
         if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
         c.pendingBytes -= sizeBytes;
-        _getSPRegistryStorage()._manifestAssignedToProvider[manifestHash][CommonTypes.FilActorId.unwrap(provider)] =
-        false;
+        s()._manifestAssignedToProvider[manifestHash][_providerId(provider)] = false;
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }
 
     function _remainingCapacity(CommonTypes.FilActorId provider) internal view returns (uint256) {
-        ProviderCapacity storage c = _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)];
+        ProviderCapacity storage c = s()._providerCapacity[_providerId(provider)];
         uint256 used = c.committedBytes + c.pendingBytes;
         return c.availableBytes > used ? c.availableBytes - used : 0;
     }
 
     function _matchLoad(CommonTypes.FilActorId provider) internal view returns (uint256) {
-        return _getSPRegistryStorage()._providerCapacity[CommonTypes.FilActorId.unwrap(provider)].pendingBytes;
+        return s()._providerCapacity[_providerId(provider)].pendingBytes;
     }
 
     function _meetsRequirements(SharedTypes.SLIThresholds memory caps, SharedTypes.SLIThresholds calldata reqs)
@@ -1097,15 +1087,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         CommonTypes.FilActorId[] memory result = new CommonTypes.FilActorId[](length);
         for (uint256 i = 0; i < length; i++) {
             result[i] = CommonTypes.FilActorId.wrap(uint64(set.at(i)));
-        }
-        return result;
-    }
-
-    function _toUintArray(EnumerableSet.UintSet storage set) internal view returns (uint256[] memory) {
-        uint256 length = set.length();
-        uint256[] memory result = new uint256[](length);
-        for (uint256 i = 0; i < length; i++) {
-            result[i] = set.at(i);
         }
         return result;
     }
