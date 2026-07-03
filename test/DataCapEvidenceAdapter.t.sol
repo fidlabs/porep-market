@@ -1680,7 +1680,7 @@ contract DataCapEvidenceAdapterTest is Test {
             requestedSizeBytes: 4096,
             client: clientAddress,
             durationEpochs: 0,
-            activationToleranceBps: 10_000,
+            activationToleranceBps: 0,
             provider: providerFilActorId
         });
 
@@ -1707,7 +1707,7 @@ contract DataCapEvidenceAdapterTest is Test {
             requestedSizeBytes: 8192,
             client: clientAddress,
             durationEpochs: 0,
-            activationToleranceBps: 10_000,
+            activationToleranceBps: 0,
             provider: providerFilActorId
         });
 

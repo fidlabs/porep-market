@@ -517,7 +517,8 @@ contract DataCapEvidenceAdapter is
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
-        uint256 threshold = context.requestedSizeBytes * context.activationToleranceBps / BPS_DENOMINATOR;
+        uint256 threshold =
+            context.requestedSizeBytes * (BPS_DENOMINATOR - context.activationToleranceBps) / BPS_DENOMINATOR;
 
         if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
             // TODO: add custom reasonCode
