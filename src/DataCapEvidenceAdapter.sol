@@ -427,6 +427,10 @@ contract DataCapEvidenceAdapter is
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
 
+        if ($._operational == false) {
+            revert AdapterNotOperational();
+        }
+
         if (dealSnapshot.state != DealState.ACCEPTED) {
             revert InvalidDealStateForTransfer();
         }

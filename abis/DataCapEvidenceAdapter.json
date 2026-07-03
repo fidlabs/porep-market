@@ -1234,6 +1234,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidAllocatedBytes",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidAllocationRequest",
     "inputs": []
   },
