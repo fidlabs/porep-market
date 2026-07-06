@@ -17,8 +17,8 @@ import {RailStatus} from "../src/types/RailStatus.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {TestUtils} from "./utils/TestUtils.sol";
-import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
+import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -140,6 +140,7 @@ contract PoRepMarketTest is Test {
     {
         return DataCapEvidenceAdapter.DataCapDealEvidence({
             completed: false,
+            postingFinished: false,
             client: clientAddress,
             validator: validatorAddress,
             provider: providerFilActorId,

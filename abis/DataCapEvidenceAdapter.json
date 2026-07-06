@@ -250,6 +250,19 @@
   },
   {
     "type": "function",
+    "name": "finishDataCapPosting",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getAllocatedBytes",
     "inputs": [
       {
@@ -331,6 +344,25 @@
         "name": "sumOfClaims",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getDealAllocationStatus",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "status",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "stateMutability": "view"
@@ -475,6 +507,25 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "isDataCapPostingFinished",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -893,6 +944,44 @@
   },
   {
     "type": "event",
+    "name": "DataCapBatchSubmitted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "allocatedBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "DataCapPostingFinished",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "allocatedBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "DatacapSpent",
     "inputs": [
       {
@@ -1145,6 +1234,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidAllocatedBytes",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidAllocationRequest",
     "inputs": []
   },
@@ -1327,6 +1421,16 @@
   {
     "type": "error",
     "name": "NotInitializing",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PostingAlreadyFinished",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "PostingNotFinished",
     "inputs": []
   },
   {
