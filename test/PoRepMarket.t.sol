@@ -1718,12 +1718,10 @@ contract PoRepMarketTest is Test {
 
     function testSetMinEpochsBetweenSettlementsUpdatesDealService() public {
         proposeDefaultDeal();
-        vm.prank(validatorAddress);
-        poRepMarket.updateValidator(dealId);
 
         vm.expectEmit(true, false, false, true);
         emit PoRepMarket.MinEpochsBetweenSettlementsUpdated(dealId, 1000);
-        vm.prank(validatorAddress);
+        vm.prank(adminAddress);
         poRepMarket.setMinEpochsBetweenSettlements(dealId, 1000);
 
         assertEq(poRepMarket.getDealService(dealId).minTimeBetweenSettlementsInEpochs, 1000);
@@ -1733,7 +1731,7 @@ contract PoRepMarketTest is Test {
         proposeDefaultDeal();
 
         vm.expectRevert(PoRepMarket.InvalidMinEpochsBetweenSettlements.selector);
-        vm.prank(validatorAddress);
+        vm.prank(adminAddress);
         poRepMarket.setMinEpochsBetweenSettlements(dealId, 0);
     }
 
@@ -1741,15 +1739,19 @@ contract PoRepMarketTest is Test {
         proposeDefaultDeal();
 
         vm.expectRevert(PoRepMarket.MinEpochsBetweenSettlementsExceeded.selector);
-        vm.prank(validatorAddress);
+        vm.prank(adminAddress);
         poRepMarket.setMinEpochsBetweenSettlements(dealId, 1_051_201);
     }
 
-    function testSetMinEpochsBetweenSettlementsRevertsWhenCallerIsNotValidator() public {
+    function testSetMinEpochsBetweenSettlementsRevertsWhenCallerIsNotAdmin() public {
         proposeDefaultDeal();
         address caller = vm.addr(0x999);
 
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.CallerIsNotValidator.selector, dealId, caller));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.DEFAULT_ADMIN_ROLE()
+            )
+        );
         vm.prank(caller);
         poRepMarket.setMinEpochsBetweenSettlements(dealId, 1000);
     }

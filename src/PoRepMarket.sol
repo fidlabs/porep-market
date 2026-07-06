@@ -1132,11 +1132,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Sets the minimum time between settlements for a deal
-     * @dev Only the deal's validator may update the settlement cadence.
+     * @dev Only the admin may update the settlement cadence.
      * @param dealId The deal being configured
      * @param minEpochs Minimum time between settlements in epochs
      */
-    function setMinEpochsBetweenSettlements(uint256 dealId, uint256 minEpochs) external {
+    function setMinEpochsBetweenSettlements(uint256 dealId, uint256 minEpochs) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (minEpochs == 0) {
             revert InvalidMinEpochsBetweenSettlements();
         }
@@ -1148,9 +1148,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
         _ensureDealExists(deal);
-        if (deal.validator != msg.sender) {
-            revert CallerIsNotValidator(dealId, msg.sender);
-        }
 
         $._dealService[dealId].minTimeBetweenSettlementsInEpochs = minEpochs;
         emit MinEpochsBetweenSettlementsUpdated(dealId, minEpochs);
