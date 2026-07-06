@@ -3,6 +3,7 @@
 
 pragma solidity =0.8.30;
 
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 import {DealState} from "../../src/types/DealState.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
@@ -10,9 +11,10 @@ import {SharedTypes} from "../../src/types/SharedTypes.sol";
 contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepTypes.Deal deal) public deals;
     mapping(uint256 dealId => SharedTypes.SLIThresholds slis) public dealSLIs;
+    mapping(uint256 dealId => PoRepTypes.DealTerms terms) public dealTerms;
     mapping(uint256 dealId => PoRepTypes.DealPayment payment) public dealPayments;
     mapping(uint256 dealId => PoRepTypes.DealService service) public dealServices;
-    mapping(uint256 dealId => PoRepTypes.DealTerms terms) public dealTerms;
+    SharedTypes.SettlementDecision public settlementDecision;
     uint256 public finalizeDealCallCount;
 
     function setDeal(uint256 dealId, PoRepTypes.Deal calldata deal) external {
@@ -23,6 +25,10 @@ contract PoRepMarketMock {
         dealSLIs[dealId] = slis;
     }
 
+    function setDealTerms(uint256 dealId, PoRepTypes.DealTerms calldata terms) external {
+        dealTerms[dealId] = terms;
+    }
+
     function setDealPayment(uint256 dealId, PoRepTypes.DealPayment calldata payment) external {
         dealPayments[dealId] = payment;
     }
@@ -31,8 +37,10 @@ contract PoRepMarketMock {
         dealServices[dealId] = service;
     }
 
-    function setDealTerms(uint256 dealId, PoRepTypes.DealTerms calldata terms) external {
-        dealTerms[dealId] = terms;
+    function setSettlementDecision(uint256 settlementAmount, uint256 settleUpto, string calldata note) external {
+        settlementDecision = SharedTypes.SettlementDecision({
+            settlementAmount: settlementAmount, settleUpto: settleUpto, reasonCode: 0, result: 0, note: note
+        });
     }
 
     function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory) {
@@ -55,6 +63,14 @@ contract PoRepMarketMock {
         return dealTerms[dealId];
     }
 
+    function validateDealSettlement(uint256, uint256, uint256)
+        external
+        view
+        returns (SharedTypes.SettlementDecision memory)
+    {
+        return settlementDecision;
+    }
+
     function finalizeDeal(uint256) external {
         finalizeDealCallCount++;
     }
@@ -71,7 +87,8 @@ contract PoRepMarketMock {
         deals[dealId].railId = newRailId;
     }
 
-    function terminateDeal(uint256 dealId, uint256) external {
+    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external {
         deals[dealId].state = DealState.TERMINATED;
+        dealServices[dealId].earlyTerminationEpoch = earlyTerminationEpoch;
     }
 }

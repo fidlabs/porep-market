@@ -54,6 +54,9 @@ library PoRepTypes {
     struct DealService {
         CommonTypes.ChainEpoch serviceStartEpoch;
         CommonTypes.ChainEpoch serviceEndEpoch;
+        CommonTypes.ChainEpoch earlyTerminationEpoch;
+        uint256 minTimeBetweenSettlementsInEpochs;
+        CommonTypes.ChainEpoch lastSettledEpoch;
     }
 
     /**

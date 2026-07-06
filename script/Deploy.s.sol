@@ -56,16 +56,15 @@ contract Deploy is Script, DeployUtils {
         (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
         (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
         (dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl) = _deployDataCapEvidenceAdapter();
-        (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry);
-        DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
         (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
+        (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry, sliScorer);
+        DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
         PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
-        ValidatorFactory(validatorFactory)
-            .initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket);
+        ValidatorFactory(validatorFactory).initialize2(poRepService, filecoinPay, dataCapEvidenceAdapter, poRepMarket);
         SPRegistry(spRegistry).initialize2(poRepMarket);
 
         if (operatorAddress != address(0)) {
@@ -92,13 +91,14 @@ contract Deploy is Script, DeployUtils {
         valImpl = address(_validatorImpl);
     }
 
-    function _deployPoRepMarket(address _admin, address _validatorFactory, address _spRegistry)
+    function _deployPoRepMarket(address _admin, address _validatorFactory, address _spRegistry, address _sliScorer)
         internal
         returns (address proxy, address impl)
     {
         PoRepMarket _impl = new PoRepMarket();
-        bytes memory init =
-            abi.encodeCall(PoRepMarket.initialize, (_admin, _validatorFactory, _spRegistry, dataCapEvidenceAdapter));
+        bytes memory init = abi.encodeCall(
+            PoRepMarket.initialize, (_admin, _validatorFactory, _spRegistry, dataCapEvidenceAdapter, _sliScorer)
+        );
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }

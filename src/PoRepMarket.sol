@@ -17,8 +17,11 @@ import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {RailStatus} from "./types/RailStatus.sol";
+import {SettlementReason} from "./types/SettlementReason.sol";
+import {SettlementResult} from "./types/SettlementResult.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
+import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 
 /**
  * @title PoRepMarket contract
@@ -42,6 +45,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
      */
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
+
+    /**
+     * @notice Number of epochs in one year
+     * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
+     */
+    uint256 private constant EPOCHS_IN_YEAR = 1_051_200;
 
     /**
      * @notice Size of a single Filecoin sector in bytes (32 GiB)
@@ -86,10 +95,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         mapping(uint8 state => EnumerableSet.UintSet dealIds) _dealIdsByState;
         mapping(address client => EnumerableSet.UintSet dealIds) _dealIdsByClient;
         mapping(CommonTypes.FilActorId provider => EnumerableSet.UintSet dealIds) _dealIdsByProvider;
-        EnumerableSet.UintSet _dealIdsReadyForPayment;
         ISPRegistry _SPRegistryContract;
         IValidatorFactory _validatorFactoryContract;
         IStorageEvidenceAdapter _globalEvidenceAdapter;
+        ISLIScorer _SLIScorer;
         uint256 _dealIdCounter;
         uint256 _dealActivationPadding;
         uint256 _dealExpiration;
@@ -173,7 +182,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @param endEpoch The Filecoin epoch at which the deal was terminated
      */
-    event DealTerminated(uint256 indexed dealId, uint256 indexed endEpoch);
+    event DealTerminated(uint256 indexed dealId, CommonTypes.ChainEpoch indexed endEpoch);
 
     /**
      * @notice DealRejected event
@@ -228,6 +237,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         CommonTypes.ChainEpoch serviceStartEpoch,
         CommonTypes.ChainEpoch serviceEndEpoch
     );
+
+    /**
+     * @notice Emitted when the minimum time between settlements is updated
+     * @param dealId The id of the deal
+     * @param minTimeBetweenSettlementsInEpochs The new minimum time between settlements in epochs
+     */
+    event MinEpochsBetweenSettlementsUpdated(uint256 indexed dealId, uint256 indexed minTimeBetweenSettlementsInEpochs);
 
     /**
      * @notice DealExpirationUpdated event
@@ -333,6 +349,26 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error InvalidEvidenceAdapterAddress();
 
     /**
+     * @notice Error indicating that the SLI scorer address is invalid
+     */
+    error InvalidSLIScorerAddress();
+
+    /**
+     * @notice Error indicating that a deal has not started its service window
+     */
+    error DealServiceNotStarted(uint256 dealId);
+
+    /**
+     * @notice Error indicating that the minimum time between settlements is invalid
+     */
+    error InvalidMinEpochsBetweenSettlements();
+
+    /**
+     * @notice Error indicating that the maximum time between settlements is exceeded
+     */
+    error MinEpochsBetweenSettlementsExceeded();
+
+    /**
      * @notice Error thrown when deal duration in terms is invalid
      * @dev 0xab1a0367
      */
@@ -420,14 +456,19 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param _validatorFactory The address of the validator registry
      * @param _spRegistry The address of the SP registry
      * @param _globalEvidenceAdapter The address of the default evidence adapter
+     * @param _SLIScorer The address of the SLI scorer
      */
-    function initialize(address _admin, address _validatorFactory, address _spRegistry, address _globalEvidenceAdapter)
-        public
-        initializer
-    {
+    function initialize(
+        address _admin,
+        address _validatorFactory,
+        address _spRegistry,
+        address _globalEvidenceAdapter,
+        address _SLIScorer
+    ) external initializer {
         if (_globalEvidenceAdapter == address(0)) {
             revert InvalidEvidenceAdapterAddress();
         }
+        if (_SLIScorer == address(0)) revert InvalidSLIScorerAddress();
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
@@ -438,6 +479,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
+        $._SLIScorer = ISLIScorer(_SLIScorer);
         $._dealExpiration = DEFAULT_DEAL_EXPIRATION;
 
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
@@ -506,7 +548,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             });
         }
         $._dealService[dealId] = PoRepTypes.DealService({
-            serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0), serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0)
+            serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0),
+            serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0),
+            earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(0),
+            minTimeBetweenSettlementsInEpochs: EPOCHS_IN_MONTH,
+            lastSettledEpoch: CommonTypes.ChainEpoch.wrap(0)
         });
         $._dealCapacity[dealId] = PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
         $._dealPayments[dealId] = PoRepTypes.DealPayment({
@@ -741,7 +787,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         service.serviceStartEpoch = CommonTypes.ChainEpoch.wrap(serviceStartEpoch);
         service.serviceEndEpoch =
             CommonTypes.ChainEpoch.wrap(serviceStartEpoch + int64(uint64($._dealTerms[dealId].durationEpochs)));
-        $._dealIdsReadyForPayment.remove(dealId);
         IOperator(deal.validator).modifyRailPayment(railMaxRatePerEpoch);
         emit PaymentActivated(dealId, railMaxRatePerEpoch, service.serviceStartEpoch, service.serviceEndEpoch);
     }
@@ -750,9 +795,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal
-     * @param endEpoch The Filecoin epoch at which the deal was terminated
+     * @param earlyTerminationEpoch The Filecoin epoch at which the deal was terminated
      */
-    function terminateDeal(uint256 dealId, uint256 endEpoch) external {
+    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external {
         PoRepMarketStorage storage $ = _getPoRepMarketStorage();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -763,12 +808,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
+        $._dealService[dealId].earlyTerminationEpoch = earlyTerminationEpoch;
         $._SPRegistryContract
             .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
-        $._dealIdsReadyForPayment.remove(dealId);
 
         _changeDealState(dealId, DealState.TERMINATED);
-        emit DealTerminated(dealId, endEpoch);
+        emit DealTerminated(dealId, earlyTerminationEpoch);
     }
 
     /**
@@ -990,6 +1035,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return status Current evidence status
      */
     function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status) {
+        return _currentEvidenceStatus(dealId);
+    }
+
+    /**
+     * @notice Reads current evidence status for a deal through its assigned adapter
+     * @param dealId The id of the deal
+     * @return status Current evidence status
+     */
+    function _currentEvidenceStatus(uint256 dealId) internal view returns (SharedTypes.EvidenceStatus memory status) {
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
 
@@ -1077,6 +1131,135 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
+     * @notice Sets the minimum time between settlements for a deal
+     * @dev Only the admin may update the settlement cadence.
+     * @param dealId The deal being configured
+     * @param minEpochs Minimum time between settlements in epochs
+     */
+    function setMinEpochsBetweenSettlements(uint256 dealId, uint256 minEpochs) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        if (minEpochs == 0) {
+            revert InvalidMinEpochsBetweenSettlements();
+        }
+
+        if (minEpochs > EPOCHS_IN_YEAR) {
+            revert MinEpochsBetweenSettlementsExceeded();
+        }
+
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+        _ensureDealExists(deal);
+
+        $._dealService[dealId].minTimeBetweenSettlementsInEpochs = minEpochs;
+        emit MinEpochsBetweenSettlementsUpdated(dealId, minEpochs);
+    }
+
+    // solhint-disable function-max-lines, gas-strict-inequalities, gas-small-strings
+    /**
+     * @notice Validates the settlement amount for a deal's service window
+     * @dev Only the deal's validator may request a settlement decision.
+     * @param dealId The deal being settled
+     * @param fromEpoch The epoch at which the settlement window starts
+     * @param toEpoch The epoch at which the settlement window ends
+     * @return decision The amount and epoch accepted for settlement
+     */
+    function validateDealSettlement(uint256 dealId, uint256 fromEpoch, uint256 toEpoch)
+        external
+        returns (SharedTypes.SettlementDecision memory decision)
+    {
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+        _ensureDealExists(deal);
+        if (deal.validator != msg.sender) {
+            revert CallerIsNotValidator(dealId, msg.sender);
+        }
+
+        PoRepTypes.DealService storage service = $._dealService[dealId];
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+
+        if (serviceEndEpoch == 0) {
+            revert DealServiceNotStarted(dealId);
+        }
+
+        if (fromEpoch > serviceEndEpoch) {
+            decision.settleUpto = fromEpoch;
+            decision.reasonCode = SettlementReason.DEAL_ENDED;
+            decision.result = SettlementResult.REJECTED;
+            decision.note = "deal ended";
+            return decision;
+        }
+
+        bool settlementWasCapped;
+        uint256 settlementToEpoch = toEpoch;
+        uint256 earlyTerminationEpoch = _epochToUint(service.earlyTerminationEpoch);
+        if (earlyTerminationEpoch > 0) {
+            if (fromEpoch >= earlyTerminationEpoch) {
+                decision.settleUpto = fromEpoch;
+                decision.reasonCode = SettlementReason.DEAL_TERMINATED;
+                decision.result = SettlementResult.REJECTED;
+                decision.note = "deal terminated";
+                return decision;
+            }
+            if (settlementToEpoch > earlyTerminationEpoch) {
+                settlementToEpoch = earlyTerminationEpoch;
+                decision.note = "payment limited to deal termination epoch";
+                settlementWasCapped = true;
+            }
+        } else {
+            if (settlementToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
+                decision.settleUpto = fromEpoch;
+                decision.reasonCode = SettlementReason.TOO_EARLY;
+                decision.result = SettlementResult.REJECTED;
+                decision.note = "too early for settlement";
+                return decision;
+            }
+
+            if (settlementToEpoch > serviceEndEpoch) {
+                settlementToEpoch = serviceEndEpoch;
+                decision.note = "payment limited to deal endepoch";
+                settlementWasCapped = true;
+            }
+        }
+
+        {
+            SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
+            if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
+                decision.settleUpto = settlementToEpoch;
+                decision.reasonCode = SettlementReason.SCORE_BELOW_THRESHOLD;
+                decision.result = SettlementResult.REJECTED;
+                decision.note = "score below required threshold";
+                return decision;
+            }
+        }
+        {
+            SharedTypes.EvidenceStatus memory evidenceStatus =
+                IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
+            if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
+                decision.settleUpto = settlementToEpoch;
+                decision.reasonCode = SettlementReason.DATA_SIZE_MISMATCH;
+                decision.result = SettlementResult.REJECTED;
+                decision.note = "data size does not match the deal";
+                return decision;
+            }
+        }
+        PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
+        uint256 serviceStartEpoch = _epochToUint(service.serviceStartEpoch);
+        decision.settlementAmount = _calculateDueAmount(payment, serviceStartEpoch, settlementToEpoch)
+            - _calculateDueAmount(payment, serviceStartEpoch, fromEpoch);
+
+        decision.settleUpto = settlementToEpoch;
+        decision.reasonCode = SettlementReason.OK;
+        decision.result = settlementWasCapped ? SettlementResult.MODIFIED : SettlementResult.ACCEPTED;
+        if (!settlementWasCapped) {
+            decision.note = "payment validated successfully";
+        }
+        int64 lastSettledEpoch = int64(uint64(decision.settleUpto));
+        service.lastSettledEpoch = CommonTypes.ChainEpoch.wrap(lastSettledEpoch);
+        return decision;
+    }
+
+    // solhint-enable function-max-lines, gas-strict-inequalities, gas-small-strings
+
+    /**
      * @notice Changes the state of a deal
      * @param dealId The id of the deal
      * @param toState The new state of the deal
@@ -1149,6 +1332,26 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
     }
 
+    /**
+     * @notice Calculates cumulative earned payment due at an epoch using frozen deal pricing
+     * @param payment The deal payment data
+     * @param serviceStartEpoch The epoch at which service started
+     * @param epoch The epoch at which cumulative due amount is calculated
+     * @return amount Cumulative amount due at the epoch
+     */
+    function _calculateDueAmount(PoRepTypes.DealPayment memory payment, uint256 serviceStartEpoch, uint256 epoch)
+        internal
+        pure
+        returns (uint256 amount)
+    {
+        if (epoch <= serviceStartEpoch) {
+            return 0;
+        }
+
+        uint256 monthlyTotal = payment.pricePer32GiBPerMonth * payment.billed32GiBUnits;
+        amount = Math.mulDiv(monthlyTotal, epoch - serviceStartEpoch, EPOCHS_IN_MONTH);
+    }
+
     //  solhint-enable
 
     /**
@@ -1156,7 +1359,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param deal The deal
      */
     function _ensureDealExists(PoRepTypes.Deal storage deal) internal view {
-        if (deal.client == address(0)) revert DealDoesNotExist();
+        if (deal.dealId == 0) revert DealDoesNotExist();
     }
 
     /**
@@ -1237,6 +1440,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (delta * 10_000 > expectedDealSize * padding) {
             revert InvalidAllocationSizeForDealActivation();
         }
+    }
+
+    /**
+     * @notice Converts a non-negative Filecoin epoch to uint256
+     * @param epoch The epoch to convert
+     */
+    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256) {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return uint256(uint64(CommonTypes.ChainEpoch.unwrap(epoch)));
     }
 
     // solhint-disable no-empty-blocks

@@ -6,11 +6,8 @@ pragma solidity =0.8.30;
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
-import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract PoRepMarketContractMock is PoRepMarket {
-    using EnumerableSet for EnumerableSet.UintSet;
-
     function _getStorage() private pure returns (PoRepMarket.PoRepMarketStorage storage $) {
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
@@ -34,6 +31,10 @@ contract PoRepMarketContractMock is PoRepMarket {
         _getStorage()._dealTiming[dealId] = timing;
     }
 
+    function setDealService(uint256 dealId, PoRepTypes.DealService calldata service) external {
+        _getStorage()._dealService[dealId] = service;
+    }
+
     function setDealCapacity(uint256 dealId, PoRepTypes.DealCapacity calldata capacity) external {
         _getStorage()._dealCapacity[dealId] = capacity;
     }
@@ -42,14 +43,13 @@ contract PoRepMarketContractMock is PoRepMarket {
         _getStorage()._dealData[dealId] = dealData;
     }
 
-    function setDealIdsReadyForPayment(uint256[] calldata dealIds) external {
-        for (uint256 i = 0; i < dealIds.length; i++) {
-            _getStorage()._dealIdsReadyForPayment.add(dealIds[i]);
-        }
+    // solhint-disable-next-line no-empty-blocks
+    function setDealIdsReadyForPayment(uint256[] calldata) external {
+        // Intentionally left blank for tests that bypass the ready-for-payment queue.
     }
 
-    function getActiveDealIdsReadyForPayment() public view returns (uint256[] memory) {
-        return _getStorage()._dealIdsReadyForPayment.values();
+    function getActiveDealIdsReadyForPayment() public pure returns (uint256[] memory) {
+        return new uint256[](0);
     }
 
     function ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) external view {
