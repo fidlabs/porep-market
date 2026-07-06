@@ -13,7 +13,6 @@ import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
-import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
@@ -74,12 +73,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @dev 0x7725d473
      */
     error InvalidPoRepServiceAddress();
-
-    /**
-     * @notice Error indicating that the SPRegistry address provided during initialization is the zero address
-     * @dev 0xe6e262d1
-     */
-    error InvalidSPRegistryAddress();
 
     /**
      * @notice Error indicating that the caller is not the client
@@ -230,7 +223,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address SLIScorer;
         address dataCapEvidenceAdapter;
         address poRepMarket;
-        address SPRegistry;
         CommonTypes.FilActorId providerId;
         uint256 amountPerEpoch;
         uint256 earlyTerminatedEpoch;
@@ -297,7 +289,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _SLIScorer Address of the SLIScorer contract
      * @param _dataCapEvidenceAdapter Address of the DataCap evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
-     * @param _SPRegistry Address of the SPRegistry contract
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
     function initialize(
@@ -307,11 +298,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _SLIScorer,
         address _dataCapEvidenceAdapter,
         address _poRepMarket,
-        address _SPRegistry,
         uint256 _dealId
     ) external initializer {
         _validateInitializeAddresses(
-            _admin, _porepService, _filecoinPay, _SLIScorer, _dataCapEvidenceAdapter, _SPRegistry, _poRepMarket
+            _admin, _porepService, _filecoinPay, _SLIScorer, _dataCapEvidenceAdapter, _poRepMarket
         );
 
         __AccessControl_init();
@@ -327,7 +317,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         $.SLIScorer = _SLIScorer;
         $.dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
         $.poRepMarket = _poRepMarket;
-        $.SPRegistry = _SPRegistry;
         $.dealId = _dealId;
         $.minTimeBetweenSettlementsInEpochs = EPOCHS_IN_MONTH;
 
@@ -408,14 +397,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     // solhint-enable function-max-lines, gas-strict-inequalities
 
     /**
-     * @notice Creates a payment rail with the specified parameters and set initial lockup period
-     * @dev Only callable by the client
-     * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID
-     * @param token The ERC20 token to use for the payment rail
+     * @notice Creates the FilecoinPay rail for this validator and sets the initial lockup period.
+     * @dev Only callable by the client.
+     * @dev Sets railID in contract state and updates the PoRepMarket with the created rail ID.
      */
-    function createRail(IERC20 token) external override {
+    function createRail() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         PoRepTypes.Deal memory deal = IPoRepMarket($.poRepMarket).getDeal($.dealId);
+        PoRepTypes.DealPayment memory payment = IPoRepMarket($.poRepMarket).getDealPayment($.dealId);
+        IERC20 railToken = IERC20(payment.paymentToken);
 
         if (msg.sender != deal.client) {
             revert CallerIsNotClient();
@@ -426,7 +416,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
 
         (bool isApproved, uint256 rateAllowance, uint256 lockupAllowance,,, uint256 maxLockupPeriod) =
-            IFilecoinPayV1($.filecoinPay).operatorApprovals(token, deal.client, address(this));
+            IFilecoinPayV1($.filecoinPay).operatorApprovals(railToken, deal.client, address(this));
 
         if (!isApproved) {
             revert OperatorNotApproved();
@@ -444,9 +434,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
             revert InvalidRateAllowance();
         }
 
-        address payee = ISPRegistry($.SPRegistry).getPayee($.providerId);
-
-        uint256 railId = _createRail(IFilecoinPayV1($.filecoinPay), token, deal.client, payee, 0, address(0));
+        uint256 railId =
+            _createRail(IFilecoinPayV1($.filecoinPay), railToken, deal.client, payment.payee, 0, address(0));
         $.railStatus = RailStatus.PREPARED;
         $.railId = railId;
 
@@ -619,7 +608,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _SLIScorer Address of the SLIScorer contract
      * @param _dataCapEvidenceAdapter Address of the DataCap evidence adapter
-     * @param _SPRegistry Address of the SPRegistry contract
      * @param _poRepMarket Address of the PoRepMarket contract
      */
     function _validateInitializeAddresses(
@@ -628,7 +616,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _filecoinPay,
         address _SLIScorer,
         address _dataCapEvidenceAdapter,
-        address _SPRegistry,
         address _poRepMarket
     ) internal pure {
         if (_admin == address(0)) {
@@ -645,9 +632,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         }
         if (_dataCapEvidenceAdapter == address(0)) {
             revert InvalidDataCapEvidenceAdapterAddress();
-        }
-        if (_SPRegistry == address(0)) {
-            revert InvalidSPRegistryAddress();
         }
         if (_poRepMarket == address(0)) {
             revert InvalidPoRepMarketAddress();

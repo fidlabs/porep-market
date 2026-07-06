@@ -25,7 +25,6 @@ contract ValidatorFactoryTest is Test {
     address public sliScorer;
     address public dataCapEvidenceAdapter;
     address public poRepMarket;
-    address public spRegistry;
     address public client;
     uint256 public dealId;
     CommonTypes.FilActorId public provider;
@@ -39,7 +38,6 @@ contract ValidatorFactoryTest is Test {
         filecoinPay = vm.addr(3);
         sliScorer = vm.addr(4);
         dataCapEvidenceAdapter = vm.addr(5);
-        spRegistry = vm.addr(6);
         poRepMarketMock = new PoRepMarketMock();
         poRepMarket = address(poRepMarketMock);
         client = vm.addr(6);
@@ -64,7 +62,7 @@ contract ValidatorFactoryTest is Test {
         initialData = abi.encodeCall(ValidatorFactory.initialize, (admin, validatorAddress));
         factory = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
         vm.prank(admin);
-        factory.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
+        factory.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket);
     }
 
     function testEmitsUpgradedInConstructor() public {
@@ -108,16 +106,7 @@ contract ValidatorFactoryTest is Test {
                 address(factory.getBeacon()),
                 abi.encodeCall(
                     Validator.initialize,
-                    (
-                        admin_,
-                        poRepService,
-                        filecoinPay,
-                        sliScorer,
-                        dataCapEvidenceAdapter,
-                        poRepMarket,
-                        spRegistry,
-                        dealId_
-                    )
+                    (admin_, poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, dealId_)
                 )
             )
         );
@@ -152,42 +141,35 @@ contract ValidatorFactoryTest is Test {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepServiceAddress.selector));
         vm.prank(admin);
-        f.initialize2(address(0), filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
+        f.initialize2(address(0), filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket);
     }
 
     function testInitialize2RevertsWhenFilecoinPayIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidFilecoinPayAddress.selector));
         vm.prank(admin);
-        f.initialize2(poRepService, address(0), sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
+        f.initialize2(poRepService, address(0), sliScorer, dataCapEvidenceAdapter, poRepMarket);
     }
 
     function testInitialize2RevertsWhenSliScorerIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidSliScorerAddress.selector));
         vm.prank(admin);
-        f.initialize2(poRepService, filecoinPay, address(0), dataCapEvidenceAdapter, poRepMarket, spRegistry);
+        f.initialize2(poRepService, filecoinPay, address(0), dataCapEvidenceAdapter, poRepMarket);
     }
 
     function testInitialize2RevertsWhenDataCapEvidenceAdapterIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidDataCapEvidenceAdapterAddress.selector));
         vm.prank(admin);
-        f.initialize2(poRepService, filecoinPay, sliScorer, address(0), poRepMarket, spRegistry);
+        f.initialize2(poRepService, filecoinPay, sliScorer, address(0), poRepMarket);
     }
 
     function testInitialize2RevertsWhenPoRepMarketIsZero() public {
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
         vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidPoRepMarketAddress.selector));
         vm.prank(admin);
-        f.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, address(0), spRegistry);
-    }
-
-    function testInitialize2RevertsWhenSPRegistryIsZero() public {
-        ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(factoryImpl), initialData)));
-        vm.expectRevert(abi.encodeWithSelector(ValidatorFactory.InvalidSPRegistryAddress.selector));
-        vm.prank(admin);
-        f.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, address(0));
+        f.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, address(0));
     }
 
     function testInitialize2RevertsWhenNotAdmin() public {
@@ -198,7 +180,7 @@ contract ValidatorFactoryTest is Test {
             )
         );
         vm.prank(client);
-        f.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
+        f.initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket);
     }
 
     function testInitializeRevertsWhenAdminIsZero() public {

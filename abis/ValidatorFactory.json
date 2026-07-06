@@ -195,11 +195,6 @@
         "name": "_poRepMarket",
         "type": "address",
         "internalType": "address"
-      },
-      {
-        "name": "_SPRegistry",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -614,11 +609,6 @@
   {
     "type": "error",
     "name": "InvalidPoRepServiceAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSPRegistryAddress",
     "inputs": []
   },
   {

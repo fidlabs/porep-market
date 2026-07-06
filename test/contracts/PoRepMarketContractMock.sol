@@ -5,6 +5,7 @@ pragma solidity =0.8.30;
 
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
+import {SharedTypes} from "../../src/types/SharedTypes.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract PoRepMarketContractMock is PoRepMarket {
@@ -27,6 +28,18 @@ contract PoRepMarketContractMock is PoRepMarket {
 
     function setDealPayment(uint256 dealId, PoRepTypes.DealPayment calldata payment) external {
         _getStorage()._dealPayments[dealId] = payment;
+    }
+
+    function setDealTiming(uint256 dealId, PoRepTypes.DealTiming calldata timing) external {
+        _getStorage()._dealTiming[dealId] = timing;
+    }
+
+    function setDealCapacity(uint256 dealId, PoRepTypes.DealCapacity calldata capacity) external {
+        _getStorage()._dealCapacity[dealId] = capacity;
+    }
+
+    function setDealData(uint256 dealId, SharedTypes.DealData calldata dealData) external {
+        _getStorage()._dealData[dealId] = dealData;
     }
 
     function setDealIdsReadyForPayment(uint256[] calldata dealIds) external {

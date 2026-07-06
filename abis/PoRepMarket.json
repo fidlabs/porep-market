@@ -1330,6 +1330,12 @@
         ]
       },
       {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
         "name": "manifestLocation",
         "type": "string",
         "indexed": false,
@@ -1859,6 +1865,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidManifestHash",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidOrganizationAddress",
     "inputs": []
   },
@@ -1892,11 +1903,6 @@
   {
     "type": "error",
     "name": "InvalidZeroAmount",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NoProviderFoundForDeal",
     "inputs": []
   },
   {

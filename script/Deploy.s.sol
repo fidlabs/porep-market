@@ -65,7 +65,7 @@ contract Deploy is Script, DeployUtils {
 
         PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
         ValidatorFactory(validatorFactory)
-            .initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket, spRegistry);
+            .initialize2(poRepService, filecoinPay, sliScorer, dataCapEvidenceAdapter, poRepMarket);
         SPRegistry(spRegistry).initialize2(poRepMarket);
 
         if (operatorAddress != address(0)) {

@@ -13,7 +13,6 @@ import {IValidator} from "./interfaces/IValidator.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
-import {SLITypes} from "./types/SLITypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -58,7 +57,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Default number of epochs after which a proposed deal expires if not accepted
      * @dev 2 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 5_760 epochs
      */
-    uint256 private constant DEFAULT_DEAL_PROPOSAL_EXPIRATION = 5_760;
+    uint256 private constant DEFAULT_DEAL_EXPIRATION = 5_760;
 
     /**
      * @notice Minimum Filecoin deal duration equals 180 days (6 months)
@@ -108,7 +107,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     }
 
     /**
-     * @notice function to allow acess to storage
+     * @notice function to allow access to storage
      * @return PoRepMarketStorage storage struct
      */
     function s() private pure returns (PoRepMarketStorage storage) {
@@ -121,6 +120,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param client The address of the client
      * @param provider The address of the provider
      * @param requirements The SLI thresholds for the deal
+     * @param manifestHash The manifest hash for the deal
      * @param manifestLocation The location of the manifest for the deal
      * @param totalDealSize The total size of the deal in bytes
      * @param proposedAtBlock The block number when the deal was proposed
@@ -130,6 +130,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         address indexed client,
         CommonTypes.FilActorId indexed provider,
         SharedTypes.SLIThresholds requirements,
+        bytes32 manifestHash,
         string manifestLocation,
         uint256 totalDealSize,
         uint256 proposedAtBlock
@@ -278,12 +279,6 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     error NotTheClientOrStorageProviderOrAdmin(uint256 dealId, address rejector);
 
     /**
-     * @notice Error thrown when no provider is found for the deal
-     * @dev 0x66dab3aa
-     */
-    error NoProviderFoundForDeal();
-
-    /**
      * @notice Error thrown when trying to set a validator that is already set for the deal
      * @dev 0xfb35e366
      */
@@ -318,6 +313,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev 0x323de5da
      */
     error EmptyManifestLocation();
+
+    /**
+     * @notice Error thrown when a deal request has no manifest hash.
+     * @dev 0x03d0cf2a
+     */
+    error InvalidManifestHash();
 
     /**
      * @notice Error thrown when manifest location is too long
@@ -437,7 +438,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
-        $._dealExpiration = DEFAULT_DEAL_PROPOSAL_EXPIRATION;
+        $._dealExpiration = DEFAULT_DEAL_EXPIRATION;
 
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
@@ -464,6 +465,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     function proposeDeal(SharedTypes.DealRequest calldata request) external {
         _ensureCorrectManifestLocation(request.manifestLocation);
         _ensureCorrectRequirements(request.requiredSLIs);
+        if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
 
         PoRepMarketStorage storage $ = s();
         IStorageEvidenceAdapter evidenceAdapter = $._globalEvidenceAdapter;
@@ -471,37 +473,25 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert InvalidEvidenceAdapterAddress();
         }
 
-        CommonTypes.FilActorId provider;
-        bool autoApprove;
-        address organization;
-        {
-            SLITypes.DealTerms memory terms = SLITypes.DealTerms({
-                dealSizeBytes: request.requestedSizeBytes,
-                pricePerSectorPerMonth: request.maxPricePer32GiBPerMonth,
-                durationDays: request.durationDays
-            });
-            _ensureCorrectTerms(terms);
-            (provider, autoApprove, organization) =
-                $._SPRegistryContract.getProviderForDeal(request.requiredSLIs, terms);
-        }
-        if (CommonTypes.FilActorId.unwrap(provider) == 0) {
-            revert NoProviderFoundForDeal();
-        }
+        _ensureCorrectTerms(request);
+        SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
+        CommonTypes.FilActorId provider = selection.provider;
+        address organization = $._SPRegistryContract.getProviderView(provider).organization;
 
         uint256 dealId = ++$._dealIdCounter;
-        uint8 initialState = autoApprove ? DealState.ACCEPTED : DealState.PROPOSED;
+        uint8 initialState = DealState.ACCEPTED;
 
         $._deals[dealId] = PoRepTypes.Deal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
-            offerId: 0,
+            offerId: selection.offerId,
             state: initialState,
             evidenceAdapter: address(evidenceAdapter),
             validator: address(0),
             railId: 0
         });
-        $._dealSLIs[dealId] = request.requiredSLIs;
+        $._dealSLIs[dealId] = selection.promisedSLIs;
         {
             uint64 durationEpochs = uint64(uint256(request.durationDays) * (EPOCHS_IN_MONTH / 30));
             $._dealTerms[dealId] =
@@ -518,12 +508,11 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._dealService[dealId] = PoRepTypes.DealService({
             serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0), serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0)
         });
-        $._dealCapacity[dealId] =
-            PoRepTypes.DealCapacity({reservedBytes: request.requestedSizeBytes, committedBytes: 0});
+        $._dealCapacity[dealId] = PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
         $._dealPayments[dealId] = PoRepTypes.DealPayment({
-            paymentToken: request.paymentToken,
-            payee: address(0),
-            pricePer32GiBPerMonth: request.maxPricePer32GiBPerMonth,
+            paymentToken: selection.paymentToken,
+            payee: selection.payee,
+            pricePer32GiBPerMonth: selection.pricePer32GiBPerMonth,
             billed32GiBUnits: 0,
             railMaxRatePerEpoch: 0
         });
@@ -535,6 +524,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
                 msg.sender,
                 provider,
                 request.requiredSLIs,
+                request.manifestHash,
                 request.manifestLocation,
                 request.requestedSizeBytes,
                 block.number
@@ -545,10 +535,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         $._dealIdsByClient[msg.sender].add(dealId);
         $._dealIdsByProvider[provider].add(dealId);
         $._dealIdsByState[initialState].add(dealId);
-
-        if (autoApprove) {
-            emit DealAccepted(dealId, msg.sender, provider);
-        }
+        emit DealAccepted(dealId, msg.sender, provider);
     }
 
     // solhint-enable function-max-lines
@@ -718,7 +705,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         if (msg.sender != deal.validator || deal.validator == address(0)) {
             revert CallerIsNotValidator(dealId, msg.sender);
         }
-        $._SPRegistryContract.releaseCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract
+            .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
         _changeDealState(dealId, DealState.FINALIZED);
         emit DealFinalized(dealId, msg.sender);
     }
@@ -775,7 +763,8 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releaseCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract
+            .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
         $._dealIdsReadyForPayment.remove(dealId);
 
         _changeDealState(dealId, DealState.TERMINATED);
@@ -800,7 +789,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract
+            .releasePendingCapacity(
+                deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+            );
         _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);
     }
@@ -821,7 +813,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert DealNotRejectable(dealId);
         }
 
-        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract
+            .releasePendingCapacity(
+                deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+            );
         _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);
     }
@@ -845,7 +840,10 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         }
         // solhint-enable  gas-strict-inequalities
 
-        $._SPRegistryContract.releasePendingCapacity(deal.provider, $._dealTerms[dealId].requestedSizeBytes);
+        $._SPRegistryContract
+            .releasePendingCapacity(
+                deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+            );
         _changeDealState(dealId, DealState.EXPIRED);
         emit DealExpired(dealId, block.number);
     }
@@ -1103,7 +1101,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @return The proposed deal expiration in epochs
      */
     function _getDealExpiration(PoRepMarketStorage storage $) internal view returns (uint256) {
-        return $._dealExpiration == 0 ? DEFAULT_DEAL_PROPOSAL_EXPIRATION : $._dealExpiration;
+        return $._dealExpiration == 0 ? DEFAULT_DEAL_EXPIRATION : $._dealExpiration;
     }
 
     /**
@@ -1157,7 +1155,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Ensures a deal exists
      * @param deal The deal
      */
-    function _ensureDealExists(PoRepTypes.Deal memory deal) internal pure {
+    function _ensureDealExists(PoRepTypes.Deal storage deal) internal view {
         if (deal.client == address(0)) revert DealDoesNotExist();
     }
 
@@ -1166,7 +1164,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param deal The deal
      * @param expectedState The expected state
      */
-    function _ensureDealCorrectState(PoRepTypes.Deal memory deal, uint8 expectedState) internal pure {
+    function _ensureDealCorrectState(PoRepTypes.Deal storage deal, uint8 expectedState) internal view {
         if (deal.state != expectedState) {
             revert DealNotInExpectedState(deal.dealId, deal.state, expectedState);
         }
@@ -1187,23 +1185,23 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     /**
      * @notice Ensures the terms are correct
-     * @param terms The terms for the deal
+     * @param request The client deal request
      */
-    function _ensureCorrectTerms(SLITypes.DealTerms memory terms) internal pure {
-        if (terms.durationDays < MIN_DEAL_DURATION_DAYS) {
+    function _ensureCorrectTerms(SharedTypes.DealRequest calldata request) internal pure {
+        if (request.durationDays < MIN_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
-        if (terms.durationDays > MAX_DEAL_DURATION_DAYS) {
+        if (request.durationDays > MAX_DEAL_DURATION_DAYS) {
             revert InvalidDealDuration();
         }
-        if (terms.durationDays % 30 != 0) {
+        if (request.durationDays % 30 != 0) {
             revert InvalidDealDuration();
         }
-        if (terms.dealSizeBytes == 0) {
+        if (request.requestedSizeBytes == 0) {
             revert InvalidDealSize();
         }
-        uint256 minSectors = Math.ceilDiv(terms.dealSizeBytes, SECTOR_SIZE);
-        uint256 totalPerMonth = terms.pricePerSectorPerMonth * minSectors;
+        uint256 minSectors = Math.ceilDiv(request.requestedSizeBytes, SECTOR_SIZE);
+        uint256 totalPerMonth = request.maxPricePer32GiBPerMonth * minSectors;
         if (totalPerMonth < EPOCHS_IN_MONTH) {
             revert InvalidDealPricePerSectorPerMonth(totalPerMonth, EPOCHS_IN_MONTH);
         }
@@ -1225,7 +1223,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Ensures if allocations size is within padding
      * @param actualDealSize size of the deal
-     * @param expectedDealSize expecetd size from proposal
+     * @param expectedDealSize expected size from proposal
      */
     function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal view {
         if (actualDealSize == 0) {

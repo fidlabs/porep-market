@@ -59,13 +59,7 @@
   {
     "type": "function",
     "name": "createRail",
-    "inputs": [
-      {
-        "name": "token",
-        "type": "address",
-        "internalType": "contract IERC20"
-      }
-    ],
+    "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
   },
@@ -201,11 +195,6 @@
       },
       {
         "name": "_poRepMarket",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_SPRegistry",
         "type": "address",
         "internalType": "address"
       },
@@ -709,11 +698,6 @@
   {
     "type": "error",
     "name": "InvalidSLIScorerAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSPRegistryAddress",
     "inputs": []
   },
   {

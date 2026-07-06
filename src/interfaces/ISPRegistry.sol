@@ -3,193 +3,294 @@ pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
-import {SLITypes} from "../types/SLITypes.sol";
 
 /**
  * @title ISPRegistry
- * @notice Interface for storage provider registration, matching, and capacity management
+ * @notice Interface for storage provider registration, offers, matching, and capacity management
  */
 interface ISPRegistry {
-    // solhint-disable-next-line gas-struct-packing
-    struct ProviderInfo {
+    /**
+     * @notice Error thrown when no offer matches a deal request
+     * @dev 0xde89fa00
+     */
+    error NoOfferMatched();
+
+    /**
+     * @notice Current provider registration and capacity data.
+     * @param provider Provider actor ID.
+     * @param organization Address that owns the provider registration.
+     * @param payee Address receiving provider payments.
+     * @param paused True when the provider is temporarily excluded from matching.
+     * @param blocked True when the provider is administratively blocked.
+     * @param availableBytes Total provider capacity available for deals.
+     * @param committedBytes Capacity already committed to activated deals.
+     * @param pendingBytes Capacity reserved by proposed deals.
+     */
+    struct ProviderView {
+        CommonTypes.FilActorId provider;
         address organization;
         address payee;
         bool paused;
         bool blocked;
-        SharedTypes.SLIThresholds capabilities;
         uint256 availableBytes;
         uint256 committedBytes;
         uint256 pendingBytes;
-        /// @notice Monthly ERC20 token price per 32 GiB sector in smallest units (0 = manual approval)
-        uint256 pricePerSectorPerMonth;
-        uint32 minDealDurationDays;
-        uint32 maxDealDurationDays;
     }
 
     /**
-     * @notice Get all registered providers
-     * @return Array of all registered provider actor IDs
+     * @notice Payment token policy.
+     * @param allowed True when offers may use the token.
+     * @param minPricePer32GiBPerMonth Minimum monthly price per 32 GiB in token smallest units.
+     */
+    struct TokenConfig {
+        bool allowed;
+        uint256 minPricePer32GiBPerMonth;
+    }
+
+    /**
+     * @notice Current offer data plus the payment row for one token.
+     * @param offerId Offer ID.
+     * @param provider Provider actor ID that owns the offer.
+     * @param active True when the offer participates in matching.
+     * @param terms Offer size and duration bounds.
+     * @param slis Promised offer SLIs.
+     * @param paymentToken ERC20 token address used for the payment row.
+     * @param paymentActive True when this token row can be selected.
+     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
+     */
+    // solhint-disable-next-line gas-struct-packing
+    struct OfferView {
+        uint256 offerId;
+        CommonTypes.FilActorId provider;
+        bool active;
+        SharedTypes.OfferTerms terms;
+        SharedTypes.SLIThresholds slis;
+        address paymentToken;
+        bool paymentActive;
+        uint256 pricePer32GiBPerMonth;
+    }
+
+    /**
+     * @notice Registers a provider on behalf of an organization (admin/operator only).
+     * @param provider Miner actor ID to register.
+     * @param organization Organization address that controls the provider.
+     * @param availableBytes Initial available capacity in bytes.
+     * @param payee Payout recipient; defaults to organization when zero.
+     */
+    function registerProviderFor(
+        CommonTypes.FilActorId provider,
+        address organization,
+        uint256 availableBytes,
+        address payee
+    ) external;
+
+    /**
+     * @notice Returns all registered provider actor IDs.
+     * @return Array of provider actor IDs.
      */
     function getProviders() external view returns (CommonTypes.FilActorId[] memory);
 
     /**
-     * @notice Get providers that have committed capacity (committedBytes > 0)
-     * @return Array of provider actor IDs with permanently allocated storage
+     * @notice Returns current provider registration and capacity data.
+     * @param provider Provider actor ID.
+     * @return view_ Current provider view.
      */
-    function getCommittedProviders() external view returns (CommonTypes.FilActorId[] memory);
+    function getProviderView(CommonTypes.FilActorId provider) external view returns (ProviderView memory view_);
 
     /**
-     * @notice Get all providers registered under an organization
-     * @param organization The organization address
-     * @return Array of provider actor IDs belonging to the organization
-     */
-    function getProvidersByOrganization(address organization) external view returns (CommonTypes.FilActorId[] memory);
-
-    /**
-     * @notice Get full information about a provider
-     * @param provider The provider actor ID
-     * @return info The provider's registration info
-     */
-    function getProviderInfo(CommonTypes.FilActorId provider) external view returns (ProviderInfo memory info);
-
-    /**
-     * @notice Check if a provider is registered
-     * @param provider The provider actor ID
-     * @return True if the provider is registered
+     * @notice Checks whether a provider is registered.
+     * @param provider Provider actor ID.
+     * @return True when the provider is registered.
      */
     function isProviderRegistered(CommonTypes.FilActorId provider) external view returns (bool);
 
     /**
-     * @notice Find a provider matching requirements and reserve pending capacity
-     * @dev Selects the least-pending eligible provider. Reserves `pendingBytes` atomically
-     *      so capacity is held between matching and commitment.
-     *      Returns FilActorId(0) if no provider matches.
-     * @param requirements SLI thresholds the client needs
-     * @param terms Commercial terms (size, price, duration)
-     * @return provider The matched provider, or FilActorId(0) if none found
-     * @return autoApprove True if the provider's price per sector is met by the deal terms
-     * @return organization The address of the matched provider
-     */
-    function getProviderForDeal(SharedTypes.SLIThresholds calldata requirements, SLITypes.DealTerms calldata terms)
-        external
-        returns (CommonTypes.FilActorId provider, bool autoApprove, address organization);
-
-    /**
-     * @notice Release committed capacity (called on deal rejection)
-     * @dev Decrements committedBytes for the provider. Reverts on underflow.
-     * @param provider The provider whose capacity to release
-     * @param sizeBytes Amount of capacity to release
-     */
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
-
-    /**
-     * @notice Release pending capacity (called on deal rejection before commitment)
-     * @dev Decrements pendingBytes for the provider. Reverts if sizeBytes > pendingBytes.
-     * @param provider The provider whose pending capacity to release
-     * @param sizeBytes Amount of pending capacity to release
-     */
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes) external;
-
-    /**
-     * @notice Check if address is authorized to act on behalf of a provider
-     * @dev Admin and OPERATOR_ROLE always return true. Otherwise checks MinerUtils.isControllingAddress.
-     * @param caller Address to check
-     * @param provider Provider to check against
-     * @return True if caller is authorized for provider
+     * @notice Checks whether an address can manage or act for a provider.
+     * @param caller Address to check.
+     * @param provider Provider actor ID.
+     * @return True when caller is admin, operator, or Filecoin controlling address.
      */
     function isAuthorizedForProvider(address caller, CommonTypes.FilActorId provider) external view returns (bool);
 
     /**
-     * @notice Block a provider (admin only, excluded from matching)
-     * @param provider The provider to block
+     * @notice Blocks a provider and excludes it from matching.
+     * @param provider Provider actor ID.
      */
     function blockProvider(CommonTypes.FilActorId provider) external;
 
     /**
-     * @notice Unblock a provider (admin only)
-     * @param provider The provider to unblock
+     * @notice Unblocks a provider.
+     * @param provider Provider actor ID.
      */
     function unblockProvider(CommonTypes.FilActorId provider) external;
 
     /**
-     * @notice Commit actual capacity after DDO allocation
-     * @dev Releases estimated pending bytes, then commits actual bytes.
-     *      Enforces sector padding tolerance if configured.
-     * @param provider The provider whose capacity to commit
-     * @param estimatedSizeBytes Estimated size from the original deal
-     * @param actualSizeBytes Actual deal size from DDO allocation
-     */
-    function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
-        external;
-
-    /**
-     * @notice Pause a provider (excluded from matching)
-     * @param provider The provider to pause
+     * @notice Pauses a provider and excludes it from matching.
+     * @param provider Provider actor ID.
      */
     function pauseProvider(CommonTypes.FilActorId provider) external;
 
     /**
-     * @notice Unpause a provider (available for matching)
-     * @param provider The provider to unpause
+     * @notice Unpauses a provider.
+     * @param provider Provider actor ID.
      */
     function unpauseProvider(CommonTypes.FilActorId provider) external;
 
     /**
-     * @notice Update provider's available storage capacity
-     * @param provider The provider to update
-     * @param availableBytes New available capacity in bytes
+     * @notice Updates provider available capacity.
+     * @param provider Provider actor ID.
+     * @param availableBytes New available capacity in bytes.
      */
     function updateAvailableSpace(CommonTypes.FilActorId provider, uint256 availableBytes) external;
 
     /**
-     * @notice Set SLI capabilities for a provider
-     * @param provider The provider to update
-     * @param capabilities The SLI capabilities this provider guarantees
-     */
-    function setCapabilities(CommonTypes.FilActorId provider, SharedTypes.SLIThresholds calldata capabilities) external;
-
-    /**
-     * @notice Set the monthly price per sector for a provider
-     * @param provider The provider to update
-     * @param pricePerSectorPerMonth The monthly ERC20 token price per 32 GiB sector in smallest units (0 to disable auto-approve)
-     */
-    function setPrice(CommonTypes.FilActorId provider, uint256 pricePerSectorPerMonth) external;
-
-    /**
-     * @notice Set the payment recipient address for a provider
-     * @param provider The provider to update
-     * @param payee The address that will receive payments for this provider
+     * @notice Updates provider payment recipient.
+     * @param provider Provider actor ID.
+     * @param payee New payment recipient.
      */
     function setPayee(CommonTypes.FilActorId provider, address payee) external;
 
     /**
-     * @notice Set the acceptable deal duration range for a provider
-     * @param provider The provider to update
-     * @param minDealDurationDays Minimum deal duration in days (0 = no minimum)
-     * @param maxDealDurationDays Maximum deal duration in days (0 = no maximum)
+     * @notice Sets whether a payment token can be used by offers.
+     * @param token ERC20 token address.
+     * @param allowed True to allow the token, false to remove it from matching.
+     * @param minPricePer32GiBPerMonth Minimum monthly price per 32 GiB in token smallest units.
      */
-    function setDealDurationLimits(
+    function setPaymentToken(address token, bool allowed, uint256 minPricePer32GiBPerMonth) external;
+
+    /**
+     * @notice Returns allowed payment token addresses.
+     * @return tokens Array of allowed token addresses.
+     */
+    function getPaymentTokens() external view returns (address[] memory tokens);
+
+    /**
+     * @notice Returns payment token policy.
+     * @param token ERC20 token address.
+     * @return config Token policy.
+     */
+    function getPaymentTokenConfig(address token) external view returns (TokenConfig memory config);
+
+    /**
+     * @notice Creates an active provider offer.
+     * @param provider Provider actor ID.
+     * @param terms Immutable offer size and duration bounds.
+     * @param slis Immutable promised SLIs.
+     * @param payments Initial payment rows.
+     * @return offerId Created offer ID.
+     */
+    function createOffer(
         CommonTypes.FilActorId provider,
-        uint32 minDealDurationDays,
-        uint32 maxDealDurationDays
-    ) external;
+        SharedTypes.OfferTerms calldata terms,
+        SharedTypes.SLIThresholds calldata slis,
+        SharedTypes.OfferPaymentInput[] calldata payments
+    ) external returns (uint256 offerId);
 
     /**
-     * @notice Get the payment recipient address for a provider
-     * @param provider The provider actor ID
-     * @return The payee address
+     * @notice Enables or disables an offer for matching.
+     * @param offerId Offer ID.
+     * @param active True to enable the offer, false to disable it.
      */
-    function getPayee(CommonTypes.FilActorId provider) external view returns (address);
+    function setOfferActive(uint256 offerId, bool active) external;
 
     /**
-     * @notice Set the sector padding tolerance in basis points (admin only)
-     * @param bps Tolerance in basis points (e.g., 1000 = 10%)
+     * @notice Updates or adds a mutable offer payment row.
+     * @param offerId Offer ID.
+     * @param token ERC20 token address.
+     * @param active True when the token row can be selected.
+     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
      */
-    function setToleranceBps(uint256 bps) external;
+    function setOfferPayment(uint256 offerId, address token, bool active, uint256 pricePer32GiBPerMonth) external;
 
     /**
-     * @notice Get the current sector padding tolerance
-     * @return Tolerance in basis points
+     * @notice Returns offer data plus the payment row for one token.
+     * @param offerId Offer ID.
+     * @param paymentToken ERC20 token address to read from the offer payment map.
+     * @return view_ Current offer view for the requested payment token.
      */
-    function getToleranceBps() external view returns (uint256);
+    function getOfferView(uint256 offerId, address paymentToken) external view returns (OfferView memory view_);
+
+    /**
+     * @notice Returns all offer IDs created by a provider.
+     * @param provider Provider actor ID.
+     * @return offerIds Offer IDs for the provider.
+     */
+    function getOffersByProvider(CommonTypes.FilActorId provider) external view returns (uint256[] memory offerIds);
+
+    /**
+     * @notice Previews automatic offer matching without reserving capacity.
+     * @param request Client deal request.
+     * @return selection Selected offer snapshot, or zero provider when no offer matches.
+     */
+    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+        external
+        view
+        returns (SharedTypes.ProviderDealSelection memory selection);
+
+    /**
+     * @notice Selects an offer automatically and reserves pending provider capacity.
+     * @param request Client deal request.
+     * @return selection Selected offer snapshot.
+     */
+    function reserveProviderForDeal(SharedTypes.DealRequest calldata request)
+        external
+        returns (SharedTypes.ProviderDealSelection memory selection);
+
+    /**
+     * @notice Previews a specific offer for a deal without reserving capacity.
+     * @param offerId Offer ID to validate.
+     * @param request Client deal request.
+     * @return selection Selected offer snapshot, or zero provider when the offer does not match.
+     * @return reason OfferMatch reason code; OfferMatch.OK when the offer is eligible.
+     */
+    function previewOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+        external
+        view
+        returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason);
+
+    /**
+     * @notice Validates a specific offer and reserves pending provider capacity.
+     * @param offerId Offer ID to validate.
+     * @param request Client deal request.
+     * @return selection Selected offer snapshot.
+     */
+    function reserveOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+        external
+        returns (SharedTypes.ProviderDealSelection memory selection);
+
+    /**
+     * @notice Checks whether a provider is already assigned to a manifest.
+     * @param manifestHash Manifest hash used as data identity.
+     * @param provider Provider actor ID.
+     * @return True when provider is locked for the manifest.
+     */
+    function isManifestAssignedToProvider(bytes32 manifestHash, CommonTypes.FilActorId provider)
+        external
+        view
+        returns (bool);
+
+    /**
+     * @notice Releases committed provider capacity and clears the manifest/provider assignment.
+     * @param provider Provider actor ID.
+     * @param sizeBytes Capacity to release.
+     * @param manifestHash Manifest hash whose provider assignment should be cleared.
+     */
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
+
+    /**
+     * @notice Releases pending provider capacity and clears the manifest/provider assignment.
+     * @param provider Provider actor ID.
+     * @param sizeBytes Pending capacity to release.
+     * @param manifestHash Manifest hash whose provider assignment should be cleared.
+     */
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
+
+    /**
+     * @notice Converts pending capacity into committed capacity.
+     * @param provider Provider actor ID.
+     * @param estimatedSizeBytes Pending bytes reserved by the deal request.
+     * @param actualSizeBytes Actual activated bytes.
+     */
+    function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
+        external;
 }

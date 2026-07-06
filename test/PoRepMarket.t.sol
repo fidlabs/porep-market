@@ -10,7 +10,6 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
-import {SLITypes} from "../src/types/SLITypes.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
@@ -23,6 +22,12 @@ import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
+    struct RequestTerms {
+        uint256 dealSizeBytes;
+        uint256 pricePerSectorPerMonth;
+        uint32 durationDays;
+    }
+
     PoRepMarket public poRepMarket;
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
@@ -36,12 +41,16 @@ contract PoRepMarketTest is Test {
     uint256 public dealId;
     uint256 public totalDealSize;
     SharedTypes.SLIThresholds internal defaultRequirements;
-    SLITypes.DealTerms internal defaultTerms;
+    RequestTerms internal defaultTerms;
 
     uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
     uint256 public constant EPOCHS_IN_TWO_DAYS = 5_760;
 
     CommonTypes.FilActorId public providerFilActorId;
+    address public paymentToken;
+    address public paymentPayee;
+    uint256 public selectedOfferId;
+    bytes32 public defaultManifestHash;
     string public expectedManifestLocation = "https://example.com/manifest";
 
     function setUp() public {
@@ -59,11 +68,15 @@ contract PoRepMarketTest is Test {
         totalDealSize = 103_079_215_104; // 96 GiB
 
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
+        paymentToken = vm.addr(0x777);
+        paymentPayee = vm.addr(0x778);
+        selectedOfferId = 42;
+        defaultManifestHash = keccak256("default-manifest");
 
         defaultRequirements = SharedTypes.SLIThresholds({
             retrievabilityBps: 80, bandwidthBytesPerSecond: 500, latencyMs: 200, indexingPct: 90
         });
-        defaultTerms = SLITypes.DealTerms({
+        defaultTerms = RequestTerms({
             dealSizeBytes: totalDealSize, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
         });
 
@@ -75,6 +88,17 @@ contract PoRepMarketTest is Test {
         poRepMarket = PoRepMarketContractMock(address(proxy));
 
         spRegistry.setNextProvider(providerFilActorId);
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH + 10,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: totalDealSize
+            })
+        );
         spRegistry.setIsOwner(providerOwnerAddress, providerFilActorId, true);
         spRegistry.setIsOwner(operatorAddress, providerFilActorId, true);
         validatorFactory.setValidator(validatorAddress, true);
@@ -95,15 +119,15 @@ contract PoRepMarketTest is Test {
 
     function dealRequest(
         SharedTypes.SLIThresholds memory requirements,
-        SLITypes.DealTerms memory terms,
+        RequestTerms memory terms,
         string memory manifestLocation
-    ) public pure returns (SharedTypes.DealRequest memory) {
+    ) public view returns (SharedTypes.DealRequest memory) {
         return SharedTypes.DealRequest({
-            manifestHash: bytes32(0),
+            manifestHash: defaultManifestHash,
             requestedSizeBytes: terms.dealSizeBytes,
             maxPricePer32GiBPerMonth: terms.pricePerSectorPerMonth,
             manifestLocation: manifestLocation,
-            paymentToken: address(0),
+            paymentToken: paymentToken,
             durationDays: terms.durationDays,
             requiredSLIs: requirements
         });
@@ -129,6 +153,17 @@ contract PoRepMarketTest is Test {
         });
     }
 
+    function expectedRailRate(uint256 _dealId) internal view returns (uint256) {
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(_dealId);
+        return (payment.pricePer32GiBPerMonth * payment.billed32GiBUnits + poRepMarket.EPOCHS_IN_MONTH() - 1)
+            / poRepMarket.EPOCHS_IN_MONTH();
+    }
+
+    function chainEpochFromBlock(uint256 epoch) internal pure returns (CommonTypes.ChainEpoch) {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return CommonTypes.ChainEpoch.wrap(int64(uint64(epoch)));
+    }
+
     function proposeDefaultDeal() internal {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
@@ -144,6 +179,43 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock(address(poRepMarket)).setDealPayment(targetDealId, payment);
     }
 
+    function createInitializedMarketMock() internal returns (PoRepMarketContractMock) {
+        PoRepMarketContractMock impl = new PoRepMarketContractMock();
+        bytes memory initData = abi.encodeCall(
+            PoRepMarket.initialize,
+            (adminAddress, address(validatorFactory), address(spRegistry), address(dataCapEvidenceAdapterAddress))
+        );
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
+        return PoRepMarketContractMock(address(proxy));
+    }
+
+    function seedProposedDeal(PoRepMarketContractMock market) internal {
+        market.setDeal(
+            PoRepTypes.Deal({
+                dealId: dealId,
+                client: clientAddress,
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                state: DealState.PROPOSED,
+                evidenceAdapter: address(dataCapEvidenceAdapterAddress),
+                validator: address(0),
+                railId: 0
+            })
+        );
+        market.setDealCapacity(dealId, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: 0}));
+        market.setDealData(
+            dealId,
+            SharedTypes.DealData({manifestHash: defaultManifestHash, manifestLocation: expectedManifestLocation})
+        );
+        market.setDealTiming(
+            dealId,
+            PoRepTypes.DealTiming({
+                proposedAtEpoch: chainEpochFromBlock(block.number),
+                expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
+            })
+        );
+    }
+
     function testProposeDealEmitsEvent() public {
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
@@ -152,10 +224,30 @@ contract PoRepMarketTest is Test {
             clientAddress,
             providerFilActorId,
             defaultRequirements,
+            defaultManifestHash,
             expectedManifestLocation,
             totalDealSize,
             block.number
         );
+
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+    }
+
+    function testProposeDealEmitsDealAcceptedEvent() public {
+        vm.prank(clientAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealCreated(
+            dealId,
+            clientAddress,
+            providerFilActorId,
+            defaultRequirements,
+            defaultManifestHash,
+            expectedManifestLocation,
+            totalDealSize,
+            block.number
+        );
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealAccepted(dealId, clientAddress, providerFilActorId);
 
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
     }
@@ -168,10 +260,10 @@ contract PoRepMarketTest is Test {
         assertEq(p.dealId, 1);
         assertEq(p.client, clientAddress);
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), CommonTypes.FilActorId.unwrap(providerFilActorId));
-        assertEq(p.offerId, 0);
+        assertEq(p.offerId, selectedOfferId);
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
-        assertTrue(p.state == DealState.PROPOSED);
+        assertTrue(p.state == DealState.ACCEPTED);
         assertEq(p.evidenceAdapter, address(dataCapEvidenceAdapterAddress));
     }
 
@@ -182,8 +274,8 @@ contract PoRepMarketTest is Test {
         assertEq(p.dealId, 1);
         assertEq(p.client, clientAddress);
         assertEq(CommonTypes.FilActorId.unwrap(p.provider), CommonTypes.FilActorId.unwrap(providerFilActorId));
-        assertEq(p.offerId, 0);
-        assertTrue(p.state == DealState.PROPOSED);
+        assertEq(p.offerId, selectedOfferId);
+        assertTrue(p.state == DealState.ACCEPTED);
         assertEq(p.evidenceAdapter, address(dataCapEvidenceAdapterAddress));
         assertEq(p.validator, address(0));
         assertEq(p.railId, 0);
@@ -193,7 +285,7 @@ contract PoRepMarketTest is Test {
         proposeDefaultDeal();
 
         SharedTypes.DealData memory data = poRepMarket.getDealData(1);
-        assertEq(data.manifestHash, bytes32(0));
+        assertEq(data.manifestHash, defaultManifestHash);
         assertEq(data.manifestLocation, expectedManifestLocation);
     }
 
@@ -234,9 +326,9 @@ contract PoRepMarketTest is Test {
         proposeDefaultDeal();
 
         PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(1);
-        assertEq(payment.paymentToken, address(0));
-        assertEq(payment.payee, address(0));
-        assertEq(payment.pricePer32GiBPerMonth, defaultTerms.pricePerSectorPerMonth);
+        assertEq(payment.paymentToken, paymentToken);
+        assertEq(payment.payee, paymentPayee);
+        assertEq(payment.pricePer32GiBPerMonth, MIN_PRICE_PER_SECTOR_PER_MONTH + 10);
         assertEq(payment.billed32GiBUnits, 0);
         assertEq(payment.railMaxRatePerEpoch, 0);
     }
@@ -267,6 +359,65 @@ contract PoRepMarketTest is Test {
         assertEq(poRepMarket.getDealEvidenceAdapter(dealId), address(newEvidenceAdapter));
     }
 
+    function testProposeDealStoresV2SelectionSnapshot() public {
+        uint256 reservedBytes = totalDealSize - 32;
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH + 10,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: reservedBytes
+            })
+        );
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
+        assertEq(CommonTypes.FilActorId.unwrap(deal.provider), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(deal.offerId, selectedOfferId);
+
+        PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
+        assertEq(capacity.reservedBytes, reservedBytes);
+        assertEq(capacity.committedBytes, 0);
+
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+        assertEq(payment.paymentToken, paymentToken);
+        assertEq(payment.payee, paymentPayee);
+        assertEq(payment.pricePer32GiBPerMonth, MIN_PRICE_PER_SECTOR_PER_MONTH + 10);
+
+        SharedTypes.SLIThresholds memory slis = poRepMarket.getDealSLIs(dealId);
+        assertEq(slis.retrievabilityBps, defaultRequirements.retrievabilityBps);
+        assertEq(slis.bandwidthBytesPerSecond, defaultRequirements.bandwidthBytesPerSecond);
+        assertEq(slis.latencyMs, defaultRequirements.latencyMs);
+        assertEq(slis.indexingPct, defaultRequirements.indexingPct);
+    }
+
+    function testProposeDealCallsReserveProviderForDealWithRequest() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        SharedTypes.DealRequest memory request = spRegistry.getLastReserveRequest();
+        assertEq(request.manifestHash, defaultManifestHash);
+        assertEq(request.requestedSizeBytes, totalDealSize);
+        assertEq(request.maxPricePer32GiBPerMonth, MIN_PRICE_PER_SECTOR_PER_MONTH);
+        assertEq(request.paymentToken, paymentToken);
+        assertEq(request.durationDays, defaultTerms.durationDays);
+    }
+
+    function testProposeDealRevertsWhenManifestHashIsZero() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        request.manifestHash = bytes32(0);
+
+        vm.prank(clientAddress);
+        vm.expectRevert(PoRepMarket.InvalidManifestHash.selector);
+        poRepMarket.proposeDeal(request);
+    }
+
     function testShouldIncrementDealIdCounter() public {
         uint8 proposalsCount = 3;
         uint8 startingId = 1;
@@ -292,19 +443,17 @@ contract PoRepMarketTest is Test {
         assertEq(uint8(p.state), 0);
     }
 
-    function testProposeDealRevertsWhenNoProviderFoundForDeal() public {
+    function testProposeDealRevertsWhenNoOfferMatched() public {
         spRegistry.setNextProvider(CommonTypes.FilActorId.wrap(0));
 
         vm.prank(clientAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NoProviderFoundForDeal.selector));
+        vm.expectRevert(abi.encodeWithSelector(ISPRegistry.NoOfferMatched.selector));
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
     }
 
     function testUpdateValidatorEmitsValidatorUpdatedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.ValidatorUpdated(dealId, validatorAddress);
@@ -316,8 +465,6 @@ contract PoRepMarketTest is Test {
     function testUpdateValidatorRevertsIfValidatorIsAlreadySet() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -330,8 +477,6 @@ contract PoRepMarketTest is Test {
         address notTheValidator = vm.addr(0x999);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.NotTheRegisteredValidator.selector, dealId, notTheValidator));
         vm.prank(notTheValidator);
@@ -341,8 +486,6 @@ contract PoRepMarketTest is Test {
     function testUpdateRailIdEmitsRailIdUpdatedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
@@ -357,8 +500,6 @@ contract PoRepMarketTest is Test {
         address notTheValidator = vm.addr(0x999);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
@@ -370,10 +511,13 @@ contract PoRepMarketTest is Test {
     function testUpdateRailIdRevertsWhenDealIsInIncorrectState() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        setDealActive(dealId);
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.PROPOSED, DealState.ACCEPTED
+                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACTIVE, DealState.ACCEPTED
             )
         );
         vm.prank(validatorAddress);
@@ -389,8 +533,6 @@ contract PoRepMarketTest is Test {
     function testUpdateRailIdRevertsWhenRailIdIsAlreadySet() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
         vm.prank(validatorAddress);
@@ -404,8 +546,6 @@ contract PoRepMarketTest is Test {
     function testUpdateRailIdRevertsWhenRailIdIsInvalid() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
 
@@ -415,24 +555,24 @@ contract PoRepMarketTest is Test {
     }
 
     function testAcceptDealEmitsDealAcceptedEvent() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.prank(providerOwnerAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealAccepted(dealId, providerOwnerAddress, providerFilActorId);
 
-        poRepMarket.acceptDeal(dealId);
+        market.acceptDeal(dealId);
     }
 
     function testAcceptDealAllowsOperatorAuthorisedForProvider() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.prank(operatorAddress);
-        poRepMarket.acceptDeal(dealId);
+        market.acceptDeal(dealId);
 
-        PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
+        PoRepTypes.Deal memory p = market.getDeal(dealId);
         assertTrue(p.state == DealState.ACCEPTED);
     }
 
@@ -443,8 +583,8 @@ contract PoRepMarketTest is Test {
 
     function testAcceptDealRevertsWhenNotTheControllingAddress() public {
         address notOwnerAddress = vm.addr(3);
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -452,14 +592,14 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(notOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
+        market.acceptDeal(dealId);
     }
 
     function testAcceptDealRevertsWhenDealNotInExpectedState() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
         vm.prank(providerOwnerAddress);
-        poRepMarket.rejectDeal(dealId);
+        market.rejectDeal(dealId);
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -467,14 +607,12 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(clientAddress);
-        poRepMarket.acceptDeal(dealId);
+        market.acceptDeal(dealId);
     }
 
     function testFinalizeDealEmitsDealFinalizedEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -492,8 +630,6 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
         vm.prank(address(validator));
@@ -505,8 +641,6 @@ contract PoRepMarketTest is Test {
 
         uint256 serviceStartEpoch = block.number;
         uint256 expectedBilledUnits = defaultTerms.dealSizeBytes / poRepMarket.SECTOR_SIZE();
-        uint256 expectedRate =
-            (defaultTerms.pricePerSectorPerMonth * expectedBilledUnits) / poRepMarket.EPOCHS_IN_MONTH();
 
         vm.prank(adminAddress);
         poRepMarket.activatePayment(dealId);
@@ -515,14 +649,14 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
 
         assertEq(payment.billed32GiBUnits, expectedBilledUnits);
-        assertEq(payment.railMaxRatePerEpoch, expectedRate);
+        assertEq(payment.railMaxRatePerEpoch, expectedRailRate(dealId));
         assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch))), serviceStartEpoch);
         assertEq(
             uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch))),
             serviceStartEpoch + poRepMarket.getDealTerms(dealId).durationEpochs
         );
         assertEq(validator.modifyRailPaymentCallCount(), 1);
-        assertEq(validator.lastNewRate(), expectedRate);
+        assertEq(validator.lastNewRate(), expectedRailRate(dealId));
         assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
     }
 
@@ -532,8 +666,6 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
         vm.prank(address(validator));
@@ -544,9 +676,7 @@ contract PoRepMarketTest is Test {
         validator.setRailStatus(RailStatus.PREPARED);
 
         CommonTypes.ChainEpoch expectedServiceStartEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
-        uint256 expectedBilledUnits = defaultTerms.dealSizeBytes / poRepMarket.SECTOR_SIZE();
-        uint256 expectedRate =
-            (defaultTerms.pricePerSectorPerMonth * expectedBilledUnits) / poRepMarket.EPOCHS_IN_MONTH();
+        uint256 expectedRate = expectedRailRate(dealId);
         CommonTypes.ChainEpoch expectedServiceEndEpoch = CommonTypes.ChainEpoch
             .wrap(
                 CommonTypes.ChainEpoch.unwrap(expectedServiceStartEpoch)
@@ -566,8 +696,6 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
         vm.prank(address(validator));
@@ -590,8 +718,6 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
 
@@ -634,16 +760,25 @@ contract PoRepMarketTest is Test {
     function testActivatePaymentRoundsUpRate() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);
-        SLITypes.DealTerms memory terms = SLITypes.DealTerms({
+        RequestTerms memory terms = RequestTerms({
             dealSizeBytes: poRepMarket.SECTOR_SIZE() * 2, pricePerSectorPerMonth: 43_200, durationDays: 360
         });
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: terms.pricePerSectorPerMonth,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: terms.dealSizeBytes
+            })
+        );
 
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(5000);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, terms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
         vm.prank(address(validator));
@@ -702,8 +837,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealEmitsDealFinalizedEventWhenDealIsActiveWithCustomActivationPadding() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(1000);
 
@@ -720,8 +853,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealEmitsDealFinalizedEventWhenDealIsActiveAfterActivationPaddingUpdate() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(1000);
 
@@ -738,8 +869,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsForAcceptedDealWithZeroAllocationAtMaxActivationPadding() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(10000);
 
@@ -756,8 +885,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsForAcceptedDealWithAllocationUnderCustomActivationPadding() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(1000);
 
@@ -779,8 +906,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsForAcceptedDealWithAllocationOverCustomActivationPadding() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(1000);
 
@@ -812,8 +937,6 @@ contract PoRepMarketTest is Test {
         PoRepMarketContractMock porepMarekMock = PoRepMarketContractMock(address(proxy));
         vm.prank(clientAddress);
         porepMarekMock.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        porepMarekMock.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         porepMarekMock.updateValidator(dealId);
@@ -833,8 +956,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsForAcceptedDealWithAllocationUnderDefaultActivationPadding() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1)
@@ -851,8 +972,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsForAcceptedDealWithAllocationOverDefaultActivationPadding() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1)
@@ -869,8 +988,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsWhenCallerIsNotValidator() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -888,7 +1005,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.PROPOSED, DealState.ACTIVE
+                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACCEPTED, DealState.ACTIVE
             )
         );
         vm.prank(clientAddress);
@@ -898,8 +1015,6 @@ contract PoRepMarketTest is Test {
     function testFinalizeDealRevertsWhenDealAlreadyFinalized() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -917,33 +1032,33 @@ contract PoRepMarketTest is Test {
     }
 
     function testRejectAsClientDealEmitsDealRejectedEvent() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealRejected(dealId, clientAddress);
-        poRepMarket.rejectDeal(dealId);
+        market.rejectDeal(dealId);
     }
 
     function testRejectAsStorageProviderOwnerDealEmitsDealRejectedEvent() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.prank(providerOwnerAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealRejected(dealId, providerOwnerAddress);
-        poRepMarket.rejectDeal(dealId);
+        market.rejectDeal(dealId);
     }
 
     function testRejectAsOperatorAuthorisedForProviderEmitsDealRejectedEvent() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.prank(operatorAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealRejected(dealId, operatorAddress);
-        poRepMarket.rejectDeal(dealId);
+        market.rejectDeal(dealId);
     }
 
     function testRejectDealRevertsWhenDealDoesNotExist() public {
@@ -952,8 +1067,8 @@ contract PoRepMarketTest is Test {
     }
 
     function testRejectDealRevertsWhenNotTheClientOrStorageProviderOwner() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         address notTheClientOrStorageProviderOwner = vm.addr(0x999);
         vm.expectRevert(
@@ -962,7 +1077,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(notTheClientOrStorageProviderOwner);
-        poRepMarket.rejectDeal(dealId);
+        market.rejectDeal(dealId);
     }
 
     function testAuthorizeUpgradeRevert() public {
@@ -994,9 +1109,7 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(badRequirements, defaultTerms, expectedManifestLocation));
     }
 
-    function testProposeDealAutoApproveSetsDealToAccepted() public {
-        spRegistry.setNextAutoApprove(true);
-
+    function testProposeDealCreatesAcceptedDeal() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
@@ -1004,9 +1117,7 @@ contract PoRepMarketTest is Test {
         assertTrue(p.state == DealState.ACCEPTED);
     }
 
-    function testProposeDealAutoApproveEmitsBothEvents() public {
-        spRegistry.setNextAutoApprove(true);
-
+    function testProposeDealEmitsDealCreatedAndAcceptedEvents() public {
         vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealCreated(
@@ -1014,6 +1125,7 @@ contract PoRepMarketTest is Test {
             clientAddress,
             providerFilActorId,
             defaultRequirements,
+            defaultManifestHash,
             expectedManifestLocation,
             totalDealSize,
             block.number
@@ -1021,16 +1133,6 @@ contract PoRepMarketTest is Test {
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.DealAccepted(dealId, clientAddress, providerFilActorId);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-    }
-
-    function testProposeDealNoAutoApproveKeepsProposed() public {
-        spRegistry.setNextAutoApprove(false);
-
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
-        assertTrue(p.state == DealState.PROPOSED);
     }
 
     function testProposeDealRevertsEmptyManifestLocation() public {
@@ -1049,7 +1151,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealDurationIsBelowMinimum() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() - 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
@@ -1058,7 +1160,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealDurationIsNotMultiplicatioveOf30() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MIN_DEAL_DURATION_DAYS() + 1, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
@@ -1067,7 +1169,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealDurationExceedsMaximum() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: poRepMarket.MAX_DEAL_DURATION_DAYS() + 12, dealSizeBytes: 1024, pricePerSectorPerMonth: 100
         });
         vm.prank(clientAddress);
@@ -1309,9 +1411,6 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
-
         vm.startPrank(validatorAddress);
         poRepMarket.updateValidator(dealId);
         poRepMarket.updateRailId(dealId, railId);
@@ -1329,6 +1428,29 @@ contract PoRepMarketTest is Test {
         assertTrue(p.state == DealState.TERMINATED);
     }
 
+    function testTerminateDealReleasesCommittedCapacityWithManifestHash() public {
+        uint256 allocatedSize = totalDealSize - 64;
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        PoRepMarketContractMock(address(poRepMarket))
+            .setDealCapacity(
+                dealId, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: allocatedSize})
+            );
+        setDealActive(dealId);
+
+        vm.prank(validatorAddress);
+        poRepMarket.terminateDeal(dealId, block.number);
+
+        assertEq(spRegistry.lastReleasedCapacityProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(spRegistry.lastReleasedCapacityBytes(), allocatedSize);
+        assertEq(spRegistry.lastReleasedCapacityManifestHash(), defaultManifestHash);
+    }
+
     function testTerminateDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         poRepMarket.terminateDeal(dealId, 1);
@@ -1340,7 +1462,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.PROPOSED, DealState.ACTIVE
+                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACCEPTED, DealState.ACTIVE
             )
         );
         vm.prank(validatorAddress);
@@ -1350,9 +1472,6 @@ contract PoRepMarketTest is Test {
     function testTerminateDealRevertsWhenValidatorNotSet() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         setDealActive(dealId);
 
@@ -1365,9 +1484,6 @@ contract PoRepMarketTest is Test {
     function testTerminateDealRevertsWhenCallerIsNotValidator() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -1385,24 +1501,14 @@ contract PoRepMarketTest is Test {
         poRepMarket.getDealsForOrganizationByState(address(0), DealState.PROPOSED);
     }
 
-    function testGetDealsForOrganizationByStateProposed() public {
+    function testGetDealsForOrganizationByStateAccepted() public {
         address organization1 = vm.addr(0x111);
         address organization2 = vm.addr(0x222);
 
-        spRegistry.setProviderInfo(
+        spRegistry.setProviderState(
             providerFilActorId,
-            ISPRegistry.ProviderInfo({
-                organization: organization1,
-                payee: address(0),
-                paused: false,
-                blocked: false,
-                capabilities: defaultRequirements,
-                availableBytes: 0,
-                committedBytes: 0,
-                pendingBytes: 0,
-                pricePerSectorPerMonth: 0,
-                minDealDurationDays: 0,
-                maxDealDurationDays: 0
+            SPRegistryMock.MockProviderState({
+                organization: organization1, payee: address(0), paused: false, blocked: false
             })
         );
 
@@ -1410,12 +1516,16 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
         PoRepTypes.Deal[] memory dealsOrg1 =
-            poRepMarket.getDealsForOrganizationByState(organization1, DealState.PROPOSED);
+            poRepMarket.getDealsForOrganizationByState(organization1, DealState.ACCEPTED);
         assertEq(dealsOrg1.length, 1);
         assertEq(dealsOrg1[0].dealId, dealId);
 
+        PoRepTypes.Deal[] memory proposedOrg1 =
+            poRepMarket.getDealsForOrganizationByState(organization1, DealState.PROPOSED);
+        assertEq(proposedOrg1.length, 0);
+
         PoRepTypes.Deal[] memory dealsOrg2 =
-            poRepMarket.getDealsForOrganizationByState(organization2, DealState.PROPOSED);
+            poRepMarket.getDealsForOrganizationByState(organization2, DealState.ACCEPTED);
         assertEq(dealsOrg2.length, 0);
     }
 
@@ -1440,8 +1550,8 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenDealSizeIsZero() public {
-        SLITypes.DealTerms memory badTerms =
-            SLITypes.DealTerms({durationDays: 360, dealSizeBytes: 0, pricePerSectorPerMonth: 100_000});
+        RequestTerms memory badTerms =
+            RequestTerms({durationDays: 360, dealSizeBytes: 0, pricePerSectorPerMonth: 100_000});
 
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealSize.selector));
@@ -1449,7 +1559,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testProposeDealRevertsWhenPriceTimeSectorsIsBelowEpochsInMonth() public {
-        SLITypes.DealTerms memory badTerms = SLITypes.DealTerms({
+        RequestTerms memory badTerms = RequestTerms({
             durationDays: 360, dealSizeBytes: 1024, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH - 1
         });
 
@@ -1462,7 +1572,7 @@ contract PoRepMarketTest is Test {
         uint256 oneTebibyteInBytes = 1024 * 1024 * 1024 * 1024;
         uint256 pricePerSector = 62_500;
 
-        SLITypes.DealTerms memory terms = SLITypes.DealTerms({
+        RequestTerms memory terms = RequestTerms({
             durationDays: 360, dealSizeBytes: oneTebibyteInBytes, pricePerSectorPerMonth: pricePerSector
         });
 
@@ -1471,11 +1581,21 @@ contract PoRepMarketTest is Test {
     }
 
     function testRejectAcceptedDealByAdmin() public {
+        uint256 reservedBytes = totalDealSize - 96;
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH + 10,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: reservedBytes
+            })
+        );
+
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -1487,14 +1607,14 @@ contract PoRepMarketTest is Test {
 
         PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
         assertTrue(deal.state == DealState.REJECTED);
+        assertEq(spRegistry.lastReleasedPendingProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(spRegistry.lastReleasedPendingBytes(), reservedBytes);
+        assertEq(spRegistry.lastReleasedPendingManifestHash(), defaultManifestHash);
     }
 
     function testRejectAcceptedDealRevertsWhenRailIdIsSet() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
@@ -1533,48 +1653,41 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
-        vm.roll(block.number + newExpiration + 1);
-
-        vm.expectEmit(true, true, false, false);
-        emit PoRepMarket.DealExpired(dealId, block.number);
-        poRepMarket.rejectExpiredDeal(dealId);
-
-        PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
-        assertTrue(p.state == DealState.EXPIRED);
+        PoRepTypes.DealTiming memory timing = poRepMarket.getDealTiming(dealId);
+        assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(timing.expiresAtEpoch))), block.number + newExpiration);
     }
 
     function testRejectExpiredDealEmitsDealExpiredEvent() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
 
         vm.expectEmit(true, true, false, false);
         emit PoRepMarket.DealExpired(dealId, block.number);
-        poRepMarket.rejectExpiredDeal(dealId);
+        market.rejectExpiredDeal(dealId);
     }
 
     function testRejectExpiredDealSetsStateToExpired() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
-        poRepMarket.rejectExpiredDeal(dealId);
+        market.rejectExpiredDeal(dealId);
 
-        PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
+        PoRepTypes.Deal memory p = market.getDeal(dealId);
         assertTrue(p.state == DealState.EXPIRED);
     }
 
     function testRejectExpiredDealRevertsWhenDealNotExpiredYet() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
-        uint256 expiresAt =
-            uint256(uint64(CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealTiming(dealId).expiresAtEpoch)));
+        uint256 expiresAt = uint256(uint64(CommonTypes.ChainEpoch.unwrap(market.getDealTiming(dealId).expiresAtEpoch)));
         vm.roll(expiresAt);
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealNotExpiredYet.selector, dealId, block.number, expiresAt));
-        poRepMarket.rejectExpiredDeal(dealId);
+        market.rejectExpiredDeal(dealId);
     }
 
     function testRejectExpiredDealRevertsWhenDealDoesNotExist() public {
@@ -1585,9 +1698,6 @@ contract PoRepMarketTest is Test {
     function testRejectExpiredDealRevertsWhenDealNotProposed() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
 
@@ -1600,18 +1710,40 @@ contract PoRepMarketTest is Test {
     }
 
     function testRejectExpiredDealOnlyAffectsTargetDeal() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock market = createInitializedMarketMock();
+        seedProposedDeal(market);
 
         vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
 
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        market.setDeal(
+            PoRepTypes.Deal({
+                dealId: dealId + 1,
+                client: clientAddress,
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                state: DealState.PROPOSED,
+                evidenceAdapter: address(dataCapEvidenceAdapterAddress),
+                validator: address(0),
+                railId: 0
+            })
+        );
+        market.setDealCapacity(dealId + 1, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: 0}));
+        market.setDealData(
+            dealId + 1,
+            SharedTypes.DealData({manifestHash: defaultManifestHash, manifestLocation: expectedManifestLocation})
+        );
+        market.setDealTiming(
+            dealId + 1,
+            PoRepTypes.DealTiming({
+                proposedAtEpoch: chainEpochFromBlock(block.number),
+                expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
+            })
+        );
 
-        poRepMarket.rejectExpiredDeal(dealId);
+        market.rejectExpiredDeal(dealId);
 
-        assertTrue(poRepMarket.getDeal(dealId).state == DealState.EXPIRED);
-        assertTrue(poRepMarket.getDeal(dealId + 1).state == DealState.PROPOSED);
+        assertTrue(market.getDeal(dealId).state == DealState.EXPIRED);
+        assertTrue(market.getDeal(dealId + 1).state == DealState.PROPOSED);
     }
 
     function testSetDealActivationPaddingEmitsEvent() public {

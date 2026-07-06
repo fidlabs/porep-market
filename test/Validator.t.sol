@@ -11,12 +11,10 @@ import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
-import {SPRegistry} from "../src/SPRegistry.sol";
 
 import {FilecoinPayV1Mock} from "./contracts/FilecoinPayV1Mock.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
-import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -29,11 +27,9 @@ contract ValidatorTest is Test {
     Validator public validator;
     FilecoinPayV1Mock public filecoinPayMock;
     PoRepMarketMock public poRepMarketMock;
-    SPRegistryMock public spRegistryMock;
     DataCapEvidenceAdapterMock public dataCapEvidenceAdapterMock;
     SLIOracle public sliOracle;
     SLIScorer public sliScorer;
-    SPRegistry public spRegistry;
 
     address public admin;
     address public porepService;
@@ -54,7 +50,6 @@ contract ValidatorTest is Test {
         filecoinPayMock = new FilecoinPayV1Mock();
         dataCapEvidenceAdapterMock = new DataCapEvidenceAdapterMock();
         poRepMarketMock = new PoRepMarketMock();
-        spRegistryMock = new SPRegistryMock();
 
         admin = address(this);
         porepService = vm.addr(0x123);
@@ -115,7 +110,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
 
@@ -126,7 +120,7 @@ contract ValidatorTest is Test {
         dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
 
         vm.prank(admin);
-        validator.createRail(token);
+        validator.createRail();
 
         vm.prank(oracleUpdater);
         sliOracle.setSLI(dealId, defaultRequirements);
@@ -189,7 +183,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -203,7 +196,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -274,7 +266,7 @@ contract ValidatorTest is Test {
         address notClient = vm.addr(0xCAFE);
         vm.expectRevert(Validator.CallerIsNotClient.selector);
         vm.prank(notClient);
-        validator.createRail(token);
+        validator.createRail();
     }
 
     function testValidatePaymentInvalidRailIdRevert() public {
@@ -306,7 +298,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -324,7 +315,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -342,7 +332,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -360,7 +349,6 @@ contract ValidatorTest is Test {
             address(0),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -378,7 +366,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             address(0),
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
     }
@@ -395,25 +382,6 @@ contract ValidatorTest is Test {
             address(filecoinPayMock),
             address(sliScorer),
             dataCapEvidenceAdapter,
-            address(0),
-            address(spRegistryMock),
-            dealId
-        );
-    }
-
-    function testInitializeRevertsWhenSpRegistryIsZeroAddress() public {
-        Validator impl = new Validator();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
-        Validator newValidator = Validator(address(proxy));
-
-        vm.expectRevert(Validator.InvalidSPRegistryAddress.selector);
-        newValidator.initialize(
-            admin,
-            porepService,
-            address(filecoinPayMock),
-            address(sliScorer),
-            dataCapEvidenceAdapter,
-            address(poRepMarketMock),
             address(0),
             dealId
         );
@@ -461,7 +429,61 @@ contract ValidatorTest is Test {
     function testCreateRailRevertsWhenRailAlreadyCreated() public {
         vm.expectRevert(Validator.RailAlreadyCreated.selector);
         vm.prank(admin);
-        validator.createRail(token);
+        validator.createRail();
+    }
+
+    function testCreateRailUsesFrozenDealPaymentTokenAndPayee() public {
+        FilecoinPayV1Mock freshFilecoinPay = new FilecoinPayV1Mock();
+        PoRepMarketMock freshMarket = new PoRepMarketMock();
+        Validator impl = new Validator();
+        Validator freshValidator = Validator(address(new ERC1967Proxy(address(impl), "")));
+
+        IERC20 frozenToken = IERC20(vm.addr(0xF007));
+        address frozenPayee = vm.addr(0xBEEF);
+        freshMarket.setDeal(
+            dealId,
+            PoRepTypes.Deal({
+                dealId: dealId,
+                client: admin,
+                provider: providerFilActorId,
+                offerId: 123,
+                state: DealState.PROPOSED,
+                evidenceAdapter: dataCapEvidenceAdapter,
+                validator: address(0),
+                railId: 0
+            })
+        );
+        freshMarket.setDealSLIs(dealId, defaultRequirements);
+        freshMarket.setDealPayment(
+            dealId,
+            PoRepTypes.DealPayment({
+                paymentToken: address(frozenToken),
+                payee: frozenPayee,
+                pricePer32GiBPerMonth: 100,
+                billed32GiBUnits: 0,
+                railMaxRatePerEpoch: 0
+            })
+        );
+        freshFilecoinPay.setOperatorApproval(
+            frozenToken, admin, address(freshValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
+        );
+
+        freshValidator.initialize(
+            admin,
+            porepService,
+            address(freshFilecoinPay),
+            address(sliScorer),
+            dataCapEvidenceAdapter,
+            address(freshMarket),
+            dealId
+        );
+
+        vm.prank(admin);
+        freshValidator.createRail();
+
+        (IERC20 railToken,, address railPayee,,,,,) = freshFilecoinPay.rails(1);
+        assertEq(address(railToken), address(frozenToken));
+        assertEq(railPayee, frozenPayee);
     }
 
     function testFinalizeDealTerminatesFilecoinPayRailAsAnAdmin() public {
@@ -551,7 +573,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
 
@@ -560,7 +581,7 @@ contract ValidatorTest is Test {
         );
 
         vm.expectRevert(Validator.OperatorNotApproved.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testCreateRailRevertsWhenMaxLockupPeriodLessThanMinimum() public {
@@ -575,7 +596,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
 
@@ -584,7 +604,7 @@ contract ValidatorTest is Test {
         );
 
         vm.expectRevert(Validator.MaxLockupPeriodLessThanMinimum.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testCreateRailRevertsWhenLockupAllowanceIsZero() public {
@@ -599,14 +619,13 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
 
         filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, 86_400);
 
         vm.expectRevert(Validator.InvalidLockupAllowance.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testCreateRailRevertsWhenRateAllowanceIsZero() public {
@@ -621,14 +640,13 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
 
         filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, 86_400);
 
         vm.expectRevert(Validator.InvalidRateAllowance.selector);
-        newValidator.createRail(token);
+        newValidator.createRail();
     }
 
     function testModifyRailPaymentRevertsWhenCallerIsNotPoRepMarket() public {
@@ -655,7 +673,6 @@ contract ValidatorTest is Test {
             address(sliScorer),
             dataCapEvidenceAdapter,
             address(poRepMarketMock),
-            address(spRegistryMock),
             dealId
         );
 
@@ -668,7 +685,7 @@ contract ValidatorTest is Test {
         vm.expectEmit(true, false, false, true, address(newValidator));
         emit Validator.LockupPeriodUpdated(2, 86_400);
 
-        newValidator.createRail(token);
+        newValidator.createRail();
 
         assertEq(newValidator.getRailStatus(), RailStatus.PREPARED);
     }
