@@ -50,9 +50,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     uint256 public constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
-     * @notice The maximum value allowed for deal activation padding.
+     * @notice The maximum value allowed for deal activation padding, in basis points.
      */
-    uint256 private constant MAX_DEAL_ACTIVATION_PADDING = 100;
+    uint256 private constant MAX_DEAL_ACTIVATION_PADDING = 10_000;
 
     /**
      * @notice Default number of epochs after which a proposed deal expires if not accepted
@@ -1236,7 +1236,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         uint256 delta =
             actualDealSize > expectedDealSize ? actualDealSize - expectedDealSize : expectedDealSize - actualDealSize;
 
-        if (delta * 100 > expectedDealSize * padding) {
+        if (delta * 10_000 > expectedDealSize * padding) {
             revert InvalidAllocationSizeForDealActivation();
         }
     }

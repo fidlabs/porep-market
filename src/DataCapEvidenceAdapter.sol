@@ -91,6 +91,11 @@ contract DataCapEvidenceAdapter is
     uint256 private constant SECTOR_SIZE = 32 * 1024 * 1024 * 1024;
 
     /**
+     * @notice Denominator for basis points calculations
+     */
+    uint256 private constant BPS_DENOMINATOR = 10_000;
+
+    /**
      * @notice Minimum allowed allocation claim window in epochs.
      * @dev 4 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 11_520 epochs
      */
@@ -118,6 +123,13 @@ contract DataCapEvidenceAdapter is
      * @param setAtBlock The block number at which the adapter was set non-operational
      */
     event AdapterNonOperational(address indexed account, uint256 setAtBlock);
+
+    /**
+     * @notice Emitted when deal evidence is ready
+     * @param dealId The deal id
+     * @param evidenceAdapter The address of the evidence adapter
+     */
+    event DealEvidenceReady(uint256 indexed dealId, address indexed evidenceAdapter);
 
     // solhint-enable gas-indexed-events
 
@@ -285,6 +297,7 @@ contract DataCapEvidenceAdapter is
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
         uint256 claimedBytes;
+        uint256 activeClaimedBytes;
     }
 
     struct ProviderAllocation {
@@ -472,21 +485,21 @@ contract DataCapEvidenceAdapter is
 
         uint8 evidenceResult;
         if (result.claims.length == 0) {
-            evidenceResult = EvidenceResult.REJECTED;
+            evidenceResult = EvidenceResult.NONE;
         } else if (result.batch_info.fail_codes.length == 0) {
             evidenceResult = EvidenceResult.ACCEPTED;
         } else {
             evidenceResult = EvidenceResult.PARTIAL;
         }
-
+        // TODO: add custom reasonCode
         return SharedTypes.ActivationDecision({coveredBytes: coveredBytes, reasonCode: 0, result: evidenceResult});
     }
 
     // solhint-disable no-unused-vars
-    /// Note: this function is only added for testing purpose, will be implemented in the future
     /**
      * @notice Return the adapter's activation decision after submitted evidence
      * covers enough bytes for the frozen deal
+     * @dev Only callable by the PoRepMarket contract
      * @dev This function does not set payment terms; PoRepMarket consumes the
      * returned covered bytes and derives committed bytes, billed units, service
      * start/end, rail ceiling, and deal state
@@ -496,12 +509,32 @@ contract DataCapEvidenceAdapter is
      */
     function activateEvidence(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        pure
+        onlyPoRepMarket
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        context;
+        /// NOTE: compiler's warning silenced for unused variable; evidenceData gonna be used potentially in the future
         evidenceData;
-        return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: 0});
+
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
+
+        uint256 threshold =
+            context.requestedSizeBytes * (BPS_DENOMINATOR - context.activationToleranceBps) / BPS_DENOMINATOR;
+
+        if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
+            // TODO: add custom reasonCode
+            return SharedTypes.ActivationDecision({
+                coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.REJECTED
+            });
+        }
+
+        deal.activeClaimedBytes = deal.claimedBytes;
+
+        emit DealEvidenceReady(context.dealId, address(this));
+
+        // TODO: add custom reasonCode
+        return SharedTypes.ActivationDecision({
+            coveredBytes: deal.claimedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
+        });
     }
 
     /**

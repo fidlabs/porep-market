@@ -39,6 +39,7 @@ interface IStorageEvidenceAdapter {
     /**
      * @notice Return the adapter's activation decision after submitted evidence
      * covers enough bytes for the frozen deal
+     * @dev Only callable by the PoRepMarket contract
      * @dev This function does not set payment terms; PoRepMarket consumes the
      * returned covered bytes and derives committed bytes, billed units, service
      * start/end, rail ceiling, and deal state
