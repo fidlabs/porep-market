@@ -16,6 +16,6 @@ contract DataCapEvidenceAdapterContractMock is DataCapEvidenceAdapter {
 
     function deleteDealAllocationIdByIndex(uint256 dealId, uint64 index) external {
         DataCapDealEvidence storage dealEvidence = s()._deals[dealId];
-        _deleteDealAllocationIdByIndex(dealEvidence, index);
+        _deleteIdByIndex(dealEvidence.allocationIds, index);
     }
 }

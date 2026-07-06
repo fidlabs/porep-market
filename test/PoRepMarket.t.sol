@@ -122,6 +122,7 @@ contract PoRepMarketTest is Test {
             dealId: _dealId,
             railId: railId,
             allocatedBytes: _allocationSize,
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0),
             allocationIds: new CommonTypes.FilActorId[](0),
             claimIds: new CommonTypes.FilActorId[](0),
             claimedBytes: 0,

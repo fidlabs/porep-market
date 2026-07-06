@@ -382,25 +382,6 @@ contract DataCapEvidenceAdapterTest is Test {
         mock.submitEvidenceBatch(_activationContext(), abi.encode(uint256(10)));
     }
 
-    function testRefreshEvidenceStatusReturnsDummyStatus() public view {
-        SharedTypes.EvidenceStatus memory status =
-            dataCapEvidenceAdapter.refreshEvidenceStatus(_activationContext(), "");
-
-        assertEq(status.activeCoveredBytes, 0);
-        assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 0);
-        assertEq(status.reasonCode, 0);
-        assertEq(status.result, 0);
-    }
-
-    function testCurrentEvidenceStatusReturnsDummyStatus() public view {
-        SharedTypes.EvidenceStatus memory status = dataCapEvidenceAdapter.currentEvidenceStatus(_activationContext());
-
-        assertEq(status.activeCoveredBytes, 0);
-        assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 0);
-        assertEq(status.reasonCode, 0);
-        assertEq(status.result, 0);
-    }
-
     function testGetAllocationIdsPerDealPaginates() public {
         DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
             DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));

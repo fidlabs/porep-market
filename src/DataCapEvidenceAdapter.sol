@@ -101,6 +101,12 @@ contract DataCapEvidenceAdapter is
      */
     uint64 internal constant MIN_CLAIM_WINDOW_EPOCHS = 11_520;
 
+    /**
+     * @notice Number of epochs in one month
+     * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
+     */
+    uint256 public constant EPOCHS_IN_MONTH = 86_400;
+
     // solhint-disable gas-indexed-events
     /**
      * @notice Emitted when DataCap is allocated to a SP.
@@ -294,6 +300,7 @@ contract DataCapEvidenceAdapter is
         uint256 dealId;
         uint256 railId;
         uint256 allocatedBytes;
+        CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
         uint256 claimedBytes;
@@ -478,7 +485,7 @@ contract DataCapEvidenceAdapter is
             claimPointer--;
             deal.claimIds.push(allocationsBatch[idx]);
             coveredBytes += result.claims[claimPointer].size;
-            _deleteDealAllocationIdByIndex(deal, idx);
+            _deleteIdByIndex(deal.allocationIds, idx);
         }
 
         deal.claimedBytes += coveredBytes;
@@ -546,13 +553,78 @@ contract DataCapEvidenceAdapter is
      */
     function refreshEvidenceStatus(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        pure
+        nonReentrant
+        onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        context;
         evidenceData;
+
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
+        DataCapEvidenceAdapterStorage storage $ = s();
+
+        CommonTypes.FilActorId[] memory ids = deal.claimIds;
+
+        VerifRegTypes.GetClaimsParams memory getClaimsParams =
+            VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: ids});
+
+        (int256 getClaimsExitCode, VerifRegTypes.GetClaimsReturn memory getClaimsResult) =
+            VerifRegAPI.getClaims(getClaimsParams);
+
+        if (getClaimsExitCode != 0) revert GetClaimsCallFailed();
+
+        uint256 activeSize = 0;
+        uint256 failIterator = 0;
+        int64 currentEpoch = int64(uint64(block.number));
+        uint256[] memory toDelete = new uint256[](ids.length);
+        uint256 deleteCount = 0;
+        for (uint256 i = 0; i < ids.length; ++i) {
+            if (
+                getClaimsResult.batch_info.fail_codes.length > 0
+                    && getClaimsResult.batch_info.fail_codes.length > failIterator
+                    && i == getClaimsResult.batch_info.fail_codes[failIterator].idx
+            ) {
+                ++failIterator;
+                toDelete[deleteCount++] = i;
+                continue;
+            }
+            VerifRegTypes.Claim memory claim = getClaimsResult.claims[i - failIterator];
+
+            bool expired =
+                (CommonTypes.ChainEpoch.unwrap(claim.term_start) + CommonTypes.ChainEpoch.unwrap(claim.term_max))
+                    < currentEpoch;
+
+            uint64 id = CommonTypes.FilActorId.unwrap(ids[i]);
+
+            if (expired || $._terminatedClaims[id]) {
+                toDelete[deleteCount++] = i;
+                continue;
+            }
+
+            activeSize += claim.size;
+        }
+
+        for (uint256 i = deleteCount; i > 0; --i) {
+            _deleteIdByIndex(deal.claimIds, toDelete[i - 1]);
+        }
+
+        deal.activeClaimedBytes = activeSize;
+
+        uint256 threshold = context.requestedSizeBytes * context.activationToleranceBps / BPS_DENOMINATOR;
+
+        uint8 evidenceResult;
+        if (activeSize < threshold) {
+            evidenceResult = EvidenceResult.REJECTED;
+        } else {
+            deal.lastEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
+            evidenceResult = EvidenceResult.ACCEPTED;
+        }
+
+        // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
+            activeCoveredBytes: activeSize,
+            lastEvidenceRefreshEpoch: deal.lastEvidenceRefreshEpoch,
+            reasonCode: 0,
+            result: evidenceResult
         });
     }
 
@@ -564,12 +636,24 @@ contract DataCapEvidenceAdapter is
      */
     function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
-        pure
+        view
+        onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        context;
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
+
+        uint256 lastRefresh = uint256(uint64(CommonTypes.ChainEpoch.unwrap(deal.lastEvidenceRefreshEpoch)));
+
+        uint8 result = EvidenceResult.NONE;
+        if (block.number > lastRefresh + EPOCHS_IN_MONTH) {
+            result = EvidenceResult.INACTIVE;
+        }
+
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
+            activeCoveredBytes: deal.activeClaimedBytes,
+            lastEvidenceRefreshEpoch: deal.lastEvidenceRefreshEpoch,
+            reasonCode: 0,
+            result: result
         });
     }
 
@@ -1051,19 +1135,18 @@ contract DataCapEvidenceAdapter is
 
         for (uint256 i = deleteCount; i > 0; --i) {
             uint256 idx = toDelete[i - 1];
-            _deleteDealAllocationIdByIndex(dealEvidence, idx);
+            _deleteIdByIndex(dealEvidence.allocationIds, idx);
         }
 
         return activeSize == dealEvidence.allocatedBytes;
     }
 
     /**
-     * @notice Internal function to delete an allocation ID from a deal by its index
-     * @param dealEvidence The storage reference to the deal
-     * @param index The index of the allocation ID to delete
+     * @notice Internal function to delete an id from a storage array by its index
+     * @param ids The list of ids to remove from
+     * @param index The index of the id to delete
      */
-    function _deleteDealAllocationIdByIndex(DataCapDealEvidence storage dealEvidence, uint256 index) internal {
-        CommonTypes.FilActorId[] storage ids = dealEvidence.allocationIds;
+    function _deleteIdByIndex(CommonTypes.FilActorId[] storage ids, uint256 index) internal {
         uint256 last = ids.length - 1;
         if (index != last) ids[index] = ids[last];
         ids.pop();

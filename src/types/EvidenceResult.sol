@@ -10,4 +10,5 @@ library EvidenceResult {
     uint8 internal constant PARTIAL = 10;
     uint8 internal constant ACCEPTED = 20;
     uint8 internal constant REJECTED = 30;
+    uint8 internal constant INACTIVE = 40;
 }
