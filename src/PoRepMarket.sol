@@ -540,6 +540,20 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     // solhint-enable function-max-lines
 
+    /// @inheritdoc IPoRepMarket
+    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+        external
+        view
+        returns (SharedTypes.ProviderDealSelection memory selection)
+    {
+        _ensureCorrectManifestLocation(request.manifestLocation);
+        _ensureCorrectRequirements(request.requiredSLIs);
+        if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
+        _ensureCorrectTerms(request);
+
+        return s()._SPRegistryContract.previewProviderForDeal(request);
+    }
+
     /**
      * @notice Updates the validator for a deal
      * @param dealId The id of the deal

@@ -847,6 +847,143 @@
   },
   {
     "type": "function",
+    "name": "previewProviderForDeal",
+    "inputs": [
+      {
+        "name": "request",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.DealRequest",
+        "components": [
+          {
+            "name": "manifestHash",
+            "type": "bytes32",
+            "internalType": "bytes32"
+          },
+          {
+            "name": "requestedSizeBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "maxPricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "manifestLocation",
+            "type": "string",
+            "internalType": "string"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "durationDays",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "requiredSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "selection",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.ProviderDealSelection",
+        "components": [
+          {
+            "name": "provider",
+            "type": "uint64",
+            "internalType": "CommonTypes.FilActorId"
+          },
+          {
+            "name": "offerId",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "paymentToken",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "payee",
+            "type": "address",
+            "internalType": "address"
+          },
+          {
+            "name": "pricePer32GiBPerMonth",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "promisedSLIs",
+            "type": "tuple",
+            "internalType": "struct SharedTypes.SLIThresholds",
+            "components": [
+              {
+                "name": "retrievabilityBps",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "bandwidthBytesPerSecond",
+                "type": "uint64",
+                "internalType": "uint64"
+              },
+              {
+                "name": "latencyMs",
+                "type": "uint16",
+                "internalType": "uint16"
+              },
+              {
+                "name": "indexingPct",
+                "type": "uint8",
+                "internalType": "uint8"
+              }
+            ]
+          },
+          {
+            "name": "reservedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "proposeDeal",
     "inputs": [
       {

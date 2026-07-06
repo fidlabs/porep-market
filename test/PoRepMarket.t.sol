@@ -169,6 +169,25 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
     }
 
+    function testPreviewProviderForDealReturnsRegistrySelection() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.expectCall(address(spRegistry), abi.encodeCall(ISPRegistry.previewProviderForDeal, (request)));
+        SharedTypes.ProviderDealSelection memory selection = poRepMarket.previewProviderForDeal(request);
+
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(selection.offerId, selectedOfferId);
+        assertEq(selection.paymentToken, paymentToken);
+        assertEq(selection.payee, paymentPayee);
+        assertEq(selection.pricePer32GiBPerMonth, MIN_PRICE_PER_SECTOR_PER_MONTH + 10);
+        assertEq(selection.reservedBytes, totalDealSize);
+        assertEq(selection.promisedSLIs.retrievabilityBps, defaultRequirements.retrievabilityBps);
+        assertEq(selection.promisedSLIs.bandwidthBytesPerSecond, defaultRequirements.bandwidthBytesPerSecond);
+        assertEq(selection.promisedSLIs.latencyMs, defaultRequirements.latencyMs);
+        assertEq(selection.promisedSLIs.indexingPct, defaultRequirements.indexingPct);
+    }
+
     function setDealActive(uint256 targetDealId) internal {
         PoRepMarketContractMock(address(poRepMarket)).setDealState(targetDealId, DealState.ACTIVE);
     }

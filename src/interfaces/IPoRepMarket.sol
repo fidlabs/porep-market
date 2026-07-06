@@ -23,6 +23,16 @@ interface IPoRepMarket {
     function proposeDeal(SharedTypes.DealRequest calldata request) external;
 
     /**
+     * @notice Previews the provider offer automatic matching would select for a deal request
+     * @param request The client deal request
+     * @return selection The selected provider offer snapshot, or zeroed fields when no offer matches
+     */
+    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+        external
+        view
+        returns (SharedTypes.ProviderDealSelection memory selection);
+
+    /**
      * @notice Updates the validator for a deal
      * @param dealId The id of the deal
      */
