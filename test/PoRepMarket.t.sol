@@ -57,6 +57,7 @@ contract PoRepMarketTest is Test {
     bytes32 public defaultManifestHash;
     string public expectedManifestLocation = "https://example.com/manifest";
 
+    // solhint-disable-next-line function-max-lines
     function setUp() public {
         PoRepMarketContractMock impl = new PoRepMarketContractMock();
         spRegistry = new SPRegistryMock();
