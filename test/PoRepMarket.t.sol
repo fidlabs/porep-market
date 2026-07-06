@@ -1491,6 +1491,7 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, firstSettlementEndEpoch);
 
+        // forge-lint: disable-next-line(unsafe-typecast)
         int64 firstSettlementEndChainEpoch = int64(uint64(firstSettlementEndEpoch));
         assertEq(
             CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealService(dealId).lastSettledEpoch),
@@ -1500,7 +1501,6 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.validateDealSettlement(dealId, firstSettlementEndEpoch, secondSettlementEndEpoch);
 
-        // casting to 'int64' is safe because settlement epochs in this test are bounded by the deal duration.
         // forge-lint: disable-next-line(unsafe-typecast)
         int64 secondSettlementEndChainEpoch = int64(uint64(secondSettlementEndEpoch));
         assertEq(

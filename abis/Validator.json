@@ -631,16 +631,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidSLIScorerAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSPRegistryAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidTerminator",
     "inputs": []
   },

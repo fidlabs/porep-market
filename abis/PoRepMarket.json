@@ -1283,11 +1283,6 @@
         "internalType": "uint256"
       },
       {
-        "name": "proposedAmount",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
         "name": "fromEpoch",
         "type": "uint256",
         "internalType": "uint256"
@@ -2047,11 +2042,6 @@
   {
     "type": "error",
     "name": "MinEpochsBetweenSettlementsExceeded",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NoProviderFoundForDeal",
     "inputs": []
   },
   {

@@ -608,16 +608,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidSliScorerAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidSPRegistryAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "NotInitializing",
     "inputs": []
   },

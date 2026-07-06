@@ -219,14 +219,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
                 $._beacon,
                 abi.encodeCall(
                     Validator.initialize,
-                    (
-                        $._admin,
-                        $._poRepService,
-                        $._filecoinPay,
-                        $._dataCapEvidenceAdapter,
-                        $._poRepMarket,
-                        dealId
-                    )
+                    ($._admin, $._poRepService, $._filecoinPay, $._dataCapEvidenceAdapter, $._poRepMarket, dealId)
                 )
             )
         );

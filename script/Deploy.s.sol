@@ -64,8 +64,7 @@ contract Deploy is Script, DeployUtils {
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
         PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
-        ValidatorFactory(validatorFactory)
-            .initialize2(poRepService, filecoinPay, dataCapEvidenceAdapter, poRepMarket);
+        ValidatorFactory(validatorFactory).initialize2(poRepService, filecoinPay, dataCapEvidenceAdapter, poRepMarket);
         SPRegistry(spRegistry).initialize2(poRepMarket);
 
         if (operatorAddress != address(0)) {

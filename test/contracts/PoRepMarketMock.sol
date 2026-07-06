@@ -39,11 +39,7 @@ contract PoRepMarketMock {
 
     function setSettlementDecision(uint256 settlementAmount, uint256 settleUpto, string calldata note) external {
         settlementDecision = SharedTypes.SettlementDecision({
-            settlementAmount: settlementAmount,
-            settleUpto: settleUpto,
-            reasonCode: 0,
-            result: 0,
-            note: note
+            settlementAmount: settlementAmount, settleUpto: settleUpto, reasonCode: 0, result: 0, note: note
         });
     }
 
@@ -67,7 +63,7 @@ contract PoRepMarketMock {
         return dealTerms[dealId];
     }
 
-    function validateDealSettlement(uint256, uint256, uint256, uint256)
+    function validateDealSettlement(uint256, uint256, uint256)
         external
         view
         returns (SharedTypes.SettlementDecision memory)

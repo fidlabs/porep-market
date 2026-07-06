@@ -12,7 +12,6 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
-import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
@@ -255,9 +254,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         address _poRepMarket,
         uint256 _dealId
     ) external initializer {
-        _validateInitializeAddresses(
-            _admin, _porepService, _filecoinPay, _evidenceAdapter, _poRepMarket
-        );
+        _validateInitializeAddresses(_admin, _porepService, _filecoinPay, _evidenceAdapter, _poRepMarket);
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
