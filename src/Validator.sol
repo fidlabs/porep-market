@@ -285,6 +285,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param toEpoch The epoch up to and including which validation is requested; payment will be validated for (toEpoch - fromEpoch) epochs
      * @return result ValidationResult struct containing validation outcome
      */
+    // solhint-disable-next-line use-natspec
     function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256)
         external
         override

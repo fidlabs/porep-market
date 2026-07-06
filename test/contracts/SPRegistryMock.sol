@@ -36,6 +36,9 @@ contract SPRegistryMock is ISPRegistry {
     uint256 public lastReleasedCapacityBytes;
     bytes32 public lastReleasedCapacityManifestHash;
     bytes32 public lastReleasedPendingManifestHash;
+    uint64 public lastCommittedProvider;
+    uint256 public lastCommittedEstimatedBytes;
+    uint256 public lastCommittedActualBytes;
 
     function setNextSelection(SharedTypes.ProviderDealSelection calldata selection) external {
         nextSelection = selection;
@@ -226,7 +229,13 @@ contract SPRegistryMock is ISPRegistry {
         lastReleasedPendingManifestHash = manifestHash;
     }
 
-    function commitCapacity(CommonTypes.FilActorId, uint256, uint256) external {}
+    function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
+        external
+    {
+        lastCommittedProvider = CommonTypes.FilActorId.unwrap(provider);
+        lastCommittedEstimatedBytes = estimatedSizeBytes;
+        lastCommittedActualBytes = actualSizeBytes;
+    }
     function pauseProvider(CommonTypes.FilActorId) external {}
     function unpauseProvider(CommonTypes.FilActorId) external {}
     function blockProvider(CommonTypes.FilActorId) external {}

@@ -17,6 +17,7 @@ import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {RailStatus} from "./types/RailStatus.sol";
+import {EvidenceResult} from "./types/EvidenceResult.sol";
 import {SettlementReason} from "./types/SettlementReason.sol";
 import {SettlementResult} from "./types/SettlementResult.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
@@ -768,7 +769,13 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
         _ensureDealExists(deal);
         _ensureDealCorrectState(deal, DealState.ACTIVE);
+        _startPreparedPayment($, dealId, deal);
+    }
 
+    // solhint-disable-next-line use-natspec
+    function _startPreparedPayment(PoRepMarketStorage storage $, uint256 dealId, PoRepTypes.Deal storage deal)
+        internal
+    {
         if (deal.railId == 0) {
             revert InvalidRailId();
         }
@@ -1007,8 +1014,25 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _ensurePoRepServiceOrAdmin();
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, DealState.ACCEPTED);
 
-        return IStorageEvidenceAdapter(deal.evidenceAdapter).activateEvidence(_activationContext(deal), evidenceData);
+        PoRepMarketStorage storage $ = s();
+        decision =
+            IStorageEvidenceAdapter(deal.evidenceAdapter).activateEvidence(_activationContext(deal), evidenceData);
+        if (decision.result != EvidenceResult.ACCEPTED) {
+            return decision;
+        }
+
+        PoRepTypes.DealTerms storage terms = $._dealTerms[dealId];
+        PoRepTypes.DealCapacity storage capacity = $._dealCapacity[dealId];
+        PoRepTypes.DealPayment storage payment = $._dealPayments[dealId];
+        uint256 committedBytes = Math.min(decision.coveredBytes, terms.requestedSizeBytes);
+
+        capacity.committedBytes = committedBytes;
+        payment.billed32GiBUnits = Math.ceilDiv(committedBytes, SECTOR_SIZE);
+        $._SPRegistryContract.commitCapacity(deal.provider, capacity.reservedBytes, committedBytes);
+        _changeDealState(dealId, DealState.ACTIVE);
+        _startPreparedPayment($, dealId, deal);
     }
 
     /**
@@ -1445,8 +1469,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Converts a non-negative Filecoin epoch to uint256
      * @param epoch The epoch to convert
+     * @return value The epoch as an unsigned integer
      */
-    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256) {
+    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256 value) {
         // forge-lint: disable-next-line(unsafe-typecast)
         return uint256(uint64(CommonTypes.ChainEpoch.unwrap(epoch)));
     }
