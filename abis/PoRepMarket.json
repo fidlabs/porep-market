@@ -823,6 +823,21 @@
                 "name": "serviceEndEpoch",
                 "type": "int64",
                 "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "earlyTerminationEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "minTimeBetweenSettlementsInEpochs",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "lastSettledEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
               }
             ]
           },
@@ -1065,6 +1080,21 @@
               },
               {
                 "name": "serviceEndEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "earlyTerminationEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
+              },
+              {
+                "name": "minTimeBetweenSettlementsInEpochs",
+                "type": "uint256",
+                "internalType": "uint256"
+              },
+              {
+                "name": "lastSettledEpoch",
                 "type": "int64",
                 "internalType": "CommonTypes.ChainEpoch"
               }

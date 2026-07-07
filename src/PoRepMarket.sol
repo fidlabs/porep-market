@@ -1559,8 +1559,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /**
      * @notice Converts a non-negative Filecoin epoch to uint256
      * @param epoch The epoch to convert
+     * @return epochAsUint The epoch converted to uint256
      */
-    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256) {
+    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256 epochAsUint) {
         // forge-lint: disable-next-line(unsafe-typecast)
         return uint256(uint64(CommonTypes.ChainEpoch.unwrap(epoch)));
     }

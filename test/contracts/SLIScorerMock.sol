@@ -23,9 +23,16 @@ contract SLIScorerMock is ISLIScorer {
 
     /**
      * @notice Returns the configured score for a deal id.
+     * @param dealId Deal id to score.
+     * @param thresholds SLI thresholds ignored by this mock.
      * @return score Configured score for the deal id.
      */
-    function calculateScore(uint256 dealId, SharedTypes.SLIThresholds calldata) external view returns (uint256 score) {
+    function calculateScore(uint256 dealId, SharedTypes.SLIThresholds calldata thresholds)
+        external
+        view
+        returns (uint256 score)
+    {
+        thresholds; // unused parameter, kept for interface compatibility
         return scores[dealId];
     }
 }

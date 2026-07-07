@@ -394,10 +394,8 @@ contract PoRepMarketTest is Test {
         assertEq(ids.length, 0);
     }
 
-    function testGetDealIdsByStateUpdatesAfterStateChange() public {
+    function testGetDealIdsByStateTracksAcceptedDealAfterProposal() public {
         proposeDefaultDeal();
-        vm.prank(providerOwnerAddress);
-        poRepMarket.acceptDeal(dealId);
 
         (uint256[] memory proposedIds, uint256 proposedTotal) = poRepMarket.getDealIdsByState(DealState.PROPOSED, 0, 10);
         (uint256[] memory acceptedIds, uint256 acceptedTotal) = poRepMarket.getDealIdsByState(DealState.ACCEPTED, 0, 10);
@@ -409,30 +407,20 @@ contract PoRepMarketTest is Test {
         assertEq(acceptedIds[0], dealId);
     }
 
-    function testGetDealIdsByStateReturnsEmptyWhenOffsetPastTotal() public {
+    function testGetDealIdsByStateReturnsEmptyWhenOffsetPastAcceptedTotal() public {
         proposeDefaultDeal();
 
-        (uint256[] memory ids, uint256 total) = poRepMarket.getDealIdsByState(DealState.PROPOSED, 1, 10);
+        (uint256[] memory ids, uint256 total) = poRepMarket.getDealIdsByState(DealState.ACCEPTED, 1, 10);
 
         assertEq(total, 1);
         assertEq(ids.length, 0);
     }
 
     function testGetDealViewMatchesPrimitiveGetters() public {
-        spRegistry.setProviderInfo(
+        spRegistry.setProviderState(
             providerFilActorId,
-            ISPRegistry.ProviderInfo({
-                organization: providerOwnerAddress,
-                payee: address(0),
-                paused: false,
-                blocked: false,
-                capabilities: defaultRequirements,
-                availableBytes: 0,
-                committedBytes: 0,
-                pendingBytes: 0,
-                pricePerSectorPerMonth: 0,
-                minDealDurationDays: 0,
-                maxDealDurationDays: 0
+            SPRegistryMock.MockProviderState({
+                organization: providerOwnerAddress, payee: address(0), paused: false, blocked: false
             })
         );
         proposeDefaultDeal();
@@ -469,10 +457,10 @@ contract PoRepMarketTest is Test {
         assertEq(view_.providerOrganization, providerOwnerAddress);
     }
 
-    function assertDealViewPayment(
-        PoRepTypes.DealViewPayment memory viewPayment,
-        PoRepTypes.DealPayment memory payment
-    ) internal pure {
+    function assertDealViewPayment(PoRepTypes.DealViewPayment memory viewPayment, PoRepTypes.DealPayment memory payment)
+        internal
+        pure
+    {
         assertEq(viewPayment.paymentToken, payment.paymentToken);
         assertEq(viewPayment.pricePer32GiBPerMonth, payment.pricePer32GiBPerMonth);
         assertEq(viewPayment.billed32GiBUnits, payment.billed32GiBUnits);
