@@ -15,6 +15,7 @@ import {IPoRepMarket} from "../src/interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
+import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 import {SettlementReason} from "../src/types/SettlementReason.sol";
 import {SettlementResult} from "../src/types/SettlementResult.sol";
 import {PoRepMarketContractMock} from "./contracts/PoRepMarketContractMock.sol";
@@ -152,7 +153,6 @@ contract PoRepMarketTest is Test {
         returns (DataCapEvidenceAdapter.DataCapDealEvidence memory)
     {
         return DataCapEvidenceAdapter.DataCapDealEvidence({
-            completed: false,
             postingFinished: false,
             client: clientAddress,
             validator: validatorAddress,
@@ -918,6 +918,210 @@ contract PoRepMarketTest is Test {
         assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
     }
 
+    function testActivateEvidenceCommitsCapacitySetsDealActiveAndStartsPreparedRail() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateRailId(dealId, railId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, totalDealSize));
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        uint256 serviceStartEpoch = block.number;
+        bytes memory evidenceData = abi.encode("activate");
+
+        vm.prank(adminAddress);
+        SharedTypes.ActivationDecision memory decision = poRepMarket.activateEvidence(dealId, evidenceData);
+
+        PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
+        PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(decision.coveredBytes, totalDealSize);
+        assertEq(dataCapEvidenceAdapterAddress.activatedEvidence(dealId), evidenceData);
+        assertEq(deal.state, DealState.ACTIVE);
+        assertEq(capacity.reservedBytes, totalDealSize);
+        assertEq(capacity.committedBytes, totalDealSize);
+        assertEq(payment.billed32GiBUnits, totalDealSize / poRepMarket.SECTOR_SIZE());
+        assertEq(payment.railMaxRatePerEpoch, expectedRailRate(dealId));
+        assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch))), serviceStartEpoch);
+        assertEq(
+            uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch))),
+            serviceStartEpoch + poRepMarket.getDealTerms(dealId).durationEpochs
+        );
+        assertEq(spRegistry.lastCommittedProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(spRegistry.lastCommittedEstimatedBytes(), totalDealSize);
+        assertEq(spRegistry.lastCommittedActualBytes(), totalDealSize);
+        assertEq(validator.modifyRailPaymentCallCount(), 1);
+        assertEq(validator.lastNewRate(), expectedRailRate(dealId));
+        assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
+    }
+
+    function testActivateEvidenceDoesNotMutateMarketWhenAdapterRejects() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateRailId(dealId, railId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, totalDealSize));
+        dataCapEvidenceAdapterAddress.setActivationResult(dealId, EvidenceResult.REJECTED);
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.prank(adminAddress);
+        SharedTypes.ActivationDecision memory decision = poRepMarket.activateEvidence(dealId, abi.encode("activate"));
+
+        PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
+        PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+
+        assertEq(decision.result, EvidenceResult.REJECTED);
+        assertEq(deal.state, DealState.ACCEPTED);
+        assertEq(capacity.committedBytes, 0);
+        assertEq(payment.billed32GiBUnits, 0);
+        assertEq(payment.railMaxRatePerEpoch, 0);
+        assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch))), 0);
+        assertEq(spRegistry.lastCommittedActualBytes(), 0);
+        assertEq(validator.modifyRailPaymentCallCount(), 0);
+        assertEq(validator.getRailStatus(), RailStatus.PREPARED);
+    }
+
+    function testActivateEvidenceUsesCoveredBytesForCapacityAndBilling() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+        uint256 overCoveredBytes = totalDealSize + poRepMarket.SECTOR_SIZE();
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateRailId(dealId, railId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, overCoveredBytes));
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.prank(adminAddress);
+        SharedTypes.ActivationDecision memory decision = poRepMarket.activateEvidence(dealId, abi.encode("activate"));
+
+        PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+
+        assertEq(decision.coveredBytes, overCoveredBytes);
+        assertEq(capacity.committedBytes, overCoveredBytes);
+        assertEq(payment.billed32GiBUnits, overCoveredBytes / poRepMarket.SECTOR_SIZE());
+        assertEq(spRegistry.lastCommittedActualBytes(), overCoveredBytes);
+    }
+
+    function testActivateEvidenceRoundsBilledUnitsUpForPartialSector() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+        uint256 partialSectorSize = poRepMarket.SECTOR_SIZE() + 1;
+        RequestTerms memory terms = RequestTerms({
+            dealSizeBytes: partialSectorSize, pricePerSectorPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH, durationDays: 360
+        });
+        spRegistry.setNextSelection(
+            SharedTypes.ProviderDealSelection({
+                provider: providerFilActorId,
+                offerId: selectedOfferId,
+                paymentToken: paymentToken,
+                payee: paymentPayee,
+                pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH + 10,
+                promisedSLIs: defaultRequirements,
+                reservedBytes: partialSectorSize
+            })
+        );
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, terms, expectedManifestLocation));
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateRailId(dealId, railId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, partialSectorSize));
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.prank(adminAddress);
+        poRepMarket.activateEvidence(dealId, abi.encode("activate"));
+
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+        assertEq(payment.billed32GiBUnits, 2);
+        assertEq(payment.railMaxRatePerEpoch, expectedRailRate(dealId));
+        assertEq(spRegistry.lastCommittedActualBytes(), partialSectorSize);
+    }
+
+    function testActivateEvidenceRevertsAfterDealIsAlreadyActive() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        vm.prank(address(validator));
+        poRepMarket.updateRailId(dealId, railId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, totalDealSize));
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.prank(adminAddress);
+        poRepMarket.activateEvidence(dealId, abi.encode("activate"));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACTIVE, DealState.ACCEPTED
+            )
+        );
+        vm.prank(adminAddress);
+        poRepMarket.activateEvidence(dealId, abi.encode("activate-again"));
+
+        assertEq(spRegistry.lastCommittedActualBytes(), totalDealSize);
+        assertEq(validator.modifyRailPaymentCallCount(), 1);
+    }
+
+    function testActivateEvidenceRollsBackMarketWritesWhenPaymentActivationReverts() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, totalDealSize));
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.expectRevert(PoRepMarket.InvalidRailId.selector);
+        vm.prank(adminAddress);
+        poRepMarket.activateEvidence(dealId, abi.encode("activate"));
+
+        PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
+        PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+
+        assertEq(deal.state, DealState.ACCEPTED);
+        assertEq(capacity.committedBytes, 0);
+        assertEq(payment.billed32GiBUnits, 0);
+        assertEq(payment.railMaxRatePerEpoch, 0);
+        assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch))), 0);
+        assertEq(spRegistry.lastCommittedActualBytes(), 0);
+        assertEq(validator.modifyRailPaymentCallCount(), 0);
+    }
+
     function testActivatePaymentEmitsPaymentActivatedEvent() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);
@@ -1597,6 +1801,7 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        dataCapEvidenceAdapterAddress.setActivationResult(dealId, EvidenceResult.REJECTED);
 
         vm.prank(adminAddress);
         poRepMarket.activateEvidence(dealId, evidenceData);
@@ -1611,6 +1816,7 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        dataCapEvidenceAdapterAddress.setActivationResult(dealId, EvidenceResult.REJECTED);
 
         vm.prank(adminAddress);
         poRepMarket.grantRole(serviceRole, service);

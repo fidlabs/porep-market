@@ -320,8 +320,6 @@ contract DataCapEvidenceAdapter is
     error InvalidAllocatedBytes();
 
     struct DataCapDealEvidence {
-        // Deprecated; retained to preserve the deployed storage layout.
-        bool completed;
         bool postingFinished;
         address client;
         address validator;

@@ -19,6 +19,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(uint256 dealId => bytes evidenceData) public activatedEvidence;
     mapping(uint256 dealId => bytes evidenceData) public refreshedEvidence;
     mapping(uint256 dealId => address caller) public submitEvidenceCaller;
+    mapping(uint256 dealId => uint8 result) public activationResult;
     bool public operational = true;
 
     function setValid(CommonTypes.FilActorId provider, bool ok) external {
@@ -86,6 +87,10 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         operational = operational_;
     }
 
+    function setActivationResult(uint256 dealId, uint8 result) external {
+        activationResult[dealId] = result;
+    }
+
     function isOperational() external view returns (bool) {
         return operational;
     }
@@ -110,8 +115,12 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         returns (SharedTypes.ActivationDecision memory decision)
     {
         activatedEvidence[context.dealId] = evidenceData;
+        uint8 result = activationResult[context.dealId];
+        if (result == 0) {
+            result = EvidenceResult.ACCEPTED;
+        }
         return SharedTypes.ActivationDecision({
-            coveredBytes: deals[context.dealId].allocatedBytes, reasonCode: 0, result: EvidenceResult.ACCEPTED
+            coveredBytes: deals[context.dealId].allocatedBytes, reasonCode: 0, result: result
         });
     }
 
