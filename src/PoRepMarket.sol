@@ -772,10 +772,17 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _startPreparedPayment($, dealId, deal);
     }
 
-    // solhint-disable-next-line use-natspec
-    function _startPreparedPayment(PoRepMarketStorage storage $, uint256 dealId, PoRepTypes.Deal storage deal)
-        internal
-    {
+    
+    /**
+     * @notice Starts a prepared payment for a deal
+     * @dev Validates rail id and rail status, computes per-epoch payment rate,
+     *      sets up service start/end epochs, informs the operator to modify
+     *      the rail payment and emits PaymentActivated.
+     * @param $ Storage pointer to PoRepMarket storage
+     * @param dealId The id of the deal to start payment for
+     * @param deal The deal struct associated with dealId
+     */
+    function _startPreparedPayment(PoRepMarketStorage storage $, uint256 dealId, PoRepTypes.Deal storage deal) internal {
         if (deal.railId == 0) {
             revert InvalidRailId();
         }
