@@ -142,7 +142,9 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
             activeCoveredBytes: activeCoveredBytes,
             lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),
             reasonCode: 0,
-            result: activeCoveredBytes == 0 ? EvidenceResult.NONE : EvidenceResult.ACCEPTED
+            result: activeCoveredBytes == 0 ? EvidenceResult.NONE : EvidenceResult.ACCEPTED,
+            checkedClaims: 0,
+            totalClaims: 0
         });
     }
 }

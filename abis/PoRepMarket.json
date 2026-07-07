@@ -210,11 +210,21 @@
             "name": "result",
             "type": "uint8",
             "internalType": "uint8"
+          },
+          {
+            "name": "checkedClaims",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalClaims",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
     ],
-    "stateMutability": "view"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1721,6 +1731,16 @@
             "name": "result",
             "type": "uint8",
             "internalType": "uint8"
+          },
+          {
+            "name": "checkedClaims",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalClaims",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }

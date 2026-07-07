@@ -162,8 +162,7 @@ contract PoRepMarketTest is Test {
             allocatedBytes: _allocationSize,
             allocationIds: new CommonTypes.FilActorId[](0),
             claimIds: new CommonTypes.FilActorId[](0),
-            claimedBytes: 0,
-            activeClaimedBytes: 0
+            claimedBytes: 0
         });
     }
 
@@ -1847,6 +1846,7 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        setDealActive(dealId);
 
         vm.prank(adminAddress);
         poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
@@ -1861,6 +1861,7 @@ contract PoRepMarketTest is Test {
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        setDealActive(dealId);
 
         vm.prank(adminAddress);
         poRepMarket.grantRole(serviceRole, service);

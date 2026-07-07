@@ -292,7 +292,7 @@ interface IPoRepMarket {
      * @param dealId The id of the deal
      * @return status Current evidence status
      */
-    function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status);
+    function currentEvidenceStatus(uint256 dealId) external returns (SharedTypes.EvidenceStatus memory status);
 
     /**
      * @notice Gets the validator factory contract address from storage

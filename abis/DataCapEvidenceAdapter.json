@@ -222,11 +222,21 @@
             "name": "result",
             "type": "uint8",
             "internalType": "uint8"
+          },
+          {
+            "name": "checkedClaims",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalClaims",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -363,6 +373,25 @@
         "name": "status",
         "type": "uint8",
         "internalType": "uint8"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "getFailedClaimIds",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "failedClaimIds",
+        "type": "uint64[]",
+        "internalType": "CommonTypes.FilActorId[]"
       }
     ],
     "stateMutability": "view"
@@ -529,25 +558,6 @@
   },
   {
     "type": "function",
-    "name": "isDataSizeMatching",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "isOperational",
     "inputs": [],
     "outputs": [
@@ -644,11 +654,21 @@
             "name": "result",
             "type": "uint8",
             "internalType": "uint8"
+          },
+          {
+            "name": "checkedClaims",
+            "type": "uint256",
+            "internalType": "uint256"
+          },
+          {
+            "name": "totalClaims",
+            "type": "uint256",
+            "internalType": "uint256"
           }
         ]
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "nonpayable"
   },
   {
     "type": "function",
@@ -1249,6 +1269,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidAllocationState",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidBatchSize",
     "inputs": []
   },
@@ -1469,16 +1494,5 @@
     "type": "error",
     "name": "UnsupportedType",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "ValidatorNotSet",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
   }
 ]

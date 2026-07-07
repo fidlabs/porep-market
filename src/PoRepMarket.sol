@@ -1136,6 +1136,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensurePoRepServiceOrAdmin();
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, DealState.ACTIVE);
 
         return
             IStorageEvidenceAdapter(deal.evidenceAdapter).refreshEvidenceStatus(_activationContext(deal), evidenceData);
@@ -1146,12 +1147,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal
      * @return status Current evidence status
      */
-    function currentEvidenceStatus(uint256 dealId)
-        external
-        view
-        override
-        returns (SharedTypes.EvidenceStatus memory status)
-    {
+    function currentEvidenceStatus(uint256 dealId) external returns (SharedTypes.EvidenceStatus memory status) {
         return _currentEvidenceStatus(dealId);
     }
 
@@ -1160,7 +1156,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal
      * @return status Current evidence status
      */
-    function _currentEvidenceStatus(uint256 dealId) internal view returns (SharedTypes.EvidenceStatus memory status) {
+    function _currentEvidenceStatus(uint256 dealId) internal returns (SharedTypes.EvidenceStatus memory status) {
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
 
