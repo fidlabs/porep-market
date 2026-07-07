@@ -24,6 +24,16 @@ interface IPoRepMarket {
     function proposeDeal(SharedTypes.DealRequest calldata request) external;
 
     /**
+     * @notice Previews the provider offer automatic matching would select for a deal request
+     * @param request The client deal request
+     * @return selection The selected provider offer snapshot, or zeroed fields when no offer matches
+     */
+    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+        external
+        view
+        returns (SharedTypes.ProviderDealSelection memory selection);
+
+    /**
      * @notice Updates the validator for a deal
      * @param dealId The id of the deal
      */
@@ -99,6 +109,69 @@ interface IPoRepMarket {
      * @return slis The deal SLI thresholds
      */
     function getDealSLIs(uint256 dealId) external view returns (SharedTypes.SLIThresholds memory slis);
+
+    /**
+     * @notice Gets the number of deals created by PoRepMarket.
+     * @dev Offchain tools and oracle jobs use this to size full scans and detect
+     * whether new deals appeared while a scan was running.
+     * @return count Total number of created deal IDs.
+     */
+    function getDealCount() external view returns (uint256 count);
+
+    /**
+     * @notice Gets a creation-order page of deal IDs.
+     * @dev This exists for ID-first backfills, queue construction, retry logic,
+     * and large oracle scans that should avoid returning nested structs and strings
+     * before a worker knows which deals it needs to process. The caller chooses
+     * `limit` based on RPC gas, timeout, and response-size limits.
+     * @param offset Zero-based index in the creation-order deal ID list.
+     * @param limit Maximum number of deal IDs to return.
+     * @return dealIds Page of deal IDs in creation order.
+     * @return total Total number of created deal IDs at call time.
+     */
+    function getDealIds(uint256 offset, uint256 limit) external view returns (uint256[] memory dealIds, uint256 total);
+
+    /**
+     * @notice Gets a page of deal IDs for one lifecycle state.
+     * @dev Oracle jobs use this for recurring scans over active or finalized deals
+     * without scanning every historical deal. The caller chooses `limit` based on
+     * RPC gas, timeout, and response-size limits.
+     * @param state Deal lifecycle state code.
+     * @param offset Zero-based index in the state's deal ID list.
+     * @param limit Maximum number of deal IDs to return.
+     * @return dealIds Page of deal IDs in the state's existing index order.
+     * @return total Total number of deal IDs in this state at call time.
+     */
+    function getDealIdsByState(uint8 state, uint256 offset, uint256 limit)
+        external
+        view
+        returns (uint256[] memory dealIds, uint256 total);
+
+    /**
+     * @notice Gets the complete generic read model for one deal.
+     * @dev External tools, oracles, CLIs, and RPC consumers use this bounded
+     * snapshot when they need all PoRepMarket-owned or PoRepMarket-frozen facts for
+     * one deal in a single eth_call. The evidence status is adapter-local stored
+     * status and does not refresh Filecoin actor state.
+     * @param dealId The id of the deal.
+     * @return dealView Complete generic deal snapshot.
+     */
+    function getDealView(uint256 dealId) external view returns (PoRepTypes.DealView memory dealView);
+
+    /**
+     * @notice Gets a caller-sized page of complete generic deal views.
+     * @dev Oracle jobs and CLI tools use this for normal batch scans. The caller
+     * chooses `limit` because RPC providers and JSON-RPC clients have gas, timeout,
+     * and response-size limits for eth_call.
+     * @param offset Zero-based index in the creation-order deal ID list.
+     * @param limit Maximum number of deal views to return.
+     * @return dealViews Page of complete generic deal snapshots.
+     * @return total Total number of created deal IDs at call time.
+     */
+    function getDealViews(uint256 offset, uint256 limit)
+        external
+        view
+        returns (PoRepTypes.DealView[] memory dealViews, uint256 total);
 
     /**
      * @notice Accepts a deal

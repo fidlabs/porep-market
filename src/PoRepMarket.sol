@@ -7,10 +7,10 @@ import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Ini
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
+import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IOperator} from "./interfaces/IOperator.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
-import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
@@ -29,7 +29,7 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
  * @dev PoRepMarket contract is a contract that allows users to create and manage PoRep deals
  * @notice PoRepMarket contract
  */
-contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable, IPoRepMarket {
     using EnumerableSet for EnumerableSet.UintSet;
     /**
      * @notice role to manage contract upgrades
@@ -491,7 +491,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev New deals snapshot this adapter at proposal time
      * @param _globalEvidenceAdapter The address of the global evidence adapter
      */
-    function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) public onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) public override onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_globalEvidenceAdapter == address(0)) {
             revert InvalidEvidenceAdapterAddress();
         }
@@ -505,7 +505,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Proposes a deal
      * @param request The client deal request
      */
-    function proposeDeal(SharedTypes.DealRequest calldata request) external {
+    function proposeDeal(SharedTypes.DealRequest calldata request) external override {
         _ensureCorrectManifestLocation(request.manifestLocation);
         _ensureCorrectRequirements(request.requiredSLIs);
         if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
@@ -587,11 +587,25 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
 
     // solhint-enable function-max-lines
 
+    /// @inheritdoc IPoRepMarket
+    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+        external
+        view
+        returns (SharedTypes.ProviderDealSelection memory selection)
+    {
+        _ensureCorrectManifestLocation(request.manifestLocation);
+        _ensureCorrectRequirements(request.requiredSLIs);
+        if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
+        _ensureCorrectTerms(request);
+
+        return s()._SPRegistryContract.previewProviderForDeal(request);
+    }
+
     /**
      * @notice Updates the validator for a deal
      * @param dealId The id of the deal
      */
-    function updateValidator(uint256 dealId) external {
+    function updateValidator(uint256 dealId) external override {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -616,7 +630,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @param railId The id of the rail
      */
-    function updateRailId(uint256 dealId, uint256 railId) external {
+    function updateRailId(uint256 dealId, uint256 railId) external override {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -644,7 +658,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return deal The deal
      */
-    function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory deal) {
+    function getDeal(uint256 dealId) external view override returns (PoRepTypes.Deal memory deal) {
         PoRepMarketStorage storage $ = s();
         return $._deals[dealId];
     }
@@ -654,7 +668,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return dealData The deal data
      */
-    function getDealData(uint256 dealId) external view returns (SharedTypes.DealData memory dealData) {
+    function getDealData(uint256 dealId) external view override returns (SharedTypes.DealData memory dealData) {
         PoRepMarketStorage storage $ = s();
         return $._dealData[dealId];
     }
@@ -664,7 +678,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return terms The deal terms
      */
-    function getDealTerms(uint256 dealId) external view returns (PoRepTypes.DealTerms memory terms) {
+    function getDealTerms(uint256 dealId) external view override returns (PoRepTypes.DealTerms memory terms) {
         PoRepMarketStorage storage $ = s();
         return $._dealTerms[dealId];
     }
@@ -674,7 +688,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return timing The deal timing
      */
-    function getDealTiming(uint256 dealId) external view returns (PoRepTypes.DealTiming memory timing) {
+    function getDealTiming(uint256 dealId) external view override returns (PoRepTypes.DealTiming memory timing) {
         PoRepMarketStorage storage $ = s();
         return $._dealTiming[dealId];
     }
@@ -684,7 +698,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return service The deal service window
      */
-    function getDealService(uint256 dealId) external view returns (PoRepTypes.DealService memory service) {
+    function getDealService(uint256 dealId) external view override returns (PoRepTypes.DealService memory service) {
         PoRepMarketStorage storage $ = s();
         return $._dealService[dealId];
     }
@@ -694,7 +708,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return capacity The deal capacity
      */
-    function getDealCapacity(uint256 dealId) external view returns (PoRepTypes.DealCapacity memory capacity) {
+    function getDealCapacity(uint256 dealId) external view override returns (PoRepTypes.DealCapacity memory capacity) {
         PoRepMarketStorage storage $ = s();
         return $._dealCapacity[dealId];
     }
@@ -704,7 +718,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return payment The deal payment data
      */
-    function getDealPayment(uint256 dealId) external view returns (PoRepTypes.DealPayment memory payment) {
+    function getDealPayment(uint256 dealId) external view override returns (PoRepTypes.DealPayment memory payment) {
         PoRepMarketStorage storage $ = s();
         return $._dealPayments[dealId];
     }
@@ -714,16 +728,77 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return slis The deal SLI thresholds
      */
-    function getDealSLIs(uint256 dealId) external view returns (SharedTypes.SLIThresholds memory slis) {
+    function getDealSLIs(uint256 dealId) external view override returns (SharedTypes.SLIThresholds memory slis) {
         PoRepMarketStorage storage $ = s();
         return $._dealSLIs[dealId];
+    }
+
+    /// @inheritdoc IPoRepMarket
+    function getDealCount() external view override returns (uint256 count) {
+        count = s()._dealIdCounter;
+    }
+
+    /// @inheritdoc IPoRepMarket
+    function getDealIds(uint256 offset, uint256 limit)
+        external
+        view
+        override
+        returns (uint256[] memory dealIds, uint256 total)
+    {
+        total = s()._dealIdCounter;
+        uint256 length = _pageLength(total, offset, limit);
+        dealIds = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            dealIds[i] = offset + i + 1;
+        }
+    }
+
+    /// @inheritdoc IPoRepMarket
+    function getDealIdsByState(uint8 state, uint256 offset, uint256 limit)
+        external
+        view
+        override
+        returns (uint256[] memory dealIds, uint256 total)
+    {
+        EnumerableSet.UintSet storage ids = s()._dealIdsByState[state];
+        total = ids.length();
+        uint256 length = _pageLength(total, offset, limit);
+        dealIds = new uint256[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            dealIds[i] = ids.at(offset + i);
+        }
+    }
+
+    /// @inheritdoc IPoRepMarket
+    function getDealView(uint256 dealId) external view override returns (PoRepTypes.DealView memory dealView) {
+        PoRepMarketStorage storage $ = s();
+        dealView = _dealView($, dealId);
+    }
+
+    /// @inheritdoc IPoRepMarket
+    function getDealViews(uint256 offset, uint256 limit)
+        external
+        view
+        override
+        returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
+    {
+        PoRepMarketStorage storage $ = s();
+        total = $._dealIdCounter;
+        uint256 length = _pageLength(total, offset, limit);
+        dealViews = new PoRepTypes.DealView[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            dealViews[i] = _dealView($, offset + i + 1);
+        }
     }
 
     /**
      * @notice Accepts a deal
      * @param dealId The id of the deal
      */
-    function acceptDeal(uint256 dealId) external {
+    function acceptDeal(uint256 dealId) external override {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -742,7 +817,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Finalizes an active deal after service has finished
      * @param dealId The id of the deal
      */
-    function finalizeDeal(uint256 dealId) external {
+    function finalizeDeal(uint256 dealId) external override {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -763,7 +838,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev Verifies evidence, commits capacity, initializes the service window, and asks the validator to update the rail.
      * @param dealId The id of the deal
      */
-    function activatePayment(uint256 dealId) external onlyRole(POREP_SERVICE_ROLE) {
+    function activatePayment(uint256 dealId) external override onlyRole(POREP_SERVICE_ROLE) {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -814,7 +889,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @param earlyTerminationEpoch The Filecoin epoch at which the deal was terminated
      */
-    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external {
+    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external override {
         PoRepMarketStorage storage $ = _getPoRepMarketStorage();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -837,7 +912,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Rejects a deal
      * @param dealId The id of the deal
      */
-    function rejectDeal(uint256 dealId) external {
+    function rejectDeal(uint256 dealId) external override {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -864,7 +939,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev Only callable by the admin
      * @param dealId The id of the deal
      */
-    function rejectAcceptedDeal(uint256 dealId) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function rejectAcceptedDeal(uint256 dealId) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -888,7 +963,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @dev A deal is considered expired after its proposed-state expiration epoch
      */
-    function rejectExpiredDeal(uint256 dealId) external {
+    function rejectExpiredDeal(uint256 dealId) external override {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -915,7 +990,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @dev Only callable by the admin
      * @param newDealExpiration The new proposed deal expiration in epochs
      */
-    function setNewDealExpiration(uint256 newDealExpiration) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setNewDealExpiration(uint256 newDealExpiration) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newDealExpiration == 0) {
             revert InvalidDealExpiration();
         }
@@ -934,6 +1009,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     function getDealsForOrganizationByState(address organization, uint8 state)
         external
         view
+        override
         returns (PoRepTypes.Deal[] memory deals)
     {
         if (organization == address(0)) {
@@ -955,7 +1031,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Gets all deals
      * @return deals Array of all deals
      */
-    function getDeals() external view returns (PoRepTypes.Deal[] memory deals) {
+    function getDeals() external view override returns (PoRepTypes.Deal[] memory deals) {
         PoRepMarketStorage storage $ = s();
         uint256 totalDeals = $._dealIdCounter;
         deals = new PoRepTypes.Deal[](totalDeals);
@@ -969,7 +1045,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Gets the SPRegistry contract address from storage
      * @return ISPRegistry The SPRegistry contract address
      */
-    function getSPRegistryContract() external view returns (address) {
+    function getSPRegistryContract() external view override returns (address) {
         PoRepMarketStorage storage $ = s();
         return address($._SPRegistryContract);
     }
@@ -978,7 +1054,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Gets the global evidence adapter address from storage
      * @return The global evidence adapter address
      */
-    function getGlobalEvidenceAdapter() external view returns (address) {
+    function getGlobalEvidenceAdapter() external view override returns (address) {
         PoRepMarketStorage storage $ = s();
         return address($._globalEvidenceAdapter);
     }
@@ -988,7 +1064,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return The evidence adapter address for the deal
      */
-    function getDealEvidenceAdapter(uint256 dealId) external view returns (address) {
+    function getDealEvidenceAdapter(uint256 dealId) external view override returns (address) {
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
         return deal.evidenceAdapter;
@@ -1002,6 +1078,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     function submitEvidenceBatch(uint256 dealId, bytes calldata evidenceData)
         external
+        override
         returns (SharedTypes.ActivationDecision memory decision)
     {
         _ensurePoRepServiceOrAdmin();
@@ -1019,6 +1096,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     function activateEvidence(uint256 dealId, bytes calldata evidenceData)
         external
+        override
         returns (SharedTypes.ActivationDecision memory decision)
     {
         _ensurePoRepServiceOrAdmin();
@@ -1052,6 +1130,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     function refreshEvidenceStatus(uint256 dealId, bytes calldata evidenceData)
         external
+        override
         returns (SharedTypes.EvidenceStatus memory status)
     {
         _ensurePoRepServiceOrAdmin();
@@ -1067,7 +1146,12 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The id of the deal
      * @return status Current evidence status
      */
-    function currentEvidenceStatus(uint256 dealId) external view returns (SharedTypes.EvidenceStatus memory status) {
+    function currentEvidenceStatus(uint256 dealId)
+        external
+        view
+        override
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
         return _currentEvidenceStatus(dealId);
     }
 
@@ -1087,7 +1171,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Gets the validator factory contract address from storage
      * @return IValidatorFactory The validator factory contract address
      */
-    function getValidatorFactoryContract() external view returns (address) {
+    function getValidatorFactoryContract() external view override returns (address) {
         PoRepMarketStorage storage $ = s();
         return address($._validatorFactoryContract);
     }
@@ -1097,7 +1181,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @param dealId The unique identifier of the deal
      * @return manifestLocation The manifest location URL for a specific deal
      */
-    function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation) {
+    function getManifestLocation(uint256 dealId) external view override returns (string memory manifestLocation) {
         PoRepMarketStorage storage $ = s();
         _ensureDealExists($._deals[dealId]);
         return $._dealData[dealId].manifestLocation;
@@ -1107,7 +1191,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      * @notice Retrieves the proposed deal expiration
      * @return dealExpiration The proposed deal expiration in epochs
      */
-    function getDealExpiration() external view returns (uint256 dealExpiration) {
+    function getDealExpiration() external view override returns (uint256 dealExpiration) {
         PoRepMarketStorage storage $ = s();
         return _getDealExpiration($);
     }
@@ -1120,6 +1204,7 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
      */
     function updateManifestLocation(uint256 dealId, string calldata newManifestLocation)
         external
+        override
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         PoRepMarketStorage storage $ = s();
@@ -1341,6 +1426,49 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         });
     }
 
+    function _pageLength(uint256 total, uint256 offset, uint256 limit) internal pure returns (uint256 length) {
+        if (offset >= total || limit == 0) {
+            return 0;
+        }
+
+        uint256 remaining = total - offset;
+        return limit < remaining ? limit : remaining;
+    }
+
+    function _dealView(PoRepMarketStorage storage $, uint256 dealId)
+        internal
+        view
+        returns (PoRepTypes.DealView memory dealView)
+    {
+        PoRepTypes.Deal memory deal = $._deals[dealId];
+        SharedTypes.EvidenceStatus memory evidenceStatus;
+
+        if (deal.evidenceAdapter != address(0)) {
+            evidenceStatus =
+                IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
+        }
+
+        PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
+
+        dealView = PoRepTypes.DealView({
+            deal: deal,
+            data: $._dealData[dealId],
+            requiredSLIs: $._dealSLIs[dealId],
+            terms: $._dealTerms[dealId],
+            timing: $._dealTiming[dealId],
+            service: $._dealService[dealId],
+            capacity: $._dealCapacity[dealId],
+            payment: PoRepTypes.DealViewPayment({
+                paymentToken: payment.paymentToken,
+                pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth,
+                billed32GiBUnits: payment.billed32GiBUnits,
+                railMaxRatePerEpoch: payment.railMaxRatePerEpoch
+            }),
+            providerOrganization: $._dealOrganization[dealId],
+            evidenceStatus: evidenceStatus
+        });
+    }
+
     /**
      * @notice Ensures caller has admin or PoRep service role
      */
@@ -1478,9 +1606,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
     /**
      * @notice Converts a non-negative Filecoin epoch to uint256
      * @param epoch The epoch to convert
-     * @return value The epoch as an unsigned integer
+     * @return epochAsUint The epoch converted to uint256
      */
-    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256 value) {
+    function _epochToUint(CommonTypes.ChainEpoch epoch) internal pure returns (uint256 epochAsUint) {
         // forge-lint: disable-next-line(unsafe-typecast)
         return uint256(uint64(CommonTypes.ChainEpoch.unwrap(epoch)));
     }

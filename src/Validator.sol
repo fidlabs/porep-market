@@ -275,7 +275,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     // solhint-enable func-param-name-mixedcase
 
-    // solhint-disable function-max-lines, gas-strict-inequalities
+    // solhint-disable function-max-lines, gas-strict-inequalities, use-natspec
     /**
      * @notice Validates a proposed payment amount for a payment rail
      * @dev Only callable by the FilecoinPay contract
@@ -308,7 +308,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         result.note = decision.note;
     }
 
-    // solhint-enable function-max-lines, gas-strict-inequalities
+    // solhint-enable function-max-lines, gas-strict-inequalities, use-natspec
 
     /**
      * @notice Creates the FilecoinPay rail for this validator and sets the initial lockup period.
