@@ -764,7 +764,7 @@ contract PoRepMarketTest is Test {
         assertEq(validator.getRailStatus(), RailStatus.PREPARED);
     }
 
-    function testActivateEvidenceClampsCommittedAndBilledBytesToRequestedSize() public {
+    function testActivateEvidenceUsesCoveredBytesForCapacityAndBilling() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);
         uint256 overCoveredBytes = totalDealSize + poRepMarket.SECTOR_SIZE();
@@ -786,9 +786,9 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
 
         assertEq(decision.coveredBytes, overCoveredBytes);
-        assertEq(capacity.committedBytes, totalDealSize);
-        assertEq(payment.billed32GiBUnits, totalDealSize / poRepMarket.SECTOR_SIZE());
-        assertEq(spRegistry.lastCommittedActualBytes(), totalDealSize);
+        assertEq(capacity.committedBytes, overCoveredBytes);
+        assertEq(payment.billed32GiBUnits, overCoveredBytes / poRepMarket.SECTOR_SIZE());
+        assertEq(spRegistry.lastCommittedActualBytes(), overCoveredBytes);
     }
 
     function testActivateEvidenceRoundsBilledUnitsUpForPartialSector() public {

@@ -1023,10 +1023,9 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             return decision;
         }
 
-        PoRepTypes.DealTerms storage terms = $._dealTerms[dealId];
         PoRepTypes.DealCapacity storage capacity = $._dealCapacity[dealId];
         PoRepTypes.DealPayment storage payment = $._dealPayments[dealId];
-        uint256 committedBytes = Math.min(decision.coveredBytes, terms.requestedSizeBytes);
+        uint256 committedBytes = decision.coveredBytes;
 
         capacity.committedBytes = committedBytes;
         payment.billed32GiBUnits = Math.ceilDiv(committedBytes, SECTOR_SIZE);
