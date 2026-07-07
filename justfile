@@ -15,7 +15,7 @@ test:
     forge test -vvv
 
 build:
-    forge build --build-info --sizes
+    forge build --build-info --sizes src
 
 clean:
     forge clean
