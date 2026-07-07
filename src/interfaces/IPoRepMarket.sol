@@ -156,7 +156,7 @@ interface IPoRepMarket {
      * @param dealId The id of the deal.
      * @return dealView Complete generic deal snapshot.
      */
-    function getDealView(uint256 dealId) external view returns (PoRepTypes.DealView memory dealView);
+    function getDealView(uint256 dealId) external returns (PoRepTypes.DealView memory dealView);
 
     /**
      * @notice Gets a caller-sized page of complete generic deal views.
@@ -170,7 +170,6 @@ interface IPoRepMarket {
      */
     function getDealViews(uint256 offset, uint256 limit)
         external
-        view
         returns (PoRepTypes.DealView[] memory dealViews, uint256 total);
 
     /**

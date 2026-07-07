@@ -495,7 +495,7 @@ contract PoRepMarketTest is Test {
         assertEq(view_.evidenceStatus.activeCoveredBytes, coveredBytes);
     }
 
-    function testGetDealViewUnknownDealReturnsZeroedView() public view {
+    function testGetDealViewUnknownDealReturnsZeroedView() public {
         PoRepTypes.DealView memory view_ = poRepMarket.getDealView(999);
 
         assertEq(view_.deal.dealId, 0);

@@ -772,7 +772,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /// @inheritdoc IPoRepMarket
-    function getDealView(uint256 dealId) external view override returns (PoRepTypes.DealView memory dealView) {
+    function getDealView(uint256 dealId) external override returns (PoRepTypes.DealView memory dealView) {
         PoRepMarketStorage storage $ = s();
         dealView = _dealView($, dealId);
     }
@@ -780,7 +780,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /// @inheritdoc IPoRepMarket
     function getDealViews(uint256 offset, uint256 limit)
         external
-        view
         override
         returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
     {
@@ -1433,7 +1432,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     function _dealView(PoRepMarketStorage storage $, uint256 dealId)
         internal
-        view
         returns (PoRepTypes.DealView memory dealView)
     {
         PoRepTypes.Deal memory deal = $._deals[dealId];
