@@ -152,7 +152,6 @@ contract PoRepMarketTest is Test {
         returns (DataCapEvidenceAdapter.DataCapDealEvidence memory)
     {
         return DataCapEvidenceAdapter.DataCapDealEvidence({
-            completed: false,
             postingFinished: false,
             client: clientAddress,
             validator: validatorAddress,

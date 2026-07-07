@@ -148,12 +148,6 @@ contract DataCapEvidenceAdapterTest is Test {
         return address(proxy);
     }
 
-    function testDealStructRetainsDeprecatedCompletedCompatibilitySlot() public pure {
-        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence;
-
-        assertFalse(dealEvidence.completed);
-    }
-
     function _registerDealWithOneAllocation(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(10000));
         actorIdMock.setGetClaimsResult(hex"8282008080");
