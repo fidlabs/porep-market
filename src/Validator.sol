@@ -283,15 +283,16 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @param proposedAmount Proposed payment amount to validate
      * @param fromEpoch The epoch up to and including which the rail has already been settled
      * @param toEpoch The epoch up to and including which validation is requested; payment will be validated for (toEpoch - fromEpoch) epochs
+     * @param rate Rate used for payment calculation
      * @return result ValidationResult struct containing validation outcome
      */
-    // solhint-disable-next-line use-natspec
-    function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256)
+    function validatePayment(uint256 railId, uint256 proposedAmount, uint256 fromEpoch, uint256 toEpoch, uint256 rate)
         external
         override
         returns (ValidationResult memory result)
     {
         proposedAmount; // unused parameter, kept for interface compatibility
+        rate; // unused parameter, kept for interface compatibility
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
             revert CallerIsNotFilecoinPay();
