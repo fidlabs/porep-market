@@ -772,17 +772,20 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
         _startPreparedPayment($, dealId, deal);
     }
 
-    
     /**
      * @notice Starts a prepared payment for a deal
      * @dev Validates rail id and rail status, computes per-epoch payment rate,
      *      sets up service start/end epochs, informs the operator to modify
      *      the rail payment and emits PaymentActivated.
-     * @param $ Storage pointer to PoRepMarket storage
+     * @param marketStorage Storage pointer to PoRepMarket storage
      * @param dealId The id of the deal to start payment for
      * @param deal The deal struct associated with dealId
      */
-    function _startPreparedPayment(PoRepMarketStorage storage $, uint256 dealId, PoRepTypes.Deal storage deal) internal {
+    function _startPreparedPayment(
+        PoRepMarketStorage storage marketStorage,
+        uint256 dealId,
+        PoRepTypes.Deal storage deal
+    ) internal {
         if (deal.railId == 0) {
             revert InvalidRailId();
         }
@@ -792,15 +795,15 @@ contract PoRepMarket is IPoRepMarket, Initializable, AccessControlUpgradeable, U
             revert InvalidRailState(railStatus);
         }
 
-        PoRepTypes.DealPayment storage payment = $._dealPayments[dealId];
+        PoRepTypes.DealPayment storage payment = marketStorage._dealPayments[dealId];
         uint256 railMaxRatePerEpoch = _calculateAmountPerEpoch(payment);
         payment.railMaxRatePerEpoch = railMaxRatePerEpoch;
 
-        PoRepTypes.DealService storage service = $._dealService[dealId];
+        PoRepTypes.DealService storage service = marketStorage._dealService[dealId];
         int64 serviceStartEpoch = int64(uint64(block.number));
         service.serviceStartEpoch = CommonTypes.ChainEpoch.wrap(serviceStartEpoch);
-        service.serviceEndEpoch =
-            CommonTypes.ChainEpoch.wrap(serviceStartEpoch + int64(uint64($._dealTerms[dealId].durationEpochs)));
+        service.serviceEndEpoch = CommonTypes.ChainEpoch
+            .wrap(serviceStartEpoch + int64(uint64(marketStorage._dealTerms[dealId].durationEpochs)));
         IOperator(deal.validator).modifyRailPayment(railMaxRatePerEpoch);
         emit PaymentActivated(dealId, railMaxRatePerEpoch, service.serviceStartEpoch, service.serviceEndEpoch);
     }
