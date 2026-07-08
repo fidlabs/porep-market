@@ -1930,6 +1930,7 @@ contract PoRepMarketTest is Test {
         uint256 firstSettlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
         uint256 secondSettlementEndEpoch = firstSettlementEndEpoch + poRepMarket.EPOCHS_IN_MONTH();
 
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(firstSettlementEndEpoch));
         vm.prank(validatorAddress);
         poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, firstSettlementEndEpoch);
 
@@ -1940,6 +1941,7 @@ contract PoRepMarketTest is Test {
             firstSettlementEndChainEpoch
         );
 
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(secondSettlementEndEpoch));
         vm.prank(validatorAddress);
         poRepMarket.validateDealSettlement(dealId, firstSettlementEndEpoch, secondSettlementEndEpoch);
 
@@ -2018,6 +2020,49 @@ contract PoRepMarketTest is Test {
         assertEq(decision.result, SettlementResult.REJECTED);
         // solhint-disable-next-line gas-small-strings
         assertEq(decision.note, "data size does not match the deal");
+    }
+
+    function testValidateDealSettlementRejectsWhenEvidenceRefreshTooOld() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 settlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
+        uint256 lastRefreshEpoch = settlementEndEpoch - poRepMarket.EVIDENCE_REFRESH_GRACE_EPOCHS() - 1;
+
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
+        vm.roll(settlementEndEpoch);
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, settlementStartEpoch);
+        assertEq(decision.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.note, "evidence refresh too old");
+    }
+
+    function testValidateDealSettlementAcceptsEvidenceAtRefreshMarginBoundary() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 settlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
+        uint256 lastRefreshEpoch = settlementEndEpoch - poRepMarket.EVIDENCE_REFRESH_GRACE_EPOCHS();
+
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
+        vm.roll(settlementEndEpoch);
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
+
+        assertEq(decision.settlementAmount, 259_200);
+        assertEq(decision.settleUpto, settlementEndEpoch);
+        assertEq(decision.reasonCode, SettlementReason.OK);
+        assertEq(decision.result, SettlementResult.ACCEPTED);
     }
 
     function testValidateDealSettlementRejectsWhenSettlementStartsAfterServiceEnd() public {
@@ -2146,6 +2191,7 @@ contract PoRepMarketTest is Test {
             })
             );
 
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(serviceEndEpoch));
         vm.prank(validatorAddress);
         SharedTypes.SettlementDecision memory decision =
             poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, requestedEndEpoch);

@@ -1838,7 +1838,7 @@ contract DataCapEvidenceAdapterTest is Test {
 
         assertEq(status.activeCoveredBytes, 4096);
         assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), int64(uint64(block.number)));
-        assertEq(status.result, EvidenceResult.NONE);
+        assertEq(status.result, EvidenceResult.ACTIVE);
     }
 
     function testCurrentEvidenceStatusReturnsInactiveWhenStale() public {

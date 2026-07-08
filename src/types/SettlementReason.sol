@@ -12,4 +12,5 @@ library SettlementReason {
     uint16 internal constant TOO_EARLY = 30;
     uint16 internal constant SCORE_BELOW_THRESHOLD = 40;
     uint16 internal constant DATA_SIZE_MISMATCH = 50;
+    uint16 internal constant EVIDENCE_TOO_STALE = 60;
 }

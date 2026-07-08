@@ -676,6 +676,7 @@ contract DataCapEvidenceAdapter is
         } else {
             evidenceResult = EvidenceResult.PARTIAL;
         }
+        refreshStatus.result = evidenceResult;
         refreshStatus.partialEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
         // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
