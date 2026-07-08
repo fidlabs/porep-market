@@ -48,6 +48,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
 
     /**
+     * @notice Maximum settlement lead allowed beyond the latest verified evidence refresh
+     * @dev 8 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 23_040 epochs
+     */
+    uint256 public constant EVIDENCE_REFRESH_GRACE_EPOCHS = 23_040;
+
+    /**
      * @notice Number of epochs in one year
      * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
      */
@@ -1351,6 +1357,16 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 decision.reasonCode = SettlementReason.DATA_SIZE_MISMATCH;
                 decision.result = SettlementResult.REJECTED;
                 decision.note = "data size does not match the deal";
+                return decision;
+            }
+
+            uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
+            if (lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < settlementToEpoch) {
+                decision.settlementAmount = 0;
+                decision.settleUpto = fromEpoch;
+                decision.reasonCode = SettlementReason.EVIDENCE_TOO_STALE;
+                decision.result = SettlementResult.REJECTED;
+                decision.note = "evidence refresh too old";
                 return decision;
             }
         }
