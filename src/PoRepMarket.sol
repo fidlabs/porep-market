@@ -48,6 +48,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
 
     /**
+     * @notice Maximum settlement lead allowed beyond the latest verified evidence refresh
+     * @dev 8 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 23_040 epochs
+     */
+    uint256 public constant EVIDENCE_REFRESH_GRACE_EPOCHS = 23_040;
+
+    /**
      * @notice Number of epochs in one year
      * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
      */
@@ -772,7 +778,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /// @inheritdoc IPoRepMarket
-    function getDealView(uint256 dealId) external view override returns (PoRepTypes.DealView memory dealView) {
+    function getDealView(uint256 dealId) external override returns (PoRepTypes.DealView memory dealView) {
         PoRepMarketStorage storage $ = s();
         dealView = _dealView($, dealId);
     }
@@ -780,7 +786,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     /// @inheritdoc IPoRepMarket
     function getDealViews(uint256 offset, uint256 limit)
         external
-        view
         override
         returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
     {
@@ -1136,6 +1141,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensurePoRepServiceOrAdmin();
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, DealState.ACTIVE);
 
         return
             IStorageEvidenceAdapter(deal.evidenceAdapter).refreshEvidenceStatus(_activationContext(deal), evidenceData);
@@ -1146,12 +1152,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal
      * @return status Current evidence status
      */
-    function currentEvidenceStatus(uint256 dealId)
-        external
-        view
-        override
-        returns (SharedTypes.EvidenceStatus memory status)
-    {
+    function currentEvidenceStatus(uint256 dealId) external returns (SharedTypes.EvidenceStatus memory status) {
         return _currentEvidenceStatus(dealId);
     }
 
@@ -1160,7 +1161,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal
      * @return status Current evidence status
      */
-    function _currentEvidenceStatus(uint256 dealId) internal view returns (SharedTypes.EvidenceStatus memory status) {
+    function _currentEvidenceStatus(uint256 dealId) internal returns (SharedTypes.EvidenceStatus memory status) {
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
 
@@ -1358,6 +1359,16 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 decision.note = "data size does not match the deal";
                 return decision;
             }
+
+            uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
+            if (lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < settlementToEpoch) {
+                decision.settlementAmount = 0;
+                decision.settleUpto = fromEpoch;
+                decision.reasonCode = SettlementReason.EVIDENCE_TOO_STALE;
+                decision.result = SettlementResult.REJECTED;
+                decision.note = "evidence refresh too old";
+                return decision;
+            }
         }
         PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
         uint256 serviceStartEpoch = _epochToUint(service.serviceStartEpoch);
@@ -1437,7 +1448,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     function _dealView(PoRepMarketStorage storage $, uint256 dealId)
         internal
-        view
         returns (PoRepTypes.DealView memory dealView)
     {
         PoRepTypes.Deal memory deal = $._deals[dealId];

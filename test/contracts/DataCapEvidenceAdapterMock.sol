@@ -20,6 +20,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(uint256 dealId => bytes evidenceData) public refreshedEvidence;
     mapping(uint256 dealId => address caller) public submitEvidenceCaller;
     mapping(uint256 dealId => uint8 result) public activationResult;
+    mapping(uint256 dealId => CommonTypes.ChainEpoch epoch) public lastRefreshEpoch;
     bool public operational = true;
 
     function setValid(CommonTypes.FilActorId provider, bool ok) external {
@@ -91,6 +92,10 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         activationResult[dealId] = result;
     }
 
+    function setLastRefreshEpoch(uint256 dealId, CommonTypes.ChainEpoch epoch) external {
+        lastRefreshEpoch[dealId] = epoch;
+    }
+
     function isOperational() external view returns (bool) {
         return operational;
     }
@@ -138,11 +143,17 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         returns (SharedTypes.EvidenceStatus memory status)
     {
         uint256 activeCoveredBytes = deals[context.dealId].allocatedBytes;
+        CommonTypes.ChainEpoch refreshEpoch = lastRefreshEpoch[context.dealId];
+        if (CommonTypes.ChainEpoch.unwrap(refreshEpoch) == 0) {
+            refreshEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
+        }
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: activeCoveredBytes,
-            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),
+            lastEvidenceRefreshEpoch: refreshEpoch,
             reasonCode: 0,
-            result: activeCoveredBytes == 0 ? EvidenceResult.NONE : EvidenceResult.ACCEPTED
+            result: activeCoveredBytes == 0 ? EvidenceResult.NONE : EvidenceResult.ACCEPTED,
+            checkedClaims: 0,
+            totalClaims: 0
         });
     }
 }

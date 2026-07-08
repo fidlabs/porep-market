@@ -42,9 +42,23 @@ contract DataCapEvidenceAdapter is
         mapping(uint256 dealId => DataCapDealEvidence dealEvidence) _deals;
         mapping(uint64 claim => bool isTerminated) _terminatedClaims;
         mapping(uint256 dealId => uint8 status) _allocationStatusPerDeal;
+        mapping(uint256 dealId => RefreshStatus refreshStatus) _refreshStatus;
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
         bool _operational;
+    }
+
+    /**
+     * @notice Struct to track the progress of refreshing evidence status
+     * @dev This struct is used to store the number of checked claims and the number of checked bytes
+     */
+    struct RefreshStatus {
+        uint256 checkedClaims;
+        uint256 activeClaimedBytes;
+        CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
+        CommonTypes.ChainEpoch partialEvidenceRefreshEpoch;
+        CommonTypes.FilActorId[] failedClaimIds;
+        uint8 result;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DataCapEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -224,12 +238,6 @@ contract DataCapEvidenceAdapter is
     error InvalidDealStateForTransfer();
 
     /**
-     * @notice Error thrown when validator is not set for the deal
-     * @dev 0xcb304fac
-     */
-    error ValidatorNotSet(uint256 dealId);
-
-    /**
      * @notice Error thrown when invalid admin address is provided
      * @dev 0x05bb467c
      */
@@ -319,6 +327,12 @@ contract DataCapEvidenceAdapter is
      */
     error InvalidAllocatedBytes();
 
+    /**
+     * @notice Error thrown when the allocation state is invalid
+     * @dev 0x3f791d94
+     */
+    error InvalidAllocationState();
+
     struct DataCapDealEvidence {
         bool postingFinished;
         address client;
@@ -330,7 +344,6 @@ contract DataCapEvidenceAdapter is
         CommonTypes.FilActorId[] allocationIds;
         CommonTypes.FilActorId[] claimIds;
         uint256 claimedBytes;
-        uint256 activeClaimedBytes;
     }
 
     struct ProviderAllocation {
@@ -519,7 +532,7 @@ contract DataCapEvidenceAdapter is
             claimPointer--;
             deal.claimIds.push(allocationsBatch[idx]);
             coveredBytes += result.claims[claimPointer].size;
-            _deleteDealAllocationIdByIndex(deal, idx);
+            _deleteIdByIndex(deal.allocationIds, idx);
         }
 
         deal.claimedBytes += coveredBytes;
@@ -574,8 +587,6 @@ contract DataCapEvidenceAdapter is
             });
         }
 
-        deal.activeClaimedBytes = deal.claimedBytes;
-
         emit DealEvidenceReady(context.dealId, address(this));
 
         // TODO: add custom reasonCode
@@ -584,6 +595,7 @@ contract DataCapEvidenceAdapter is
         });
     }
 
+    // solhint-disable function-max-lines
     /**
      * @notice Refresh current evidence health from adapter-specific source data
      * @dev The caller supplies only the bounded batch to check; the adapter
@@ -594,15 +606,90 @@ contract DataCapEvidenceAdapter is
      */
     function refreshEvidenceStatus(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
         external
-        pure
+        nonReentrant
+        onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        context;
-        evidenceData;
+        DataCapEvidenceAdapterStorage storage $ = s();
+        if ($._allocationStatusPerDeal[context.dealId] != DataCapAllocationStatus.CLAIMED) {
+            revert InvalidAllocationState();
+        }
+
+        DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
+        int64 currentEpoch = int64(uint64(block.number));
+        RefreshStatus storage refreshStatus = $._refreshStatus[context.dealId];
+        if (
+            refreshStatus.checkedClaims == deal.claimIds.length
+                || uint256(uint64(CommonTypes.ChainEpoch.unwrap(refreshStatus.partialEvidenceRefreshEpoch)))
+                    // forge-lint: disable-next-line(unsafe-typecast)
+                    > uint256(uint64(currentEpoch)) + SharedTypes.EPOCHS_IN_MONTH
+        ) {
+            refreshStatus.checkedClaims = 0;
+            refreshStatus.activeClaimedBytes = 0;
+            delete refreshStatus.failedClaimIds;
+        }
+
+        uint256 batchSize = abi.decode(evidenceData, (uint256));
+        if (batchSize == 0) revert InvalidBatchSize();
+
+        uint256 offset = refreshStatus.checkedClaims;
+
+        (CommonTypes.FilActorId[] memory claimsBatch, uint256 totalClaims) =
+            _getClaimIds(context.dealId, offset, batchSize, deal.claimIds);
+        {
+            (int256 getClaimsExitCode, VerifRegTypes.GetClaimsReturn memory getClaimsResult) =
+                VerifRegAPI.getClaims(VerifRegTypes.GetClaimsParams({provider: deal.provider, claim_ids: claimsBatch}));
+            if (getClaimsExitCode != 0) revert GetClaimsCallFailed();
+
+            uint256 failIterator = 0;
+            for (uint256 i = 0; i < claimsBatch.length; ++i) {
+                if (
+                    getClaimsResult.batch_info.fail_codes.length > 0
+                        && getClaimsResult.batch_info.fail_codes.length > failIterator
+                        && i == getClaimsResult.batch_info.fail_codes[failIterator].idx
+                ) {
+                    refreshStatus.failedClaimIds.push(claimsBatch[i]);
+                    ++failIterator;
+                    continue;
+                }
+                VerifRegTypes.Claim memory claim = getClaimsResult.claims[i - failIterator];
+
+                if ($._terminatedClaims[CommonTypes.FilActorId.unwrap(claimsBatch[i])]) {
+                    continue;
+                }
+
+                refreshStatus.activeClaimedBytes += claim.size;
+            }
+        }
+
+        refreshStatus.checkedClaims = offset + claimsBatch.length;
+
+        uint8 evidenceResult;
+
+        if (refreshStatus.checkedClaims == totalClaims) {
+            if (refreshStatus.activeClaimedBytes != deal.claimedBytes) {
+                evidenceResult = EvidenceResult.COVERED_BYTES_MISMATCH;
+            } else {
+                refreshStatus.lastEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
+                evidenceResult = EvidenceResult.ACTIVE;
+            }
+        } else {
+            evidenceResult = EvidenceResult.PARTIAL;
+        }
+        refreshStatus.result = evidenceResult;
+        refreshStatus.partialEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
+        // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
+            activeCoveredBytes: refreshStatus.activeClaimedBytes,
+            lastEvidenceRefreshEpoch: refreshStatus.lastEvidenceRefreshEpoch,
+            reasonCode: 0,
+            result: evidenceResult,
+            checkedClaims: refreshStatus.checkedClaims,
+            totalClaims: totalClaims
         });
     }
+
+    // solhint-enable function-max-lines
 
     /**
      * @notice Read current evidence status from adapter storage only
@@ -612,12 +699,28 @@ contract DataCapEvidenceAdapter is
      */
     function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
-        pure
+        onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        context;
+        DataCapEvidenceAdapterStorage storage $ = s();
+        RefreshStatus storage refreshStatus = $._refreshStatus[context.dealId];
+
+        uint256 lastRefresh = uint256(uint64(CommonTypes.ChainEpoch.unwrap(refreshStatus.lastEvidenceRefreshEpoch)));
+
+        if (block.number > lastRefresh + SharedTypes.EPOCHS_IN_MONTH) {
+            refreshStatus.checkedClaims = 0;
+            refreshStatus.activeClaimedBytes = 0;
+            refreshStatus.result = EvidenceResult.INACTIVE;
+            delete refreshStatus.failedClaimIds;
+        }
+        // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: 0, lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0), reasonCode: 0, result: 0
+            activeCoveredBytes: refreshStatus.activeClaimedBytes,
+            lastEvidenceRefreshEpoch: refreshStatus.lastEvidenceRefreshEpoch,
+            reasonCode: 0,
+            result: refreshStatus.result,
+            checkedClaims: refreshStatus.checkedClaims,
+            totalClaims: s()._deals[context.dealId].claimIds.length
         });
     }
 
@@ -985,23 +1088,16 @@ contract DataCapEvidenceAdapter is
         view
         returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
     {
-        if (limit == 0) revert InvalidLimit();
-        if (dealId == 0) revert InvalidDealId();
-        CommonTypes.FilActorId[] storage claimIds = s()._deals[dealId].claimIds;
-        sumOfClaims = claimIds.length;
+        (ids, sumOfClaims) = _getClaimIds(dealId, offset, limit, s()._deals[dealId].claimIds);
+    }
 
-        // solhint-disable-next-line gas-strict-inequalities
-        if (offset >= sumOfClaims) {
-            return (new CommonTypes.FilActorId[](0), sumOfClaims);
-        }
-
-        uint256 remaining = sumOfClaims - offset;
-        uint256 count = limit > remaining ? remaining : limit;
-        ids = new CommonTypes.FilActorId[](count);
-
-        for (uint256 i = 0; i < count; ++i) {
-            ids[i] = claimIds[offset + i];
-        }
+    /**
+     * @notice getter to retrieve failed claim ids for a deal
+     * @param dealId the id of the deal
+     * @return failedClaimIds list of failed claim ids for the given deal
+     */
+    function getFailedClaimIds(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory failedClaimIds) {
+        return s()._refreshStatus[dealId].failedClaimIds;
     }
 
     /**
@@ -1074,6 +1170,38 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
+     * @notice Internal getter to retrieve claim ids for a deal with pagination
+     * @param dealId the id of the deal
+     * @param offset pagination offset for the claim ids
+     * @param limit pagination limit for the claim ids
+     * @param claimIds storage array of claim ids for the deal
+     * @return ids list of claim ids for the given deal
+     * @return sumOfClaims total number of claims for the given deal
+     */
+    function _getClaimIds(uint256 dealId, uint256 offset, uint256 limit, CommonTypes.FilActorId[] storage claimIds)
+        internal
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
+    {
+        if (limit == 0) revert InvalidLimit();
+        if (dealId == 0) revert InvalidDealId();
+        sumOfClaims = claimIds.length;
+
+        // solhint-disable-next-line gas-strict-inequalities
+        if (offset >= sumOfClaims) {
+            return (new CommonTypes.FilActorId[](0), sumOfClaims);
+        }
+
+        uint256 remaining = sumOfClaims - offset;
+        uint256 count = limit > remaining ? remaining : limit;
+        ids = new CommonTypes.FilActorId[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            ids[i] = claimIds[offset + i];
+        }
+    }
+
+    /**
      * @notice Internal function used to retrieve a storage deal
      * @param dealId The id of the deal
      * @return deal The storage deal
@@ -1091,78 +1219,11 @@ contract DataCapEvidenceAdapter is
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
 
     /**
-     * @notice Checks if the total active data size for the client with the specified provider matches the expected size
-     * @dev This function can only be called by the validator of the deal
-     * @param dealId The id of the deal
-     * @return totalSizePerSp The total active data size for the client with the specified provider
+     * @notice Internal function to delete an id from a storage array by its index
+     * @param ids The list of ids to remove from
+     * @param index The index of the id to delete
      */
-    function isDataSizeMatching(uint256 dealId) external nonReentrant returns (bool) {
-        DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
-        DataCapEvidenceAdapterStorage storage $ = s();
-
-        if (dealEvidence.validator == address(0)) {
-            revert ValidatorNotSet(dealId);
-        }
-
-        if (msg.sender != dealEvidence.validator) {
-            revert InvalidCaller(msg.sender, dealEvidence.validator);
-        }
-
-        CommonTypes.FilActorId[] memory ids = dealEvidence.allocationIds;
-
-        VerifRegTypes.GetClaimsParams memory getClaimsParams =
-            VerifRegTypes.GetClaimsParams({provider: dealEvidence.provider, claim_ids: ids});
-
-        (int256 getClaimsExitCode, VerifRegTypes.GetClaimsReturn memory getClaimsResult) =
-            VerifRegAPI.getClaims(getClaimsParams);
-
-        if (getClaimsExitCode != 0) revert GetClaimsCallFailed();
-
-        uint256 activeSize = 0;
-        uint256 failIterator = 0;
-        int64 currentEpoch = int64(uint64(block.number));
-        uint256[] memory toDelete = new uint256[](ids.length);
-        uint256 deleteCount = 0;
-        for (uint256 i = 0; i < ids.length; ++i) {
-            if (
-                getClaimsResult.batch_info.fail_codes.length > 0
-                    && getClaimsResult.batch_info.fail_codes.length > failIterator
-                    && i == getClaimsResult.batch_info.fail_codes[failIterator].idx
-            ) {
-                ++failIterator;
-                continue;
-            }
-            VerifRegTypes.Claim memory claim = getClaimsResult.claims[i - failIterator];
-
-            bool expired =
-                (CommonTypes.ChainEpoch.unwrap(claim.term_start) + CommonTypes.ChainEpoch.unwrap(claim.term_max))
-                    < currentEpoch;
-
-            uint64 id = CommonTypes.FilActorId.unwrap(ids[i]);
-
-            if (expired || $._terminatedClaims[id]) {
-                toDelete[deleteCount++] = i;
-                continue;
-            }
-
-            activeSize += claim.size;
-        }
-
-        for (uint256 i = deleteCount; i > 0; --i) {
-            uint256 idx = toDelete[i - 1];
-            _deleteDealAllocationIdByIndex(dealEvidence, idx);
-        }
-
-        return activeSize == dealEvidence.allocatedBytes;
-    }
-
-    /**
-     * @notice Internal function to delete an allocation ID from a deal by its index
-     * @param dealEvidence The storage reference to the deal
-     * @param index The index of the allocation ID to delete
-     */
-    function _deleteDealAllocationIdByIndex(DataCapDealEvidence storage dealEvidence, uint256 index) internal {
-        CommonTypes.FilActorId[] storage ids = dealEvidence.allocationIds;
+    function _deleteIdByIndex(CommonTypes.FilActorId[] storage ids, uint256 index) internal {
         uint256 last = ids.length - 1;
         if (index != last) ids[index] = ids[last];
         ids.pop();

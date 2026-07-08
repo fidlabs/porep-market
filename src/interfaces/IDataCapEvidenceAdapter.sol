@@ -97,19 +97,18 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
         returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims);
 
     /**
+     * @notice getter to retrieve failed claim ids for a deal
+     * @param dealId the id of the deal
+     * @return failedClaimIds list of failed claim ids for the given deal
+     */
+    function getFailedClaimIds(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory failedClaimIds);
+
+    /**
      * @notice custom getter to check if claim is terminated
      * @param claimId the id of the claim
      * @return isTerminated whether the claim is terminated
      */
     function terminatedClaims(uint64 claimId) external view returns (bool);
-
-    /**
-     * @notice Checks if the total active data size for the client with the specified provider matches the expected size
-     * @dev This function can only be called by the validator of the deal
-     * @param dealId The id of the deal
-     * @return totalSizePerSp The total active data size for the client with the specified provider
-     */
-    function isDataSizeMatching(uint256 dealId) external returns (bool);
 
     /**
      * @notice Marks the given claims as terminated early.

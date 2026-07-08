@@ -71,6 +71,5 @@ interface IStorageEvidenceAdapter {
      */
     function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
-        view
         returns (SharedTypes.EvidenceStatus memory status);
 }
