@@ -291,8 +291,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         override
         returns (ValidationResult memory result)
     {
+        // slither-disable-start redundant-statements
         proposedAmount; // unused parameter, kept for interface compatibility
         rate; // unused parameter, kept for interface compatibility
+        // slither-disable-end redundant-statements
         ValidatorStorage storage $ = _getValidatorStorage();
         if (msg.sender != $.filecoinPay) {
             revert CallerIsNotFilecoinPay();
@@ -347,7 +349,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         if (rateAllowance == 0) {
             revert InvalidRateAllowance();
         }
-
+        // slither-disable-next-line reentrancy-no-eth
         uint256 railId =
             _createRail(IFilecoinPayV1($.filecoinPay), railToken, deal.client, payment.payee, 0, address(0));
         $.railStatus = RailStatus.PREPARED;

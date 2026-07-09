@@ -438,7 +438,7 @@ contract DataCapEvidenceAdapter is
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
 
-        if ($._operational == false) {
+        if (!$._operational) {
             revert AdapterNotOperational();
         }
 
@@ -508,7 +508,7 @@ contract DataCapEvidenceAdapter is
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
-        if (deal.postingFinished == false) {
+        if (!deal.postingFinished) {
             revert PostingNotFinished();
         }
 
@@ -572,8 +572,8 @@ contract DataCapEvidenceAdapter is
         onlyPoRepMarket
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        /// NOTE: compiler's warning silenced for unused variable; evidenceData gonna be used potentially in the future
-        evidenceData;
+        // slither-disable-next-line redundant-statements
+        evidenceData; /// NOTE: compiler's warning silenced for unused variable; evidenceData gonna be used potentially in the future
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
@@ -735,6 +735,7 @@ contract DataCapEvidenceAdapter is
     }
 
     // solhint-disable function-max-lines
+    // slither-disable-start cyclomatic-complexity
     /**
      * @notice Replaces all broken tracked allocations for an active existing deal.
      * @param dealId The id of the deal to rescue.
@@ -810,6 +811,7 @@ contract DataCapEvidenceAdapter is
         emit DealAllocationsRescued(dealId, msg.sender, totalSize);
     }
 
+    // slither-disable-end cyclomatic-complexity
     // solhint-enable function-max-lines
 
     // solhint-disable func-name-mixedcase
@@ -1271,7 +1273,7 @@ contract DataCapEvidenceAdapter is
      */
     function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
         DataCapEvidenceAdapterStorage storage $ = s();
-        if ($._operational == false) {
+        if (!$._operational) {
             revert AdapterAlreadyNonOperational();
         }
         $._operational = false;

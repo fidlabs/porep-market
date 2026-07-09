@@ -51,8 +51,4 @@ contract PoRepMarketContractMock is PoRepMarket {
     function getActiveDealIdsReadyForPayment() public pure returns (uint256[] memory) {
         return new uint256[](0);
     }
-
-    function ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) external view {
-        _ensureAllocationSizeWithinTolerance(actualDealSize, expectedDealSize);
-    }
 }

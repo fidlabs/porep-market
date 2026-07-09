@@ -212,7 +212,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
 
         PoRepTypes.Deal memory deal = IPoRepMarket($._poRepMarket).getDeal(dealId);
         if (msg.sender != deal.client) revert InvalidClientAddress();
-
+        // slither-disable-next-line too-many-digits
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,
             abi.encode(

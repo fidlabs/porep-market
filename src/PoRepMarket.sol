@@ -542,7 +542,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         });
         $._dealSLIs[dealId] = selection.promisedSLIs;
         {
-            uint64 durationEpochs = uint64(uint256(request.durationDays) * (EPOCHS_IN_MONTH / 30));
+            // forge-lint: disable-next-line(unsafe-typecast)
+            uint64 durationEpochs = uint64(uint256(request.durationDays) * EPOCHS_IN_MONTH / 30);
             $._dealTerms[dealId] =
                 PoRepTypes.DealTerms({requestedSizeBytes: request.requestedSizeBytes, durationEpochs: durationEpochs});
         }
@@ -832,9 +833,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (msg.sender != deal.validator || deal.validator == address(0)) {
             revert CallerIsNotValidator(dealId, msg.sender);
         }
+        _changeDealState(dealId, DealState.FINALIZED);
         $._SPRegistryContract
             .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
-        _changeDealState(dealId, DealState.FINALIZED);
         emit DealFinalized(dealId, msg.sender);
     }
 
@@ -905,11 +906,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert CallerIsNotValidator(dealId, msg.sender);
         }
 
+        _changeDealState(dealId, DealState.TERMINATED);
         $._dealService[dealId].earlyTerminationEpoch = earlyTerminationEpoch;
         $._SPRegistryContract
             .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
 
-        _changeDealState(dealId, DealState.TERMINATED);
         emit DealTerminated(dealId, earlyTerminationEpoch);
     }
 
@@ -931,11 +932,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert NotTheClientOrStorageProviderOrAdmin(dealId, msg.sender);
         }
 
+        _changeDealState(dealId, DealState.REJECTED);
         $._SPRegistryContract
             .releasePendingCapacity(
                 deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
             );
-        _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);
     }
 
@@ -955,11 +956,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert DealNotRejectable(dealId);
         }
 
+        _changeDealState(dealId, DealState.REJECTED);
         $._SPRegistryContract
             .releasePendingCapacity(
                 deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
             );
-        _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);
     }
 
@@ -982,11 +983,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
         // solhint-enable  gas-strict-inequalities
 
+        _changeDealState(dealId, DealState.EXPIRED);
         $._SPRegistryContract
             .releasePendingCapacity(
                 deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
             );
-        _changeDealState(dealId, DealState.EXPIRED);
         emit DealExpired(dealId, block.number);
     }
 
@@ -1110,6 +1111,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureDealCorrectState(deal, DealState.ACCEPTED);
 
         PoRepMarketStorage storage $ = s();
+        // slither-disable-next-line reentrancy-no-eth
         decision =
             IStorageEvidenceAdapter(deal.evidenceAdapter).activateEvidence(_activationContext(deal), evidenceData);
         if (decision.result != EvidenceResult.ACCEPTED) {
@@ -1120,10 +1122,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         PoRepTypes.DealPayment storage payment = $._dealPayments[dealId];
         uint256 committedBytes = decision.coveredBytes;
 
+        _changeDealState(dealId, DealState.ACTIVE);
         capacity.committedBytes = committedBytes;
         payment.billed32GiBUnits = Math.ceilDiv(committedBytes, SECTOR_SIZE);
         $._SPRegistryContract.commitCapacity(deal.provider, capacity.reservedBytes, committedBytes);
-        _changeDealState(dealId, DealState.ACTIVE);
         _startPreparedPayment($, dealId, deal);
     }
 
@@ -1451,9 +1453,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         returns (PoRepTypes.DealView memory dealView)
     {
         PoRepTypes.Deal memory deal = $._deals[dealId];
+        // slither-disable-next-line uninitialized-local
         SharedTypes.EvidenceStatus memory evidenceStatus;
 
         if (deal.evidenceAdapter != address(0)) {
+            // slither-disable-next-line calls-loop
             evidenceStatus =
                 IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
         }
@@ -1591,25 +1595,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
         if (bytes(manifestLocation).length > 2048) {
             revert TooLongManifestLocation();
-        }
-    }
-
-    /**
-     * @notice Ensures if allocations size is within padding
-     * @param actualDealSize size of the deal
-     * @param expectedDealSize expected size from proposal
-     */
-    function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal view {
-        if (actualDealSize == 0) {
-            revert InvalidAllocationSizeForDealActivation();
-        }
-
-        uint256 padding = s()._dealActivationPadding;
-        uint256 delta =
-            actualDealSize > expectedDealSize ? actualDealSize - expectedDealSize : expectedDealSize - actualDealSize;
-
-        if (delta * 10_000 > expectedDealSize * padding) {
-            revert InvalidAllocationSizeForDealActivation();
         }
     }
 

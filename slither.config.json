@@ -1,0 +1,4 @@
+{
+  "exclude_dependencies": true,
+  "detectors_to_exclude": "naming-convention,pragma,assembly,uninitialized-local,reentrancy-events,unused-return"
+}

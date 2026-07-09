@@ -19,3 +19,6 @@ report/
 # Worktrees
 .worktrees/
 .worktree-links
+
+# slither static analyzer output
+slither.md

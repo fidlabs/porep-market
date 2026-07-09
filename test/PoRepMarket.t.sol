@@ -2666,42 +2666,6 @@ contract PoRepMarketTest is Test {
         assertEq(poRepMarket.getDealActivationPadding(), newPadding);
     }
 
-    function testEnsureAllocationSizeWithinToleranceRevertsWhenActualDealSizeIsZero() public {
-        PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
-
-        vm.expectRevert(PoRepMarket.InvalidAllocationSizeForDealActivation.selector);
-        market.ensureAllocationSizeWithinTolerance(0, defaultTerms.dealSizeBytes);
-    }
-
-    function testEnsureAllocationSizeWithinToleranceAcceptsSizesInsideActivationPadding() public {
-        PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
-        uint256 expectedDealSize = defaultTerms.dealSizeBytes;
-        uint256 padding = 1000;
-
-        vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(padding);
-
-        market.ensureAllocationSizeWithinTolerance(
-            expectedDealSize - (expectedDealSize * padding) / 10_000, expectedDealSize
-        );
-        market.ensureAllocationSizeWithinTolerance(
-            expectedDealSize + (expectedDealSize * padding) / 10_000, expectedDealSize
-        );
-    }
-
-    function testEnsureAllocationSizeWithinToleranceRevertsWhenSizeIsOutsideActivationPadding() public {
-        PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
-        uint256 expectedDealSize = defaultTerms.dealSizeBytes;
-        uint256 padding = 1000;
-        uint256 actualDealSize = expectedDealSize + (expectedDealSize * padding) / 10_000 + 1;
-
-        vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(padding);
-
-        vm.expectRevert(PoRepMarket.InvalidAllocationSizeForDealActivation.selector);
-        market.ensureAllocationSizeWithinTolerance(actualDealSize, expectedDealSize);
-    }
-
     function testGetSPRegistryContract() public view {
         assertEq(poRepMarket.getSPRegistryContract(), address(spRegistry));
     }

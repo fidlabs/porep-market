@@ -140,7 +140,10 @@ verify-one chain addr name:
 check: fmt-check lint test check-coverage build check-abis
     @echo "All checks passed."
 
-pre-push: fmt-check lint test check-coverage check-abis
+slither:
+    slither . --checklist --fail-medium > slither.md
+
+pre-push: fmt-check lint test check-coverage check-abis slither
     @echo "Ready to push."
 
 fix: fmt lint test
