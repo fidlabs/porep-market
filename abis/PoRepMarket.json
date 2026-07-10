@@ -1980,11 +1980,6 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "earlyTerminationEpoch",
-        "type": "int64",
-        "internalType": "CommonTypes.ChainEpoch"
       }
     ],
     "outputs": [],
@@ -2909,6 +2904,22 @@
   },
   {
     "type": "error",
+    "name": "ServiceNotEnded",
+    "inputs": [
+      {
+        "name": "serviceEndEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "TooLongManifestLocation",
     "inputs": []
   },
@@ -2931,6 +2942,17 @@
   {
     "type": "error",
     "name": "ValidatorAlreadySet",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ValidatorNotSet",
     "inputs": [
       {
         "name": "dealId",

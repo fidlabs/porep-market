@@ -24,14 +24,13 @@ interface IOperator {
     function modifyRailPayment(uint256 newRate) external;
 
     /**
-     * @notice Terminates a payment rail early and terminates its deal
-     * @dev Only callable by POREP_SERVICE bot
+     * @notice Terminates the payment rail early after the PoRepMarket terminates the deal.
      * @dev After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced
      */
     function earlyRailTermination() external;
 
     /**
-     * @notice Terminates the deal and its payment rail.
+     * @notice Terminates the payment rail after the PoRepMarket finalizes the deal.
      */
     function finalizeDeal() external;
 }

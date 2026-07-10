@@ -407,7 +407,7 @@ contract ValidatorTest is Test {
         assertEq(railPayee, frozenPayee);
     }
 
-    function testFinalizeDealTerminatesFilecoinPayRailAsAnAdmin() public {
+    function testFinalizeDealTerminatesFilecoinPayRailWhenCalledByPoRepMarket() public {
         assertFalse(filecoinPayMock.terminated(railId));
         vm.roll(100);
         activateServiceUntil(100);
@@ -415,37 +415,31 @@ contract ValidatorTest is Test {
 
         vm.expectEmit(true, true, false, true, address(validator));
         emit Validator.DealFinalized(dealId, railId);
-        vm.prank(admin);
+        vm.prank(address(poRepMarketMock));
         validator.finalizeDeal();
         assertTrue(filecoinPayMock.terminated(railId));
         assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
-        assertEq(poRepMarketMock.finalizeDealCallCount(), 1);
     }
 
-    function testFinalizeDealTerminatesFilecoinPayRailAsPoRepService() public {
+    function testFinalizeDealTerminatesFilecoinPayRailWithoutCheckingServiceEnd() public {
         assertFalse(filecoinPayMock.terminated(railId));
         vm.roll(100);
-        activateServiceUntil(100);
-        vm.roll(101);
-        vm.prank(porepService);
+        activateServiceUntil(101);
+        vm.prank(address(poRepMarketMock));
         validator.finalizeDeal();
         assertTrue(filecoinPayMock.terminated(railId));
         assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
     }
 
-    function testFinalizeDealRevertsBeforeServiceEnds() public {
-        vm.roll(100);
-        uint256 serviceEndEpoch = 101;
-        activateServiceUntil(101);
-
-        vm.expectRevert(abi.encodeWithSelector(Validator.ServiceNotEnded.selector, serviceEndEpoch, block.number));
-        vm.prank(porepService);
+    function testFinalizeDealRevertsWhenCallerIsNotPoRepMarket() public {
+        vm.expectRevert(Validator.CallerIsNotPoRepMarket.selector);
+        vm.prank(address(123));
         validator.finalizeDeal();
     }
 
-    function testFinalizeDealRevertsWhenCallerIsNotPoRepServiceOrAdmin() public {
-        vm.expectRevert(Validator.UnauthorizedCaller.selector);
-        vm.prank(address(123));
+    function testFinalizeDealRevertsWhenRailStatusIsNotActive() public {
+        vm.expectRevert(abi.encodeWithSelector(Validator.InvalidRailStatusForTermination.selector, RailStatus.PREPARED));
+        vm.prank(address(poRepMarketMock));
         validator.finalizeDeal();
     }
 
@@ -594,10 +588,27 @@ contract ValidatorTest is Test {
         vm.expectEmit(true, false, false, true, address(validator));
         emit Validator.EarlyRailTerminated(railId);
 
-        vm.prank(porepService);
+        vm.prank(address(poRepMarketMock));
         validator.earlyRailTermination();
 
         assertEq(validator.getRailStatus(), RailStatus.TERMINATED);
+    }
+
+    function testEarlyRailTerminationRevertsWhenCallerIsNotPoRepMarket() public {
+        vm.expectRevert(Validator.CallerIsNotPoRepMarket.selector);
+        vm.prank(porepService);
+        validator.earlyRailTermination();
+    }
+
+    function testEarlyRailTerminationRevertsWhenRailStatusCannotBeTerminated() public {
+        vm.prank(address(poRepMarketMock));
+        validator.earlyRailTermination();
+
+        vm.expectRevert(
+            abi.encodeWithSelector(Validator.InvalidRailStatusForTermination.selector, RailStatus.TERMINATED)
+        );
+        vm.prank(address(poRepMarketMock));
+        validator.earlyRailTermination();
     }
 
     function testValidatePaymentReturnsMarketEarlyTerminationCapDecision() public {
@@ -606,7 +617,7 @@ contract ValidatorTest is Test {
 
         vm.warp(BLOCK_TIMESTAMP);
 
-        vm.prank(porepService);
+        vm.prank(address(poRepMarketMock));
         validator.earlyRailTermination();
         poRepMarketMock.setSettlementDecision(10, 1, "payment limited to deal termination epoch");
 
@@ -628,7 +639,7 @@ contract ValidatorTest is Test {
         uint256 earlyTerminationEpoch = chainEpochConversion - 100_000;
         vm.roll(earlyTerminationEpoch);
 
-        vm.prank(porepService);
+        vm.prank(address(poRepMarketMock));
         validator.earlyRailTermination();
         poRepMarketMock.setSettlementDecision(
             10 * earlyTerminationEpoch, earlyTerminationEpoch, "payment limited to deal termination epoch"

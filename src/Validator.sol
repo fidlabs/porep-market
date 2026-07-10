@@ -137,6 +137,12 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
 
     /**
+     * @notice Error indicating that the payment rail is not in a status that can be terminated
+     * @param railStatus The current payment rail status
+     */
+    error InvalidRailStatusForTermination(uint8 railStatus);
+
+    /**
      * @notice Error indicating that an invalid terminator address was provided
      * @dev 0xee5ab23e
      */
@@ -381,12 +387,21 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Terminates a payment rail early and terminates its deal
-     * @dev Only callable by POREP_SERVICE bot
+     * @notice Terminates the payment rail early after PoRepMarket terminates the deal.
+     * @dev Only callable by the PoRepMarket contract.
      */
-    function earlyRailTermination() external override onlyRole(POREP_SERVICE_ROLE) {
+    function earlyRailTermination() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-        _terminateDeal();
+        if (msg.sender != $.poRepMarket) {
+            revert CallerIsNotPoRepMarket();
+        }
+
+        uint8 railStatus = $.railStatus;
+        if (railStatus != RailStatus.PREPARED && railStatus != RailStatus.ACTIVE) {
+            revert InvalidRailStatusForTermination(railStatus);
+        }
+
+        $.railStatus = RailStatus.TERMINATED;
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
         emit EarlyRailTerminated($.railId);
     }
@@ -403,36 +418,23 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Terminates the deal and its payment rail.
+     * @notice Terminates the payment rail after PoRepMarket finalizes the deal.
+     * @dev Only callable by the PoRepMarket contract.
      */
     function finalizeDeal() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-        if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
-            revert UnauthorizedCaller();
+        if (msg.sender != $.poRepMarket) {
+            revert CallerIsNotPoRepMarket();
         }
 
-        PoRepTypes.DealService memory service = IPoRepMarket($.poRepMarket).getDealService($.dealId);
-        uint256 serviceEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch)));
-        bool serviceEnded = serviceEndEpoch < block.number;
-        if (!serviceEnded) {
-            revert ServiceNotEnded(serviceEndEpoch, block.number);
+        uint8 railStatus = $.railStatus;
+        if (railStatus != RailStatus.ACTIVE) {
+            revert InvalidRailStatusForTermination(railStatus);
         }
 
         $.railStatus = RailStatus.TERMINATED;
-        IPoRepMarket($.poRepMarket).finalizeDeal($.dealId);
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
         emit DealFinalized($.dealId, $.railId);
-    }
-
-    /**
-     * @notice Terminates the deal in PoRep Market and records the early termination epoch.
-     */
-    function _terminateDeal() internal {
-        ValidatorStorage storage $ = _getValidatorStorage();
-        $.railStatus = RailStatus.TERMINATED;
-        int64 earlyTerminationEpoch = int64(uint64(block.number));
-
-        IPoRepMarket($.poRepMarket).terminateDeal($.dealId, CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch));
     }
 
     /**

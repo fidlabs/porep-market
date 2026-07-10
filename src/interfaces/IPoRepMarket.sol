@@ -3,7 +3,6 @@ pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 /**
  * @title IPoRepMarket interface
@@ -179,7 +178,7 @@ interface IPoRepMarket {
     function acceptDeal(uint256 dealId) external;
 
     /**
-     * @notice Finalizes a deal after its assigned evidence adapter accepts its evidence
+     * @notice Finalizes an active deal after service has ended and asks its validator to terminate the rail.
      * @param dealId The id of the deal
      */
     function finalizeDeal(uint256 dealId) external;
@@ -191,12 +190,10 @@ interface IPoRepMarket {
     function activatePayment(uint256 dealId) external;
 
     /**
-     * @notice Terminate a deal
-     * @dev Terminates a deal by setting the deal state to terminated
+     * @notice Terminates an active deal early and asks its validator to terminate the rail.
      * @param dealId The id of the deal
-     * @param earlyTerminationEpoch The Filecoin epoch at which the deal was terminated
      */
-    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external;
+    function terminateDeal(uint256 dealId) external;
 
     /**
      * @notice Rejects a deal

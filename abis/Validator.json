@@ -626,6 +626,17 @@
   },
   {
     "type": "error",
+    "name": "InvalidRailStatusForTermination",
+    "inputs": [
+      {
+        "name": "railStatus",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "InvalidRateAllowance",
     "inputs": []
   },

@@ -284,10 +284,15 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error DealNotInExpectedState(uint256 dealId, uint8 currentState, uint8 expectedState);
 
     /**
-     * @notice Error thrown when caller is not the validator for the deal or validator is not set
+     * @notice Error thrown when caller is not the validator for the deal
      * @dev 0xd325131b
      */
     error CallerIsNotValidator(uint256 dealId, address caller);
+
+    /**
+     * @notice Error thrown when a deal has no validator assigned
+     */
+    error ValidatorNotSet(uint256 dealId);
 
     /**
      * @notice Error thrown when a deal does not exist for a given id
@@ -407,6 +412,13 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param epochsInMonth the divisor that would produce zero
      */
     error InvalidDealPricePerSectorPerMonth(uint256 totalPerMonth, uint256 epochsInMonth);
+
+    /**
+     * @notice Error indicating that a deal is not ready to be finalized
+     * @param serviceEndEpoch The epoch at which the deal service ends
+     * @param currentEpoch The current block epoch
+     */
+    error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
 
     /**
      * @notice Error thrown when there are no billable 32 GiB units for a deal
@@ -823,19 +835,29 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The id of the deal
      */
     function finalizeDeal(uint256 dealId) external override {
+        _ensurePoRepServiceOrAdmin();
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
         _ensureDealExists(deal);
         _ensureDealCorrectState(deal, DealState.ACTIVE);
 
-        if (msg.sender != deal.validator || deal.validator == address(0)) {
-            revert CallerIsNotValidator(dealId, msg.sender);
+        if (deal.validator == address(0)) {
+            revert ValidatorNotSet(dealId);
         }
+
+        PoRepTypes.DealService memory service = $._dealService[dealId];
+        uint256 serviceEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch)));
+        bool serviceEnded = serviceEndEpoch < block.number;
+        if (!serviceEnded) {
+            revert ServiceNotEnded(serviceEndEpoch, block.number);
+        }
+
+        IOperator(deal.validator).finalizeDeal();
+        _changeDealState(dealId, DealState.FINALIZED);
         $._SPRegistryContract
             .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
-        _changeDealState(dealId, DealState.FINALIZED);
-        emit DealFinalized(dealId, msg.sender);
+        emit DealFinalized(dealId, deal.validator);
     }
 
     /**
@@ -892,25 +914,25 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Terminate a deal
      * @dev Terminates a deal by setting the deal state to terminated
      * @param dealId The id of the deal
-     * @param earlyTerminationEpoch The Filecoin epoch at which the deal was terminated
      */
-    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external override {
+    function terminateDeal(uint256 dealId) external override {
+        _ensurePoRepServiceOrAdmin();
         PoRepMarketStorage storage $ = _getPoRepMarketStorage();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
         _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.ACTIVE);
 
-        if (msg.sender != deal.validator || deal.validator == address(0)) {
-            revert CallerIsNotValidator(dealId, msg.sender);
+        if (deal.validator == address(0)) {
+            revert ValidatorNotSet(dealId);
         }
 
-        $._dealService[dealId].earlyTerminationEpoch = earlyTerminationEpoch;
+        IOperator(deal.validator).earlyRailTermination();
+        int64 earlyTerminationEpoch = int64(uint64(block.number));
+        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch);
+        _changeDealState(dealId, DealState.TERMINATED);
         $._SPRegistryContract
             .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
-
-        _changeDealState(dealId, DealState.TERMINATED);
-        emit DealTerminated(dealId, earlyTerminationEpoch);
+        emit DealTerminated(dealId, $._dealService[dealId].earlyTerminationEpoch);
     }
 
     /**
