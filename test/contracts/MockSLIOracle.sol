@@ -12,10 +12,6 @@ contract MockSLIOracle {
     uint16 public latencyMs;
     uint8 public indexingPct;
 
-    function setLastUpdate(uint256 lastUpdate_) public {
-        lastUpdate = lastUpdate_;
-    }
-
     function setAttestations(
         uint256 lastUpdate_,
         uint16 retrievabilityBps_,

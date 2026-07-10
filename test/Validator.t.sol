@@ -72,7 +72,6 @@ contract ValidatorTest is Test {
                 railId: railId
             })
         );
-        poRepMarketMock.setDealSLIs(dealId, defaultRequirements);
         poRepMarketMock.setDealPayment(
             dealId,
             PoRepTypes.DealPayment({
@@ -168,7 +167,6 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentDoesNotApplySettlementCadenceLocally() public {
         activateServiceUntil(CHAIN_EPOCH);
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
         poRepMarketMock.setSettlementDecision(100, 0, "payment validated successfully");
 
         vm.prank(address(filecoinPayMock));
@@ -194,7 +192,6 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentReturnsMarketScoreFailureDecision() public {
         activateServiceUntil(CHAIN_EPOCH);
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         uint256 maxEpoch = uint256(uint64(type(int64).max));
         poRepMarketMock.setSettlementDecision(0, maxEpoch, "score below required threshold");
@@ -209,7 +206,6 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentReturnsMarketAcceptedDecision() public {
         activateServiceUntil(CHAIN_EPOCH);
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         poRepMarketMock.setSettlementDecision(100, 86_400, "payment validated successfully");
 
@@ -380,7 +376,6 @@ contract ValidatorTest is Test {
                 railId: 0
             })
         );
-        freshMarket.setDealSLIs(dealId, defaultRequirements);
         freshMarket.setDealPayment(
             dealId,
             PoRepTypes.DealPayment({
@@ -451,7 +446,6 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentReturnsMarketServiceEndedDecision() public {
         activateServiceUntil(10);
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
         poRepMarketMock.setDealService(
             dealId,
             PoRepTypes.DealService({
@@ -473,7 +467,6 @@ contract ValidatorTest is Test {
     }
 
     function testValidatePaymentReturnsMarketServiceEndCapDecision() public {
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
         activateServiceUntil(1000);
 
         poRepMarketMock.setSettlementDecision(10_000, 1000, "payment limited to deal endepoch");
@@ -602,7 +595,6 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentReturnsMarketEarlyTerminationCapDecision() public {
         activateServiceUntil(CHAIN_EPOCH);
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         vm.warp(BLOCK_TIMESTAMP);
 
@@ -621,7 +613,6 @@ contract ValidatorTest is Test {
 
     function testValidatePaymentReturnsMarketEarlierEarlyTerminationDecision() public {
         activateServiceUntil(CHAIN_EPOCH);
-        dataCapEvidenceAdapterMock.setDataSizeMatching(dealId, true);
 
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 chainEpochConversion = uint256(uint64(CHAIN_EPOCH));

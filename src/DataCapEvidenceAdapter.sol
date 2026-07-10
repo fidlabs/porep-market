@@ -91,11 +91,6 @@ contract DataCapEvidenceAdapter is
     bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /**
-     * @notice Role allowed to rescue broken allocation tracking for existing deals.
-     */
-    bytes32 public constant RESCUE_ROLE = keccak256("RESCUE_ROLE");
-
-    /**
      * @notice The role to set terminated claims.
      */
     bytes32 public constant TERMINATION_ORACLE = keccak256("TERMINATION_ORACLE");
@@ -124,14 +119,6 @@ contract DataCapEvidenceAdapter is
      * @param amount The amount of DataCap allocated.
      */
     event DatacapSpent(address indexed client, uint256 amount);
-
-    /**
-     * @notice Emitted when tracked allocations are rescued for a deal.
-     * @param dealId The rescued deal id.
-     * @param rescuer The account that executed the rescue.
-     * @param totalSize The total rescued allocation size.
-     */
-    event DealAllocationsRescued(uint256 indexed dealId, address indexed rescuer, uint256 totalSize);
 
     /**
      * @notice Emitted when the adapter is permanently non-operational
@@ -392,40 +379,12 @@ contract DataCapEvidenceAdapter is
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, admin);
         _grantRole(UPGRADER_ROLE, admin);
-        _grantRole(RESCUE_ROLE, admin);
         _grantRole(TERMINATION_ORACLE, terminationOracle);
 
         DataCapEvidenceAdapterStorage storage $ = s();
         $._poRepMarketContract = IPoRepMarket(_poRepMarketContract);
         $._metaAllocatorContract = IMetaAllocator(_metaAllocatorContract);
         $._operational = true;
-    }
-
-    /**
-     * @notice Validates the addresses passed to the initialize function
-     * @param admin Contract owner
-     * @param terminationOracle Address of the Termination Oracle
-     * @param poRepMarketContract Address of the PoRepMarket contract
-     * @param metaAllocatorContract Address of the MetaAllocator contract
-     */
-    function _validateInitializeAddresses(
-        address admin,
-        address terminationOracle,
-        address poRepMarketContract,
-        address metaAllocatorContract
-    ) internal pure {
-        if (admin == address(0)) {
-            revert InvalidAdminAddress();
-        }
-        if (terminationOracle == address(0)) {
-            revert InvalidTerminationOracleAddress();
-        }
-        if (poRepMarketContract == address(0)) {
-            revert InvalidPoRepMarketContractAddress();
-        }
-        if (metaAllocatorContract == address(0)) {
-            revert InvalidMetaAllocatorContractAddress();
-        }
     }
 
     /**
@@ -595,6 +554,8 @@ contract DataCapEvidenceAdapter is
         });
     }
 
+    // solhint-enable no-unused-vars
+
     // solhint-disable function-max-lines
     /**
      * @notice Refresh current evidence health from adapter-specific source data
@@ -725,92 +686,37 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
-     * @notice Returns whether the adapter can still process new evidence
-     * @dev Returns false when the adapter is no longer operational, for example
-     * when the DataCap adapter can no longer accept allocations or claims
-     * @return True if the adapter can process new evidence, false if it is no longer operational
+     * @notice Closes DataCap posting for a deal in a separate transaction
+     * @dev Only callable by the deal client while the deal is Accepted and posting is open
+     * @param dealId The id of the deal
      */
-    function isOperational() external view returns (bool) {
-        return s()._operational;
-    }
-
-    // solhint-disable function-max-lines
-    /**
-     * @notice Replaces all broken tracked allocations for an active existing deal.
-     * @param dealId The id of the deal to rescue.
-     * @param params The DataCap transfer parameters that create replacement allocations.
-     */
-    function rescueDealAllocations(uint256 dealId, DataCapTypes.TransferParams calldata params)
-        external
-        nonReentrant
-        onlyRole(RESCUE_ROLE)
-    {
+    function finishDataCapPosting(uint256 dealId) external {
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
-        if (dealSnapshot.state != DealState.ACTIVE || $._deals[dealId].dealId == 0) {
+
+        if (dealSnapshot.state != DealState.ACCEPTED) {
             revert InvalidDealStateForTransfer();
         }
 
-        DataCapDealEvidence storage dealEvidence = $._deals[dealId];
-        CommonTypes.FilActorId[] memory oldAllocationIds = dealEvidence.allocationIds;
-        if (oldAllocationIds.length == 0 || params.amount.neg) revert InvalidAllocationRequest();
-
-        if (
-            keccak256(params.to.data)
-                != keccak256(FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)).data)
-        ) {
-            revert InvalidAllocationRequest();
+        if (msg.sender != dealSnapshot.client) {
+            revert InvalidClient();
         }
 
-        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
-            _deserializeVerifregOperatorData(params.operator_data);
-        if (allocations.length != oldAllocationIds.length || claimExtensions.length != 0) {
-            revert InvalidAllocationRequest();
+        DataCapDealEvidence storage deal = $._deals[dealId];
+        if (deal.postingFinished) {
+            revert PostingAlreadyFinished();
         }
 
-        uint256 totalSize;
-        for (uint256 i = 0; i < allocations.length; i++) {
-            ProviderAllocation memory alloc = allocations[i];
-            if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(dealEvidence.provider)) {
-                revert InvalidProvider();
-            }
-            _ensureValidAllocationTerms(alloc.termMin, alloc.termMax, alloc.expiration);
-            if (alloc.size == 0) revert InvalidAllocationRequest();
-            if (alloc.size > SECTOR_SIZE) revert InvalidAllocationSize();
-
-            totalSize += alloc.size;
+        PoRepTypes.DealTerms memory dealTerms = $._poRepMarketContract.getDealTerms(dealId);
+        if (deal.allocatedBytes < dealTerms.requestedSizeBytes) {
+            revert InvalidAllocatedBytes();
         }
 
-        if (
-            totalSize != dealEvidence.allocatedBytes
-                || keccak256(params.amount.val) != keccak256(abi.encodePacked(totalSize * 1 ether))
-        ) {
-            revert InvalidAllocationRequest();
-        }
+        deal.postingFinished = true;
+        $._allocationStatusPerDeal[dealId] = DataCapAllocationStatus.ALLOCATED;
 
-        $._metaAllocatorContract
-            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, dealEvidence.allocatedBytes);
-        emit DatacapSpent(dealEvidence.client, dealEvidence.allocatedBytes);
-
-        /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
-        (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
-        if (exitCode != 0) {
-            revert TransferFailed(exitCode);
-        }
-
-        CommonTypes.FilActorId[] memory newAllocationIds = transferReturn.decodeAllocationResponse();
-        if (newAllocationIds.length != oldAllocationIds.length) {
-            revert InvalidAllocationRequest();
-        }
-        delete dealEvidence.allocationIds;
-        for (uint256 i = 0; i < newAllocationIds.length; ++i) {
-            dealEvidence.allocationIds.push(newAllocationIds[i]);
-        }
-
-        emit DealAllocationsRescued(dealId, msg.sender, totalSize);
+        emit DataCapPostingFinished(dealId, deal.allocatedBytes);
     }
-
-    // solhint-enable function-max-lines
 
     // solhint-disable func-name-mixedcase
     /**
@@ -845,6 +751,150 @@ contract DataCapEvidenceAdapter is
         exitCode = 0;
         codec = 0;
         data = "";
+    }
+
+    /**
+     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already non-operational
+     * @dev Only callable by the admin
+     */
+    function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
+        DataCapEvidenceAdapterStorage storage $ = s();
+        if ($._operational == false) {
+            revert AdapterAlreadyNonOperational();
+        }
+        $._operational = false;
+        emit AdapterNonOperational(msg.sender, block.number);
+    }
+
+    /**
+     * @notice Marks the given claims as terminated early.
+     * @dev Only callable by TERMINATION_ORACLE role.
+     * @param claims An array of claim IDs to mark as terminated.
+     */
+    function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
+        DataCapEvidenceAdapterStorage storage $ = s();
+        for (uint256 i = 0; i < claims.length; ++i) {
+            $._terminatedClaims[claims[i]] = true;
+        }
+    }
+
+    /**
+     * @notice Returns whether the adapter can still process new evidence
+     * @dev Returns false when the adapter is no longer operational, for example
+     * when the DataCap adapter can no longer accept allocations or claims
+     * @return True if the adapter can process new evidence, false if it is no longer operational
+     */
+    function isOperational() external view returns (bool) {
+        return s()._operational;
+    }
+
+    /**
+     * @notice Returns whether DataCap posting has been finished for a deal
+     * @param dealId The id of the deal
+     * @return True if posting is finished, false otherwise
+     */
+    function isDataCapPostingFinished(uint256 dealId) external view returns (bool) {
+        return s()._deals[dealId].postingFinished;
+    }
+
+    /**
+     * @notice custom getter to check if claim is terminated
+     * @param claimId the id of the claim
+     * @return True whether the claim is terminated, false otherwise
+     */
+    function isClaimTerminated(uint64 claimId) external view returns (bool) {
+        return s()._terminatedClaims[claimId];
+    }
+
+    /**
+     * @notice getter to retrieve allocation ids for a deal with pagination
+     * @param dealId the id of the deal
+     * @param offset index to start from
+     * @param limit max number of ids to return
+     * @return ids allocation ids for the deal
+     * @return sumOfAllocations total number of allocation ids for the deal
+     */
+    function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfAllocations)
+    {
+        if (limit == 0) revert InvalidLimit();
+        if (dealId == 0) revert InvalidDealId();
+        CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
+        sumOfAllocations = allocationIds.length;
+
+        // solhint-disable-next-line gas-strict-inequalities
+        if (offset >= sumOfAllocations) {
+            return (new CommonTypes.FilActorId[](0), sumOfAllocations);
+        }
+
+        uint256 remaining = sumOfAllocations - offset;
+        uint256 count = limit > remaining ? remaining : limit;
+        ids = new CommonTypes.FilActorId[](count);
+
+        for (uint256 i = 0; i < count; i++) {
+            ids[i] = allocationIds[offset + i];
+        }
+    }
+
+    /**
+     * @notice getter to retrieve claim ids for a deal with pagination
+     * @param dealId the id of the deal
+     * @param offset pagination offset for the claim ids
+     * @param limit pagination limit for the claim ids
+     * @return ids list of claim ids for the given deal
+     * @return sumOfClaims total number of claims for the given deal
+     */
+    function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
+    {
+        (ids, sumOfClaims) = _getClaimIds(dealId, offset, limit, s()._deals[dealId].claimIds);
+    }
+
+    /**
+     * @notice getter to retrieve failed claim ids for a deal
+     * @param dealId the id of the deal
+     * @return failedClaimIds list of failed claim ids for the given deal
+     */
+    function getFailedClaimIds(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory failedClaimIds) {
+        return s()._refreshStatus[dealId].failedClaimIds;
+    }
+
+    /**
+     * @notice custom getter to retrieve allocated bytes in deal
+     * @param dealId The id of the deal
+     * @return allocatedBytes allocated bytes for the selected deal
+     */
+    function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
+        return s()._deals[dealId].allocatedBytes;
+    }
+
+    /**
+     * @notice Getter to retrieve the lifecycle status of a deal's DataCap allocations
+     * @param dealId The id of the deal
+     * @return status The allocation status as defined in DataCapAllocationStatus
+     */
+    function getDealAllocationStatus(uint256 dealId) external view returns (uint8 status) {
+        return s()._allocationStatusPerDeal[dealId];
+    }
+
+    /**
+     * @notice Getter for the PoRepMarket contract address
+     * @return Address of the PoRepMarket contract
+     */
+    function getPoRepMarketAddress() external view returns (address) {
+        return address(s()._poRepMarketContract);
+    }
+
+    /**
+     * @notice Getter for the evidence type
+     * @return The evidence type as uint8
+     */
+    function getEvidenceType() external pure returns (uint8) {
+        return EvidenceTypes.VERIF_REG_CLAIMS;
     }
 
     // solhint-disable function-max-lines
@@ -983,7 +1033,6 @@ contract DataCapEvidenceAdapter is
         }
     }
 
-    // solhint-disable function-max-lines
     /**
      * @notice Verifies and registers claim extensions.
      * @param dealId The id of the deal.
@@ -1044,132 +1093,6 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
-     * @notice getter to retrieve allocation ids for a deal with pagination
-     * @param dealId the id of the deal
-     * @param offset index to start from
-     * @param limit max number of ids to return
-     * @return ids allocation ids for the deal
-     * @return sumOfAllocations total number of allocation ids for the deal
-     */
-    function getAllocationIdsPerDeal(uint256 dealId, uint256 offset, uint256 limit)
-        external
-        view
-        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfAllocations)
-    {
-        if (limit == 0) revert InvalidLimit();
-        if (dealId == 0) revert InvalidDealId();
-        CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
-        sumOfAllocations = allocationIds.length;
-
-        // solhint-disable-next-line gas-strict-inequalities
-        if (offset >= sumOfAllocations) {
-            return (new CommonTypes.FilActorId[](0), sumOfAllocations);
-        }
-
-        uint256 remaining = sumOfAllocations - offset;
-        uint256 count = limit > remaining ? remaining : limit;
-        ids = new CommonTypes.FilActorId[](count);
-
-        for (uint256 i = 0; i < count; i++) {
-            ids[i] = allocationIds[offset + i];
-        }
-    }
-
-    /**
-     * @notice getter to retrieve claim ids for a deal with pagination
-     * @param dealId the id of the deal
-     * @param offset pagination offset for the claim ids
-     * @param limit pagination limit for the claim ids
-     * @return ids list of claim ids for the given deal
-     * @return sumOfClaims total number of claims for the given deal
-     */
-    function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
-        external
-        view
-        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
-    {
-        (ids, sumOfClaims) = _getClaimIds(dealId, offset, limit, s()._deals[dealId].claimIds);
-    }
-
-    /**
-     * @notice getter to retrieve failed claim ids for a deal
-     * @param dealId the id of the deal
-     * @return failedClaimIds list of failed claim ids for the given deal
-     */
-    function getFailedClaimIds(uint256 dealId) external view returns (CommonTypes.FilActorId[] memory failedClaimIds) {
-        return s()._refreshStatus[dealId].failedClaimIds;
-    }
-
-    /**
-     * @notice custom getter to check if claim is terminated
-     * @param claimId the id of the claim
-     * @return isTerminated whether the claim is terminated
-     */
-    function terminatedClaims(uint64 claimId) external view returns (bool) {
-        return s()._terminatedClaims[claimId];
-    }
-
-    /**
-     * @notice custom getter to retrieve allocated bytes in deal
-     * @param dealId The id of the deal
-     * @return allocatedBytes allocated bytes for the selected deal
-     */
-    function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
-        return s()._deals[dealId].allocatedBytes;
-    }
-
-    /**
-     * @notice Getter to retrieve the lifecycle status of a deal's DataCap allocations
-     * @param dealId The id of the deal
-     * @return status The allocation status as defined in DataCapAllocationStatus
-     */
-    function getDealAllocationStatus(uint256 dealId) external view returns (uint8 status) {
-        return s()._allocationStatusPerDeal[dealId];
-    }
-
-    /**
-     * @notice Closes DataCap posting for a deal in a separate transaction
-     * @dev Only callable by the deal client while the deal is Accepted and posting is open
-     * @param dealId The id of the deal
-     */
-    function finishDataCapPosting(uint256 dealId) external {
-        DataCapEvidenceAdapterStorage storage $ = s();
-        PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
-
-        if (dealSnapshot.state != DealState.ACCEPTED) {
-            revert InvalidDealStateForTransfer();
-        }
-
-        if (msg.sender != dealSnapshot.client) {
-            revert InvalidClient();
-        }
-
-        DataCapDealEvidence storage deal = $._deals[dealId];
-        if (deal.postingFinished) {
-            revert PostingAlreadyFinished();
-        }
-
-        PoRepTypes.DealTerms memory dealTerms = $._poRepMarketContract.getDealTerms(dealId);
-        if (deal.allocatedBytes < dealTerms.requestedSizeBytes) {
-            revert InvalidAllocatedBytes();
-        }
-
-        deal.postingFinished = true;
-        $._allocationStatusPerDeal[dealId] = DataCapAllocationStatus.ALLOCATED;
-
-        emit DataCapPostingFinished(dealId, deal.allocatedBytes);
-    }
-
-    /**
-     * @notice Returns whether DataCap posting has been finished for a deal
-     * @param dealId The id of the deal
-     * @return True if posting is finished, false otherwise
-     */
-    function isDataCapPostingFinished(uint256 dealId) external view returns (bool) {
-        return s()._deals[dealId].postingFinished;
-    }
-
-    /**
      * @notice Internal getter to retrieve claim ids for a deal with pagination
      * @param dealId the id of the deal
      * @param offset pagination offset for the claim ids
@@ -1218,6 +1141,8 @@ contract DataCapEvidenceAdapter is
      */
     function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
 
+    // solhint-enable no-empty-blocks
+
     /**
      * @notice Internal function to delete an id from a storage array by its index
      * @param ids The list of ids to remove from
@@ -1230,23 +1155,30 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
-     * @notice Marks the given claims as terminated early.
-     * @dev Only callable by TERMINATION_ORACLE role.
-     * @param claims An array of claim IDs to mark as terminated.
+     * @notice Validates the addresses passed to the initialize function
+     * @param admin Contract owner
+     * @param terminationOracle Address of the Termination Oracle
+     * @param poRepMarketContract Address of the PoRepMarket contract
+     * @param metaAllocatorContract Address of the MetaAllocator contract
      */
-    function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
-        DataCapEvidenceAdapterStorage storage $ = s();
-        for (uint256 i = 0; i < claims.length; ++i) {
-            $._terminatedClaims[claims[i]] = true;
+    function _validateInitializeAddresses(
+        address admin,
+        address terminationOracle,
+        address poRepMarketContract,
+        address metaAllocatorContract
+    ) internal pure {
+        if (admin == address(0)) {
+            revert InvalidAdminAddress();
         }
-    }
-
-    /**
-     * @notice Getter for the PoRepMarket contract address
-     * @return Address of the PoRepMarket contract
-     */
-    function getPoRepMarketAddress() external view returns (address) {
-        return address(s()._poRepMarketContract);
+        if (terminationOracle == address(0)) {
+            revert InvalidTerminationOracleAddress();
+        }
+        if (poRepMarketContract == address(0)) {
+            revert InvalidPoRepMarketContractAddress();
+        }
+        if (metaAllocatorContract == address(0)) {
+            revert InvalidMetaAllocatorContractAddress();
+        }
     }
 
     /**
@@ -1255,26 +1187,5 @@ contract DataCapEvidenceAdapter is
     function _onlyPoRepMarket() internal view {
         address poRepMarketAddress = address(s()._poRepMarketContract);
         if (msg.sender != poRepMarketAddress) revert CallerIsNotPoRepMarket();
-    }
-
-    /**
-     * @notice Getter for the evidence type
-     * @return The evidence type as uint8
-     */
-    function evidenceType() external pure returns (uint8) {
-        return EvidenceTypes.VERIF_REG_CLAIMS;
-    }
-
-    /**
-     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already non-operational
-     * @dev Only callable by the admin
-     */
-    function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
-        DataCapEvidenceAdapterStorage storage $ = s();
-        if ($._operational == false) {
-            revert AdapterAlreadyNonOperational();
-        }
-        $._operational = false;
-        emit AdapterNonOperational(msg.sender, block.number);
     }
 }

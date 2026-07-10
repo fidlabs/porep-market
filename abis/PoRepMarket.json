@@ -2711,11 +2711,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidAllocationSizeForDealActivation",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidBilled32GiBUnits",
     "inputs": []
   },

@@ -427,12 +427,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error InvalidRailState(uint8 railStatus);
 
     /**
-     * @notice Error indicating that the allocated size for a deal is outside the activation tolerance
-     * @dev 0x39d70eaf
-     */
-    error InvalidAllocationSizeForDealActivation();
-
-    /**
      * @notice Error thrown when trying to set the padding value higher than maximum
      * @dev 0x6e8e586a
      */
@@ -1591,25 +1585,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
         if (bytes(manifestLocation).length > 2048) {
             revert TooLongManifestLocation();
-        }
-    }
-
-    /**
-     * @notice Ensures if allocations size is within padding
-     * @param actualDealSize size of the deal
-     * @param expectedDealSize expected size from proposal
-     */
-    function _ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) internal view {
-        if (actualDealSize == 0) {
-            revert InvalidAllocationSizeForDealActivation();
-        }
-
-        uint256 padding = s()._dealActivationPadding;
-        uint256 delta =
-            actualDealSize > expectedDealSize ? actualDealSize - expectedDealSize : expectedDealSize - actualDealSize;
-
-        if (delta * 10_000 > expectedDealSize * padding) {
-            revert InvalidAllocationSizeForDealActivation();
         }
     }
 

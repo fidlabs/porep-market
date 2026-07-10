@@ -227,6 +227,18 @@ interface IPoRepMarket {
     function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external;
 
     /**
+     * @notice Updates the deal activation padding
+     * @param padding The new padding value
+     */
+    function setDealActivationPadding(uint256 padding) external;
+
+    /**
+     * @notice Getter for deal activation padding
+     * @return padding Current padding value
+     */
+    function getDealActivationPadding() external view returns (uint256);
+
+    /**
      * @notice Gets deals for a specific organization by state
      * @param organization The address of the organization
      * @param state The state of the deals to retrieve
