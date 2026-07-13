@@ -172,17 +172,7 @@
     "name": "initialize2",
     "inputs": [
       {
-        "name": "_poRepService",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_filecoinPay",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_dataCapEvidenceAdapter",
         "type": "address",
         "internalType": "address"
       },
@@ -568,11 +558,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidDataCapEvidenceAdapterAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidFilecoinPayAddress",
     "inputs": []
   },
@@ -599,11 +584,6 @@
   {
     "type": "error",
     "name": "InvalidPoRepMarketAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidPoRepServiceAddress",
     "inputs": []
   },
   {

@@ -27,8 +27,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     struct ValidatorFactoryStorage {
         mapping(uint256 dealId => address contractAddress) _instances;
         mapping(address => bool) _isValidatorContract;
-        address _dataCapEvidenceAdapter;
-        address _poRepService;
         address _filecoinPay;
         address _poRepMarket;
         address _beacon;
@@ -82,22 +80,10 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     error InvalidPoRepMarketAddress();
 
     /**
-     * @notice Error indicating that the provided DataCapEvidenceAdapter address is invalid
-     * @dev 0xd2178646
-     */
-    error InvalidDataCapEvidenceAdapterAddress();
-
-    /**
      * @notice Error indicating that the provided FilecoinPay address is invalid
      * @dev 0x5419d62f
      */
     error InvalidFilecoinPayAddress();
-
-    /**
-     * @notice Error indicating that the provided PoRep service address is invalid
-     * @dev 0x7725d473
-     */
-    error InvalidPoRepServiceAddress();
 
     /**
      * @notice Error indicating that the provided implementation address is invalid
@@ -175,28 +161,21 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     }
 
     /**
-     * @notice Initializes the contract with the PoRepMarket, DataCapEvidenceAdapter, and FilecoinPay addresses
+     * @notice Initializes the contract with the PoRepMarket, and FilecoinPay addresses
      * @dev This function is called after the contract is initialized with the admin and implementation addresses
-     * @param _poRepService The address of the PoRepService contract
      * @param _filecoinPay The address of the FilecoinPay contract
-     * @param _dataCapEvidenceAdapter The address of the DataCapEvidenceAdapter contract
      * @param _poRepMarket The address of the PoRepMarket contract
      */
-    function initialize2(
-        address _poRepService,
-        address _filecoinPay,
-        address _dataCapEvidenceAdapter,
-        address _poRepMarket
-    ) external reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_poRepService == address(0)) revert InvalidPoRepServiceAddress();
+    function initialize2(address _filecoinPay, address _poRepMarket)
+        external
+        reinitializer(2)
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
         if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
-        if (_dataCapEvidenceAdapter == address(0)) revert InvalidDataCapEvidenceAdapterAddress();
         if (_filecoinPay == address(0)) revert InvalidFilecoinPayAddress();
 
         ValidatorFactoryStorage storage $ = s();
         $._poRepMarket = _poRepMarket;
-        $._dataCapEvidenceAdapter = _dataCapEvidenceAdapter;
-        $._poRepService = _poRepService;
         $._filecoinPay = _filecoinPay;
     }
 
@@ -212,15 +191,10 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
 
         PoRepTypes.Deal memory deal = IPoRepMarket($._poRepMarket).getDeal(dealId);
         if (msg.sender != deal.client) revert InvalidClientAddress();
-
         bytes memory initCode = abi.encodePacked(
             type(BeaconProxy).creationCode,
             abi.encode(
-                $._beacon,
-                abi.encodeCall(
-                    Validator.initialize,
-                    ($._admin, $._poRepService, $._filecoinPay, $._dataCapEvidenceAdapter, $._poRepMarket, dealId)
-                )
+                $._beacon, abi.encodeCall(Validator.initialize, ($._admin, $._filecoinPay, $._poRepMarket, dealId))
             )
         );
         // forge-lint: disable-next-line(asm-keccak256)

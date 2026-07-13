@@ -45,19 +45,6 @@
   },
   {
     "type": "function",
-    "name": "POREP_SERVICE_ROLE",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "createRail",
     "inputs": [],
     "outputs": [],
@@ -161,17 +148,7 @@
         "internalType": "address"
       },
       {
-        "name": "_porepService",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
         "name": "_filecoinPay",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "_evidenceAdapter",
         "type": "address",
         "internalType": "address"
       },
@@ -580,11 +557,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidEvidenceAdapterAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidFilecoinPayAddress",
     "inputs": []
   },
@@ -601,11 +573,6 @@
   {
     "type": "error",
     "name": "InvalidPoRepMarketAddress",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidPoRepServiceAddress",
     "inputs": []
   },
   {

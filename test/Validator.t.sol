@@ -87,9 +87,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy validatorProxy = new ERC1967Proxy(address(impl), "");
         validator = Validator(address(validatorProxy));
 
-        validator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        validator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
 
         filecoinPayMock.setOperatorApproval(token, admin, address(validator), true, 1_000_000, 1_000_000, 0, 0, 86_400);
 
@@ -154,16 +152,12 @@ contract ValidatorTest is Test {
     function testImplementationContractCannotBeInitialized() public {
         Validator impl = new Validator();
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        impl.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        impl.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
     }
 
     function testValidatorCannotBeReinitialized() public {
         vm.expectRevert(abi.encodeWithSelector(Initializable.InvalidInitialization.selector));
-        validator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        validator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
     }
 
     function testValidatePaymentDoesNotApplySettlementCadenceLocally() public {
@@ -269,20 +263,7 @@ contract ValidatorTest is Test {
         Validator newValidator = Validator(address(proxy));
 
         vm.expectRevert(Validator.InvalidAdminAddress.selector);
-        newValidator.initialize(
-            address(0), porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
-    }
-
-    function testInitializeRevertsWhenPoRepServiceIsZeroAddress() public {
-        Validator impl = new Validator();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
-        Validator newValidator = Validator(address(proxy));
-
-        vm.expectRevert(Validator.InvalidPoRepServiceAddress.selector);
-        newValidator.initialize(
-            admin, address(0), address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(address(0), address(filecoinPayMock), address(poRepMarketMock), dealId);
     }
 
     function testInitializeRevertsWhenFilecoinPayIsZeroAddress() public {
@@ -291,18 +272,7 @@ contract ValidatorTest is Test {
         Validator newValidator = Validator(address(proxy));
 
         vm.expectRevert(Validator.InvalidFilecoinPayAddress.selector);
-        newValidator.initialize(admin, porepService, address(0), evidenceAdapter, address(poRepMarketMock), dealId);
-    }
-
-    function testInitializeRevertsWhenEvidenceAdapterIsZeroAddress() public {
-        Validator impl = new Validator();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
-        Validator newValidator = Validator(address(proxy));
-
-        vm.expectRevert(Validator.InvalidEvidenceAdapterAddress.selector);
-        newValidator.initialize(
-            admin, porepService, address(filecoinPayMock), address(0), address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(admin, address(0), address(poRepMarketMock), dealId);
     }
 
     function testInitializeRevertsWhenPoRepMarketIsZeroAddress() public {
@@ -311,7 +281,7 @@ contract ValidatorTest is Test {
         Validator newValidator = Validator(address(proxy));
 
         vm.expectRevert(Validator.InvalidPoRepMarketAddress.selector);
-        newValidator.initialize(admin, porepService, address(filecoinPayMock), evidenceAdapter, address(0), dealId);
+        newValidator.initialize(admin, address(filecoinPayMock), address(0), dealId);
     }
 
     function testModifyRailPaymentEmitsRailPaymentModified() public {
@@ -395,9 +365,7 @@ contract ValidatorTest is Test {
             frozenToken, admin, address(freshValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
         );
 
-        freshValidator.initialize(
-            admin, porepService, address(freshFilecoinPay), evidenceAdapter, address(freshMarket), dealId
-        );
+        freshValidator.initialize(admin, address(freshFilecoinPay), address(freshMarket), dealId);
 
         vm.prank(admin);
         freshValidator.createRail();
@@ -485,9 +453,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        newValidator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
 
         filecoinPayMock.setOperatorApproval(
             token, admin, address(newValidator), false, 1_000_000, 1_000_000, 0, 0, 86_400
@@ -502,9 +468,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        newValidator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
 
         filecoinPayMock.setOperatorApproval(
             token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_399
@@ -519,9 +483,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        newValidator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
 
         filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 1_000_000, 0, 0, 0, 86_400);
 
@@ -534,9 +496,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        newValidator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
 
         filecoinPayMock.setOperatorApproval(token, admin, address(newValidator), true, 0, 1_000_000, 0, 0, 86_400);
 
@@ -566,9 +526,7 @@ contract ValidatorTest is Test {
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         Validator newValidator = Validator(address(proxy));
 
-        newValidator.initialize(
-            admin, porepService, address(filecoinPayMock), evidenceAdapter, address(poRepMarketMock), dealId
-        );
+        newValidator.initialize(admin, address(filecoinPayMock), address(poRepMarketMock), dealId);
 
         filecoinPayMock.setOperatorApproval(
             token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400

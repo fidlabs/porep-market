@@ -1519,10 +1519,9 @@ contract PoRepMarketTest is Test {
         vm.prank(validatorAddress);
         poRepMarket.updateValidator(dealId);
         setDealActive(dealId);
-
-        uint256 serviceEndEpoch = block.number + 1;
+        int64 serviceEndEpoch = int64(uint64(block.number + 1));
         PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
-        service.serviceEndEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(serviceEndEpoch)));
+        service.serviceEndEpoch = CommonTypes.ChainEpoch.wrap(serviceEndEpoch);
         PoRepMarketContractMock(address(poRepMarket)).setDealService(dealId, service);
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ServiceNotEnded.selector, serviceEndEpoch, block.number));

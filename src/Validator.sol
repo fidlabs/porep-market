@@ -49,22 +49,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidFilecoinPayAddress();
 
     /**
-     * @notice Error indicating that the evidence adapter address provided during initialization is the zero address
-     * @dev 0xd2178646
-     */
-    error InvalidEvidenceAdapterAddress();
-
-    /**
      * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
      * @dev 0xc9cc4a06
      */
     error InvalidPoRepMarketAddress();
-
-    /**
-     * @notice Error indicating that the PoRep service bot address provided during initialization is the zero address
-     * @dev 0x7725d473
-     */
-    error InvalidPoRepServiceAddress();
 
     /**
      * @notice Error indicating that the caller is not the client
@@ -192,15 +180,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 dealId;
         uint8 railStatus;
         address filecoinPay;
-        address evidenceAdapter;
         address poRepMarket;
         CommonTypes.FilActorId providerId;
     }
-
-    /**
-     * @notice Role for PoRep bot which is responsible for automating validator functions
-     */
-    bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     /**
      * @notice Name of the validator
@@ -246,25 +228,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     /**
      * @notice Initializes the contract
      * @param _admin Address to be granted the default admin role
-     * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
-     * @param _evidenceAdapter Address of the evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
-    function initialize(
-        address _admin,
-        address _porepService,
-        address _filecoinPay,
-        address _evidenceAdapter,
-        address _poRepMarket,
-        uint256 _dealId
-    ) external initializer {
-        _validateInitializeAddresses(_admin, _porepService, _filecoinPay, _evidenceAdapter, _poRepMarket);
+    function initialize(address _admin, address _filecoinPay, address _poRepMarket, uint256 _dealId)
+        external
+        initializer
+    {
+        _validateInitializeAddresses(_admin, _filecoinPay, _poRepMarket);
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(POREP_SERVICE_ROLE, _porepService);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -272,7 +247,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         $.providerId = deal.provider;
         $.filecoinPay = _filecoinPay;
-        $.evidenceAdapter = _evidenceAdapter;
         $.poRepMarket = _poRepMarket;
         $.dealId = _dealId;
 
@@ -493,29 +467,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     /**
      * @notice Validates that the provided addresses for initialization are not zero addresses
      * @param _admin Address to be granted the default admin role
-     * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
-     * @param _evidenceAdapter Address of the evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
      */
-    function _validateInitializeAddresses(
-        address _admin,
-        address _porepService,
-        address _filecoinPay,
-        address _evidenceAdapter,
-        address _poRepMarket
-    ) internal pure {
+    function _validateInitializeAddresses(address _admin, address _filecoinPay, address _poRepMarket) internal pure {
         if (_admin == address(0)) {
             revert InvalidAdminAddress();
         }
-        if (_porepService == address(0)) {
-            revert InvalidPoRepServiceAddress();
-        }
         if (_filecoinPay == address(0)) {
             revert InvalidFilecoinPayAddress();
-        }
-        if (_evidenceAdapter == address(0)) {
-            revert InvalidEvidenceAdapterAddress();
         }
         if (_poRepMarket == address(0)) {
             revert InvalidPoRepMarketAddress();
