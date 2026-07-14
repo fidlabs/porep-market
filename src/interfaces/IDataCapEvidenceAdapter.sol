@@ -42,14 +42,6 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     function getDealAllocationStatus(uint256 dealId) external view returns (uint8 status);
 
     /**
-     * @notice Replaces all broken tracked allocations for an active existing deal.
-     * @dev Only callable by RESCUE_ROLE.
-     * @param dealId The id of the deal to rescue.
-     * @param params The DataCap transfer parameters that create replacement allocations.
-     */
-    function rescueDealAllocations(uint256 dealId, DataCapTypes.TransferParams calldata params) external;
-
-    /**
      * @notice The handle_filecoin_method function is a universal entry point for calls
      * coming from built-in Filecoin actors. Datacap is an FRC-46 Token. Receiving FRC46
      * tokens requires implementing a Receiver Hook:
@@ -106,9 +98,9 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     /**
      * @notice custom getter to check if claim is terminated
      * @param claimId the id of the claim
-     * @return isTerminated whether the claim is terminated
+     * @return True whether the claim is terminated, false otherwise
      */
-    function terminatedClaims(uint64 claimId) external view returns (bool);
+    function isClaimTerminated(uint64 claimId) external view returns (bool);
 
     /**
      * @notice Marks the given claims as terminated early.

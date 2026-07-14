@@ -67,12 +67,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error RailAlreadyCreated();
 
     /**
-     * @notice Error indicating that an invalid deal ID was provided
-     * @dev 0xb06db32a
-     */
-    error InvalidDealId();
-
-    /**
      * @notice Error indicating that the operator is not approved
      * @dev 0xe3129001
      */

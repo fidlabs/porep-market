@@ -43,16 +43,7 @@ contract PoRepMarketContractMock is PoRepMarket {
         _getStorage()._dealData[dealId] = dealData;
     }
 
-    // solhint-disable-next-line no-empty-blocks
-    function setDealIdsReadyForPayment(uint256[] calldata) external {
-        // Intentionally left blank for tests that bypass the ready-for-payment queue.
-    }
-
     function getActiveDealIdsReadyForPayment() public pure returns (uint256[] memory) {
         return new uint256[](0);
-    }
-
-    function ensureAllocationSizeWithinTolerance(uint256 actualDealSize, uint256 expectedDealSize) external view {
-        _ensureAllocationSizeWithinTolerance(actualDealSize, expectedDealSize);
     }
 }

@@ -10,7 +10,6 @@ import {SharedTypes} from "../../src/types/SharedTypes.sol";
 
 contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepTypes.Deal deal) public deals;
-    mapping(uint256 dealId => SharedTypes.SLIThresholds slis) public dealSLIs;
     mapping(uint256 dealId => PoRepTypes.DealTerms terms) public dealTerms;
     mapping(uint256 dealId => PoRepTypes.DealPayment payment) public dealPayments;
     mapping(uint256 dealId => PoRepTypes.DealService service) public dealServices;
@@ -19,10 +18,6 @@ contract PoRepMarketMock {
 
     function setDeal(uint256 dealId, PoRepTypes.Deal calldata deal) external {
         deals[dealId] = deal;
-    }
-
-    function setDealSLIs(uint256 dealId, SharedTypes.SLIThresholds calldata slis) external {
-        dealSLIs[dealId] = slis;
     }
 
     function setDealTerms(uint256 dealId, PoRepTypes.DealTerms calldata terms) external {
@@ -45,10 +40,6 @@ contract PoRepMarketMock {
 
     function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory) {
         return deals[dealId];
-    }
-
-    function getDealSLIs(uint256 dealId) external view returns (SharedTypes.SLIThresholds memory) {
-        return dealSLIs[dealId];
     }
 
     function getDealPayment(uint256 dealId) external view returns (PoRepTypes.DealPayment memory) {
