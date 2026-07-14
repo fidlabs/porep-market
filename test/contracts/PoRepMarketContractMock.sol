@@ -6,6 +6,7 @@ pragma solidity =0.8.30;
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
+import {IStorageEvidenceAdapter} from "../../src/interfaces/IStorageEvidenceAdapter.sol";
 
 contract PoRepMarketContractMock is PoRepMarket {
     function _getStorage() private pure returns (PoRepMarket.PoRepMarketStorage storage $) {
@@ -41,6 +42,10 @@ contract PoRepMarketContractMock is PoRepMarket {
 
     function setDealData(uint256 dealId, SharedTypes.DealData calldata dealData) external {
         _getStorage()._dealData[dealId] = dealData;
+    }
+
+    function setGlobalEvidenceAdapterForTest(address evidenceAdapter) external {
+        _getStorage()._globalEvidenceAdapter = IStorageEvidenceAdapter(evidenceAdapter);
     }
 
     function getActiveDealIdsReadyForPayment() public pure returns (uint256[] memory) {
