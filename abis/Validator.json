@@ -45,6 +45,19 @@
   },
   {
     "type": "function",
+    "name": "POREP_SERVICE_ROLE",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "createRail",
     "inputs": [],
     "outputs": [],
@@ -148,7 +161,17 @@
         "internalType": "address"
       },
       {
+        "name": "_porepService",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "_filecoinPay",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "_evidenceAdapter",
         "type": "address",
         "internalType": "address"
       },
@@ -557,6 +580,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidEvidenceAdapterAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidFilecoinPayAddress",
     "inputs": []
   },
@@ -577,6 +605,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidPoRepServiceAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidRailId",
     "inputs": [
       {
@@ -588,17 +621,6 @@
         "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidRailStatusForTermination",
-    "inputs": [
-      {
-        "name": "railStatus",
-        "type": "uint8",
-        "internalType": "uint8"
       }
     ]
   },
@@ -635,6 +657,27 @@
   {
     "type": "error",
     "name": "RailAlreadyCreated",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ServiceNotEnded",
+    "inputs": [
+      {
+        "name": "serviceEndEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnauthorizedCaller",
     "inputs": []
   }
 ]
