@@ -575,11 +575,6 @@
   },
   {
     "type": "error",
-    "name": "InvalidDealId",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidEvidenceAdapterAddress",
     "inputs": []
   },

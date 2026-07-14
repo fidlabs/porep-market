@@ -33,13 +33,11 @@ import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
-import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
 import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
 
 // solhint-disable max-states-count
 contract DataCapEvidenceAdapterTest is Test {
     error MissingAllocationId();
-    error UnexpectedAllocationId();
 
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
     address public datacapContract = address(0xfF00000000000000000000000000000000000007);
@@ -197,11 +195,6 @@ contract DataCapEvidenceAdapterTest is Test {
         mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(10)));
     }
 
-    function _grantRescueRole(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock, address account) internal {
-        vm.prank(address(this));
-        dataCapEvidenceAdapterMock.grantRole(dataCapEvidenceAdapterMock.RESCUE_ROLE(), account);
-    }
-
     function _activationContext() internal pure returns (SharedTypes.ActivationContext memory context) {
         context = SharedTypes.ActivationContext({
             dealId: 1,
@@ -213,57 +206,11 @@ contract DataCapEvidenceAdapterTest is Test {
         });
     }
 
-    function _rescueParams(bytes memory operatorData, uint256 amount)
-        internal
-        pure
-        returns (DataCapTypes.TransferParams memory params)
-    {
-        params = DataCapTypes.TransferParams({
-            to: FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)),
-            amount: CommonTypes.BigInt({val: abi.encodePacked(amount * 1 ether), neg: false}),
-            operator_data: operatorData
-        });
-    }
-
-    function _oneAllocationRescueParams() internal pure returns (DataCapTypes.TransferParams memory params) {
-        params = _rescueParams(
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080",
-            2048
-        );
-    }
-
-    function _twoAllocationRescueParams() internal pure returns (DataCapTypes.TransferParams memory params) {
-        params = _rescueParams(
-            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334086192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221910001A0007E9001A000816001A0050334080",
-            6144
-        );
-    }
-
     function _assertContainsAllocationId(CommonTypes.FilActorId[] memory ids, uint64 expectedId) internal pure {
         for (uint256 i = 0; i < ids.length; i++) {
             if (CommonTypes.FilActorId.unwrap(ids[i]) == expectedId) return;
         }
         revert MissingAllocationId();
-    }
-
-    function _assertDoesNotContainAllocationId(CommonTypes.FilActorId[] memory ids, uint64 unexpectedId) internal pure {
-        for (uint256 i = 0; i < ids.length; i++) {
-            if (CommonTypes.FilActorId.unwrap(ids[i]) == unexpectedId) {
-                revert UnexpectedAllocationId();
-            }
-        }
-    }
-
-    function _assertOneAllocationDealUnchanged(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock)
-        internal
-        view
-    {
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
-        assertEq(ids.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 1);
-
-        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(dealEvidence.allocatedBytes, 2048);
     }
 
     function testIsAdminSet() public view {
@@ -276,13 +223,8 @@ contract DataCapEvidenceAdapterTest is Test {
         assertTrue(dataCapEvidenceAdapter.hasRole(terminationOracleRole, terminationOracle));
     }
 
-    function testIsRescueRoleSet() public view {
-        bytes32 rescueRole = dataCapEvidenceAdapter.RESCUE_ROLE();
-        assertTrue(dataCapEvidenceAdapter.hasRole(rescueRole, address(this)));
-    }
-
     function testDataCapEvidenceAdapterEvidenceType() public view {
-        assertEq(dataCapEvidenceAdapter.evidenceType(), EvidenceTypes.VERIF_REG_CLAIMS);
+        assertEq(dataCapEvidenceAdapter.getEvidenceType(), EvidenceTypes.VERIF_REG_CLAIMS);
     }
 
     function testSubmitEvidenceBatchMovesAllClaimedAllocations() public {
@@ -444,268 +386,6 @@ contract DataCapEvidenceAdapterTest is Test {
     function testGetAllocationIdsPerDealRevertsWhenDealIdIsZero() public {
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealId.selector));
         dataCapEvidenceAdapter.getAllocationIdsPerDeal(0, 0, 1);
-    }
-
-    function testRescueDealAllocationsRevertsWithoutRescueRole() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-
-        address unauthorized = vm.addr(0x523);
-        bytes32 rescueRole = dataCapEvidenceAdapterMock.RESCUE_ROLE();
-
-        vm.prank(unauthorized);
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, rescueRole)
-        );
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-    }
-
-    function testRescueDealAllocationsRejectsNonActiveMarketDeal() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        uint8[3] memory states = [DealState.ACCEPTED, DealState.REJECTED, DealState.TERMINATED];
-        for (uint256 i = 0; i < states.length; ++i) {
-            poRepMarketMock.setDealState(dealId, states[i]);
-            vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealStateForTransfer.selector));
-            dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-        }
-    }
-
-    function testRescueDealAllocationsRejectsUnregisteredLocalDeal() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        poRepMarketMock.setDealState(dealId, DealState.ACTIVE);
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidDealStateForTransfer.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-    }
-
-    function testRescueDealAllocationsRejectsZeroReplacementSize() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _rescueParams(
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22001A0007E9001A000816001A0050334080",
-            0
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsTooTightReplacementWindow() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _rescueParams(
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000815FF1A0050334080",
-            2048
-        );
-
-        vm.expectRevert(
-            abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidClaimWindow.selector, int64(518400), int64(529919))
-        );
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsExpiredReplacementAllocation() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _rescueParams(
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001903E780",
-            2048
-        );
-        vm.roll(1000);
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsPartialReplacement() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-    }
-
-    function testRescueDealAllocationsRejectsMismatchedAmount() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _oneAllocationRescueParams();
-        params.amount.val = abi.encodePacked(uint256(2049) * 1 ether);
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsWrongReceiver() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _oneAllocationRescueParams();
-        params.to = FilAddresses.fromActorID(12345);
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsDifferentReplacementProvider() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _rescueParams(
-            hex"828186194E20D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080",
-            2048
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidProvider.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsClaimExtensions() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = _rescueParams(
-            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC",
-            2048
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRejectsNegativeValue() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        DataCapTypes.TransferParams memory params = DataCapTypes.TransferParams({
-            to: FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)),
-            amount: CommonTypes.BigInt({val: abi.encodePacked(uint256(2048) * 1 ether), neg: true}),
-            operator_data: hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC"
-        });
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
-    }
-
-    function testRescueDealAllocationsRollsBackWhenDataCapTransferFails() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        actorIdMock.setDataCapTransferExitCode(16);
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.TransferFailed.selector, int256(16)));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-
-        _assertOneAllocationDealUnchanged(dataCapEvidenceAdapterMock);
-    }
-
-    function testRescueDealAllocationsRollsBackWhenReturnedAllocationCountIsTooSmall() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        actorIdMock.setDataCapTransferResult(hex"8341004100488382018082008080");
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-
-        _assertOneAllocationDealUnchanged(dataCapEvidenceAdapterMock);
-    }
-
-    function testRescueDealAllocationsRollsBackWhenReturnedAllocationCountIsTooLarge() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        actorIdMock.setDataCapTransferResult(hex"83410041004C8382018082008082182A182B");
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationRequest.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-
-        _assertOneAllocationDealUnchanged(dataCapEvidenceAdapterMock);
-    }
-
-    function testRescueDealAllocationsReplacesTrackedIdsAndPreservesDealIdentity() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        actorIdMock.setDataCapTransferResult(hex"83410041004A8382018082008081182A");
-
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _oneAllocationRescueParams());
-
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
-        assertEq(ids.length, 1);
-        assertEq(CommonTypes.FilActorId.unwrap(ids[0]), 42);
-
-        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(dealEvidence.allocatedBytes, 2048);
-        assertEq(dealEvidence.dealId, dealId);
-        assertEq(dealEvidence.client, clientAddress);
-        assertEq(CommonTypes.FilActorId.unwrap(dealEvidence.provider), CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(dealEvidence.validator, address(validatorMock));
-        assertEq(dealEvidence.railId, 1);
-
-        (uint64 provider, bytes memory data,,,,) = actorIdMock.lastDataCapTransferAllocation(0);
-        assertEq(provider, CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(data, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
-    }
-
-    function testRescueDealAllocationsReplacesMultipleTrackedIdsAndPreservesAggregateSize() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithTwoAllocations(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-        actorIdMock.setDataCapTransferResult(hex"83410041004C8382018082008082182A182B");
-
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, _twoAllocationRescueParams());
-
-        CommonTypes.FilActorId[] memory ids = dataCapEvidenceAdapterMock.getAllAllocationIdsPerDeal(dealId);
-        assertEq(ids.length, 2);
-        _assertDoesNotContainAllocationId(ids, 1);
-        _assertDoesNotContainAllocationId(ids, 2);
-        _assertContainsAllocationId(ids, 42);
-        _assertContainsAllocationId(ids, 43);
-
-        DataCapEvidenceAdapter.DataCapDealEvidence memory dealEvidence = dataCapEvidenceAdapterMock.getDeal(dealId);
-        assertEq(dealEvidence.allocatedBytes, 6144);
-
-        (uint64 firstProvider, bytes memory firstData,,,,) = actorIdMock.lastDataCapTransferAllocation(0);
-        (uint64 secondProvider, bytes memory secondData,,,,) = actorIdMock.lastDataCapTransferAllocation(1);
-        assertEq(firstProvider, CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(secondProvider, CommonTypes.FilActorId.unwrap(SP1));
-        assertEq(firstData, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
-        assertEq(secondData, hex"000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22");
-        assertEq(poRepMarketMock.finalizeDealCallCount(), 0);
     }
 
     function testAuthorizeUpgradeRevert() public {
@@ -1146,20 +826,20 @@ contract DataCapEvidenceAdapterTest is Test {
     }
 
     function testClaimsTerminatedEarlySetCorrectly() public {
-        bool isFirstClaimTerminated = dataCapEvidenceAdapter.terminatedClaims(1);
+        bool isFirstClaimTerminated = dataCapEvidenceAdapter.isClaimTerminated(1);
         assertTrue(!isFirstClaimTerminated);
         earlyTerminatedClaims.push(2);
         earlyTerminatedClaims.push(3);
         vm.prank(terminationOracle);
         dataCapEvidenceAdapter.claimsTerminatedEarly(earlyTerminatedClaims);
 
-        isFirstClaimTerminated = dataCapEvidenceAdapter.terminatedClaims(1);
-        bool isSecondClaimTerminated = dataCapEvidenceAdapter.terminatedClaims(2);
-        bool isThirdClaimTerminated = dataCapEvidenceAdapter.terminatedClaims(3);
+        isFirstClaimTerminated = dataCapEvidenceAdapter.isClaimTerminated(1);
+        bool isSecondClaimTerminated = dataCapEvidenceAdapter.isClaimTerminated(2);
+        bool isThirdClaimTerminated = dataCapEvidenceAdapter.isClaimTerminated(3);
         assertTrue(isFirstClaimTerminated);
         assertTrue(isSecondClaimTerminated);
         assertTrue(isThirdClaimTerminated);
-        bool isFourthClaimTerminated = dataCapEvidenceAdapter.terminatedClaims(4);
+        bool isFourthClaimTerminated = dataCapEvidenceAdapter.isClaimTerminated(4);
         assertTrue(!isFourthClaimTerminated);
     }
 
@@ -1354,22 +1034,6 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationSize.selector));
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
-    }
-
-    function testRescueDealAllocationsRejectsAllocationSizeExceedingSector() public {
-        DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock =
-            DataCapEvidenceAdapterContractMock(setupProxy(address(new DataCapEvidenceAdapterContractMock())));
-        _registerDealWithOneAllocation(dataCapEvidenceAdapterMock);
-        _grantRescueRole(dataCapEvidenceAdapterMock, address(this));
-
-        // alloc.size = 32GiB + 1 byte = 34359738369 bytes
-        DataCapTypes.TransferParams memory params = _rescueParams(
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221B00000008000000011A0007E9001A000816001A0050334080",
-            2048
-        );
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocationSize.selector));
-        dataCapEvidenceAdapterMock.rescueDealAllocations(dealId, params);
     }
 
     function testGetClaimIdsRevertsWhenLimitIsZero() public {

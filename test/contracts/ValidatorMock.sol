@@ -15,10 +15,6 @@ contract ValidatorMock is IOperator {
 
     function updateLockupPeriod(uint256) external {}
 
-    function updateLockupPeriod(uint256 railId, uint256 newLockupPeriod) external {
-        // noop
-    }
-
     function modifyRailPayment(uint256 newRate) external {
         modifyRailPaymentCallCount++;
         lastNewRate = newRate;

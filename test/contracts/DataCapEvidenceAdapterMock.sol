@@ -11,8 +11,6 @@ import {EvidenceTypes} from "../../src/types/EvidenceTypes.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
 
 contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
-    mapping(CommonTypes.FilActorId provider => bool ok) public valid;
-    mapping(uint256 dealId => bool matches) public dataSizeMatches;
     mapping(uint256 dealId => DataCapEvidenceAdapter.DataCapDealEvidence dealEvidence) public deals;
     mapping(uint256 dealId => CommonTypes.FilActorId[] ids) internal allocationIds;
     mapping(uint256 dealId => bytes evidenceData) public submittedEvidence;
@@ -22,26 +20,6 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(uint256 dealId => uint8 result) public activationResult;
     mapping(uint256 dealId => CommonTypes.ChainEpoch epoch) public lastRefreshEpoch;
     bool public operational = true;
-
-    function setValid(CommonTypes.FilActorId provider, bool ok) external {
-        valid[provider] = ok;
-    }
-
-    function setDataSizeMatching(uint256 dealId, bool matches) external {
-        dataSizeMatches[dealId] = matches;
-    }
-
-    function isDataSizeMatching(uint256 dealId) external view returns (bool) {
-        return dataSizeMatches[dealId];
-    }
-
-    function getDataCapEvidenceAdapterDealInfo(uint256 dealId)
-        external
-        view
-        returns (DataCapEvidenceAdapter.DataCapDealEvidence memory)
-    {
-        return deals[dealId];
-    }
 
     function setAllocationIds(uint256 dealId, CommonTypes.FilActorId[] calldata ids_) external {
         delete allocationIds[dealId];
@@ -84,10 +62,6 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         return deals[dealId].allocatedBytes;
     }
 
-    function setOperational(bool operational_) external {
-        operational = operational_;
-    }
-
     function setActivationResult(uint256 dealId, uint8 result) external {
         activationResult[dealId] = result;
     }
@@ -100,7 +74,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         return operational;
     }
 
-    function evidenceType() external pure returns (uint8) {
+    function getEvidenceType() external pure returns (uint8) {
         return EvidenceTypes.VERIF_REG_CLAIMS;
     }
 

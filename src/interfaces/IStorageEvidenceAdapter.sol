@@ -13,7 +13,7 @@ interface IStorageEvidenceAdapter {
      * @notice Returns the adapter's evidence type identifier
      * @return evidence type as a uint8; PoRepMarket uses this to route evidence to the correct adapter
      */
-    function evidenceType() external view returns (uint8);
+    function getEvidenceType() external pure returns (uint8);
 
     /**
      * @notice Returns whether the adapter can still process new evidence
