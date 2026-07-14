@@ -10,8 +10,8 @@
     },
     "PoRepMarket": {
       "artifact": "src/PoRepMarket.sol:PoRepMarket",
-      "implementation": "0x347B247FD1A1e2Ddc9acB83c14BF13787DdF9571",
-      "implementationCodeHash": "0x7948c846d122f9a45fde82eaf82a567bc629f7a75620d8dcd5d25adaffc84569",
+      "implementation": "0xF7c68A8fa4601f6949a9E0fF6bb7077E04AD7c42",
+      "implementationCodeHash": "0x28d92b0aed8ee511b4aac3f0bd9d686122d4dda1c7fa2522212b2d773fa315b6",
       "kind": "uups",
       "proxy": "0xD48B093E55Df8e52c964f45da7EdBe1EedfDcEcb",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
@@ -34,15 +34,15 @@
     },
     "SPRegistry": {
       "artifact": "src/SPRegistry.sol:SPRegistry",
-      "implementation": "0x2ac531E6231AC944e0765C4C638B5141974a8998",
-      "implementationCodeHash": "0xda132e100c38e11fd3fbc779cea83a37d6129fa56b7e64e0ae3da39f01de62f2",
+      "implementation": "0x0a6D880347b294B42d217c23f15Ce9f87718AF44",
+      "implementationCodeHash": "0xed97823a778228cf625ca35d6045dfd2f1d4abb04ee71f5f75067a9fccc4376c",
       "kind": "uups",
       "proxy": "0xF1A3A59b31e262DcBD2D7Ecc97fa092F1617EcFF",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
     },
     "Validator": {
       "artifact": "src/Validator.sol:Validator",
-      "implementation": "0xD316876894F40A97d703f345B424B1086cb53126",
+      "implementation": "0xC541BCf267e54cC095F5a236910dc622f0e1EbD2",
       "implementationCodeHash": "0x1a504833abb64ebc4e4c5e76636e734186dfa7701271b77c421fafec6c4f45ff",
       "kind": "implementation"
     },
@@ -50,7 +50,7 @@
       "address": "0x4FA1d64Fa28c11476a4075aB99dB89E6bAEc48Da",
       "artifact": "lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
       "factoryProxy": "0xbeDDfBcd0797f697224de635A2bc083DB9b6AaF4",
-      "implementation": "0xD316876894F40A97d703f345B424B1086cb53126",
+      "implementation": "0xC541BCf267e54cC095F5a236910dc622f0e1EbD2",
       "kind": "beacon"
     },
     "ValidatorFactory": {
@@ -72,8 +72,8 @@
     "TerminationOracle": "0x087Ea8b72CBf4B435023356776834eB10dd07f2a"
   },
   "release": {
-    "buildInfoSha256": "0x470b2353e1c3a520b657433e1329b679ef22def875625b5beed29a45ffb13f7e",
-    "gitCommit": "40b549d4e7f2641a1695e1378028cc11d1ebcda3"
+    "buildInfoSha256": "0x74b1f5e1894149539006a391c62450f1d98ed1936ab28c5bebad01ed33962c43",
+    "gitCommit": "28152cda431ad271755db08e1be130911479ced9"
   },
   "status": "finalized",
   "finalizedAt": "2026-07-13T10:02:55Z",

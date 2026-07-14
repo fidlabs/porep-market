@@ -1,6 +1,7 @@
 # PoRep Market task runner
 # Run `just` to see all available commands
-set dotenv-load
+
+set dotenv-load := true
 
 fmt:
     forge fmt
@@ -36,111 +37,32 @@ coverage:
 check-coverage:
     ./ci/check-full-coverage.sh
 
-deploy flags='':
-    forge script script/Deploy.s.sol:Deploy --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+deployment-tests:
+    bash test/scripts/deployment-commands.sh
+    bash test/scripts/deployment-finality.sh
+    bash test/scripts/deployment-live.sh
+    bash test/scripts/deployment-flow.sh
 
-upgrade flags='':
-    forge script script/Upgrade.s.sol:Upgrade --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+deploy network *args:
+    ./script/deployment.sh deploy {{ network }} {{ args }}
 
-upgrade_validator_beacon flags='':
-    forge script script/UpgradeValidatorBeacon.s.sol:UpgradeValidatorBeacon --gas-estimate-multiplier 100000 --disable-block-gas-limit -vvvv --broadcast --rpc-url $RPC_URL --private-key $PRIVATE_KEY {{flags}}
+finalize-deploy network:
+    ./script/deployment.sh finalize-deploy {{ network }}
 
-devnet_deploy: clean build
-	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just deploy 
+upgrade network target *targets:
+    ./script/deployment.sh upgrade {{ network }} {{ target }} {{ targets }}
 
-calibnet_deploy: clean build
-    RPC_URL=$RPC_CALIBNET \
-    PRIVATE_KEY=$PRIVATE_KEY_CALIBNET \
-    FILECOIN_PAY=$FILECOIN_PAY_CALIBNET \
-    TERMINATION_ORACLE=$TERMINATION_ORACLE_CALIBNET \
-    ORACLE=$ORACLE_CALIBNET \
-    POREP_SERVICE=$POREP_SERVICE_CALIBNET \
-    META_ALLOCATOR=$META_ALLOCATOR_CALIBNET \
-    OPERATOR_ADDR=${OPERATOR_ADDR_CALIBNET:-} \
-    just deploy --slow
+finalize-upgrade network:
+    ./script/deployment.sh finalize-upgrade {{ network }}
 
-devnet_upgrade: clean build
-	RPC_URL=$RPC_TEST PRIVATE_KEY=$PRIVATE_KEY_TEST just upgrade
-
-calibnet_upgrade: clean build
-	RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade --slow
-
-calibnet_upgrade_validator_beacon: clean build
-    RPC_URL=$RPC_CALIBNET PRIVATE_KEY=$PRIVATE_KEY_CALIBNET just upgrade_validator_beacon --slow
-
-# Full mainnet (production) deploy with 5-gate safety check (requires CONFIRM_MAINNET=yes).
-mainnet_deploy: clean build
-    ./script/preflight-mainnet.sh deploy
-    RPC_URL=$RPC_MAINNET \
-    PRIVATE_KEY=$PRIVATE_KEY_MAINNET \
-    FILECOIN_PAY=$FILECOIN_PAY_MAINNET \
-    TERMINATION_ORACLE=$TERMINATION_ORACLE_MAINNET \
-    ORACLE=$ORACLE_MAINNET \
-    POREP_SERVICE=$POREP_SERVICE_MAINNET \
-    META_ALLOCATOR=$META_ALLOCATOR_MAINNET \
-    OPERATOR_ADDR=${OPERATOR_ADDR_MAINNET:-} \
-    just deploy --slow
-
-# Mainnet deploy dry-run — preview addresses + gas estimates, no broadcast.
-mainnet_deploy_dry: clean build
-    ./script/preflight-mainnet.sh dry
-    RPC_URL=$RPC_MAINNET \
-    PRIVATE_KEY=$PRIVATE_KEY_MAINNET \
-    FILECOIN_PAY=$FILECOIN_PAY_MAINNET \
-    TERMINATION_ORACLE=$TERMINATION_ORACLE_MAINNET \
-    ORACLE=$ORACLE_MAINNET \
-    POREP_SERVICE=$POREP_SERVICE_MAINNET \
-    META_ALLOCATOR=$META_ALLOCATOR_MAINNET \
-    OPERATOR_ADDR=${OPERATOR_ADDR_MAINNET:-} \
-    forge script script/Deploy.s.sol:Deploy \
-        --gas-estimate-multiplier 100000 \
-        --disable-block-gas-limit \
-        -vvvv \
-        --rpc-url $RPC_MAINNET
-
-# Mainnet proxy upgrade (requires existing deployments/mainnet/latest.json).
-mainnet_upgrade: clean build
-    ./script/preflight-mainnet.sh upgrade
-    RPC_URL=$RPC_MAINNET PRIVATE_KEY=$PRIVATE_KEY_MAINNET just upgrade --slow
-
-# Mainnet Validator beacon upgrade (requires existing deployments/mainnet/latest.json).
-mainnet_upgrade_validator_beacon: clean build
-    ./script/preflight-mainnet.sh validator-beacon-upgrade
-    RPC_URL=$RPC_MAINNET PRIVATE_KEY=$PRIVATE_KEY_MAINNET just upgrade_validator_beacon --slow
-
-rescue_prepare deal_ids term_min term_max:
-    ./script/rescue-allocations.sh prepare --deal-ids {{deal_ids}} --term-min {{term_min}} --term-max {{term_max}}
-
-rescue_dry_run plan:
-    ./script/rescue-allocations.sh execute --plan {{plan}} --dry-run
-
-rescue_execute plan:
-    PRIVATE_KEY=$RESCUE_PRIVATE_KEY_MAINNET ./script/rescue-allocations.sh execute --plan {{plan}} --broadcast
-
-# Blockscout contract verification
-# Verify reads deployments/<net>/latest.json and works from any 
-# fresh checkout of the deployment commit (no broadcast/artifacts needed).
-
-verify-calibnet:
-    ./script/verify-blockscout.sh verify 314159
-
-verify-mainnet:
-    ./script/verify-blockscout.sh verify 314
-
-audit-calibnet:
-    ./script/verify-blockscout.sh audit 314159
-
-audit-mainnet:
-    ./script/verify-blockscout.sh audit 314
-
-verify-one chain addr name:
-    ./script/verify-blockscout.sh verify-one {{chain}} {{addr}} {{name}}
+verify network:
+    ./script/deployment.sh verify {{ network }}
 
 # CI equivalent check
-check: fmt-check lint test check-coverage build check-abis
+check: fmt-check lint test deployment-tests check-coverage build check-abis
     @echo "All checks passed."
 
-pre-push: fmt-check lint test check-coverage check-abis
+pre-push: fmt-check lint test deployment-tests check-coverage check-abis
     @echo "Ready to push."
 
 fix: fmt lint test

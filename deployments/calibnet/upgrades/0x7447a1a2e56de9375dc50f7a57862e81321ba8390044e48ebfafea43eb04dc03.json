@@ -1,0 +1,73 @@
+{
+  "operation": "upgrade",
+  "sourceDeploymentId": "0x1aa3d660e03d597dc0987374afa36d99cc7da4aa1d400272f24aee2496e3bdda",
+  "finalizedAt": "2026-07-13T14:08:11Z",
+  "operations": [
+    {
+      "target": "PoRepMarket",
+      "kind": "uups",
+      "artifact": "src/PoRepMarket.sol:PoRepMarket",
+      "newImplementation": "0x347B247FD1A1e2Ddc9acB83c14BF13787DdF9571",
+      "newImplementationCodeHash": "0x7948c846d122f9a45fde82eaf82a567bc629f7a75620d8dcd5d25adaffc84569"
+    },
+    {
+      "target": "SPRegistry",
+      "kind": "uups",
+      "artifact": "src/SPRegistry.sol:SPRegistry",
+      "newImplementation": "0x2ac531E6231AC944e0765C4C638B5141974a8998",
+      "newImplementationCodeHash": "0xda132e100c38e11fd3fbc779cea83a37d6129fa56b7e64e0ae3da39f01de62f2"
+    },
+    {
+      "target": "Validator",
+      "kind": "beacon",
+      "artifact": "src/Validator.sol:Validator",
+      "newImplementation": "0xD316876894F40A97d703f345B424B1086cb53126",
+      "newImplementationCodeHash": "0x1a504833abb64ebc4e4c5e76636e734186dfa7701271b77c421fafec6c4f45ff"
+    }
+  ],
+  "transactions": [
+    {
+      "hash": "0x243733906eefb24fd22ccfb77c00aadeb57fec94d80c3b705a4b1764cd71277c",
+      "status": 1,
+      "blockNumber": 3887460,
+      "blockHash": "0x038a02dbd1a509183314a15e893ddc2b430c11325f74daa8787d8f37bd5262b0",
+      "contractAddress": null
+    },
+    {
+      "hash": "0x2adba53f75478e282454f6bb65afc74c0f27cf76b42c706dfc6ffd6b04dec4de",
+      "status": 1,
+      "blockNumber": 3887456,
+      "blockHash": "0x052d1ceb575531831f2009bbb5dba265154458e274550533c3b2dded21fbeb7a",
+      "contractAddress": "0x2ac531e6231ac944e0765c4c638b5141974a8998"
+    },
+    {
+      "hash": "0x3608c9e7068b4103abd417c99addf6f377fe74145d6ce2868840b8abb59a3f2f",
+      "status": 1,
+      "blockNumber": 3887464,
+      "blockHash": "0x26f1708305e0c2684c85e08de1f09b7300f4e1fe00a9c6c8e8749ea76c2f1441",
+      "contractAddress": null
+    },
+    {
+      "hash": "0x7b9aae828ede2ef853ae076a9682cbad16f06a85b2894f9b69013acd1b1c69fd",
+      "status": 1,
+      "blockNumber": 3887462,
+      "blockHash": "0x299fe0135775ebfaf743cf7f59528bc387340899bc09689f6c21fda69b581859",
+      "contractAddress": null
+    },
+    {
+      "hash": "0x7e202b806760cfa1de759becfad54750839fdf5f28b6717ac01d72c86f2223af",
+      "status": 1,
+      "blockNumber": 3887454,
+      "blockHash": "0x504ea54911f842d4cccd665626890961d868bca4e93224288a2e93055e3db09d",
+      "contractAddress": "0x347b247fd1a1e2ddc9acb83c14bf13787ddf9571"
+    },
+    {
+      "hash": "0xdf3b07f31018c13367415ab137a1a1eab3427e676f65bbe7570bf01a3a00d913",
+      "status": 1,
+      "blockNumber": 3887458,
+      "blockHash": "0xdc050045f7b0eb2dcb7bbc7998f076445ff2165fa5a80f9092a8769c0e40b5d9",
+      "contractAddress": "0xd316876894f40a97d703f345b424b1086cb53126"
+    }
+  ],
+  "upgradeId": "0x7447a1a2e56de9375dc50f7a57862e81321ba8390044e48ebfafea43eb04dc03"
+}
