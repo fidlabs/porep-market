@@ -97,12 +97,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidRateAllowance();
 
     /**
-     * @notice Error indicating that the caller is not authorized to perform the action
-     * @dev 0x5c427cd9
-     */
-    error UnauthorizedCaller();
-
-    /**
      * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
      * @dev 0xdd484e70
      */
@@ -116,13 +110,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @dev 0x664f7d6c
      */
     error InvalidRailId(uint256 expected, uint256 actual);
-
-    /**
-     * @notice Error indicating that a deal is not ready to be finished
-     * @param serviceEndEpoch The epoch at which the deal service ends
-     * @param currentEpoch The current block epoch
-     */
-    error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
 
     /**
      * @notice Error indicating that the payment rail is not in a status that can be terminated

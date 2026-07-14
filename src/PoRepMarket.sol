@@ -362,21 +362,25 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Error indicating that the SLI scorer address is invalid
+     * @dev 0x91d3d465
      */
     error InvalidSLIScorerAddress();
 
     /**
      * @notice Error indicating that a deal has not started its service window
+     * @dev 0xf73df7ce
      */
     error DealServiceNotStarted(uint256 dealId);
 
     /**
      * @notice Error indicating that the minimum time between settlements is invalid
+     * @dev 0xf90f5b8f
      */
     error InvalidMinEpochsBetweenSettlements();
 
     /**
      * @notice Error indicating that the maximum time between settlements is exceeded
+     * @dev 0xb0c81e57
      */
     error MinEpochsBetweenSettlementsExceeded();
 
