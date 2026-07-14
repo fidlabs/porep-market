@@ -44,3 +44,5 @@ operator="$(jq -r .externalDependencies.Operator "$manifest")"
 call_address "$(jq -r .contracts.PoRepMarket.proxy "$manifest")" 'getValidatorFactoryContract()(address)' "$factory" 'market validator factory'
 call_address "$(jq -r .contracts.PoRepMarket.proxy "$manifest")" 'getSPRegistryContract()(address)' "$(jq -r .contracts.SPRegistry.proxy "$manifest")" 'market SP registry'
 call_address "$(jq -r .contracts.DataCapEvidenceAdapter.proxy "$manifest")" 'getPoRepMarketAddress()(address)' "$(jq -r .contracts.PoRepMarket.proxy "$manifest")" 'adapter market'
+runtime "$(jq -r .externalDependencies.FilecoinPay "$manifest")" 'FilecoinPay'
+runtime "$(jq -r .externalDependencies.MetaAllocator "$manifest")" 'MetaAllocator'

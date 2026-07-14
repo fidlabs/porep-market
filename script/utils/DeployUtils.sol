@@ -20,14 +20,6 @@ contract DeployUtils is Script {
         return address(new ERC1967Proxy(implementation, init));
     }
 
-    function _writeJson(string memory json, string memory outputPath) internal {
-        vm.writeJson(json, outputPath, ".result");
-    }
-
-    function _manifestContents(string memory manifestPath) internal view virtual returns (string memory) {
-        return vm.readFile(manifestPath);
-    }
-
     function _uupsArtifact(string memory name) internal pure returns (string memory) {
         bytes32 target = keccak256(bytes(name));
         if (target == keccak256("PoRepMarket")) return "src/PoRepMarket.sol:PoRepMarket";
@@ -41,14 +33,10 @@ contract DeployUtils is Script {
         revert InvalidUpgradeTarget(name);
     }
 
-    function _manifestUupsTarget(string memory json, string memory name)
-        internal
-        view
-        returns (address proxy, address implementation)
-    {
+    function _manifestUupsTarget(string memory json, string memory name) internal view returns (address proxy) {
         string memory key = string.concat(".contracts.", name);
         proxy = json.readAddress(string.concat(key, ".proxy"));
-        implementation = json.readAddress(string.concat(key, ".implementation"));
+        address implementation = json.readAddress(string.concat(key, ".implementation"));
         _ensureCode(proxy);
         _ensureCode(implementation);
         address live = _erc1967Implementation(proxy);

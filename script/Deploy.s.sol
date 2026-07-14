@@ -2,7 +2,6 @@
 // solhint-disable use-natspec, max-states-count, no-console, gas-small-strings
 pragma solidity =0.8.30;
 
-import {Script} from "forge-std/Script.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
@@ -14,7 +13,7 @@ import {SLIScorer} from "../src/SLIScorer.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {console} from "forge-std/console.sol";
 
-contract Deploy is Script, DeployUtils {
+contract Deploy is DeployUtils {
     using stdJson for string;
 
     address internal poRepMarket;
@@ -80,7 +79,7 @@ contract Deploy is Script, DeployUtils {
 
         vm.stopBroadcast();
 
-        _serializeAndSaveArtifact(outputPath, gitCommit, buildInfoSha256);
+        vm.writeJson(_serializePendingManifest(gitCommit, buildInfoSha256), outputPath, ".result");
     }
 
     function _deployValidatorFactory(address _admin)
@@ -132,13 +131,6 @@ contract Deploy is Script, DeployUtils {
         bytes memory init = abi.encodeCall(SPRegistry.initialize, (_admin));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
-    }
-
-    function _serializeAndSaveArtifact(string memory outputPath, string memory gitCommit, string memory buildInfoSha256)
-        internal
-    {
-        string memory output = _serializePendingManifest(gitCommit, buildInfoSha256);
-        _writeJson(output, outputPath);
     }
 
     function _serializePendingManifest(string memory gitCommit, string memory buildInfoSha256)

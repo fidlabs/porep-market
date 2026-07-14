@@ -25,8 +25,8 @@ contract Upgrade is DeployUtils {
     }
 
     function run() external {
-        string memory manifest = _manifestContents(_manifestPath());
-        string[] memory names = _upgradeNames();
+        string memory manifest = vm.readFile(vm.envString("DEPLOYMENT_MANIFEST"));
+        string[] memory names = vm.envString("UPGRADE_CONTRACT_NAMES", ",");
         Operation[] memory operations = new Operation[](names.length);
         for (uint256 i; i < names.length; ++i) {
             if (keccak256(bytes(names[i])) == keccak256("Validator")) {
@@ -43,11 +43,11 @@ contract Upgrade is DeployUtils {
                 operations[i] = Operation(names[i], "src/Validator.sol:Validator", beacon, address(0), true);
             } else {
                 string memory artifact = _uupsArtifact(names[i]);
-                (address proxy,) = _manifestUupsTarget(manifest, names[i]);
+                address proxy = _manifestUupsTarget(manifest, names[i]);
                 operations[i] = Operation(names[i], artifact, proxy, address(0), false);
             }
         }
-        vm.startBroadcast(_upgradeAdmin());
+        vm.startBroadcast(vm.addr(vm.envUint("PRIVATE_KEY")));
         for (uint256 i; i < operations.length; ++i) {
             operations[i].newImplementation = vm.deployCode(operations[i].artifact);
         }
@@ -82,22 +82,6 @@ contract Upgrade is DeployUtils {
                 "\"}"
             );
         }
-        vm.writeJson(string.concat(json, "]"), _outputPath(), ".operations");
-    }
-
-    function _outputPath() internal view virtual returns (string memory) {
-        return vm.envString("UPGRADE_OUTPUT");
-    }
-
-    function _manifestPath() internal view virtual returns (string memory) {
-        return vm.envString("DEPLOYMENT_MANIFEST");
-    }
-
-    function _upgradeNames() internal view virtual returns (string[] memory) {
-        return vm.envString("UPGRADE_CONTRACT_NAMES", ",");
-    }
-
-    function _upgradeAdmin() internal view virtual returns (address) {
-        return vm.addr(vm.envUint("PRIVATE_KEY"));
+        vm.writeJson(string.concat(json, "]"), vm.envString("UPGRADE_OUTPUT"), ".operations");
     }
 }

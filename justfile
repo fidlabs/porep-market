@@ -13,7 +13,7 @@ lint:
     solhint 'src/**/*.sol' 'test/**/*.sol' 'script/**/*.sol' --max-warnings 0
 
 test:
-    forge test -vvv
+    forge test -vvv --threads 1
 
 build:
     forge build --build-info --sizes src

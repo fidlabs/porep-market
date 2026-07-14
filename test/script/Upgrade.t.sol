@@ -29,49 +29,21 @@ contract LegacyValidatorFactory is UUPSUpgradeable {
     function _authorizeUpgrade(address) internal override {}
 }
 
-contract UpgradeHarness is Upgrade {
-    string internal manifest;
-    string[] internal names;
-
-    function configure(string memory manifest_, string[] memory names_) external {
-        manifest = manifest_;
-        names = names_;
-    }
-
-    function _manifestContents(string memory) internal view override returns (string memory) {
-        return manifest;
-    }
-
-    function _manifestPath() internal pure override returns (string memory) {
-        return "unused";
-    }
-
-    function _outputPath() internal pure override returns (string memory) {
-        return "./.deployment/upgrade.json";
-    }
-
-    function _upgradeNames() internal view override returns (string[] memory) {
-        return names;
-    }
-
-    function _upgradeAdmin() internal pure override returns (address) {
-        return vm.addr(1);
-    }
-}
-
 contract UpgradeTest is Test {
     using stdJson for string;
     bytes32 private constant SLOT = 0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
 
+    function setUp() public {
+        vm.createDir(string.concat(vm.projectRoot(), "/.deployment"), true);
+        vm.setEnv("PRIVATE_KEY", "1");
+    }
+
     function testUpgradesOrderedBatchAndWritesOperations() public {
         string[] memory names = _allTargets();
         (string memory manifest, address[] memory destinations) = _manifestFor(names);
-        UpgradeHarness script = new UpgradeHarness();
-        script.configure(manifest, names);
-        vm.createDir("./.deployment", true);
-        vm.writeFile("./.deployment/upgrade.json", "{\"operations\":[]}");
-        script.run();
-        string memory json = vm.readFile("./.deployment/upgrade.json");
+        string memory outputPath = _configure(manifest, names);
+        new Upgrade().run();
+        string memory json = vm.readFile(outputPath);
         for (uint256 i; i < names.length; ++i) {
             string memory key = string.concat(".operations[", vm.toString(i), "]");
             address implementation = json.readAddress(string.concat(key, ".newImplementation"));
@@ -85,11 +57,23 @@ contract UpgradeTest is Test {
     }
 
     function testRejectsUnsupportedTarget() public {
-        UpgradeHarness script = new UpgradeHarness();
         string[] memory names = new string[](1);
         names[0] = "Unknown";
-        script.configure("{}", names);
+        _configure("{}", names);
+        Upgrade script = new Upgrade();
         vm.expectRevert(abi.encodeWithSelector(DeployUtils.InvalidUpgradeTarget.selector, "Unknown"));
+        script.run();
+    }
+
+    function testRejectsStaleProxyImplementation() public {
+        string[] memory names = new string[](1);
+        names[0] = "PoRepMarket";
+        address live = address(new LegacyUups());
+        address proxy = address(new ERC1967Proxy(live, ""));
+        address stale = address(new LegacyUups());
+        _configure(string.concat("{\"contracts\":{\"PoRepMarket\":", _contract(proxy, stale), "}}"), names);
+        Upgrade script = new Upgrade();
+        vm.expectPartialRevert(DeployUtils.StaleManifestImplementation.selector);
         script.run();
     }
 
@@ -101,8 +85,8 @@ contract UpgradeTest is Test {
         address factory =
             address(new ERC1967Proxy(address(new LegacyValidatorFactory(address(new LegacyValidator()))), ""));
         string memory manifest = _validatorManifest(address(beacon), factory, previous);
-        UpgradeHarness script = new UpgradeHarness();
-        script.configure(manifest, names);
+        _configure(manifest, names);
+        Upgrade script = new Upgrade();
         vm.expectPartialRevert(Upgrade.StaleValidatorBeacon.selector);
         script.run();
     }
@@ -113,10 +97,27 @@ contract UpgradeTest is Test {
         address live = address(new LegacyValidator());
         UpgradeableBeacon beacon = new UpgradeableBeacon(live, vm.addr(1));
         address factory = address(new ERC1967Proxy(address(new LegacyValidatorFactory(address(beacon))), ""));
-        UpgradeHarness script = new UpgradeHarness();
-        script.configure(_validatorManifest(address(beacon), factory, address(new LegacyValidator())), names);
+        _configure(_validatorManifest(address(beacon), factory, address(new LegacyValidator())), names);
+        Upgrade script = new Upgrade();
         vm.expectPartialRevert(Upgrade.StaleValidatorImpl.selector);
         script.run();
+    }
+
+    function _configure(string memory manifest, string[] memory names) private returns (string memory outputPath) {
+        string memory suffix = vm.toString(uint256(keccak256(abi.encode(manifest))));
+        string memory manifestPath =
+            string.concat(vm.projectRoot(), "/.deployment/upgrade-test-manifest-", suffix, ".json");
+        outputPath = string.concat(vm.projectRoot(), "/.deployment/upgrade-test-output-", suffix, ".json");
+        vm.setEnv("DEPLOYMENT_MANIFEST", manifestPath);
+        vm.setEnv("UPGRADE_OUTPUT", outputPath);
+        vm.writeFile(manifestPath, manifest);
+        vm.writeFile(outputPath, "{\"operations\":[]}");
+        string memory csv;
+        for (uint256 i; i < names.length; ++i) {
+            if (i != 0) csv = string.concat(csv, ",");
+            csv = string.concat(csv, names[i]);
+        }
+        vm.setEnv("UPGRADE_CONTRACT_NAMES", csv);
     }
 
     function _allTargets() private pure returns (string[] memory names) {
@@ -157,7 +158,7 @@ contract UpgradeTest is Test {
         manifest = string.concat("{\"contracts\":", contractsJson, "}");
     }
 
-    function _contract(address proxy, address implementation) private returns (string memory json) {
+    function _contract(address proxy, address implementation) private pure returns (string memory json) {
         json = string.concat(
             "{\"proxy\":\"", vm.toString(proxy), "\",\"implementation\":\"", vm.toString(implementation), "\"}"
         );
@@ -165,6 +166,7 @@ contract UpgradeTest is Test {
 
     function _validatorManifest(address beacon, address factory, address implementation)
         private
+        pure
         returns (string memory manifest)
     {
         manifest = string.concat(
