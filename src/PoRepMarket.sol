@@ -1026,7 +1026,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         override
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        _ensurePoRepServiceOrAdmin();
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
         _ensureDealCorrectState(deal, DealState.ACCEPTED);
@@ -1060,7 +1059,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         override
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        _ensurePoRepServiceOrAdmin();
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
         _ensureDealCorrectState(deal, DealState.ACTIVE);
