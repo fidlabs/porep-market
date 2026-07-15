@@ -201,6 +201,15 @@ contract PoRepMarketTest is Test {
         assertEq(selection.promisedSLIs.indexingPct, defaultRequirements.indexingPct);
     }
 
+    function testPreviewProviderForDealRevertsWhenManifestHashIsZero() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        request.manifestHash = bytes32(0);
+
+        vm.expectRevert(PoRepMarket.InvalidManifestHash.selector);
+        poRepMarket.previewProviderForDeal(request);
+    }
+
     function setDealActive(uint256 targetDealId) internal {
         PoRepMarketContractMock(address(poRepMarket)).setDealState(targetDealId, DealState.ACTIVE);
     }

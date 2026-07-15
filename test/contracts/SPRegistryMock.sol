@@ -213,7 +213,7 @@ contract SPRegistryMock is ISPRegistry {
         return new uint256[](0);
     }
 
-    function isManifestAssignedToProvider(bytes32, CommonTypes.FilActorId) external pure returns (bool) {
+    function isManifestAssignedToOrganization(bytes32, address) external pure returns (bool) {
         return false;
     }
 

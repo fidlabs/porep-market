@@ -259,29 +259,26 @@ interface ISPRegistry {
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
-     * @notice Checks whether a provider is already assigned to a manifest.
+     * @notice Checks whether an organization is already assigned to a manifest.
      * @param manifestHash Manifest hash used as data identity.
-     * @param provider Provider actor ID.
-     * @return True when provider is locked for the manifest.
+     * @param organization Organization address.
+     * @return True when organization is locked for the manifest.
      */
-    function isManifestAssignedToProvider(bytes32 manifestHash, CommonTypes.FilActorId provider)
-        external
-        view
-        returns (bool);
+    function isManifestAssignedToOrganization(bytes32 manifestHash, address organization) external view returns (bool);
 
     /**
-     * @notice Releases committed provider capacity and clears the manifest/provider assignment.
+     * @notice Releases committed provider capacity and clears the manifest/organization assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Capacity to release.
-     * @param manifestHash Manifest hash whose provider assignment should be cleared.
+     * @param manifestHash Manifest hash whose organization assignment should be cleared.
      */
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
 
     /**
-     * @notice Releases pending provider capacity and clears the manifest/provider assignment.
+     * @notice Releases pending provider capacity and clears the manifest/organization assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Pending capacity to release.
-     * @param manifestHash Manifest hash whose provider assignment should be cleared.
+     * @param manifestHash Manifest hash whose organization assignment should be cleared.
      */
     function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
 
