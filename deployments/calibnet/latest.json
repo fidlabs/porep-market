@@ -2,47 +2,47 @@
   "contracts": {
     "DataCapEvidenceAdapter": {
       "artifact": "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
-      "implementation": "0x2Cb8835c5Af5AEc5C24F65E137915b473F8Ac382",
-      "implementationCodeHash": "0x5edd2aa9db38ce1b0e14d2f45c121e7229cae4c123170dde44d83f0f467359bf",
+      "implementation": "0x8D5d0Cca95a3c55Fccb10415c7FbC92e373aF5Dc",
+      "implementationCodeHash": "0x204bc9935d17a3dc288447540a4547e7c0f2acd3961aa440d7f8d1f6445e7eaa",
       "kind": "uups",
       "proxy": "0xa21508B503bbF02f59401e2ed248f9628136b8F2",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
     },
     "PoRepMarket": {
       "artifact": "src/PoRepMarket.sol:PoRepMarket",
-      "implementation": "0x241634eeb0F78F182E865d0A1FC2323BA6B2FC9F",
-      "implementationCodeHash": "0x137830409835ef1eb1a56ba6188da8d63bc5bb156c1d3582a309ce564c5af4c9",
+      "implementation": "0xF1F4F6B671264D0666649Ba985f9562A64988A7D",
+      "implementationCodeHash": "0x9a231a062e3a6523a34ba08c730ea691e04569df074f65eee14b7614cf49fce9",
       "kind": "uups",
       "proxy": "0x4d6479d4fcfcBF12b3da40de96E955C945ff8ceA",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
     },
     "SLIOracle": {
       "artifact": "src/SLIOracle.sol:SLIOracle",
-      "implementation": "0x766602Dc02F239FCa44De58D81505eb323b985F7",
-      "implementationCodeHash": "0x6b52f4bb0925125bc5493d2c2f4b73f1360bd5b8242f441bd9ef9ae09b43df9f",
+      "implementation": "0x0464D92E5bb837E9645C9f869D25e845d4ea4B88",
+      "implementationCodeHash": "0xc48a32c0a3852bd6b1cc3ecb5003765c31643414dfb9071e90cc7e886f124df7",
       "kind": "uups",
       "proxy": "0x75c810C8BBcEAe7c9f3EC613435dfBA2729dF621",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
     },
     "SLIScorer": {
       "artifact": "src/SLIScorer.sol:SLIScorer",
-      "implementation": "0xB47FF7df20676545b14aCdd382ec048Df548D9C4",
-      "implementationCodeHash": "0xdc5e573da2741a65f483aa15db25e51dc7708a58564b7cd490a05e2a65a8a8cc",
+      "implementation": "0x401012d3dE9f2F8Db50bDa1083a93F07EA37D493",
+      "implementationCodeHash": "0x4ce7365f1f8789fe802e98354e762b2e4a4e0f992b7ef0f6455970e0b973189a",
       "kind": "uups",
       "proxy": "0xB768a0d63fa22D9F2cA91b230c056704f876dF77",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
     },
     "SPRegistry": {
       "artifact": "src/SPRegistry.sol:SPRegistry",
-      "implementation": "0xEb8349E62153E7Ce09eb55CC031B081F3CF1b3b9",
-      "implementationCodeHash": "0x4db9d6723110ed83c921a07dc11b913ab353a608cf79f4ebd2c6f16a6172a12f",
+      "implementation": "0xCB41f05d88d20171C05A4432C659b26397D3c482",
+      "implementationCodeHash": "0x5e01f583df5161dbe12594e15a8585cf4f884d5f0974f41806f4c9668f57abf5",
       "kind": "uups",
       "proxy": "0x5D4F1021bA1726610b5AdA0000810Ed0ffcfB344",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
     },
     "Validator": {
       "artifact": "src/Validator.sol:Validator",
-      "implementation": "0x7A0e8f984aEDD2c138E96836d49A784EAf29dbf4",
+      "implementation": "0x454C863793ce7046dfc57499a715fDC60CFf0EcF",
       "implementationCodeHash": "0x9e5671c06c2e962b3d2813a814e6d0d2d288f5a61840c24cbc29f803a9521492",
       "kind": "implementation"
     },
@@ -50,13 +50,13 @@
       "address": "0xa876059683a30036AcB71C5259B30e5257bA60dE",
       "artifact": "lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
       "factoryProxy": "0x502683cf0bFA3987C368F88A270Ce7f0B613ed23",
-      "implementation": "0x7A0e8f984aEDD2c138E96836d49A784EAf29dbf4",
+      "implementation": "0x454C863793ce7046dfc57499a715fDC60CFf0EcF",
       "kind": "beacon"
     },
     "ValidatorFactory": {
       "artifact": "src/ValidatorFactory.sol:ValidatorFactory",
-      "implementation": "0x3CAB49b78549D9aE7df62A7A473a0F1D8fa3edBF",
-      "implementationCodeHash": "0xe4bda4c895814209477b5f577f1aea841b9e8b8f60131fba24101618a1dd47a7",
+      "implementation": "0x68EF6E0E6AdeE75A44bF821D356d641e98336812",
+      "implementationCodeHash": "0x20661f0f549bf9b31e56996e26e7064b43becc2803f351903a84f5da63085d16",
       "kind": "uups",
       "proxy": "0x502683cf0bFA3987C368F88A270Ce7f0B613ed23",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932"
