@@ -211,12 +211,16 @@ fi
 
 mkdir -p "$BROADCAST_ROOT/Deploy.s.sol/314159"
 printf '{}\n' >"$BROADCAST_ROOT/Deploy.s.sol/314159/run-latest.json"
+mkdir -p "$PENDING_ROOT/calibnet"
+printf '{"status":"pending","operation":"deploy","network":"calibnet","chainId":314159,"stale":true}\n' \
+  >"$PENDING_ROOT/calibnet/pending-deploy.json"
 cmd_deploy calibnet --fresh
 pending="$PENDING_ROOT/calibnet/pending-deploy.json"
 broadcast="$PENDING_ROOT/calibnet/pending-deploy.broadcast.json"
 
 jq -e '.status=="pending" and .operation=="deploy" and .network=="calibnet"
   and .chainId==314159 and .result.status=="pending"
+  and (.stale // false)==false
   and .broadcast.path==".deployment/calibnet/pending-deploy.broadcast.json"
   and (.broadcast.sha256|test("^0x[0-9a-f]{64}$"))' "$pending" >/dev/null
 [[ ! -e "$DEPLOYMENTS_ROOT/calibnet/latest.json" ]] || fail 'deploy published canonical state'

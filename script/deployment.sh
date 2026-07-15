@@ -273,7 +273,7 @@ cmd_deploy() {
   rpc_var="$(network_value "$network" rpc)"; key_var="$(network_value "$network" key)"; require_var "$rpc_var"; require_var "$key_var"
   suffix="$(printf '%s' "$network" | tr '[:lower:]' '[:upper:]')"; for var in FILECOIN_PAY TERMINATION_ORACLE ORACLE POREP_SERVICE META_ALLOCATOR OPERATOR_ADDR; do require_var "${var}_$suffix"; done
   pending_dir="$PENDING_ROOT/$network"; pending="$pending_dir/pending-deploy.json"
-  if [[ -e "$pending" ]] && [[ "$(jq -r '.status // empty' "$pending")" == pending ]]; then
+  if [[ "$fresh" != true && -e "$pending" ]] && [[ "$(jq -r '.status // empty' "$pending")" == pending ]]; then
     die "pending $network deployment already exists"
   fi
   mkdir -p "$pending_dir"
