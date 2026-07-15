@@ -518,7 +518,8 @@ cmd_verify() {
     address="$(jq -er '.value.implementation' <<<"$entry")"
     artifact="$(jq -er '.value.artifact' <<<"$entry")"
     "$FORGE_BIN" verify-contract "$address" "$artifact" \
-      --chain "$chain" --rpc-url "${!rpc_var}" --verifier blockscout --verifier-url "$verifier" --watch
+      --chain "$chain" --rpc-url "${!rpc_var}" --verifier blockscout --verifier-url "$verifier" \
+      --skip-is-verified-check --watch
   done <"$entries"
   rm -f "$entries"
 }

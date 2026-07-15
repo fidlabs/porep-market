@@ -165,6 +165,8 @@ grep -q 'verify-contract 0x9999999999999999999999999999999999999999 src/Future.s
   || fail 'new manifest implementation was not verified dynamically'
 grep -q -- '--verifier-url https://filecoin-testnet.blockscout.com/api/' "$FORGE_LOG" \
   || fail 'Calibnet Blockscout verifier URL was not supplied'
+[[ "$(grep -c -- '--skip-is-verified-check' "$FORGE_LOG")" == 8 ]] \
+  || fail 'verification trusted stale Blockscout address metadata'
 if grep -q UpgradeableBeacon "$FORGE_LOG"; then fail 'ValidatorBeacon was submitted for verification'; fi
 
 : >"$FORGE_LOG"
