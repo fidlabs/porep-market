@@ -1795,96 +1795,27 @@ contract PoRepMarketTest is Test {
         assertEq(newEvidenceAdapter.submittedEvidence(dealId).length, 0);
     }
 
-    function testActivateEvidenceAllowsAdmin() public {
+    function testActivateEvidenceAllowsAnyCaller() public {
         bytes memory evidenceData = abi.encode("activate");
 
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         dataCapEvidenceAdapterAddress.setActivationResult(dealId, EvidenceResult.REJECTED);
 
-        vm.prank(adminAddress);
         poRepMarket.activateEvidence(dealId, evidenceData);
 
         assertEq(dataCapEvidenceAdapterAddress.activatedEvidence(dealId), evidenceData);
     }
 
-    function testActivateEvidenceAllowsPoRepServiceRole() public {
-        bytes memory evidenceData = abi.encode("activate");
-        address service = vm.addr(0x777);
-        bytes32 serviceRole = poRepMarket.POREP_SERVICE_ROLE();
-
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        dataCapEvidenceAdapterAddress.setActivationResult(dealId, EvidenceResult.REJECTED);
-
-        vm.prank(adminAddress);
-        poRepMarket.grantRole(serviceRole, service);
-
-        vm.prank(service);
-        poRepMarket.activateEvidence(dealId, evidenceData);
-
-        assertEq(dataCapEvidenceAdapterAddress.activatedEvidence(dealId), evidenceData);
-    }
-
-    function testActivateEvidenceRevertsWhenCallerIsNotServiceOrAdmin() public {
-        address caller = vm.addr(0x999);
-
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
-            )
-        );
-        vm.prank(caller);
-        poRepMarket.activateEvidence(dealId, abi.encode("activate"));
-    }
-
-    function testRefreshEvidenceStatusAllowsAdmin() public {
+    function testRefreshEvidenceStatusAllowsAnyCaller() public {
         bytes memory evidenceData = abi.encode("refresh");
-
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         setDealActive(dealId);
 
-        vm.prank(adminAddress);
         poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
 
         assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
-    }
-
-    function testRefreshEvidenceStatusAllowsPoRepServiceRole() public {
-        bytes memory evidenceData = abi.encode("refresh");
-        address service = vm.addr(0x777);
-        bytes32 serviceRole = poRepMarket.POREP_SERVICE_ROLE();
-
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        setDealActive(dealId);
-
-        vm.prank(adminAddress);
-        poRepMarket.grantRole(serviceRole, service);
-
-        vm.prank(service);
-        poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
-
-        assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
-    }
-
-    function testRefreshEvidenceStatusRevertsWhenCallerIsNotServiceOrAdmin() public {
-        address caller = vm.addr(0x999);
-
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
-            )
-        );
-        vm.prank(caller);
-        poRepMarket.refreshEvidenceStatus(dealId, abi.encode("refresh"));
     }
 
     function testCurrentEvidenceStatusIsReadableByAnyCaller() public {
