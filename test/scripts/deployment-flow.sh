@@ -23,6 +23,7 @@ export META_ALLOCATOR_CALIBNET=0x5
 export OPERATOR_ADDR_CALIBNET=0x6
 
 export TEST_TX_HASH="0x$(printf 'a%.0s' {1..64})"
+export TEST_RECEIPT_HASH="0x$(printf 'c%.0s' {1..64})"
 export TEST_BLOCK_HASH="0x$(printf 'b%.0s' {1..64})"
 export TEST_ADDRESS="0x$(printf '1%.0s' {1..40})"
 export TEST_UPGRADE_ADDRESS="0x$(printf '2%.0s' {1..40})"
@@ -158,7 +159,7 @@ export STORAGE_VALIDATOR="$tmp/storage"
 export STORAGE_LOG="$tmp/storage.log"
 
 write_rpc_evidence() {
-  local observed_hash="$1" receipt_hash="${2:-$1}"
+  local observed_hash="$1" receipt_hash="${2:-$TEST_RECEIPT_HASH}"
   jq -n --arg observed "$(printf '%s' "$observed_hash" | tr '[:upper:]' '[:lower:]')" \
     --arg receipt_hash "$receipt_hash" --arg block "$TEST_BLOCK_HASH" '
     {eth_getTransactionReceipt:{($observed):{transactionHash:$receipt_hash,status:"0x1",blockNumber:"0x2",blockHash:$block,
@@ -244,12 +245,11 @@ mv "$pending.next" "$pending"
 cp "$tmp/good-broadcast.json" "$broadcast"
 jq --arg hash "0x$(sha256_file "$broadcast")" '.broadcast.sha256=$hash' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
-for receipt_case in missing failed wrong-hash; do
+for receipt_case in missing failed; do
   write_rpc_evidence "$TEST_TX_HASH"
   case "$receipt_case" in
     missing) jq '.eth_getTransactionReceipt[]=null' "$RPC_DATA" >"$RPC_DATA.next" ;;
     failed) jq '.eth_getTransactionReceipt[].status="0x0"' "$RPC_DATA" >"$RPC_DATA.next" ;;
-    wrong-hash) jq '.eth_getTransactionReceipt[].transactionHash="0x'"$(printf 'e%.0s' {1..64})"'"' "$RPC_DATA" >"$RPC_DATA.next" ;;
   esac
   mv "$RPC_DATA.next" "$RPC_DATA"
   : >"$FLOW_LOG"

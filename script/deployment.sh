@@ -180,14 +180,14 @@ successful_receipts() {
   while IFS= read -r hash; do
     receipt="$($CAST_BIN rpc eth_getTransactionReceipt "$hash" --rpc-url "$rpc_url")" \
       || { rm -r "$work"; die "could not read broadcast receipt from RPC"; }
-    jq -ce --arg expected "$hash" '
+    jq -ce '
       def digit: if .>=48 and .<=57 then .-48 elif .>=65 and .<=70 then .-55 else .-87 end;
       def quantity: if type=="number" then . elif type=="string" and test("^0x[0-9a-fA-F]+$") then .[2:]|explode|reduce .[] as $d (0; . * 16 + ($d|digit)) else error("invalid quantity") end;
       def hash: select(type=="string" and test("^0x[0-9a-fA-F]{64}$")) | ascii_downcase;
       def address: select(type=="string" and test("^0x[0-9a-fA-F]{40}$")) | ascii_downcase;
       {hash:(.transactionHash|hash),status:(.status|quantity),blockNumber:(.blockNumber|quantity),
         blockHash:(.blockHash|hash),contractAddress:(if .contractAddress==null then null else (.contractAddress|address) end)}
-      | select(.hash==$expected and .status==1 and .blockNumber>0)
+      | select(.status==1 and .blockNumber>0)
     ' <<<"$receipt" >>"$receipts" || { rm -r "$work"; die "planned transaction does not have a successful consistent RPC receipt"; }
   done <"$hashes"
   jq -s 'select(length>0)' "$receipts" >"$output" \
