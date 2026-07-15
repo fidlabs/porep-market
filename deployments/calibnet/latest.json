@@ -72,8 +72,7 @@
     "TerminationOracle": "0x087Ea8b72CBf4B435023356776834eB10dd07f2a"
   },
   "release": {
-    "buildInfoSha256": "0x470b2353e1c3a520b657433e1329b679ef22def875625b5beed29a45ffb13f7e",
-    "gitCommit": "40b549d4e7f2641a1695e1378028cc11d1ebcda3"
+    "buildInfoSha256": "0x470b2353e1c3a520b657433e1329b679ef22def875625b5beed29a45ffb13f7e"
   },
   "status": "finalized",
   "finalizedAt": "2026-07-13T10:02:55Z",
@@ -204,6 +203,5 @@
       "blockHash": "0x0ff359e5329bd84a99dac6ea7542d37432f89ea4773c94575997a354ea8dacbb",
       "contractAddress": null
     }
-  ],
-  "deploymentId": "0x1aa3d660e03d597dc0987374afa36d99cc7da4aa1d400272f24aee2496e3bdda"
+  ]
 }

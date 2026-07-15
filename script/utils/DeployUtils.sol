@@ -9,8 +9,19 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 contract DeployUtils is Script {
     using stdJson for string;
 
+    /**
+     * @dev 0x8123dbd5
+     */
     error InvalidUpgradeTarget(string name);
+
+    /**
+     * @dev 0x4535258f
+     */
     error MissingContractCode(address target);
+
+    /**
+     * @dev 0x5ab89e50
+     */
     error StaleManifestImplementation(address manifestImplementation, address liveImplementation);
 
     bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =

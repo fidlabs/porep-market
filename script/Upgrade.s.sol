@@ -13,7 +13,15 @@ interface IUpgradeable {
 
 contract Upgrade is DeployUtils {
     using stdJson for string;
+
+    /**
+     * @dev 0xd1c4219d
+     */
     error StaleValidatorBeacon(address manifestBeacon, address factoryBeacon);
+
+    /**
+     * @dev 0xf0002840
+     */
     error StaleValidatorImpl(address manifestImpl, address beaconImpl);
 
     struct Operation {

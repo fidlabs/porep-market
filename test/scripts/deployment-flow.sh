@@ -68,9 +68,10 @@ cat >"$tmp/git" <<'EOF'
 #!/usr/bin/env bash
 [[ "${1:-}" != -C ]] || shift 2
 case "${1:-}" in
-  rev-parse) printf '%s\n' "${TEST_GIT_COMMIT:-1111111111111111111111111111111111111111}" ;;
   status)
-    if [[ "${TEST_GIT_UNTRACKED:-0}" == 1 ]]; then printf '%s\n' '?? src/NewContract.sol'
+    if [[ "${TEST_CANONICAL_DIRTY:-0}" == 1 && "$*" == *deployments/calibnet/latest.json* ]]; then
+      printf '%s\n' ' M deployments/calibnet/latest.json'
+    elif [[ "${TEST_GIT_UNTRACKED:-0}" == 1 ]]; then printf '%s\n' '?? src/NewContract.sol'
     elif [[ "${TEST_GIT_DIRTY:-0}" != 0 ]]; then printf '%s\n' ' M src/PoRepMarket.sol'
     fi
     ;;
@@ -115,10 +116,9 @@ if [[ "$script" != Deploy.s.sol ]]; then
   exit 0
 fi
 
-git_commit="$(jq -r .release.gitCommit "$DEPLOYMENT_OUTPUT")"
 build_hash="$(jq -r .release.buildInfoSha256 "$DEPLOYMENT_OUTPUT")"
-jq --arg git "$git_commit" --arg build "$build_hash" --arg i "$TEST_ADDRESS" --arg code_hash "$TEST_UPGRADE_CODE_HASH" '
-  .result={status:"pending",deployer:$i,release:{gitCommit:$git,buildInfoSha256:$build},
+jq --arg build "$build_hash" --arg i "$TEST_ADDRESS" --arg code_hash "$TEST_UPGRADE_CODE_HASH" '
+  .result={status:"pending",deployer:$i,release:{buildInfoSha256:$build},
     contracts:{
       PoRepMarket:{kind:"uups",artifact:"src/PoRepMarket.sol:PoRepMarket",proxy:$i,implementation:$i,proxyCodeHash:$code_hash,implementationCodeHash:$code_hash},
       ValidatorFactory:{kind:"uups",artifact:"src/ValidatorFactory.sol:ValidatorFactory",proxy:$i,implementation:$i,proxyCodeHash:$code_hash,implementationCodeHash:$code_hash},
@@ -158,14 +158,10 @@ export STORAGE_VALIDATOR="$tmp/storage"
 export STORAGE_LOG="$tmp/storage.log"
 
 write_rpc_evidence() {
-  local observed_hash="$1" transaction_hash="${2:-$1}" receipt_hash="${3:-$1}"
+  local observed_hash="$1" receipt_hash="${2:-$1}"
   jq -n --arg observed "$(printf '%s' "$observed_hash" | tr '[:upper:]' '[:lower:]')" \
-    --arg transaction_hash "$transaction_hash" --arg receipt_hash "$receipt_hash" \
-    --arg from "$TEST_FROM" --arg to "$TEST_TO" --arg input "$TEST_INPUT" \
-    --arg value "$TEST_VALUE" --arg nonce "$TEST_NONCE" --arg block "$TEST_BLOCK_HASH" '
-    {eth_getTransactionByHash:{($observed):{hash:$transaction_hash,from:$from,nonce:$nonce,to:$to,input:$input,value:$value,
-      blockNumber:"0x2",blockHash:$block}},
-     eth_getTransactionReceipt:{($observed):{transactionHash:$receipt_hash,status:"0x1",blockNumber:"0x2",blockHash:$block,
+    --arg receipt_hash "$receipt_hash" --arg block "$TEST_BLOCK_HASH" '
+    {eth_getTransactionReceipt:{($observed):{transactionHash:$receipt_hash,status:"0x1",blockNumber:"0x2",blockHash:$block,
       contractAddress:null}}}
   ' >"$RPC_DATA"
   : >"$RPC_LOG"
@@ -241,179 +237,68 @@ jq --arg path ".deployment/calibnet/pending-deploy.broadcast.json" --arg hash "0
   '.broadcast={path:$path,sha256:$hash}' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
 
-replacement_hash="0x$(printf 'f%.0s' {1..64})"
-jq --arg replacement "$replacement_hash" \
-  '.pending=[.transactions[0].hash] | .receipts=[{transactionHash:$replacement,status:"0x1",blockNumber:"0x2",blockHash:.receipts[0].blockHash,contractAddress:null}]' \
-  "$broadcast" >"$broadcast.next"
+cp "$tmp/good-broadcast.json" "$broadcast"
+jq '.pending=[.transactions[0].hash]' "$broadcast" >"$broadcast.next"
 mv "$broadcast.next" "$broadcast"
 jq --arg hash "0x$(sha256_file "$broadcast")" '.broadcast.sha256=$hash' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
-write_rpc_evidence "$replacement_hash"
 : >"$FLOW_LOG"
-if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail 'replacement transaction finalized before Filecoin finality'; fi
-[[ "$(cat "$FLOW_LOG")" == finality ]] || fail 'matching replacement transaction was rejected'
-[[ "$(sort "$RPC_LOG" | uniq -c | tr -s ' ' | sed 's/^ //')" == $'1 eth_getTransactionByHash '"$replacement_hash"$'\n1 eth_getTransactionReceipt '"$replacement_hash" ]] \
-  || fail 'replacement hash was not fetched exactly once per RPC method'
-
-jq --arg from "0x$(printf '9%.0s' {1..40})" '.eth_getTransactionByHash[].from=$from' "$RPC_DATA" >"$RPC_DATA.next"
-mv "$RPC_DATA.next" "$RPC_DATA"
-: >"$FLOW_LOG"
-if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail 'unrelated replacement transaction finalized'; fi
-[[ ! -s "$FLOW_LOG" ]] || fail 'unrelated replacement transaction reached finality check'
-
-jq '.pending=[]' "$broadcast" >"$broadcast.next"
-mv "$broadcast.next" "$broadcast"
-jq --arg hash "0x$(sha256_file "$broadcast")" '.broadcast.sha256=$hash' "$pending" >"$pending.next"
-mv "$pending.next" "$pending"
-write_rpc_evidence "$replacement_hash"
-: >"$FLOW_LOG"
-if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail 'replacement without original pending hash finalized'; fi
-[[ ! -s "$FLOW_LOG" ]] || fail 'unauthorized replacement reached finality check'
+if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail 'pending transaction finalized'; fi
+[[ ! -s "$FLOW_LOG" ]] || fail 'pending transaction reached finality check'
 
 cp "$tmp/good-broadcast.json" "$broadcast"
 jq --arg hash "0x$(sha256_file "$broadcast")" '.broadcast.sha256=$hash' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
-write_rpc_evidence "$TEST_TX_HASH"
-for null_case in eth_getTransactionByHash eth_getTransactionReceipt; do
-  jq --arg method "$null_case" '.[$method][]=null' "$RPC_DATA" >"$RPC_DATA.next"
-  mv "$RPC_DATA.next" "$RPC_DATA"
-  : >"$FLOW_LOG"
-  if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail "null $null_case response finalized"; fi
-  [[ ! -s "$FLOW_LOG" ]] || fail "null $null_case response reached finality check"
+for receipt_case in missing failed wrong-hash; do
   write_rpc_evidence "$TEST_TX_HASH"
-done
-for rpc_case in malformed-transaction failed-receipt malformed-receipt conflicting-receipt wrong-transaction-hash wrong-receipt-hash; do
-  case "$rpc_case" in
-    malformed-transaction) jq '.eth_getTransactionByHash[].nonce="wat"' "$RPC_DATA" >"$RPC_DATA.next" ;;
-    failed-receipt) jq '.eth_getTransactionReceipt[].status="0x0"' "$RPC_DATA" >"$RPC_DATA.next" ;;
-    malformed-receipt) jq '.eth_getTransactionReceipt[].blockNumber="wat"' "$RPC_DATA" >"$RPC_DATA.next" ;;
-    conflicting-receipt) jq '.eth_getTransactionReceipt[].blockHash="0x'"$(printf 'e%.0s' {1..64})"'"' "$RPC_DATA" >"$RPC_DATA.next" ;;
-    wrong-transaction-hash) jq '.eth_getTransactionByHash[].hash="0x'"$(printf 'e%.0s' {1..64})"'"' "$RPC_DATA" >"$RPC_DATA.next" ;;
-    wrong-receipt-hash) jq '.eth_getTransactionReceipt[].transactionHash="0x'"$(printf 'e%.0s' {1..64})"'"' "$RPC_DATA" >"$RPC_DATA.next" ;;
+  case "$receipt_case" in
+    missing) jq '.eth_getTransactionReceipt[]=null' "$RPC_DATA" >"$RPC_DATA.next" ;;
+    failed) jq '.eth_getTransactionReceipt[].status="0x0"' "$RPC_DATA" >"$RPC_DATA.next" ;;
+    wrong-hash) jq '.eth_getTransactionReceipt[].transactionHash="0x'"$(printf 'e%.0s' {1..64})"'"' "$RPC_DATA" >"$RPC_DATA.next" ;;
   esac
   mv "$RPC_DATA.next" "$RPC_DATA"
   : >"$FLOW_LOG"
-  if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail "$rpc_case finalized"; fi
-  [[ ! -s "$FLOW_LOG" ]] || fail "$rpc_case reached finality check"
-  write_rpc_evidence "$TEST_TX_HASH"
+  if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail "$receipt_case receipt finalized"; fi
+  [[ ! -s "$FLOW_LOG" ]] || fail "$receipt_case receipt reached finality check"
 done
 
-large_value="$tmp/large-value.json"
-jq '.transactions[0].transaction.value="0x1000000000000000"' "$broadcast" >"$large_value"
+duplicate="$tmp/duplicate-transactions.json"
+jq '.transactions += [.transactions[0]]' "$broadcast" >"$duplicate"
 write_rpc_evidence "$TEST_TX_HASH"
-jq '.eth_getTransactionByHash[].value="0x1000000000000001"' "$RPC_DATA" >"$RPC_DATA.next"
-mv "$RPC_DATA.next" "$RPC_DATA"
-if (successful_receipts "$large_value" "$tmp/large-value-receipts.json" rpc) 2>/dev/null; then
-  fail 'distinct arbitrary-width transaction values were treated as equal'
+if (successful_receipts "$duplicate" "$tmp/duplicate-receipts.json" rpc) 2>/dev/null; then
+  fail 'duplicate transaction hash was accepted'
 fi
-write_rpc_evidence "$TEST_TX_HASH"
-keyed_broadcast="$tmp/keyed-broadcast.json"
-jq '.transactions={key:.transactions[0]}' "$broadcast" >"$keyed_broadcast"
-if (successful_receipts "$keyed_broadcast" "$tmp/keyed-receipts.json" rpc) 2>/dev/null; then
-  fail 'keyed transaction object was accepted as an array'
+malformed="$tmp/malformed-transactions.json"
+jq '.transactions += [{hash:"invalid"}]' "$broadcast" >"$malformed"
+if (successful_receipts "$malformed" "$tmp/malformed-receipts.json" rpc) 2>/dev/null; then
+  fail 'malformed transaction hash was omitted'
 fi
-invalid_extra="$tmp/invalid-extra-receipt.json"
-jq '.receipts += [{transactionHash:"invalid"}]' "$broadcast" >"$invalid_extra"
-if (successful_receipts "$invalid_extra" "$tmp/invalid-extra-receipts.json" rpc) 2>/dev/null; then
-  fail 'invalid extra receipt was ignored'
-fi
-duplicate_receipt="$tmp/duplicate-receipt.json"
-jq '.receipts += [.receipts[0]]' "$broadcast" >"$duplicate_receipt"
-if (successful_receipts "$duplicate_receipt" "$tmp/duplicate-receipts.json" rpc) 2>/dev/null; then
-  fail 'duplicate receipt hash was silently deduplicated'
-fi
-keyed_receipts="$tmp/keyed-receipts-broadcast.json"
-jq '.receipts={key:.receipts[0]}' "$broadcast" >"$keyed_receipts"
-if (successful_receipts "$keyed_receipts" "$tmp/keyed-receipt-output.json" rpc) 2>/dev/null; then
-  fail 'keyed receipt object was accepted as an array'
-fi
-keyed_pending="$tmp/keyed-pending.json"
-jq '.pending={}' "$broadcast" >"$keyed_pending"
-if (successful_receipts "$keyed_pending" "$tmp/keyed-pending-output.json" rpc) 2>/dev/null; then
-  fail 'keyed pending object was accepted as an array'
-fi
-ambiguous="$tmp/ambiguous-planned-envelope.json"
-second_hash="0x$(printf 'c%.0s' {1..64})"
-jq --arg hash "$second_hash" '
-  .transactions += [{hash:$hash,transaction:.transactions[0].transaction}]
-  | .receipts += [{transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:.receipts[0].blockHash,contractAddress:null}]
-' "$broadcast" >"$ambiguous"
-jq --arg hash "$second_hash" --arg from "$TEST_FROM" --arg to "$TEST_TO" --arg input "$TEST_INPUT" --arg value "$TEST_VALUE" --arg nonce "$TEST_NONCE" --arg block "$TEST_BLOCK_HASH" '
-  .eth_getTransactionByHash[$hash]={hash:$hash,from:$from,nonce:$nonce,to:$to,input:$input,value:$value,blockNumber:"0x2",blockHash:$block}
-  | .eth_getTransactionReceipt[$hash]={transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null}
-' "$RPC_DATA" >"$RPC_DATA.next"
-mv "$RPC_DATA.next" "$RPC_DATA"
-if (successful_receipts "$ambiguous" "$tmp/ambiguous-receipts.json" rpc) 2>/dev/null; then
-  fail 'duplicate planned transaction envelopes were accepted'
-fi
-write_rpc_evidence "$TEST_TX_HASH"
-swapped="$tmp/swapped-planned-envelopes.json"
-jq --arg hash "$second_hash" '
-  .transactions += [{hash:$hash,transaction:(.transactions[0].transaction | .nonce="0x8")}]
-  | .receipts += [{transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:.receipts[0].blockHash,contractAddress:null}]
-  | .pending=[.transactions[].hash]
-' "$broadcast" >"$swapped"
-jq --arg first "$TEST_TX_HASH" --arg second "$second_hash" --arg from "$TEST_FROM" --arg to "$TEST_TO" --arg input "$TEST_INPUT" --arg value "$TEST_VALUE" --arg block "$TEST_BLOCK_HASH" '
-  .eth_getTransactionByHash={
-    ($first):{hash:$first,from:$from,nonce:"0x8",to:$to,input:$input,value:$value,blockNumber:"0x2",blockHash:$block},
-    ($second):{hash:$second,from:$from,nonce:"0x7",to:$to,input:$input,value:$value,blockNumber:"0x2",blockHash:$block}}
-  | .eth_getTransactionReceipt={
-    ($first):{transactionHash:$first,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null},
-    ($second):{transactionHash:$second,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null}}
-' "$RPC_DATA" >"$RPC_DATA.next"
-mv "$RPC_DATA.next" "$RPC_DATA"
-if (successful_receipts "$swapped" "$tmp/swapped-receipts.json" rpc) 2>/dev/null; then
-  fail 'exact planned hashes accepted swapped transaction envelopes'
-fi
-write_rpc_evidence "$TEST_TX_HASH"
 
-conflicting="$tmp/conflicting-blocks.json"
-second_block="0x$(printf 'd%.0s' {1..64})"
-jq --arg hash "$second_hash" --arg block "$second_block" \
-  '.transactions += [{hash:$hash,transaction:(.transactions[0].transaction | .nonce="0x8")}] | .receipts += [{transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null}]' \
-  "$broadcast" >"$conflicting"
-jq --arg hash "$second_hash" --arg block "$second_block" --arg from "$TEST_FROM" --arg to "$TEST_TO" --arg input "$TEST_INPUT" --arg value "$TEST_VALUE" '
-  .eth_getTransactionByHash[$hash]={hash:$hash,from:$from,nonce:"0x8",to:$to,input:$input,value:$value,blockNumber:"0x2",blockHash:$block}
-  | .eth_getTransactionReceipt[$hash]={transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null}
-' "$RPC_DATA" >"$RPC_DATA.next"
-mv "$RPC_DATA.next" "$RPC_DATA"
-if (successful_receipts "$conflicting" "$tmp/conflicting-receipts.json" rpc) 2>/dev/null; then
-  fail 'conflicting block hashes were accepted'
-fi
+write_rpc_evidence "$TEST_TX_HASH"
+: >"$FLOW_LOG"
+if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail 'deploy finalized before Filecoin finality'; fi
+[[ "$(cat "$FLOW_LOG")" == finality ]] || fail 'deploy finalizer order is wrong'
 
 : >"$FLOW_LOG"
 FINALITY_READY=1 cmd_finalize_deploy calibnet
 latest="$DEPLOYMENTS_ROOT/calibnet/latest.json"
-deployment_id="$(jq -r .deploymentId "$latest")"
-[[ -f "$DEPLOYMENTS_ROOT/calibnet/history/$deployment_id.json" ]] || fail 'history was not published'
 build_hash="$(jq -r '.release.buildInfoSha256[2:]' "$latest")"
 [[ -f "$DEPLOYMENTS_ROOT/calibnet/build-info/$build_hash.json.gz" ]] || fail 'build-info was not retained'
-[[ "$(tr '\n' ' ' <"$FLOW_LOG")" == 'finality live ' ]] || fail 'finalizer order is wrong'
+[[ "$(find "$DEPLOYMENTS_ROOT/calibnet/build-info" -name '*.json.gz' | wc -l | tr -d ' ')" == 1 ]] \
+  || fail 'superseded build-info was retained'
+[[ "$(tr '\n' ' ' <"$FLOW_LOG")" == 'finality live ' ]] || fail 'deploy finalizer order is wrong'
 
 latest_hash="$(sha256_file "$latest")"
-history_hash="$(sha256_file "$DEPLOYMENTS_ROOT/calibnet/history/$deployment_id.json")"
 FINALITY_READY=1 cmd_finalize_deploy calibnet
-[[ "$(sha256_file "$latest")" == "$latest_hash" ]] || fail 'second finalizer rewrote latest'
-[[ "$(sha256_file "$DEPLOYMENTS_ROOT/calibnet/history/$deployment_id.json")" == "$history_hash" ]] \
-  || fail 'second finalizer rewrote history'
+[[ "$(sha256_file "$latest")" == "$latest_hash" ]] || fail 'second deploy finalizer rewrote latest'
 
-source_hash="$(sha256_file "$latest")"
-fixture_hash="0x$(sha256_file "$TEST_BUILD_INFO")"
-gzip -n -c "$TEST_BUILD_INFO" >"$DEPLOYMENTS_ROOT/calibnet/build-info/${fixture_hash#0x}.json.gz"
-jq --arg hash "$fixture_hash" '.release.buildInfoSha256=$hash' "$latest" >"$latest.next"; mv "$latest.next" "$latest"
-source_hash="$(sha256_file "$latest")"
-
-cp "$TEST_BUILD_INFO" "$tmp/inconsistent-build.json"
-jq '.output.contracts["src/SPRegistry.sol"].SPRegistry.evm.deployedBytecode.object="02"' \
-  "$TEST_BUILD_INFO" >"$tmp/inconsistent-build.next"
-mv "$tmp/inconsistent-build.next" "$TEST_BUILD_INFO"
-if (cmd_upgrade calibnet PoRepMarket) 2>"$tmp/error"; then
-  fail 'partial upgrade accepted changed unselected implementation'
+if (TEST_CANONICAL_DIRTY=1 cmd_upgrade calibnet PoRepMarket) 2>"$tmp/error"; then
+  fail 'upgrade accepted an uncommitted canonical manifest'
 fi
-grep -q 'implementation does not match retained build-info: SPRegistry' "$tmp/error" \
-  || fail 'partial-upgrade build mismatch was unclear'
-cp "$tmp/inconsistent-build.json" "$TEST_BUILD_INFO"
+grep -q 'canonical deployment manifest is not committed and clean' "$tmp/error" \
+  || fail 'dirty canonical manifest rejection was unclear'
 
+source_hash="$(sha256_file "$latest")"
 : >"$FLOW_LOG"
 : >"$STORAGE_LOG"
 cmd_upgrade calibnet PoRepMarket SPRegistry Validator
@@ -423,6 +308,8 @@ for target in DataCapEvidenceAdapter PoRepMarket SLIOracle SLIScorer SPRegistry 
 done
 jq -e '.status=="pending" and .operation=="upgrade" and .targets==["PoRepMarket","SPRegistry","Validator"]
   and .broadcast.path==".deployment/calibnet/pending-upgrade.broadcast.json"
+  and (.sourceManifestSha256|test("^0x[0-9a-f]{64}$"))
+  and (.resultManifestSha256|test("^0x[0-9a-f]{64}$"))
   and (.release.storageReportSha256|test("^0x[0-9a-f]{64}$"))
   and [.operations[].target]==.targets and [.operations[].kind]==["uups","uups","beacon"]' "$pending" >/dev/null
 [[ "$(sha256_file "$latest")" == "$source_hash" ]] || fail 'upgrade broadcast changed latest'
@@ -431,18 +318,14 @@ jq -e '.status=="pending" and .operation=="upgrade" and .targets==["PoRepMarket"
 : >"$FLOW_LOG"
 if (cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'upgrade finalized before Filecoin finality'; fi
 [[ "$(cat "$FLOW_LOG")" == finality ]] || fail 'upgrade finalizer order is wrong'
-[[ "$(sha256_file "$latest")" == "$source_hash" ]] || fail 'early upgrade finalizer changed latest'
 
 jq 'del(.broadcast)' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
-missing_binding_hash="$(sha256_file "$pending")"
-mkdir -p "$BROADCAST_ROOT/Upgrade.s.sol/314159"
-printf '{}\n' >"$BROADCAST_ROOT/Upgrade.s.sol/314159/run-300.json"
 : >"$FLOW_LOG"
 if (cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'upgrade finalized without recorded broadcast binding'; fi
-[[ "$(sha256_file "$pending")" == "$missing_binding_hash" ]] || fail 'upgrade binding failure mutated pending'
 [[ ! -s "$FLOW_LOG" ]] || fail 'upgrade binding failure reached finality check'
-jq --arg path ".deployment/calibnet/pending-upgrade.broadcast.json" --arg hash "0x$(sha256_file "$PENDING_ROOT/calibnet/pending-upgrade.broadcast.json")" \
+jq --arg path ".deployment/calibnet/pending-upgrade.broadcast.json" \
+  --arg hash "0x$(sha256_file "$PENDING_ROOT/calibnet/pending-upgrade.broadcast.json")" \
   '.broadcast={path:$path,sha256:$hash}' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
 
@@ -454,68 +337,53 @@ mv "$pending.next" "$pending"
 
 jq '.operations[0].artifact="src/Tampered.sol:Tampered"' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
-if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'tampered upgrade operation finalized'; fi
-jq '.operations[0].artifact="src/PoRepMarket.sol:PoRepMarket"' "$pending" >"$pending.next"
-mv "$pending.next" "$pending"
-
-cp "$latest" "$tmp/authentic-latest.json"
+cp "$latest" "$tmp/canonical-artifact.json"
 jq '.contracts.PoRepMarket.artifact="src/Tampered.sol:Tampered"' "$latest" >"$latest.next"
 mv "$latest.next" "$latest"
-jq '.operations[0].artifact="src/Tampered.sol:Tampered"' "$pending" >"$pending.next"
-mv "$pending.next" "$pending"
-if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'tampered source deployment finalized'; fi
-cp "$tmp/authentic-latest.json" "$latest"
+if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'paired artifact mutation finalized'; fi
+cp "$tmp/canonical-artifact.json" "$latest"
 jq '.operations[0].artifact="src/PoRepMarket.sol:PoRepMarket"' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
 
-jq '.release.gitCommit="2222222222222222222222222222222222222222" | .release.buildInfoSha256="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$latest" >"$latest.next"
+cp "$latest" "$tmp/pre-upgrade-latest.json"
+jq '.externalDependencies.FilecoinPay="0x9999999999999999999999999999999999999999"' "$latest" >"$latest.next"
 mv "$latest.next" "$latest"
-if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'tampered source deployment release finalized'; fi
-cp "$tmp/authentic-latest.json" "$latest"
+if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'upgrade finalized from a changed source manifest'; fi
+cp "$tmp/pre-upgrade-latest.json" "$latest"
 
-: >"$STORAGE_LOG"
-if (TEST_GIT_COMMIT=2222222222222222222222222222222222222222 FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then
-  fail 'upgrade finalized from a different Git commit'
-fi
-[[ ! -s "$STORAGE_LOG" ]] || fail 'commit mismatch reran storage validation'
+jq '.release.buildInfoSha256="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' "$latest" >"$latest.next"
+mv "$latest.next" "$latest"
+if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then fail 'upgrade finalized after canonical release changed'; fi
+cp "$tmp/pre-upgrade-latest.json" "$latest"
 
 : >"$FLOW_LOG"
-TEST_GIT_DIRTY=1 FINALITY_READY=1 cmd_finalize_upgrade calibnet
+: >"$STORAGE_LOG"
+render_upgraded_manifest "$pending" "$latest" "$latest.next"
+mv "$latest.next" "$latest"
+[[ "$(jq -r .status "$pending")" == pending ]] || fail 'crash simulation finalized pending state'
+FINALITY_READY=1 cmd_finalize_upgrade calibnet
 [[ ! -s "$STORAGE_LOG" ]] || fail 'upgrade finalization reran storage validation'
 [[ "$(jq -r .contracts.PoRepMarket.implementation "$latest")" == "$TEST_UPGRADE_ADDRESS" ]] \
   || fail 'finalizer did not update selected implementation'
-[[ "$(jq -r .contracts.SPRegistry.implementation "$latest")" == "$TEST_UPGRADE_ADDRESS" ]] || fail 'finalizer did not update second implementation'
-[[ "$(jq -r .contracts.Validator.implementation "$latest")" == "$TEST_UPGRADE_ADDRESS" ]] || fail 'finalizer did not update Validator implementation'
-upgrade_id="$(jq -r .upgradeId "$pending")"
-record="$DEPLOYMENTS_ROOT/calibnet/upgrades/$upgrade_id.json"
-[[ -f "$record" ]] || fail 'upgrade record was not published'
-jq -e --arg previous "$fixture_hash" '
-  .release.previousBuildInfoSha256==$previous
-    and (.release.storageReportSha256|test("^0x[0-9a-f]{64}$"))
-' "$record" >/dev/null || fail 'upgrade record omitted storage validation provenance'
+[[ "$(jq -r .contracts.SPRegistry.implementation "$latest")" == "$TEST_UPGRADE_ADDRESS" ]] \
+  || fail 'finalizer did not update second implementation'
+[[ "$(jq -r .contracts.Validator.implementation "$latest")" == "$TEST_UPGRADE_ADDRESS" ]] \
+  || fail 'finalizer did not update Validator implementation'
 [[ "$(tr '\n' ' ' <"$FLOW_LOG")" == 'finality live ' ]] || fail 'upgrade finalizer order is wrong'
+[[ "$(find "$DEPLOYMENTS_ROOT/calibnet/build-info" -name '*.json.gz' | wc -l | tr -d ' ')" == 1 ]] \
+  || fail 'upgrade retained superseded build-info'
 
 latest_hash="$(sha256_file "$latest")"
-record_hash="$(sha256_file "$record")"
 FINALITY_READY=1 cmd_finalize_upgrade calibnet
 [[ "$(sha256_file "$latest")" == "$latest_hash" ]] || fail 'second upgrade finalizer rewrote latest'
-[[ "$(sha256_file "$record")" == "$record_hash" ]] || fail 'second upgrade finalizer rewrote record'
 
 cp "$latest" "$tmp/finalized-latest.json"
 jq '.contracts.PoRepMarket.implementationCodeHash="0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"' \
   "$latest" >"$latest.next"
 mv "$latest.next" "$latest"
 if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then
-  fail 'finalized upgrade replay accepted tampered canonical evidence'
+  fail 'finalized upgrade replay accepted changed canonical implementation'
 fi
 cp "$tmp/finalized-latest.json" "$latest"
-
-cp "$record" "$tmp/finalized-record.json"
-jq '.transactions[0].status=0' "$record" >"$record.next"
-mv "$record.next" "$record"
-if (FINALITY_READY=1 cmd_finalize_upgrade calibnet) 2>/dev/null; then
-  fail 'finalized upgrade replay accepted tampered upgrade history'
-fi
-cp "$tmp/finalized-record.json" "$record"
 
 printf 'deployment flow: PASS\n'

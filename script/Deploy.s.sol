@@ -43,7 +43,6 @@ contract Deploy is DeployUtils {
 
     function run() external {
         string memory outputPath = vm.envString("DEPLOYMENT_OUTPUT");
-        string memory gitCommit = vm.envString("GIT_COMMIT");
         string memory buildInfoSha256 = vm.envString("BUILD_INFO_SHA256");
 
         admin = vm.addr(vm.envUint("PRIVATE_KEY"));
@@ -79,7 +78,7 @@ contract Deploy is DeployUtils {
 
         vm.stopBroadcast();
 
-        vm.writeJson(_serializePendingManifest(gitCommit, buildInfoSha256), outputPath, ".result");
+        vm.writeJson(_serializePendingManifest(buildInfoSha256), outputPath, ".result");
     }
 
     function _deployValidatorFactory(address _admin)
@@ -133,21 +132,17 @@ contract Deploy is DeployUtils {
         impl = address(_impl);
     }
 
-    function _serializePendingManifest(string memory gitCommit, string memory buildInfoSha256)
-        internal
-        returns (string memory)
-    {
+    function _serializePendingManifest(string memory buildInfoSha256) internal returns (string memory) {
         string memory json = "pendingDeployment";
         json.serialize("status", string("pending"));
-        json.serialize("release", _serializeRelease(gitCommit, buildInfoSha256));
+        json.serialize("release", _serializeRelease(buildInfoSha256));
         json.serialize("deployer", admin);
         json.serialize("contracts", _serializeContracts());
         return json.serialize("externalDependencies", _serializeExternalDependencies());
     }
 
-    function _serializeRelease(string memory gitCommit, string memory buildInfoSha256) private returns (string memory) {
+    function _serializeRelease(string memory buildInfoSha256) private returns (string memory) {
         string memory json = "pendingRelease";
-        json.serialize("gitCommit", gitCommit);
         return json.serialize("buildInfoSha256", buildInfoSha256);
     }
 

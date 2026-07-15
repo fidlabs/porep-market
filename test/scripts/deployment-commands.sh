@@ -27,7 +27,6 @@ cat >"$tmp/git" <<'EOF'
 #!/usr/bin/env bash
 [[ "${1:-}" != -C ]] || shift 2
 case "${1:-}" in
-  rev-parse) printf '%s\n' 1111111111111111111111111111111111111111 ;;
   status)
     if [[ "${TEST_GIT_UNTRACKED:-0}" == 1 ]]; then printf '%s\n' '?? src/NewContract.sol'
     elif [[ "${TEST_GIT_DIRTY:-0}" != 0 ]]; then printf '%s\n' ' M src/PoRepMarket.sol'
@@ -69,6 +68,11 @@ if "$SCRIPT" upgrade calibnet PoRepMarket PoRepMarket 2>"$tmp/error"; then fail 
 grep -q 'duplicate upgrade target: PoRepMarket' "$tmp/error" || fail 'duplicate-target rejection was unclear'
 if "$SCRIPT" upgrade calibnet Unknown 2>"$tmp/error"; then fail 'unknown target succeeded'; fi
 grep -q 'unsupported upgrade target' "$tmp/error" || fail 'unknown-target rejection was unclear'
+jq '.contracts.Unknown={kind:"uups",proxy:"0x1111111111111111111111111111111111111111",implementation:"0x1111111111111111111111111111111111111111",proxyCodeHash:"0x1111111111111111111111111111111111111111111111111111111111111111",implementationCodeHash:"0x1111111111111111111111111111111111111111111111111111111111111111"}' \
+  "$DEPLOYMENTS_ROOT/calibnet/latest.json" >"$tmp/latest.next"
+mv "$tmp/latest.next" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
+if "$SCRIPT" upgrade calibnet Unknown 2>"$tmp/error"; then fail 'unknown manifest target succeeded'; fi
+grep -q 'unsupported upgrade target' "$tmp/error" || fail 'unknown manifest target rejection was unclear'
 for rejected in ValidatorBeacon ExternalDependency; do
   jq --arg name "$rejected" '.contracts[$name]={kind:(if $name=="ValidatorBeacon" then "beacon" else "external" end),artifact:"src/Rejected.sol:Rejected",implementation:"0x1111111111111111111111111111111111111111",implementationCodeHash:"0x1111111111111111111111111111111111111111111111111111111111111111"}' \
     "$DEPLOYMENTS_ROOT/calibnet/latest.json" >"$tmp/latest.next"
@@ -81,6 +85,11 @@ jq '.contracts.PoRepMarket={kind:"uups",artifact:"src/PoRepMarket.sol:PoRepMarke
 mv "$tmp/latest.next" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
 if "$SCRIPT" upgrade calibnet PoRepMarket 2>"$tmp/error"; then fail 'invalid UUPS manifest entry succeeded'; fi
 grep -q 'unsupported upgrade target' "$tmp/error" || fail 'invalid UUPS manifest rejection was unclear'
+jq '.contracts.PoRepMarket={kind:"uups",artifact:"src/SPRegistry.sol:SPRegistry",proxy:"0x1111111111111111111111111111111111111111",implementation:"0x1111111111111111111111111111111111111111",implementationCodeHash:"0x1111111111111111111111111111111111111111111111111111111111111111"}' \
+  "$DEPLOYMENTS_ROOT/calibnet/latest.json" >"$tmp/latest.next"
+mv "$tmp/latest.next" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
+if "$SCRIPT" upgrade calibnet PoRepMarket 2>"$tmp/error"; then fail 'wrong target artifact succeeded'; fi
+grep -q 'unsupported upgrade target' "$tmp/error" || fail 'wrong target artifact rejection was unclear'
 
 : >"$FORGE_LOG"
 if CONFIRM_MAINNET= "$SCRIPT" deploy mainnet 2>"$tmp/error"; then fail 'mainnet deploy accepted missing confirmation'; fi
@@ -108,14 +117,9 @@ fi
 grep -q 'deployment source is dirty' "$tmp/error" || fail 'untracked-source rejection was unclear'
 [[ ! -s "$FORGE_LOG" ]] || fail 'Forge ran before untracked-source check'
 
-printf '{"release":{"gitCommit":"1111111111111111111111111111111111111111","buildInfoSha256":"0x%s"},"contracts":{}}\n' "$(printf 'a%.0s' {1..64})" >"$DEPLOYMENTS_ROOT/calibnet/latest.json"
-mkdir -p "$DEPLOYMENTS_ROOT/calibnet/build-info" "$DEPLOYMENTS_ROOT/calibnet/history"
+printf '{"release":{"buildInfoSha256":"0x%s"},"contracts":{}}\n' "$(printf 'a%.0s' {1..64})" >"$DEPLOYMENTS_ROOT/calibnet/latest.json"
+mkdir -p "$DEPLOYMENTS_ROOT/calibnet/build-info"
 printf '{"output":{"contracts":{}}}\n' >"$tmp/verification-build.json"
-gzip -n -c "$tmp/verification-build.json" >"$DEPLOYMENTS_ROOT/calibnet/build-info/$(printf 'a%.0s' {1..64}).json.gz"
-verification_hash="$(if command -v sha256sum >/dev/null; then sha256sum "$tmp/verification-build.json" | awk '{print $1}'; else shasum -a 256 "$tmp/verification-build.json" | awk '{print $1}'; fi)"
-mv "$DEPLOYMENTS_ROOT/calibnet/build-info/$(printf 'a%.0s' {1..64}).json.gz" "$DEPLOYMENTS_ROOT/calibnet/build-info/$verification_hash.json.gz"
-jq --arg hash "0x$verification_hash" '.release.buildInfoSha256=$hash' "$DEPLOYMENTS_ROOT/calibnet/latest.json" >"$tmp/latest.next"
-mv "$tmp/latest.next" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
 names=(PoRepMarket ValidatorFactory DataCapEvidenceAdapter SPRegistry SLIOracle SLIScorer Validator)
 for index in "${!names[@]}"; do
   name="${names[$index]}"; digit=$(( index + 1 ))
@@ -147,10 +151,6 @@ verification_hash="$(if command -v sha256sum >/dev/null; then sha256sum "$tmp/ve
 gzip -n -c "$tmp/verification-build.json" >"$DEPLOYMENTS_ROOT/calibnet/build-info/$verification_hash.json.gz"
 jq --arg hash "0x$verification_hash" '.release.buildInfoSha256=$hash' "$DEPLOYMENTS_ROOT/calibnet/latest.json" >"$tmp/latest.next"
 mv "$tmp/latest.next" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
-jq '.deploymentId=""' "$DEPLOYMENTS_ROOT/calibnet/latest.json" >"$tmp/history.no-id"
-verification_id="0x$(if command -v sha256sum >/dev/null; then jq 'del(.deploymentId)' "$tmp/history.no-id" | sha256sum | awk '{print $1}'; else jq 'del(.deploymentId)' "$tmp/history.no-id" | shasum -a 256 | awk '{print $1}'; fi)"
-jq --arg id "$verification_id" '.deploymentId=$id' "$tmp/history.no-id" >"$DEPLOYMENTS_ROOT/calibnet/history/$verification_id.json"
-cp "$DEPLOYMENTS_ROOT/calibnet/history/$verification_id.json" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
 export RPC_CALIBNET=rpc
 : >"$FORGE_LOG"
 FORGE_EXIT=0 "$SCRIPT" verify calibnet
@@ -171,16 +171,8 @@ if grep -q UpgradeableBeacon "$FORGE_LOG"; then fail 'ValidatorBeacon was submit
 if TEST_GIT_DIRTY=1 FORGE_EXIT=0 "$SCRIPT" verify calibnet 2>/dev/null; then fail 'dirty verification source succeeded'; fi
 [[ ! -s "$FORGE_LOG" ]] || fail 'Forge ran for dirty verification source'
 cp "$DEPLOYMENTS_ROOT/calibnet/latest.json" "$tmp/verification-latest.json"
-jq '.release.gitCommit="2222222222222222222222222222222222222222"' "$tmp/verification-latest.json" >"$DEPLOYMENTS_ROOT/calibnet/latest.json"
-if FORGE_EXIT=0 "$SCRIPT" verify calibnet 2>/dev/null; then fail 'verification from wrong Git commit succeeded'; fi
-[[ ! -s "$FORGE_LOG" ]] || fail 'Forge ran from wrong Git commit'
-cp "$tmp/verification-latest.json" "$DEPLOYMENTS_ROOT/calibnet/latest.json"
-printf 'tampered\n' >"$tmp/tampered-build.json"
-gzip -n -c "$tmp/tampered-build.json" >"$DEPLOYMENTS_ROOT/calibnet/build-info/$verification_hash.json.gz"
-if FORGE_EXIT=0 "$SCRIPT" verify calibnet 2>/dev/null; then fail 'tampered verification build-info succeeded'; fi
-[[ ! -s "$FORGE_LOG" ]] || fail 'Forge ran with tampered verification build-info'
-gzip -n -c "$tmp/verification-build.json" >"$DEPLOYMENTS_ROOT/calibnet/build-info/$verification_hash.json.gz"
 
+: >"$FORGE_LOG"
 printf '{invalid\n' >"$DEPLOYMENTS_ROOT/calibnet/latest.json"
 if FORGE_EXIT=0 "$SCRIPT" verify calibnet 2>/dev/null; then fail 'malformed verification manifest succeeded'; fi
 [[ ! -s "$FORGE_LOG" ]] || fail 'Forge ran for malformed verification manifest'

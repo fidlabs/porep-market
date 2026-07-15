@@ -44,6 +44,10 @@ assert_clean_release_source() {
   [[ -z "$($GIT_BIN -C "$ROOT" status --porcelain --untracked-files=all -- "${TRACKED_RELEASE_PATHS[@]}")" ]] \
     || die "deployment source is dirty"
 }
+assert_clean_canonical_manifest() {
+  [[ -z "$($GIT_BIN -C "$ROOT" status --porcelain --untracked-files=all -- "$1")" ]] \
+    || die "canonical deployment manifest is not committed and clean"
+}
 assert_chain() {
   local network="$1" rpc_var expected actual
   rpc_var="$(network_value "$network" rpc)"; require_var "$rpc_var"
@@ -63,69 +67,21 @@ preflight_finalize() {
   assert_chain "$1"
   confirm_mainnet "$1"
 }
-assert_recorded_source() {
-  local pending="$1"
-  [[ "$($GIT_BIN -C "$ROOT" rev-parse HEAD)" == "$(jq -er '.release.gitCommit' "$pending")" ]] \
-    || die "HEAD differs from pending Git commit"
-}
-authenticate_implementation_builds() {
-  local manifest="$1" build_info="$2" excluded_json="${3:-[]}" entries entry name artifact address expected source_path contract bytecode actual
-  entries="$(mktemp "${TMPDIR:-/tmp}/porep-implementations.XXXXXX")"
-  jq -ce --argjson excluded "$excluded_json" '
-    [.contracts | to_entries[] | . as $entry | select(.value.kind!="beacon" and ($excluded|index($entry.key)|not))]
-    | select(length>0 and all(.[].value;
-        (.artifact|type=="string" and test("^[^:]+:[^:]+$"))
-          and (.implementation|type=="string" and test("^0x[0-9a-fA-F]{40}$"))
-          and (.implementationCodeHash|type=="string" and test("^0x[0-9a-f]{64}$"))))
-    | .[]
-  ' "$manifest" >"$entries" || { rm -f "$entries"; die "implementation evidence is invalid"; }
-  while IFS= read -r entry; do
-    name="$(jq -er '.key' <<<"$entry")"; artifact="$(jq -er '.value.artifact' <<<"$entry")"
-    address="$(jq -er '.value.implementation' <<<"$entry")"; expected="$(jq -er '.value.implementationCodeHash' <<<"$entry")"
-    source_path="${artifact%:*}"; contract="${artifact#*:}"
-    bytecode="$(gzip -cd "$build_info" | jq -er --arg source "$source_path" --arg contract "$contract" --arg address "${address#0x}" '
-      .output.contracts[$source][$contract].evm.deployedBytecode as $bytecode
-      | select(($bytecode.object|type)=="string" and ($bytecode.object|test("^[0-9a-fA-F]+$")))
-      | (($address|ascii_downcase|[range(0;64-length)]|map("0")|join("")) + ($address|ascii_downcase)) as $replacement
-      | reduce ([($bytecode.immutableReferences // {})[][]?.start] | sort)[] as $start
-          ($bytecode.object; .[0:($start*2)] + $replacement + .[($start*2+64):])
-    ')" || { rm -f "$entries"; die "artifact is absent from retained build-info: $name"; }
-    actual="$($CAST_BIN keccak "0x$bytecode")" || { rm -f "$entries"; die "could not hash artifact: $name"; }
-    [[ "$(printf '%s' "$actual" | tr '[:upper:]' '[:lower:]')" == "$expected" ]] \
-      || { rm -f "$entries"; die "implementation does not match retained build-info: $name"; }
-  done <"$entries"
-  rm -f "$entries"
-}
-authenticate_source_deployment() {
-  local source="$1" network="$2" id history history_hash build_hash build_info
-  id="$(jq -er '.deploymentId | select(test("^0x[0-9a-f]{64}$"))' "$source")" \
-    || die "source deployment ID is invalid"
-  history="$DEPLOYMENTS_ROOT/$network/history/$id.json"
-  [[ -f "$history" ]] || die "source deployment history does not exist"
-  [[ "$(jq -er '.deploymentId' "$history")" == "$id" ]] || die "source deployment history ID does not match"
-  history_hash="0x$(jq 'del(.deploymentId)' "$history" | sha256_stream)"
-  [[ "$history_hash" == "$id" ]] || die "source deployment history hash does not match"
-  jq -e --slurpfile history "$history" '
-    def static:
-      del(.release,.status,.finalizedAt,.transactions)
-      | .contracts |= with_entries(.value |= del(.implementation,.implementationCodeHash));
-    static == ($history[0] | static)
-  ' "$source" >/dev/null || die "source deployment topology does not match deployment history"
-
-  build_hash="$(jq -er '.release.buildInfoSha256 | select(test("^0x[0-9a-f]{64}$"))' "$source")" \
-    || die "source build-info hash is invalid"
-  build_info="$DEPLOYMENTS_ROOT/$network/build-info/${build_hash#0x}.json.gz"
-  authenticate_build_info "$build_info" "$build_hash"
-  authenticate_implementation_builds "$source" "$build_info"
-}
 validate_upgrade_targets() {
   local manifest="$1" targets_json="$2"
   jq -e --argjson targets "$targets_json" '
     def address: type=="string" and test("^0x[0-9a-fA-F]{40}$");
     def code_hash: type=="string" and test("^0x[0-9a-f]{64}$");
+    def artifact($target): {
+      PoRepMarket:"src/PoRepMarket.sol:PoRepMarket", ValidatorFactory:"src/ValidatorFactory.sol:ValidatorFactory",
+      DataCapEvidenceAdapter:"src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter", SPRegistry:"src/SPRegistry.sol:SPRegistry",
+      SLIOracle:"src/SLIOracle.sol:SLIOracle", SLIScorer:"src/SLIScorer.sol:SLIScorer",
+      Validator:"src/Validator.sol:Validator"
+    }[$target];
     ($targets|type=="array" and length>0 and length==(unique|length)) and all($targets[]; . as $target
       | $manifest[0].contracts[$target] as $contract
-      | ($contract|type=="object") and ($contract.artifact|type=="string" and length>0)
+      | artifact($target) as $artifact
+      | ($artifact|type=="string") and ($contract|type=="object") and $contract.artifact==$artifact
         and ($contract.implementation|address) and ($contract.implementationCodeHash|code_hash)
         and (if $target=="Validator" then $contract.kind=="implementation"
           else $contract.kind=="uups" and ($contract.proxy|address) and ($contract.proxyCodeHash|code_hash) end))
@@ -136,10 +92,18 @@ validate_upgrade_operations() {
   jq -e --slurpfile manifest "$manifest" '
     def address: type=="string" and test("^0x[0-9a-fA-F]{40}$");
     def code_hash: type=="string" and test("^0x[0-9a-f]{64}$");
+    def artifact($target): {
+      PoRepMarket:"src/PoRepMarket.sol:PoRepMarket", ValidatorFactory:"src/ValidatorFactory.sol:ValidatorFactory",
+      DataCapEvidenceAdapter:"src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter", SPRegistry:"src/SPRegistry.sol:SPRegistry",
+      SLIOracle:"src/SLIOracle.sol:SLIOracle", SLIScorer:"src/SLIScorer.sol:SLIScorer",
+      Validator:"src/Validator.sol:Validator"
+    }[$target];
     (.targets|type=="array" and length>0 and length==(unique|length))
       and (.operations|type=="array") and [.operations[].target]==.targets
       and all(.operations[]; . as $operation | $manifest[0].contracts[$operation.target] as $contract
-        | ($contract|type=="object") and $operation.artifact==$contract.artifact
+        | artifact($operation.target) as $artifact
+        | ($artifact|type=="string") and ($contract|type=="object")
+          and $contract.artifact==$artifact and $operation.artifact==$artifact
           and $operation.kind==(if $operation.target=="Validator" then "beacon" else $contract.kind end)
           and ($operation.newImplementation|address) and ($operation.newImplementationCodeHash|code_hash))
   ' "$pending" >/dev/null
@@ -163,6 +127,14 @@ retain_build_info() {
   fi
   staged="$(mktemp "$(dirname "$destination")/.build-info.XXXXXX")"
   cp "$source" "$staged"; mv "$staged" "$destination"
+}
+
+prune_build_info() {
+  local network="$1" retained_hash="$2" retained file
+  retained="$DEPLOYMENTS_ROOT/$network/build-info/${retained_hash#0x}.json.gz"
+  for file in "$DEPLOYMENTS_ROOT/$network"/build-info/*.json.gz; do
+    [[ ! -e "$file" || "$file" == "$retained" ]] || rm -f "$file"
+  done
 }
 
 retain_broadcast() {
@@ -195,136 +167,78 @@ recorded_broadcast() {
 }
 
 successful_receipts() {
-  local broadcast="$1" output="$2" rpc_url="$3" work observed hash
-  local transaction receipt transactions receipts
+  local broadcast="$1" output="$2" rpc_url="$3" work hashes receipts hash receipt
   work="$(mktemp -d "${TMPDIR:-/tmp}/porep-receipts.XXXXXX")"
-  observed="$work/observed.txt"
-  jq -er 'select(.transactions|type=="array") | select(.receipts|type=="array") | select(.pending|type=="array")
-    | [.receipts[].transactionHash] as $hashes
-    | [$hashes[] | select(type=="string" and test("^0x[0-9a-fA-F]{64}$")) | ascii_downcase]
-    | select(length==($hashes|length) and length>0 and (unique|length)==length) | .[]' "$broadcast" >"$observed" \
-    || { rm -r "$work"; die "broadcast transaction hashes are invalid"; }
-  transactions="$work/transactions.jsonl"; receipts="$work/receipts.jsonl"
-  : >"$transactions"; : >"$receipts"
+  hashes="$work/hashes.txt"; receipts="$work/receipts.jsonl"
+  jq -er '
+    select(.transactions|type=="array" and length>0)
+    | select((.pending // [])|type=="array" and length==0)
+    | (.transactions|length) as $count
+    | [.transactions[].hash | select(type=="string" and test("^0x[0-9a-fA-F]{64}$")) | ascii_downcase]
+    | select(length==$count and length==(.|unique|length)) | .[]
+  ' "$broadcast" >"$hashes" || { rm -r "$work"; die "broadcast transaction hashes are invalid"; }
+  : >"$receipts"
   while IFS= read -r hash; do
-    transaction="$($CAST_BIN rpc eth_getTransactionByHash "$hash" --rpc-url "$rpc_url")" \
-      || { rm -r "$work"; die "could not read broadcast transaction from RPC"; }
     receipt="$($CAST_BIN rpc eth_getTransactionReceipt "$hash" --rpc-url "$rpc_url")" \
       || { rm -r "$work"; die "could not read broadcast receipt from RPC"; }
-    jq -cn --arg observed "$hash" --argjson value "$transaction" '{observed:$observed,value:$value}' >>"$transactions" \
-      || { rm -r "$work"; die "RPC transaction is malformed"; }
-    jq -cn --arg observed "$hash" --argjson value "$receipt" '{observed:$observed,value:$value}' >>"$receipts" \
-      || { rm -r "$work"; die "RPC receipt is malformed"; }
-  done <"$observed"
-  jq -s '.' "$transactions" >"$work/transactions.json" || { rm -r "$work"; die "RPC transaction is malformed"; }
-  jq -s '.' "$receipts" >"$work/receipts.json" || { rm -r "$work"; die "RPC receipt is malformed"; }
-  jq -e --slurpfile rpc_transactions "$work/transactions.json" --slurpfile rpc_receipts "$work/receipts.json" '
-    def digit: if .>=48 and .<=57 then .-48 elif .>=65 and .<=70 then .-55 else .-87 end;
-    def quantity: if type=="number" then . elif type=="string" and test("^0x[0-9a-fA-F]+$") then .[2:]|explode|reduce .[] as $d (0; . * 16 + ($d|digit)) else error("invalid quantity") end;
-    def hex_quantity: select(type=="string" and test("^0x[0-9a-fA-F]+$")) | ascii_downcase | sub("^0x0+"; "0x") | if .=="0x" then "0x0" else . end;
-    def hash: select(type=="string" and test("^0x[0-9a-fA-F]{64}$")) | ascii_downcase;
-    def address: select(type=="string" and test("^0x[0-9a-fA-F]{40}$")) | ascii_downcase;
-    def envelope: {from:(.from|address),nonce:(.nonce|hex_quantity),to:(if .to==null then null else (.to|address) end),
-      input:(.input|select(type=="string" and test("^0x([0-9a-fA-F]{2})*$"))|ascii_downcase),value:(.value|hex_quantity)};
-    (.transactions|length) as $planned_count
-    | [.transactions[] | {hash:(.hash|hash),envelope:(.transaction|envelope)}] as $planned
-    | select(($planned|length)==$planned_count and ([$planned[].hash]|unique|length)==$planned_count
-        and ([$planned[].envelope]|unique|length)==$planned_count)
-    | (.pending // []) as $raw_pending
-    | [$raw_pending[] | hash] as $pending
-    | select(($pending|length)==($raw_pending|length) and ($pending|unique|length)==($pending|length))
-    | select((($pending-[$planned[].hash])|length)==0)
-    | [$rpc_transactions[0][] | .observed as $observed | .value
-        | {observed:$observed,hash:(.hash|hash),envelope:(.|envelope),blockNumber:(.blockNumber|quantity),blockHash:(.blockHash|hash)}] as $transactions
-    | [$rpc_receipts[0][] | .observed as $observed | .value
-        | {observed:$observed,hash:(.transactionHash|hash),status:(.status|quantity),blockNumber:(.blockNumber|quantity),
-          blockHash:(.blockHash|hash),contractAddress:(if .contractAddress==null then null else (.contractAddress|address) end)}] as $receipts
-    | select(($transactions|length)==$planned_count and ($receipts|length)==$planned_count)
-    | select(all($transactions[]; .observed==.hash) and all($receipts[]; .observed==.hash))
-    | select(([$transactions[].hash]|unique|length)==$planned_count and ([$receipts[].hash]|unique|length)==$planned_count)
-    | select(all($transactions[]; . as $transaction | any($receipts[]; .hash==$transaction.hash and .blockNumber==$transaction.blockNumber and .blockHash==$transaction.blockHash)))
-    | select(all($receipts[]; .status==1 and .blockNumber>0))
-    | select(all($transactions[]; . as $transaction
-        | if any($planned[]; .hash==$transaction.hash) then
-            any($planned[]; .hash==$transaction.hash and .envelope==$transaction.envelope)
-          else
-            ([ $planned[] | select(.envelope==$transaction.envelope and (.hash as $original | ($pending|index($original))!=null)) ] | length)==1
-          end))
-    | select([$transactions[].envelope]|unique|length==$planned_count)
-    | select($receipts | group_by(.blockNumber) | all(.[]; ([.[].blockHash]|unique|length)==1))
-    | [$receipts[] | del(.observed)]
-  ' "$broadcast" >"$output" || { rm -r "$work"; die "every planned transaction must have one successful consistent RPC receipt"; }
+    jq -ce --arg expected "$hash" '
+      def digit: if .>=48 and .<=57 then .-48 elif .>=65 and .<=70 then .-55 else .-87 end;
+      def quantity: if type=="number" then . elif type=="string" and test("^0x[0-9a-fA-F]+$") then .[2:]|explode|reduce .[] as $d (0; . * 16 + ($d|digit)) else error("invalid quantity") end;
+      def hash: select(type=="string" and test("^0x[0-9a-fA-F]{64}$")) | ascii_downcase;
+      def address: select(type=="string" and test("^0x[0-9a-fA-F]{40}$")) | ascii_downcase;
+      {hash:(.transactionHash|hash),status:(.status|quantity),blockNumber:(.blockNumber|quantity),
+        blockHash:(.blockHash|hash),contractAddress:(if .contractAddress==null then null else (.contractAddress|address) end)}
+      | select(.hash==$expected and .status==1 and .blockNumber>0)
+    ' <<<"$receipt" >>"$receipts" || { rm -r "$work"; die "planned transaction does not have a successful consistent RPC receipt"; }
+  done <"$hashes"
+  jq -s 'select(length>0)' "$receipts" >"$output" \
+    || { rm -r "$work"; die "planned transaction receipts are invalid"; }
   rm -r "$work"
 }
 
 publish_deploy() {
   local pending="$1" receipts="$2" network="$3" build_gzip="$4" build_hash="$5"
-  local dir without_id canonical history id retained staged latest staged_pending finalized_at
-  dir="$DEPLOYMENTS_ROOT/$network"; mkdir -p "$dir/history" "$dir/build-info"
+  local dir retained latest staged finalized_at
+  dir="$DEPLOYMENTS_ROOT/$network"; mkdir -p "$dir/build-info"
   finalized_at="$(jq -er '.finalizedAt | select(type=="string" and length>0)' "$pending")"
-  without_id="$(mktemp "$dir/.deployment.XXXXXX")"
-  canonical="$(mktemp "$dir/.deployment.XXXXXX")"
+  latest="$(mktemp "$dir/.latest.XXXXXX")"
   jq --slurpfile tx "$receipts" --arg at "$finalized_at" \
-    '.result | .status="finalized" | .finalizedAt=$at | .transactions=$tx[0]' "$pending" >"$without_id"
-  id="0x$(sha256_file "$without_id")"
-  jq --arg id "$id" '.deploymentId=$id' "$without_id" >"$canonical"
-  rm -f "$without_id"
-
-  history="$dir/history/$id.json"
-  if [[ -e "$history" ]]; then
-    cmp -s "$canonical" "$history" || die "deployment history differs: $id"
-  else
-    staged="$(mktemp "$dir/history/.deployment.XXXXXX")"
-    cp "$canonical" "$staged"; mv "$staged" "$history"
-  fi
-
+    '.result | .status="finalized" | .finalizedAt=$at | .transactions=$tx[0]' "$pending" >"$latest"
   retained="$dir/build-info/${build_hash#0x}.json.gz"
   retain_build_info "$build_gzip" "$retained"
-  latest="$(mktemp "$dir/.latest.XXXXXX")"
-  cp "$canonical" "$latest"; mv "$latest" "$dir/latest.json"
-  rm -f "$canonical"
-
-  staged_pending="$pending.next"
-  jq --arg id "$id" '.status="finalized" | .deploymentId=$id' "$pending" >"$staged_pending"
-  mv "$staged_pending" "$pending"
+  mv "$latest" "$dir/latest.json"
+  staged="$pending.next"; jq '.status="finalized"' "$pending" >"$staged"; mv "$staged" "$pending"
+  prune_build_info "$network" "$build_hash"
 }
 
 confirm_finalized_deploy() {
-  local pending="$1" network="$2" id history latest
-  id="$(jq -er '.deploymentId' "$pending")"
-  history="$DEPLOYMENTS_ROOT/$network/history/$id.json"
-  latest="$DEPLOYMENTS_ROOT/$network/latest.json"
-  [[ -f "$history" && -f "$latest" ]] || die "finalized deployment artifacts are missing"
-  [[ "$(jq -er '.deploymentId' "$history")" == "$id" ]] || die "deployment history ID does not match"
-  [[ "$(jq -er '.deploymentId' "$latest")" == "$id" ]] || die "latest deployment ID does not match"
+  local pending="$1" network="$2" latest
+  latest="$DEPLOYMENTS_ROOT/$network/latest.json"; [[ -f "$latest" ]] || die "finalized deployment manifest is missing"
+  jq -e --slurpfile latest "$latest" '
+    .result.contracts==$latest[0].contracts
+      and .result.externalDependencies==$latest[0].externalDependencies
+      and .release.buildInfoSha256==$latest[0].release.buildInfoSha256
+  ' "$pending" >/dev/null || die "canonical deployment differs from finalized deployment"
 }
 
 publish_upgrade() {
-  local pending="$1" receipts="$2" network="$3" build_gzip="$4" source="$5"
-  local dir without_id canonical record id retained latest staged
-  dir="$DEPLOYMENTS_ROOT/$network"; mkdir -p "$dir/upgrades" "$dir/build-info"
-  without_id="$(mktemp "$dir/.upgrade.XXXXXX")"
-  canonical="$(mktemp "$dir/.upgrade.XXXXXX")"
-  jq --slurpfile tx "$receipts" '
-    {operation:"upgrade",sourceDeploymentId:.sourceDeploymentId,finalizedAt:.finalizedAt,
-      release:.release,operations:.operations,transactions:$tx[0]}
-  ' "$pending" >"$without_id"
-  id="0x$(sha256_file "$without_id")"
-  jq --arg id "$id" '.upgradeId=$id' "$without_id" >"$canonical"
-  rm -f "$without_id"
-
-  record="$dir/upgrades/$id.json"
+  local pending="$1" network="$2" build_gzip="$3" source="$4"
+  local dir retained latest staged expected_hash actual_hash
+  dir="$DEPLOYMENTS_ROOT/$network"; mkdir -p "$dir/build-info"
   retained="$dir/build-info/$(jq -er '.release.buildInfoSha256[2:]' "$pending").json.gz"
   retain_build_info "$build_gzip" "$retained"
-  if [[ -e "$record" ]]; then
-    cmp -s "$canonical" "$record" || die "upgrade history differs: $id"
-  else
-    staged="$(mktemp "$dir/upgrades/.upgrade.XXXXXX")"
-    cp "$canonical" "$staged"; mv "$staged" "$record"
-  fi
-  rm -f "$canonical"
-
   latest="$(mktemp "$dir/.latest.XXXXXX")"
+  render_upgraded_manifest "$pending" "$source" "$latest"
+  expected_hash="$(jq -er '.resultManifestSha256' "$pending")"
+  actual_hash="0x$(sha256_file "$latest")"
+  [[ "$actual_hash" == "$expected_hash" ]] || die "rendered upgrade manifest hash does not match"
+  mv "$latest" "$dir/latest.json"
+  staged="$pending.next"; jq '.status="finalized"' "$pending" >"$staged"; mv "$staged" "$pending"
+  prune_build_info "$network" "$(jq -er '.release.buildInfoSha256' "$pending")"
+}
+
+render_upgraded_manifest() {
+  local pending="$1" source="$2" output="$3"
   jq --slurpfile pending "$pending" '
     reduce $pending[0].operations[] as $operation (.;
       if $operation.target=="Validator" then
@@ -335,51 +249,21 @@ publish_upgrade() {
         .contracts[$operation.target].implementation=$operation.newImplementation
         | .contracts[$operation.target].implementationCodeHash=$operation.newImplementationCodeHash
       end)
-    | .release.gitCommit=$pending[0].release.gitCommit
     | .release.buildInfoSha256=$pending[0].release.buildInfoSha256
-  ' "$source" >"$latest"
-  mv "$latest" "$dir/latest.json"
-
-  staged="$pending.next"
-  jq --arg id "$id" '.status="finalized" | .upgradeId=$id' "$pending" >"$staged"
-  mv "$staged" "$pending"
+  ' "$source" >"$output"
 }
 
 confirm_finalized_upgrade() {
-  local pending="$1" network="$2" source id record latest record_hash build_hash build_info
-  id="$(jq -er '.upgradeId | select(test("^0x[0-9a-f]{64}$"))' "$pending")" \
-    || die "upgrade history ID is invalid"
-  record="$DEPLOYMENTS_ROOT/$network/upgrades/$id.json"
+  local pending="$1" network="$2" latest
   latest="$DEPLOYMENTS_ROOT/$network/latest.json"
-  [[ -f "$record" && -f "$latest" ]] || die "finalized upgrade artifacts are missing"
-  [[ "$(jq -er '.upgradeId' "$record")" == "$id" ]] || die "upgrade history ID does not match"
-  record_hash="0x$(jq 'del(.upgradeId)' "$record" | sha256_stream)"
-  [[ "$record_hash" == "$id" ]] || die "upgrade history hash does not match"
-  source="$(jq -er '.sourceDeploymentId' "$pending")"
-  [[ "$(jq -er '.sourceDeploymentId' "$record")" == "$source" ]] \
-    || die "upgrade history source does not match"
-  [[ "$(jq -er '.deploymentId' "$latest")" == "$source" ]] || die "canonical deployment changed"
-  authenticate_source_deployment "$latest" "$network"
-  build_hash="$(jq -er '.release.buildInfoSha256' "$record")"
-  [[ "$build_hash" == "$(jq -er '.release.buildInfoSha256' "$latest")" ]] \
-    || die "canonical release does not match finalized upgrade"
-  build_info="$DEPLOYMENTS_ROOT/$network/build-info/${build_hash#0x}.json.gz"
-  authenticate_build_info "$build_info" "$build_hash"
-  jq -e --slurpfile latest "$latest" --slurpfile record "$record" '
-    .operations==$record[0].operations
-      and all(.operations[]; . as $operation | if $operation.target=="Validator" then
-        $latest[0].contracts.Validator.implementation==$operation.newImplementation
-          and $latest[0].contracts.Validator.implementationCodeHash==$operation.newImplementationCodeHash
-          and $latest[0].contracts.ValidatorBeacon.implementation==$operation.newImplementation
-      else
-        $latest[0].contracts[$operation.target].implementation==$operation.newImplementation
-          and $latest[0].contracts[$operation.target].implementationCodeHash==$operation.newImplementationCodeHash
-      end)
-  ' "$pending" >/dev/null || die "canonical implementations do not match finalized upgrade"
+  [[ -f "$latest" ]] || die "finalized deployment manifest is missing"
+  [[ "0x$(sha256_file "$latest")" == "$(jq -er '.resultManifestSha256' "$pending")" ]] \
+    || die "canonical manifest does not match finalized upgrade"
+  prune_build_info "$network" "$(jq -er '.release.buildInfoSha256' "$pending")"
 }
 
 cmd_deploy() {
-  local network="${1:-}" fresh=false rpc_var key_var suffix work build_out broadcast_root commit pending_dir pending forge_rc
+  local network="${1:-}" fresh=false rpc_var key_var suffix work build_out broadcast_root pending_dir pending forge_rc
   [[ -n "$network" ]] || { usage; exit 2; }; network_value "$network" chain >/dev/null; shift
   if [[ "${1:-}" == --fresh && $# == 1 ]]; then fresh=true; shift; fi
   (( $# == 0 )) || die "unsupported deploy argument: $1"
@@ -395,15 +279,15 @@ cmd_deploy() {
   mkdir -p "$pending_dir"
   work="$(mktemp -d "${TMPDIR:-/tmp}/porep-deploy.XXXXXX")"; broadcast_root="$work/broadcast"
   build_out="$work/out"; "$FORGE_BIN" build --root "$ROOT" --out "$build_out" --cache-path "$work/cache" --build-info --extra-output storageLayout >/dev/null
-  prepare_build_info "$build_out/build-info" "$pending_dir/pending-deploy.build-info"; commit="$($GIT_BIN -C "$ROOT" rev-parse HEAD)"
+  prepare_build_info "$build_out/build-info" "$pending_dir/pending-deploy.build-info"
   jq -n --arg network "$network" --argjson chain "$(network_value "$network" chain)" \
-    --arg commit "$commit" --arg build "$BUILD_INFO_SHA256" \
+    --arg build "$BUILD_INFO_SHA256" \
     --arg path ".deployment/$network/pending-deploy.build-info.json.gz" \
     '{status:"pending",operation:"deploy",network:$network,chainId:$chain,
-      release:{gitCommit:$commit,buildInfoSha256:$build},buildInfoPath:$path,result:{}}' >"$pending"
+      release:{buildInfoSha256:$build},buildInfoPath:$path,result:{}}' >"$pending"
   forge_rc=0
   FOUNDRY_BROADCAST="$broadcast_root" PRIVATE_KEY="${!key_var}" RPC_URL="${!rpc_var}" DEPLOYMENT_OUTPUT="$pending" \
-    GIT_COMMIT="$commit" BUILD_INFO_SHA256="$BUILD_INFO_SHA256" \
+    BUILD_INFO_SHA256="$BUILD_INFO_SHA256" \
     FILECOIN_PAY="$(eval echo \"\$FILECOIN_PAY_$suffix\")" TERMINATION_ORACLE="$(eval echo \"\$TERMINATION_ORACLE_$suffix\")" \
     ORACLE="$(eval echo \"\$ORACLE_$suffix\")" POREP_SERVICE="$(eval echo \"\$POREP_SERVICE_$suffix\")" \
     META_ALLOCATOR="$(eval echo \"\$META_ALLOCATOR_$suffix\")" OPERATOR_ADDR="$(eval echo \"\$OPERATOR_ADDR_$suffix\")" \
@@ -431,9 +315,9 @@ cmd_finalize_deploy() {
   jq -e --arg network "$network" --argjson chain "$(network_value "$network" chain)" \
     '.operation=="deploy" and .network==$network and .chainId==$chain' "$pending" >/dev/null \
     || die "pending deployment does not match $network"
-  assert_recorded_source "$pending"
   if [[ "$(jq -r '.status // empty' "$pending")" == finalized ]]; then
     confirm_finalized_deploy "$pending" "$network"
+    prune_build_info "$network" "$(jq -er '.release.buildInfoSha256' "$pending")"
     return 0
   fi
   [[ "$(jq -r '.status // empty' "$pending")" == pending ]] || die "pending deployment has invalid status"
@@ -457,7 +341,6 @@ cmd_finalize_deploy() {
   "${FINALITY_VERIFIER:-$ROOT/script/verify-filecoin-finality.sh}" --blocks-json "$blocks" --rpc-url "${!rpc_var}" \
     || die "finality check failed"
   manifest="$work/deployment.json"; jq '.result' "$pending" >"$manifest"
-  authenticate_implementation_builds "$manifest" "$build_gzip"
   "${LIVE_CHECKER:-$ROOT/script/deployment-live-checks.sh}" --manifest "$manifest" --rpc-url "${!rpc_var}" \
     || die "live topology check failed"
 
@@ -472,7 +355,7 @@ cmd_finalize_deploy() {
 
 cmd_upgrade() {
   local network="${1:-}" targets_csv targets_json i j source rpc_var key_var pending_dir pending build_gzip storage_report
-  local reference reference_hash work build_out broadcast_root commit report_hash script script_file forge_rc existing
+  local reference reference_hash source_hash result_hash expected_manifest work build_out broadcast_root report_hash script script_file forge_rc existing
   [[ -n "$network" ]] || { usage; exit 2; }
   network_value "$network" chain >/dev/null
   shift; (( $# > 0 )) || die "at least one upgrade target is required"; local targets=("$@")
@@ -481,7 +364,8 @@ cmd_upgrade() {
   source="$DEPLOYMENTS_ROOT/$network/latest.json"
   [[ -f "$source" ]] || die "canonical $network deployment does not exist"
   validate_upgrade_targets "$source" "$targets_json" || die "unsupported upgrade target"
-  authenticate_source_deployment "$source" "$network"
+  assert_clean_canonical_manifest "$source"
+  source_hash="0x$(sha256_file "$source")"
   preflight_broadcast "$network"
   rpc_var="$(network_value "$network" rpc)"; key_var="$(network_value "$network" key)"
   require_var "$rpc_var"; require_var "$key_var"
@@ -500,8 +384,6 @@ cmd_upgrade() {
   build_out="$work/out"
   "$FORGE_BIN" build --root "$ROOT" --out "$build_out" --cache-path "$work/cache" --build-info --extra-output storageLayout >/dev/null
   prepare_build_info "$build_out/build-info" "${build_gzip%.json.gz}"
-  authenticate_implementation_builds "$source" "$BUILD_INFO_GZIP" "$targets_json"
-  commit="$($GIT_BIN -C "$ROOT" rev-parse HEAD)"
   local storage_args=() storage_target
   while IFS= read -r storage_target; do storage_args+=(--target "$storage_target"); done < <(
     jq -er '.contracts | to_entries[] | select(.value.kind=="uups" or .key=="Validator") | .key' "$source"
@@ -515,14 +397,13 @@ cmd_upgrade() {
   script=Upgrade.s.sol:Upgrade
   script_file="${script%%:*}"
   jq -n --arg network "$network" --argjson chain "$(network_value "$network" chain)" \
-    --argjson targets "$targets_json" --arg source "$(jq -er '.deploymentId' "$source")" \
-    --arg commit "$commit" --arg build "$BUILD_INFO_SHA256" --arg previous "$reference_hash" \
-    --arg report "$report_hash" \
+    --argjson targets "$targets_json" --arg build "$BUILD_INFO_SHA256" --arg previous "$reference_hash" \
+    --arg report "$report_hash" --arg source_hash "$source_hash" \
     --arg build_path ".deployment/$network/pending-upgrade.build-info.json.gz" \
     --arg report_path ".deployment/$network/pending-upgrade.storage.txt" \
     '{status:"pending",operation:"upgrade",network:$network,chainId:$chain,targets:$targets,operations:[],
-      sourceDeploymentId:$source,
-      release:{gitCommit:$commit,buildInfoSha256:$build,previousBuildInfoSha256:$previous,
+      sourceManifestSha256:$source_hash,
+      release:{buildInfoSha256:$build,previousBuildInfoSha256:$previous,
         storageReportSha256:$report},buildInfoPath:$build_path,storageReportPath:$report_path}' >"$pending"
   forge_rc=0
   FOUNDRY_BROADCAST="$broadcast_root" UPGRADE_OUTPUT="$pending" DEPLOYMENT_MANIFEST="$source" UPGRADE_CONTRACT_NAMES="$targets_csv" \
@@ -535,6 +416,12 @@ cmd_upgrade() {
   (( forge_rc == 0 )) || die "upgrade broadcast failed; pending evidence was preserved"
   jq -e --argjson targets "$targets_json" '.targets==$targets' "$pending" >/dev/null \
     && validate_upgrade_operations "$pending" "$source" || die "Forge did not write ordered upgrade operations"
+  [[ "0x$(sha256_file "$source")" == "$source_hash" ]] || die "canonical deployment changed during upgrade broadcast"
+  expected_manifest="$work/expected-latest.json"
+  render_upgraded_manifest "$pending" "$source" "$expected_manifest"
+  result_hash="0x$(sha256_file "$expected_manifest")"
+  jq --arg hash "$result_hash" '.resultManifestSha256=$hash' "$pending" >"$pending.next"
+  mv "$pending.next" "$pending"
   jq -e '.broadcast.sha256 | test("^0x[0-9a-f]{64}$")' "$pending" >/dev/null \
     || die "Forge did not write the expected upgrade broadcast"
   rm -r "$work"
@@ -544,7 +431,7 @@ cmd_upgrade() {
 cmd_finalize_upgrade() {
   local network="${1:-}" source pending_dir pending build_gzip storage_report
   local reference_hash reference rpc_var work report_hash script_file broadcast expected_path
-  local expected_hash actual_hash receipts blocks operations tmp
+  local expected_hash actual_hash source_hash source_expected result_expected receipts blocks operations tmp
   [[ -n "$network" ]] || { usage; exit 2; }
   network_value "$network" chain >/dev/null
   (( $# == 1 )) || { usage; exit 2; }
@@ -557,17 +444,20 @@ cmd_finalize_upgrade() {
   jq -e --arg network "$network" --argjson chain "$(network_value "$network" chain)" \
     '.operation=="upgrade" and .network==$network and .chainId==$chain' "$pending" >/dev/null \
     && validate_upgrade_operations "$pending" "$source" || die "pending upgrade does not match command"
-  assert_recorded_source "$pending"
   if [[ "$(jq -r '.status // empty' "$pending")" == finalized ]]; then
     confirm_finalized_upgrade "$pending" "$network"
     return 0
   fi
   [[ "$(jq -r '.status // empty' "$pending")" == pending ]] || die "pending upgrade has invalid status"
-  [[ "$(jq -er '.sourceDeploymentId' "$pending")" == "$(jq -er '.deploymentId' "$source")" ]] \
+  source_hash="0x$(sha256_file "$source")"
+  source_expected="$(jq -er '.sourceManifestSha256' "$pending")"
+  result_expected="$(jq -er '.resultManifestSha256' "$pending")"
+  [[ "$source_hash" == "$source_expected" || "$source_hash" == "$result_expected" ]] \
     || die "canonical deployment changed after upgrade broadcast"
-  authenticate_source_deployment "$source" "$network"
-  [[ "$(jq -er '.release.previousBuildInfoSha256' "$pending")" == "$(jq -er '.release.buildInfoSha256' "$source")" ]] \
-    || die "canonical release changed after upgrade broadcast"
+  if [[ "$source_hash" == "$source_expected" ]]; then
+    [[ "$(jq -er '.release.previousBuildInfoSha256' "$pending")" == "$(jq -er '.release.buildInfoSha256' "$source")" ]] \
+      || die "canonical release changed after upgrade broadcast"
+  fi
   [[ "$(jq -er '.buildInfoPath' "$pending")" == ".deployment/$network/pending-upgrade.build-info.json.gz" ]] \
     || die "pending build-info path is invalid"
   [[ "$(jq -er '.storageReportPath' "$pending")" == ".deployment/$network/pending-upgrade.storage.txt" ]] \
@@ -605,23 +495,16 @@ cmd_finalize_upgrade() {
     jq --arg at "$(date -u +%Y-%m-%dT%H:%M:%SZ)" '.finalizedAt=$at' "$pending" >"$tmp"
     mv "$tmp" "$pending"
   fi
-  publish_upgrade "$pending" "$receipts" "$network" "$build_gzip" "$source"
+  publish_upgrade "$pending" "$network" "$build_gzip" "$source"
   rm -r "$work"
 }
 
 cmd_verify() {
-  local network="${1:-}" manifest chain rpc_var verifier entries entry address artifact build_hash build_info
+  local network="${1:-}" manifest chain rpc_var verifier entries entry address artifact
   [[ -n "$network" && $# == 1 ]] || { usage; exit 2; }; chain="$(network_value "$network" chain)"; rpc_var="$(network_value "$network" rpc)"; require_var "$rpc_var"
   verifier="$(network_value "$network" verifier)"
   manifest="$DEPLOYMENTS_ROOT/$network/latest.json"; [[ -f "$manifest" ]] || die "canonical $network deployment does not exist"
-  [[ "$($GIT_BIN -C "$ROOT" rev-parse HEAD)" == "$(jq -er '.release.gitCommit' "$manifest")" ]] \
-    || die "HEAD differs from deployment Git commit"
   assert_clean_release_source
-  build_hash="$(jq -er '.release.buildInfoSha256 | select(test("^0x[0-9a-f]{64}$"))' "$manifest")" \
-    || die "deployment build-info hash is invalid"
-  build_info="$DEPLOYMENTS_ROOT/$network/build-info/${build_hash#0x}.json.gz"
-  authenticate_build_info "$build_info" "$build_hash"
-  authenticate_source_deployment "$manifest" "$network"
   entries="$(mktemp "${TMPDIR:-/tmp}/porep-verify.XXXXXX")"
   jq -ce '
     (.contracts | select(type=="object")) as $contracts
