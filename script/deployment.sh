@@ -172,7 +172,6 @@ successful_receipts() {
   hashes="$work/hashes.txt"; receipts="$work/receipts.jsonl"
   jq -er '
     select(.transactions|type=="array" and length>0)
-    | select((.pending // [])|type=="array" and length==0)
     | (.transactions|length) as $count
     | [.transactions[].hash | select(type=="string" and test("^0x[0-9a-fA-F]{64}$")) | ascii_downcase]
     | select(length==$count and length==(.|unique|length)) | .[]

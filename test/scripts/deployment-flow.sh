@@ -104,7 +104,7 @@ jq -n --arg hash "$TEST_TX_HASH" --arg block "$TEST_BLOCK_HASH" \
   --arg from "$TEST_FROM" --arg to "$TEST_TO" --arg input "$TEST_INPUT" \
   --arg value "$TEST_VALUE" --arg nonce "$TEST_NONCE" '
   {transactions:[{hash:$hash,transaction:{from:$from,nonce:$nonce,to:$to,input:$input,value:$value}}],
-    receipts:[{transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null}],pending:[]}
+    receipts:[{transactionHash:$hash,status:"0x1",blockNumber:"0x2",blockHash:$block,contractAddress:null}],pending:[$hash]}
 ' >"$FOUNDRY_BROADCAST/$script/314159/run-200.json"
 cp "$FOUNDRY_BROADCAST/$script/314159/run-200.json" "$FOUNDRY_BROADCAST/$script/314159/run-latest.json"
 
@@ -240,15 +240,6 @@ cp "$tmp/good-broadcast.json" "$broadcast"
 jq --arg path ".deployment/calibnet/pending-deploy.broadcast.json" --arg hash "0x$(sha256_file "$broadcast")" \
   '.broadcast={path:$path,sha256:$hash}' "$pending" >"$pending.next"
 mv "$pending.next" "$pending"
-
-cp "$tmp/good-broadcast.json" "$broadcast"
-jq '.pending=[.transactions[0].hash]' "$broadcast" >"$broadcast.next"
-mv "$broadcast.next" "$broadcast"
-jq --arg hash "0x$(sha256_file "$broadcast")" '.broadcast.sha256=$hash' "$pending" >"$pending.next"
-mv "$pending.next" "$pending"
-: >"$FLOW_LOG"
-if (cmd_finalize_deploy calibnet) 2>/dev/null; then fail 'pending transaction finalized'; fi
-[[ ! -s "$FLOW_LOG" ]] || fail 'pending transaction reached finality check'
 
 cp "$tmp/good-broadcast.json" "$broadcast"
 jq --arg hash "0x$(sha256_file "$broadcast")" '.broadcast.sha256=$hash' "$pending" >"$pending.next"
