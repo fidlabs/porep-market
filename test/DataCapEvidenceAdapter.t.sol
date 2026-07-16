@@ -1397,6 +1397,94 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(CommonTypes.ChainEpoch.unwrap(second.lastEvidenceRefreshEpoch), int64(uint64(block.number)));
     }
 
+    function testPartialRefreshKeepsLastCompletedEvidenceStatus() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory partialStatus =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(partialStatus.result, EvidenceResult.PARTIAL);
+        assertEq(partialStatus.activeCoveredBytes, 2048);
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory current = mock.currentEvidenceStatus(_activationContext());
+        assertEq(current.activeCoveredBytes, 4096);
+        assertEq(current.result, EvidenceResult.ACTIVE);
+    }
+
+    function testRefreshRestartsAfterClaimTerminationDuringPartialSweep() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+
+        vm.prank(address(poRepMarketMock));
+        mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+
+        uint64[] memory claims = new uint64[](1);
+        claims[0] = 1;
+        vm.prank(terminationOracle);
+        mock.claimsTerminatedEarly(claims);
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory restarted =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(restarted.result, EvidenceResult.PARTIAL);
+        assertEq(restarted.checkedClaims, 1);
+        assertEq(restarted.activeCoveredBytes, 2048);
+    }
+
+    function testExpiredPartialRefreshRestartsFromFirstClaim() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+
+        vm.prank(address(poRepMarketMock));
+        mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+
+        vm.roll(block.number + SharedTypes.EPOCHS_IN_MONTH + 1);
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory restarted =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(restarted.result, EvidenceResult.PARTIAL);
+        assertEq(restarted.checkedClaims, 1);
+        assertEq(restarted.activeCoveredBytes, 2048);
+    }
+
+    function testCurrentEvidenceStatusDoesNotResetFreshPartialRefresh() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+        vm.roll(block.number + SharedTypes.EPOCHS_IN_MONTH + 1);
+
+        vm.prank(address(poRepMarketMock));
+        mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory current = mock.currentEvidenceStatus(_activationContext());
+        assertEq(current.result, EvidenceResult.INACTIVE);
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory completed =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(completed.result, EvidenceResult.ACTIVE);
+        assertEq(completed.activeCoveredBytes, 4096);
+    }
+
+    function testUnrelatedTerminationDoesNotResetPartialRefresh() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+
+        vm.prank(address(poRepMarketMock));
+        mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+
+        uint64[] memory claims = new uint64[](1);
+        claims[0] = 999;
+        vm.prank(terminationOracle);
+        mock.claimsTerminatedEarly(claims);
+        vm.prank(terminationOracle);
+        mock.claimsTerminatedEarly(claims);
+
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory completed =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(completed.result, EvidenceResult.ACTIVE);
+        assertEq(completed.activeCoveredBytes, 4096);
+    }
+
     function testRefreshEvidenceStatusUnderCoverageReportsMismatchAndKeepsEpoch() public {
         DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
 
