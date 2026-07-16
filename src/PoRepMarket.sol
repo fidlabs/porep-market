@@ -924,12 +924,22 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert ValidatorNotSet(dealId);
         }
 
+        uint8 previousState = deal.state;
         IOperator(deal.validator).earlyRailTermination();
         int64 earlyTerminationEpoch = int64(uint64(block.number));
         $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch);
         _changeDealState(dealId, DealState.TERMINATED);
-        $._SPRegistryContract
-            .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
+        if (previousState == DealState.ACCEPTED) {
+            $._SPRegistryContract
+                .releasePendingCapacity(
+                    deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+                );
+        } else {
+            $._SPRegistryContract
+                .releaseCapacity(
+                    deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash
+                );
+        }
         emit DealTerminated(dealId, $._dealService[dealId].earlyTerminationEpoch);
     }
 

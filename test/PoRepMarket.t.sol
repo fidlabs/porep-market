@@ -2397,6 +2397,29 @@ contract PoRepMarketTest is Test {
         assertEq(validator.earlyRailTerminationCallCount(), 1);
     }
 
+    function testTerminateAcceptedDealReleasesPendingCapacityWithManifestHash() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.startPrank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId);
+
+        assertEq(spRegistry.lastReleasedPendingProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(spRegistry.lastReleasedPendingBytes(), totalDealSize);
+        assertEq(spRegistry.lastReleasedPendingManifestHash(), defaultManifestHash);
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.TERMINATED);
+        assertEq(validator.earlyRailTerminationCallCount(), 1);
+    }
+
     function testTerminateDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         vm.prank(adminAddress);
