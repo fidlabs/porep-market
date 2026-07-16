@@ -2133,7 +2133,7 @@ contract PoRepMarketTest is Test {
             poRepMarket.validateDealSettlement(dealId, earlyTerminationEpoch, earlyTerminationEpoch + 100);
 
         assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, earlyTerminationEpoch);
+        assertEq(decision.settleUpto, earlyTerminationEpoch + 100);
         assertEq(decision.reasonCode, SettlementReason.DEAL_TERMINATED);
         assertEq(decision.result, SettlementResult.REJECTED);
         assertEq(decision.note, "deal terminated");
@@ -2164,7 +2164,7 @@ contract PoRepMarketTest is Test {
             poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, requestedEndEpoch);
 
         assertEq(decision.settlementAmount, 300);
-        assertEq(decision.settleUpto, earlyTerminationEpoch);
+        assertEq(decision.settleUpto, requestedEndEpoch);
         assertEq(decision.reasonCode, SettlementReason.OK);
         assertEq(decision.result, SettlementResult.MODIFIED);
         // solhint-disable-next-line gas-small-strings
@@ -2197,7 +2197,7 @@ contract PoRepMarketTest is Test {
             poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, requestedEndEpoch);
 
         assertEq(decision.settlementAmount, poRepMarket.EPOCHS_IN_MONTH() * 3);
-        assertEq(decision.settleUpto, serviceEndEpoch);
+        assertEq(decision.settleUpto, requestedEndEpoch);
         assertEq(decision.reasonCode, SettlementReason.OK);
         assertEq(decision.result, SettlementResult.MODIFIED);
         assertEq(decision.note, "payment limited to deal endepoch");
