@@ -1294,7 +1294,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         if (fromEpoch > serviceEndEpoch) {
-            decision.settleUpto = fromEpoch;
+            decision.settlementAmount = 0;
+            decision.settleUpto = toEpoch;
             decision.reasonCode = SettlementReason.DEAL_ENDED;
             decision.result = SettlementResult.REJECTED;
             decision.note = "deal ended";

@@ -2069,13 +2069,14 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
         uint256 fromEpoch = serviceEndEpoch + 1;
+        uint256 toEpoch = serviceEndEpoch + 100;
 
         vm.prank(validatorAddress);
         SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch + 100);
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, toEpoch);
 
         assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, fromEpoch);
+        assertEq(decision.settleUpto, toEpoch);
         assertEq(decision.reasonCode, SettlementReason.DEAL_ENDED);
         assertEq(decision.result, SettlementResult.REJECTED);
         assertEq(decision.note, "deal ended");
