@@ -311,7 +311,7 @@ contract SPRegistryTest is Test {
         assertEq(preview.offerId, cheapOffer);
     }
 
-    function testAutoMatchSkipsProviderAlreadyAssignedToManifest() public {
+    function testAutoMatchSkipsOrganizationAlreadyAssignedToManifest() public {
         (, uint256 provider2Offer) = _setupTwoProviderAutoMatch();
         bytes32 manifestHash = keccak256("same-manifest");
         SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
@@ -319,7 +319,7 @@ contract SPRegistryTest is Test {
         vm.prank(market);
         SharedTypes.ProviderDealSelection memory first = spRegistry.reserveProviderForDeal(request);
         assertEq(CommonTypes.FilActorId.unwrap(first.provider), CommonTypes.FilActorId.unwrap(provider1));
-        assertTrue(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+        assertTrue(spRegistry.isManifestAssignedToOrganization(manifestHash, owner1));
 
         SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(request);
         assertEq(preview.offerId, provider2Offer);
@@ -327,10 +327,10 @@ contract SPRegistryTest is Test {
         vm.prank(market);
         SharedTypes.ProviderDealSelection memory second = spRegistry.reserveProviderForDeal(request);
         assertEq(CommonTypes.FilActorId.unwrap(second.provider), CommonTypes.FilActorId.unwrap(provider2));
-        assertTrue(spRegistry.isManifestAssignedToProvider(manifestHash, provider2));
+        assertTrue(spRegistry.isManifestAssignedToOrganization(manifestHash, owner2));
     }
 
-    function testAutoMatchRevertsWhenAllEligibleProvidersAlreadyAssignedToManifest() public {
+    function testAutoMatchRevertsWhenAllEligibleOrganizationsAlreadyAssignedToManifest() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         _createOffer(provider1, 90_000);
@@ -358,10 +358,12 @@ contract SPRegistryTest is Test {
         assertEq(preview.offerId, offerId);
     }
 
-    function testReserveOfferForDealRejectsProviderAlreadyAssignedToManifest() public {
+    function testReserveOfferForDealRejectsOrganizationAlreadyAssignedToManifest() public {
         _allowToken();
         _registerProvider(provider1, owner1);
-        uint256 offerId = _createOffer(provider1, 90_000);
+        _registerProvider(provider2, owner1);
+        _createOffer(provider1, 90_000);
+        uint256 offerId = _createOffer(provider2, 90_000);
         bytes32 manifestHash = keccak256("same-manifest");
         SharedTypes.DealRequest memory request = _requestWithManifest(manifestHash, 100_000);
 
@@ -375,7 +377,7 @@ contract SPRegistryTest is Test {
         spRegistry.reserveOfferForDeal(offerId, request);
     }
 
-    function testPreviewOfferReturnsManifestAlreadyAssignedReasonForSameProviderAndManifest() public {
+    function testPreviewOfferReturnsManifestAlreadyAssignedReasonForSameOrganizationAndManifest() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         _createOffer(provider1, 90_000);
@@ -743,7 +745,7 @@ contract SPRegistryTest is Test {
         assertEq(capacity.committedBytes, 900_000);
     }
 
-    function testReleasePendingCapacityClearsManifestProviderLock() public {
+    function testReleasePendingCapacityClearsManifestOrganizationLock() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         _createOffer(provider1, 90_000);
@@ -752,14 +754,14 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.reserveProviderForDeal(request);
-        assertTrue(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+        assertTrue(spRegistry.isManifestAssignedToOrganization(manifestHash, owner1));
 
         vm.prank(market);
         spRegistry.releasePendingCapacity(provider1, request.requestedSizeBytes, manifestHash);
-        assertFalse(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+        assertFalse(spRegistry.isManifestAssignedToOrganization(manifestHash, owner1));
     }
 
-    function testReleaseCapacityClearsManifestProviderLock() public {
+    function testReleaseCapacityClearsManifestOrganizationLock() public {
         _allowToken();
         _registerProvider(provider1, owner1);
         _createOffer(provider1, 90_000);
@@ -773,7 +775,7 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.releaseCapacity(provider1, request.requestedSizeBytes, manifestHash);
-        assertFalse(spRegistry.isManifestAssignedToProvider(manifestHash, provider1));
+        assertFalse(spRegistry.isManifestAssignedToOrganization(manifestHash, owner1));
     }
 
     function testReserveValidationFailures() public {
