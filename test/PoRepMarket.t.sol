@@ -1713,20 +1713,20 @@ contract PoRepMarketTest is Test {
     function testManifestLocationIsSetCorrectly() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        string memory manifestLocation = poRepMarket.getManifestLocation(dealId);
-        assertEq(manifestLocation, expectedManifestLocation);
+        SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
+        assertEq(data.manifestLocation, expectedManifestLocation);
     }
 
     function testManifestLocationIsUpdatedCorrectly() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        string memory manifestLocation = poRepMarket.getManifestLocation(dealId);
-        assertEq(manifestLocation, expectedManifestLocation);
+        SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
+        assertEq(data.manifestLocation, expectedManifestLocation);
         string memory updatedManifestLocation = "updatedManifestLocation";
         vm.prank(adminAddress);
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
-        manifestLocation = poRepMarket.getManifestLocation(dealId);
-        assertEq(manifestLocation, updatedManifestLocation);
+        data = poRepMarket.getDealData(dealId);
+        assertEq(data.manifestLocation, updatedManifestLocation);
     }
 
     function testManifestLocationUpdateEmitsEvent() public {

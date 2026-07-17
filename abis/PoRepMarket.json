@@ -1365,25 +1365,6 @@
   },
   {
     "type": "function",
-    "name": "getManifestLocation",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "manifestLocation",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getRoleAdmin",
     "inputs": [
       {
