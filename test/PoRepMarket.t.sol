@@ -2072,8 +2072,7 @@ contract PoRepMarketTest is Test {
         uint256 toEpoch = serviceEndEpoch + 100;
 
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, fromEpoch, toEpoch);
+        SharedTypes.SettlementDecision memory decision = poRepMarket.validateDealSettlement(dealId, fromEpoch, toEpoch);
 
         assertEq(decision.settlementAmount, 0);
         assertEq(decision.settleUpto, toEpoch);
