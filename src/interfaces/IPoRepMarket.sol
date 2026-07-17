@@ -24,6 +24,14 @@ interface IPoRepMarket {
     function proposeDeal(SharedTypes.DealRequest calldata request) external;
 
     /**
+     * @notice Proposes a deal against a specific provider offer
+     * @dev Only admins can bypass automatic matching and reserve a specific offer
+     * @param offerId The provider offer to reserve for the deal
+     * @param request The client deal request
+     */
+    function proposeDealWithSpecificOffer(uint256 offerId, SharedTypes.DealRequest calldata request) external;
+
+    /**
      * @notice Previews the provider offer automatic matching would select for a deal request
      * @param request The client deal request
      * @return selection The selected provider offer snapshot, or zeroed fields when no offer matches
