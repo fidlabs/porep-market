@@ -179,9 +179,7 @@ contract PoRepMarketViewHelperTest is Test {
     function testGetDealViewsMatchesRepeatedGetDealView() public {
         for (uint256 i = 0; i < 3; i++) {
             vm.prank(clientAddress);
-            poRepMarket.proposeDeal(
-                _dealRequest(string.concat("https://example.com/view-", vm.toString(i), ".json"))
-            );
+            poRepMarket.proposeDeal(_dealRequest(string.concat("https://example.com/view-", vm.toString(i), ".json")));
         }
 
         (PoRepTypes.DealView[] memory views, uint256 total) = poRepMarketViewHelper.getDealViews(1, 2);
@@ -239,10 +237,10 @@ contract PoRepMarketViewHelperTest is Test {
         });
     }
 
-    function _assertDealViewPayment(
-        PoRepTypes.DealPayment memory dealPayment,
-        PoRepTypes.DealPayment memory payment
-    ) internal pure {
+    function _assertDealViewPayment(PoRepTypes.DealPayment memory dealPayment, PoRepTypes.DealPayment memory payment)
+        internal
+        pure
+    {
         assertEq(dealPayment.paymentToken, payment.paymentToken);
         assertEq(dealPayment.payee, payment.payee);
         assertEq(dealPayment.pricePer32GiBPerMonth, payment.pricePer32GiBPerMonth);
