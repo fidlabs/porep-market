@@ -257,6 +257,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      */
     bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
+    string private constant SERVICE_NAME = "FCSS";
+    string private constant SERVICE_DESCRIPTION = "Filecoin Cold Storage Service";
+
     /**
      * @notice Number of epochs in one month
      * @dev 30 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 86_400 epochs
@@ -291,6 +294,22 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      */
     constructor() {
         _disableInitializers();
+    }
+
+    /**
+     * @notice Returns the validator's service name
+     * @return The validator's service name
+     */
+    function name() external pure returns (string memory) {
+        return SERVICE_NAME;
+    }
+
+    /**
+     * @notice Returns the validator's service description
+     * @return The validator's service description
+     */
+    function description() external pure returns (string memory) {
+        return SERVICE_DESCRIPTION;
     }
 
     // solhint-disable func-param-name-mixedcase

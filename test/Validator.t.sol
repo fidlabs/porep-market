@@ -132,6 +132,14 @@ contract ValidatorTest is Test {
         assertTrue(validator.hasRole(adminRole, admin));
     }
 
+    function testNameReturnsFCSS() public view {
+        assertEq(validator.name(), "FCSS");
+    }
+
+    function testDescriptionReturnsFullServiceName() public view {
+        assertEq(validator.description(), "Filecoin Cold Storage Service");
+    }
+
     function testEIP7201StorageSlotIsCorrect() public pure {
         // solhint-disable-next-line gas-small-strings
         bytes32 expected = keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorStorage")) - 1))
