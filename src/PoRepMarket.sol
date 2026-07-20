@@ -1335,7 +1335,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         if (fromEpoch > serviceEndEpoch) {
-            decision.settleUpto = fromEpoch;
+            decision.settlementAmount = 0;
+            decision.settleUpto = toEpoch;
             decision.reasonCode = SettlementReason.DEAL_ENDED;
             decision.result = SettlementResult.REJECTED;
             decision.note = "deal ended";
@@ -1347,7 +1348,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         uint256 earlyTerminationEpoch = _epochToUint(service.earlyTerminationEpoch);
         if (earlyTerminationEpoch > 0) {
             if (fromEpoch >= earlyTerminationEpoch) {
-                decision.settleUpto = fromEpoch;
+                decision.settlementAmount = 0;
+                decision.settleUpto = toEpoch;
                 decision.reasonCode = SettlementReason.DEAL_TERMINATED;
                 decision.result = SettlementResult.REJECTED;
                 decision.note = "deal terminated";
@@ -1360,6 +1362,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             }
         } else {
             if (settlementToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
+                decision.settlementAmount = 0;
                 decision.settleUpto = fromEpoch;
                 decision.reasonCode = SettlementReason.TOO_EARLY;
                 decision.result = SettlementResult.REJECTED;
@@ -1377,6 +1380,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         {
             SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
             if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
+                decision.settlementAmount = 0;
                 decision.settleUpto = settlementToEpoch;
                 decision.reasonCode = SettlementReason.SCORE_BELOW_THRESHOLD;
                 decision.result = SettlementResult.REJECTED;
@@ -1388,6 +1392,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             SharedTypes.EvidenceStatus memory evidenceStatus =
                 IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
             if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
+                decision.settlementAmount = 0;
                 decision.settleUpto = settlementToEpoch;
                 decision.reasonCode = SettlementReason.DATA_SIZE_MISMATCH;
                 decision.result = SettlementResult.REJECTED;
@@ -1410,7 +1415,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         decision.settlementAmount = _calculateDueAmount(payment, serviceStartEpoch, settlementToEpoch)
             - _calculateDueAmount(payment, serviceStartEpoch, fromEpoch);
 
-        decision.settleUpto = settlementToEpoch;
+        decision.settleUpto = settlementWasCapped ? toEpoch : settlementToEpoch;
         decision.reasonCode = SettlementReason.OK;
         decision.result = settlementWasCapped ? SettlementResult.MODIFIED : SettlementResult.ACCEPTED;
         if (!settlementWasCapped) {
