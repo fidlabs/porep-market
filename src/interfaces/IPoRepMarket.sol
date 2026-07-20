@@ -209,13 +209,6 @@ interface IPoRepMarket {
     function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
-     * @notice Retrieves the manifest location URL for a specific deal
-     * @param dealId The unique identifier of the deal
-     * @return manifestLocation The manifest location URL for a specific deal
-     */
-    function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation);
-
-    /**
      * @notice Updates the manifest location for a specific deal
      * @dev Only callable by the admin
      * @param dealId The unique identifier of the deal

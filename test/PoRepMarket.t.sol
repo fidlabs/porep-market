@@ -1713,20 +1713,20 @@ contract PoRepMarketTest is Test {
     function testManifestLocationIsSetCorrectly() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        string memory manifestLocation = poRepMarket.getManifestLocation(dealId);
-        assertEq(manifestLocation, expectedManifestLocation);
+        SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
+        assertEq(data.manifestLocation, expectedManifestLocation);
     }
 
     function testManifestLocationIsUpdatedCorrectly() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        string memory manifestLocation = poRepMarket.getManifestLocation(dealId);
-        assertEq(manifestLocation, expectedManifestLocation);
+        SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
+        assertEq(data.manifestLocation, expectedManifestLocation);
         string memory updatedManifestLocation = "updatedManifestLocation";
         vm.prank(adminAddress);
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
-        manifestLocation = poRepMarket.getManifestLocation(dealId);
-        assertEq(manifestLocation, updatedManifestLocation);
+        data = poRepMarket.getDealData(dealId);
+        assertEq(data.manifestLocation, updatedManifestLocation);
     }
 
     function testManifestLocationUpdateEmitsEvent() public {
@@ -2394,6 +2394,29 @@ contract PoRepMarketTest is Test {
         assertEq(spRegistry.lastReleasedCapacityProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
         assertEq(spRegistry.lastReleasedCapacityBytes(), allocatedSize);
         assertEq(spRegistry.lastReleasedCapacityManifestHash(), defaultManifestHash);
+        assertEq(validator.earlyRailTerminationCallCount(), 1);
+    }
+
+    function testTerminateAcceptedDealReleasesPendingCapacityWithManifestHash() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.startPrank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId);
+
+        assertEq(spRegistry.lastReleasedPendingProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(spRegistry.lastReleasedPendingBytes(), totalDealSize);
+        assertEq(spRegistry.lastReleasedPendingManifestHash(), defaultManifestHash);
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.TERMINATED);
         assertEq(validator.earlyRailTerminationCallCount(), 1);
     }
 
