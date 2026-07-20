@@ -821,25 +821,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /// @inheritdoc IPoRepMarket
-    function getDealView(uint256 dealId) external override returns (PoRepTypes.DealView memory dealView) {
-        PoRepMarketStorage storage $ = s();
-        dealView = _dealView($, dealId);
-    }
-
-    /// @inheritdoc IPoRepMarket
-    function getDealViews(uint256 offset, uint256 limit)
-        external
-        override
-        returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
-    {
-        PoRepMarketStorage storage $ = s();
-        total = $._dealIdCounter;
-        uint256 length = _pageLength(total, offset, limit);
-        dealViews = new PoRepTypes.DealView[](length);
-
-        for (uint256 i = 0; i < length; i++) {
-            dealViews[i] = _dealView($, offset + i + 1);
-        }
+    function getDealOrganization(uint256 dealId) external view override returns (address organization) {
+        organization = s()._dealOrganization[dealId];
     }
 
     /**
@@ -1501,39 +1484,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         uint256 remaining = total - offset;
         return limit < remaining ? limit : remaining;
-    }
-
-    function _dealView(PoRepMarketStorage storage $, uint256 dealId)
-        internal
-        returns (PoRepTypes.DealView memory dealView)
-    {
-        PoRepTypes.Deal memory deal = $._deals[dealId];
-        SharedTypes.EvidenceStatus memory evidenceStatus;
-
-        if (deal.evidenceAdapter != address(0)) {
-            evidenceStatus =
-                IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
-        }
-
-        PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
-
-        dealView = PoRepTypes.DealView({
-            deal: deal,
-            data: $._dealData[dealId],
-            requiredSLIs: $._dealSLIs[dealId],
-            terms: $._dealTerms[dealId],
-            timing: $._dealTiming[dealId],
-            service: $._dealService[dealId],
-            capacity: $._dealCapacity[dealId],
-            payment: PoRepTypes.DealViewPayment({
-                paymentToken: payment.paymentToken,
-                pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth,
-                billed32GiBUnits: payment.billed32GiBUnits,
-                railMaxRatePerEpoch: payment.railMaxRatePerEpoch
-            }),
-            providerOrganization: $._dealOrganization[dealId],
-            evidenceStatus: evidenceStatus
-        });
     }
 
     /**

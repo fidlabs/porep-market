@@ -341,11 +341,6 @@ contract PoRepMarketTest is Test {
         );
     }
 
-    function testDealViewInterfaceSelectorsAreAvailable() public pure {
-        assertEq(IPoRepMarket.getDealView.selector, bytes4(keccak256("getDealView(uint256)")));
-        assertEq(IPoRepMarket.getDealViews.selector, bytes4(keccak256("getDealViews(uint256,uint256)")));
-    }
-
     function testGetDealCountReturnsZeroWhenEmpty() public view {
         assertEq(poRepMarket.getDealCount(), 0);
     }
@@ -441,109 +436,6 @@ contract PoRepMarketTest is Test {
 
         assertEq(total, 1);
         assertEq(ids.length, 0);
-    }
-
-    function testGetDealViewMatchesPrimitiveGetters() public {
-        spRegistry.setProviderState(
-            providerFilActorId,
-            SPRegistryMock.MockProviderState({
-                organization: providerOwnerAddress, payee: address(0), paused: false, blocked: false
-            })
-        );
-        proposeDefaultDeal();
-
-        PoRepTypes.DealView memory view_ = poRepMarket.getDealView(dealId);
-
-        PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
-        SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
-        SharedTypes.SLIThresholds memory slis = poRepMarket.getDealSLIs(dealId);
-        PoRepTypes.DealTerms memory terms = poRepMarket.getDealTerms(dealId);
-        PoRepTypes.DealTiming memory timing = poRepMarket.getDealTiming(dealId);
-        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
-        PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
-        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
-
-        assertEq(view_.deal.dealId, deal.dealId);
-        assertEq(view_.deal.client, deal.client);
-        assertEq(CommonTypes.FilActorId.unwrap(view_.deal.provider), CommonTypes.FilActorId.unwrap(deal.provider));
-        assertEq(view_.deal.state, deal.state);
-        assertEq(view_.data.manifestHash, data.manifestHash);
-        assertEq(view_.data.manifestLocation, data.manifestLocation);
-        assertEq(view_.requiredSLIs.retrievabilityBps, slis.retrievabilityBps);
-        assertEq(view_.terms.requestedSizeBytes, terms.requestedSizeBytes);
-        assertEq(
-            CommonTypes.ChainEpoch.unwrap(view_.timing.proposedAtEpoch),
-            CommonTypes.ChainEpoch.unwrap(timing.proposedAtEpoch)
-        );
-        assertEq(
-            CommonTypes.ChainEpoch.unwrap(view_.service.serviceStartEpoch),
-            CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch)
-        );
-        assertEq(view_.capacity.reservedBytes, capacity.reservedBytes);
-        assertDealViewPayment(view_.payment, payment);
-        assertEq(view_.providerOrganization, providerOwnerAddress);
-    }
-
-    function assertDealViewPayment(PoRepTypes.DealViewPayment memory viewPayment, PoRepTypes.DealPayment memory payment)
-        internal
-        pure
-    {
-        assertEq(viewPayment.paymentToken, payment.paymentToken);
-        assertEq(viewPayment.pricePer32GiBPerMonth, payment.pricePer32GiBPerMonth);
-        assertEq(viewPayment.billed32GiBUnits, payment.billed32GiBUnits);
-        assertEq(viewPayment.railMaxRatePerEpoch, payment.railMaxRatePerEpoch);
-    }
-
-    function testGetDealViewReturnsEvidenceStatus() public {
-        uint256 coveredBytes = defaultTerms.dealSizeBytes;
-        proposeDefaultDeal();
-        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, coveredBytes));
-
-        PoRepTypes.DealView memory view_ = poRepMarket.getDealView(dealId);
-
-        assertEq(view_.evidenceStatus.activeCoveredBytes, coveredBytes);
-    }
-
-    function testGetDealViewUnknownDealReturnsZeroedView() public {
-        PoRepTypes.DealView memory view_ = poRepMarket.getDealView(999);
-
-        assertEq(view_.deal.dealId, 0);
-        assertEq(view_.deal.client, address(0));
-        assertEq(view_.data.manifestHash, bytes32(0));
-        assertEq(view_.data.manifestLocation, "");
-        assertEq(view_.providerOrganization, address(0));
-        assertEq(view_.evidenceStatus.activeCoveredBytes, 0);
-    }
-
-    function testGetDealViewsMatchesRepeatedGetDealView() public {
-        for (uint256 i = 0; i < 3; i++) {
-            vm.prank(clientAddress);
-            poRepMarket.proposeDeal(
-                dealRequest(
-                    defaultRequirements,
-                    defaultTerms,
-                    string.concat("https://example.com/view-", vm.toString(i), ".json")
-                )
-            );
-        }
-
-        (PoRepTypes.DealView[] memory views, uint256 total) = poRepMarket.getDealViews(1, 2);
-
-        assertEq(total, 3);
-        assertEq(views.length, 2);
-        assertEq(views[0].deal.dealId, poRepMarket.getDealView(2).deal.dealId);
-        assertEq(views[1].deal.dealId, poRepMarket.getDealView(3).deal.dealId);
-        assertEq(views[0].data.manifestLocation, poRepMarket.getDealView(2).data.manifestLocation);
-        assertEq(views[1].data.manifestLocation, poRepMarket.getDealView(3).data.manifestLocation);
-    }
-
-    function testGetDealViewsReturnsEmptyWhenOffsetPastTotal() public {
-        proposeDefaultDeal();
-
-        (PoRepTypes.DealView[] memory views, uint256 total) = poRepMarket.getDealViews(1, 10);
-
-        assertEq(total, 1);
-        assertEq(views.length, 0);
     }
 
     function testGetDealDataReturnsValidData() public {

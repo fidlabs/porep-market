@@ -155,29 +155,11 @@ interface IPoRepMarket {
         returns (uint256[] memory dealIds, uint256 total);
 
     /**
-     * @notice Gets the complete generic read model for one deal.
-     * @dev External tools, oracles, CLIs, and RPC consumers use this bounded
-     * snapshot when they need all PoRepMarket-owned or PoRepMarket-frozen facts for
-     * one deal in a single eth_call. The evidence status is adapter-local stored
-     * status and does not refresh Filecoin actor state.
+     * @notice Gets the organization selected for a provider when a deal was proposed.
      * @param dealId The id of the deal.
-     * @return dealView Complete generic deal snapshot.
+     * @return organization The provider organization.
      */
-    function getDealView(uint256 dealId) external returns (PoRepTypes.DealView memory dealView);
-
-    /**
-     * @notice Gets a caller-sized page of complete generic deal views.
-     * @dev Oracle jobs and CLI tools use this for normal batch scans. The caller
-     * chooses `limit` because RPC providers and JSON-RPC clients have gas, timeout,
-     * and response-size limits for eth_call.
-     * @param offset Zero-based index in the creation-order deal ID list.
-     * @param limit Maximum number of deal views to return.
-     * @return dealViews Page of complete generic deal snapshots.
-     * @return total Total number of created deal IDs at call time.
-     */
-    function getDealViews(uint256 offset, uint256 limit)
-        external
-        returns (PoRepTypes.DealView[] memory dealViews, uint256 total);
+    function getDealOrganization(uint256 dealId) external view returns (address organization);
 
     /**
      * @notice Accepts a deal
