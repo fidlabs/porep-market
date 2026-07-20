@@ -40,7 +40,7 @@
     "impl": "0x6925e1d9c8AEDF9627648db6f2A788e3e2fc208B",
     "proxy": "0x1814d77CDef6297e9E015667d912aE11ae6f68D8"
   },
-  "ValidatorImpl": "0x0b8C0f10278d2Ec28231224E7948C32b06E6FdA0",
+  "ValidatorImpl": "0x6C6c40f44BE071f42d0E95553F8f3f3F6E910dAf",
   "block": 5934189,
   "chainId": 314,
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",
