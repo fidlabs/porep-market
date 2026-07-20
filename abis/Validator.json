@@ -19,36 +19,23 @@
   },
   {
     "type": "function",
-    "name": "DESCRIPTION",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "NAME",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "string",
-        "internalType": "string"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "createRail",
     "inputs": [],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "description",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "serviceDescription",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "pure"
   },
   {
     "type": "function",
@@ -178,6 +165,19 @@
     ],
     "outputs": [],
     "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
+    "name": "name",
+    "inputs": [],
+    "outputs": [
+      {
+        "name": "serviceName",
+        "type": "string",
+        "internalType": "string"
+      }
+    ],
+    "stateMutability": "pure"
   },
   {
     "type": "function",

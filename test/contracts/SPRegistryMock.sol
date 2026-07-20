@@ -39,6 +39,7 @@ contract SPRegistryMock is ISPRegistry {
     uint64 public lastCommittedProvider;
     uint256 public lastCommittedEstimatedBytes;
     uint256 public lastCommittedActualBytes;
+    uint256 public lastReserveOfferId;
 
     function setNextSelection(SharedTypes.ProviderDealSelection calldata selection) external {
         nextSelection = selection;
@@ -162,11 +163,13 @@ contract SPRegistryMock is ISPRegistry {
         return (nextSelection, 0);
     }
 
-    function reserveOfferForDeal(uint256, SharedTypes.DealRequest calldata)
+    function reserveOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
         external
-        view
         returns (SharedTypes.ProviderDealSelection memory)
     {
+        lastReserveOfferId = offerId;
+        _lastReserveRequest = request;
+        if (CommonTypes.FilActorId.unwrap(nextSelection.provider) == 0) revert ISPRegistry.NoOfferMatched();
         return nextSelection;
     }
 
@@ -213,7 +216,7 @@ contract SPRegistryMock is ISPRegistry {
         return new uint256[](0);
     }
 
-    function isManifestAssignedToProvider(bytes32, CommonTypes.FilActorId) external pure returns (bool) {
+    function isManifestAssignedToOrganization(bytes32, address) external pure returns (bool) {
         return false;
     }
 

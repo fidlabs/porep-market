@@ -508,31 +508,70 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
 
-    // solhint-disable function-max-lines
     /**
      * @notice Proposes a deal
      * @param request The client deal request
      */
     function proposeDeal(SharedTypes.DealRequest calldata request) external override {
+        PoRepMarketStorage storage $ = s();
+        _ensureValidProposalRequest(request);
+        SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
+
+        _createDeal(request, selection, $);
+    }
+
+    /**
+     * @notice Proposes a deal against a specific provider offer
+     * @dev Only admins can bypass automatic matching and reserve a specific offer
+     * @param offerId The provider offer to reserve for the deal
+     * @param request The client deal request
+     */
+    function proposeDealWithSpecificOffer(uint256 offerId, SharedTypes.DealRequest calldata request)
+        external
+        override
+        onlyRole(DEFAULT_ADMIN_ROLE)
+    {
+        PoRepMarketStorage storage $ = s();
+        _ensureValidProposalRequest(request);
+        SharedTypes.ProviderDealSelection memory reservedProvider =
+            $._SPRegistryContract.reserveOfferForDeal(offerId, request);
+
+        _createDeal(request, reservedProvider, $);
+    }
+
+    /**
+     * @notice Ensures a deal proposal request is valid
+     * @param request The client deal request
+     */
+    function _ensureValidProposalRequest(SharedTypes.DealRequest calldata request) internal pure {
         _ensureCorrectManifestLocation(request.manifestLocation);
         _ensureCorrectRequirements(request.requiredSLIs);
         if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
 
-        PoRepMarketStorage storage $ = s();
-        IStorageEvidenceAdapter evidenceAdapter = $._globalEvidenceAdapter;
+        _ensureCorrectTerms(request);
+    }
+
+    /**
+     * @notice Stores a new accepted deal from an already reserved provider selection
+     * @param request The client deal request
+     * @param selection The reserved provider offer selection
+     * @param marketStorage PoRepMarket storage pointer
+     */
+    // solhint-disable-next-line function-max-lines
+    function _createDeal(
+        SharedTypes.DealRequest calldata request,
+        SharedTypes.ProviderDealSelection memory selection,
+        PoRepMarketStorage storage marketStorage
+    ) internal {
+        CommonTypes.FilActorId provider = selection.provider;
+
+        uint256 dealId = ++marketStorage._dealIdCounter;
+        uint8 initialState = DealState.ACCEPTED;
+        IStorageEvidenceAdapter evidenceAdapter = marketStorage._globalEvidenceAdapter;
         if (address(evidenceAdapter) == address(0)) {
             revert InvalidEvidenceAdapterAddress();
         }
-
-        _ensureCorrectTerms(request);
-        SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
-        CommonTypes.FilActorId provider = selection.provider;
-        address organization = $._SPRegistryContract.getProviderView(provider).organization;
-
-        uint256 dealId = ++$._dealIdCounter;
-        uint8 initialState = DealState.ACCEPTED;
-
-        $._deals[dealId] = PoRepTypes.Deal({
+        marketStorage._deals[dealId] = PoRepTypes.Deal({
             dealId: dealId,
             client: msg.sender,
             provider: provider,
@@ -542,36 +581,37 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             validator: address(0),
             railId: 0
         });
-        $._dealSLIs[dealId] = selection.promisedSLIs;
+        marketStorage._dealSLIs[dealId] = selection.promisedSLIs;
         {
             uint64 durationEpochs = uint64(uint256(request.durationDays) * (EPOCHS_IN_MONTH / 30));
-            $._dealTerms[dealId] =
+            marketStorage._dealTerms[dealId] =
                 PoRepTypes.DealTerms({requestedSizeBytes: request.requestedSizeBytes, durationEpochs: durationEpochs});
         }
         {
             int64 proposedAtEpoch = int64(uint64(block.number));
-            int64 expiresAtEpoch = int64(uint64(block.number + _getDealExpiration($)));
-            $._dealTiming[dealId] = PoRepTypes.DealTiming({
+            int64 expiresAtEpoch = int64(uint64(block.number + _getDealExpiration(marketStorage)));
+            marketStorage._dealTiming[dealId] = PoRepTypes.DealTiming({
                 proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch),
                 expiresAtEpoch: CommonTypes.ChainEpoch.wrap(expiresAtEpoch)
             });
         }
-        $._dealService[dealId] = PoRepTypes.DealService({
+        marketStorage._dealService[dealId] = PoRepTypes.DealService({
             serviceStartEpoch: CommonTypes.ChainEpoch.wrap(0),
             serviceEndEpoch: CommonTypes.ChainEpoch.wrap(0),
             earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(0),
             minTimeBetweenSettlementsInEpochs: EPOCHS_IN_MONTH,
             lastSettledEpoch: CommonTypes.ChainEpoch.wrap(0)
         });
-        $._dealCapacity[dealId] = PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
-        $._dealPayments[dealId] = PoRepTypes.DealPayment({
+        marketStorage._dealCapacity[dealId] =
+            PoRepTypes.DealCapacity({reservedBytes: selection.reservedBytes, committedBytes: 0});
+        marketStorage._dealPayments[dealId] = PoRepTypes.DealPayment({
             paymentToken: selection.paymentToken,
             payee: selection.payee,
             pricePer32GiBPerMonth: selection.pricePer32GiBPerMonth,
             billed32GiBUnits: 0,
             railMaxRatePerEpoch: 0
         });
-        $._dealData[dealId] =
+        marketStorage._dealData[dealId] =
             SharedTypes.DealData({manifestHash: request.manifestHash, manifestLocation: request.manifestLocation});
         {
             emit DealCreated(
@@ -585,11 +625,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 block.number
             );
         }
-        $._dealOrganization[dealId] = organization;
-        $._dealIdsByStateByOrganization[initialState][organization].add(dealId);
-        $._dealIdsByClient[msg.sender].add(dealId);
-        $._dealIdsByProvider[provider].add(dealId);
-        $._dealIdsByState[initialState].add(dealId);
+        address organization = marketStorage._SPRegistryContract.getProviderView(provider).organization;
+        marketStorage._dealOrganization[dealId] = organization;
+        marketStorage._dealIdsByStateByOrganization[initialState][organization].add(dealId);
+        marketStorage._dealIdsByClient[msg.sender].add(dealId);
+        marketStorage._dealIdsByProvider[provider].add(dealId);
+        marketStorage._dealIdsByState[initialState].add(dealId);
         emit DealAccepted(dealId, msg.sender, provider);
     }
 
@@ -1311,7 +1352,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         if (fromEpoch > serviceEndEpoch) {
-            decision.settleUpto = fromEpoch;
+            decision.settlementAmount = 0;
+            decision.settleUpto = toEpoch;
             decision.reasonCode = SettlementReason.DEAL_ENDED;
             decision.result = SettlementResult.REJECTED;
             decision.note = "deal ended";
@@ -1323,7 +1365,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         uint256 earlyTerminationEpoch = _epochToUint(service.earlyTerminationEpoch);
         if (earlyTerminationEpoch > 0) {
             if (fromEpoch >= earlyTerminationEpoch) {
-                decision.settleUpto = fromEpoch;
+                decision.settlementAmount = 0;
+                decision.settleUpto = toEpoch;
                 decision.reasonCode = SettlementReason.DEAL_TERMINATED;
                 decision.result = SettlementResult.REJECTED;
                 decision.note = "deal terminated";
@@ -1336,6 +1379,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             }
         } else {
             if (settlementToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
+                decision.settlementAmount = 0;
                 decision.settleUpto = fromEpoch;
                 decision.reasonCode = SettlementReason.TOO_EARLY;
                 decision.result = SettlementResult.REJECTED;
@@ -1353,6 +1397,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         {
             SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
             if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
+                decision.settlementAmount = 0;
                 decision.settleUpto = settlementToEpoch;
                 decision.reasonCode = SettlementReason.SCORE_BELOW_THRESHOLD;
                 decision.result = SettlementResult.REJECTED;
@@ -1364,6 +1409,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             SharedTypes.EvidenceStatus memory evidenceStatus =
                 IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
             if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
+                decision.settlementAmount = 0;
                 decision.settleUpto = settlementToEpoch;
                 decision.reasonCode = SettlementReason.DATA_SIZE_MISMATCH;
                 decision.result = SettlementResult.REJECTED;
@@ -1386,7 +1432,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         decision.settlementAmount = _calculateDueAmount(payment, serviceStartEpoch, settlementToEpoch)
             - _calculateDueAmount(payment, serviceStartEpoch, fromEpoch);
 
-        decision.settleUpto = settlementToEpoch;
+        decision.settleUpto = settlementWasCapped ? toEpoch : settlementToEpoch;
         decision.reasonCode = SettlementReason.OK;
         decision.result = settlementWasCapped ? SettlementResult.MODIFIED : SettlementResult.ACCEPTED;
         if (!settlementWasCapped) {

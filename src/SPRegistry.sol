@@ -76,7 +76,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint256 => SharedTypes.OfferTerms) _offerTerms;
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
         mapping(uint256 => mapping(address => RegistryOfferPayment)) _offerPayments;
-        mapping(bytes32 manifestHash => mapping(uint64 provider => bool)) _manifestAssignedToProvider;
+        mapping(bytes32 manifestHash => mapping(address organization => bool)) _manifestAssignedToOrganization;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SPRegistryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -670,12 +670,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function isManifestAssignedToProvider(bytes32 manifestHash, CommonTypes.FilActorId provider)
-        external
-        view
-        returns (bool)
-    {
-        return s()._manifestAssignedToProvider[manifestHash][_providerId(provider)];
+    function isManifestAssignedToOrganization(bytes32 manifestHash, address organization) external view returns (bool) {
+        return s()._manifestAssignedToOrganization[manifestHash][organization];
     }
 
     /// @inheritdoc ISPRegistry
@@ -957,7 +953,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         Provider storage providerInfo = $._providers[_providerId(offer.provider)];
         if (providerInfo.blocked) return (selection, OfferMatch.PROVIDER_BLOCKED);
         if (providerInfo.paused) return (selection, OfferMatch.PROVIDER_PAUSED);
-        if ($._manifestAssignedToProvider[request.manifestHash][_providerId(offer.provider)]) {
+        if ($._manifestAssignedToOrganization[request.manifestHash][providerInfo.organization]) {
             return (selection, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
         }
 
@@ -1020,7 +1016,9 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     function _reserveSelection(bytes32 manifestHash, SharedTypes.ProviderDealSelection memory selection) internal {
         _reservePending(selection.provider, selection.reservedBytes);
-        s()._manifestAssignedToProvider[manifestHash][_providerId(selection.provider)] = true;
+        SPRegistryStorage storage $ = s();
+        uint64 providerId = _providerId(selection.provider);
+        $._manifestAssignedToOrganization[manifestHash][$._providers[providerId].organization] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -1033,10 +1031,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) internal {
         _ensureProviderRegistered(provider);
 
-        ProviderCapacity storage c = s()._providerCapacity[_providerId(provider)];
+        SPRegistryStorage storage $ = s();
+        uint64 providerId = _providerId(provider);
+        ProviderCapacity storage c = $._providerCapacity[providerId];
         if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
         c.committedBytes -= sizeBytes;
-        s()._manifestAssignedToProvider[manifestHash][_providerId(provider)] = false;
+        $._manifestAssignedToOrganization[manifestHash][$._providers[providerId].organization] = false;
 
         emit CapacityReleased(provider, sizeBytes);
     }
@@ -1046,10 +1046,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     {
         _ensureProviderRegistered(provider);
 
-        ProviderCapacity storage c = s()._providerCapacity[_providerId(provider)];
+        SPRegistryStorage storage $ = s();
+        uint64 providerId = _providerId(provider);
+        ProviderCapacity storage c = $._providerCapacity[providerId];
         if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
         c.pendingBytes -= sizeBytes;
-        s()._manifestAssignedToProvider[manifestHash][_providerId(provider)] = false;
+        $._manifestAssignedToOrganization[manifestHash][$._providers[providerId].organization] = false;
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }
