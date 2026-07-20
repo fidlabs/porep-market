@@ -16,6 +16,7 @@ import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
 
+// solhint-disable-next-line max-states-count
 contract PoRepMarketViewHelperTest is Test {
     struct RequestTerms {
         uint256 dealSizeBytes;
@@ -49,6 +50,7 @@ contract PoRepMarketViewHelperTest is Test {
     SharedTypes.SLIThresholds internal defaultRequirements;
     RequestTerms internal defaultTerms;
 
+    // solhint-disable-next-line function-max-lines
     function setUp() public {
         PoRepMarketContractMock implementation = new PoRepMarketContractMock();
         spRegistry = new SPRegistryMock();
