@@ -51,6 +51,7 @@ contract PoRepMarketTest is Test {
 
     uint256 public constant MIN_PRICE_PER_SECTOR_PER_MONTH = 86_400;
     uint256 public constant EPOCHS_IN_TWO_DAYS = 5_760;
+    uint256 public constant EVIDENCE_REFRESH_GRACE_EPOCHS = 23_040;
 
     CommonTypes.FilActorId public providerFilActorId;
     address public paymentToken;
@@ -127,7 +128,8 @@ contract PoRepMarketTest is Test {
             state: state,
             evidenceAdapter: address(dataCapEvidenceAdapterAddress),
             validator: validatorAddress,
-            railId: railId
+            railId: railId,
+            proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
         });
     }
 
@@ -246,20 +248,14 @@ contract PoRepMarketTest is Test {
                 state: DealState.PROPOSED,
                 evidenceAdapter: address(dataCapEvidenceAdapterAddress),
                 validator: address(0),
-                railId: 0
+                railId: 0,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         market.setDealCapacity(dealId, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: 0}));
         market.setDealData(
             dealId,
             SharedTypes.DealData({manifestHash: defaultManifestHash, manifestLocation: expectedManifestLocation})
-        );
-        market.setDealTiming(
-            dealId,
-            PoRepTypes.DealTiming({
-                proposedAtEpoch: chainEpochFromBlock(block.number),
-                expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
-            })
         );
     }
 
@@ -454,13 +450,12 @@ contract PoRepMarketTest is Test {
         assertEq(terms.durationEpochs, uint64(uint256(defaultTerms.durationDays) * 2_880));
     }
 
-    function testGetDealTimingReturnsValidTiming() public {
+    function testGetDealProposedAtEpochReturnsValidTiming() public {
         vm.roll(100);
         proposeDefaultDeal();
 
-        PoRepTypes.DealTiming memory timing = poRepMarket.getDealTiming(1);
-        assertEq(CommonTypes.ChainEpoch.unwrap(timing.proposedAtEpoch), 100);
-        assertEq(CommonTypes.ChainEpoch.unwrap(timing.expiresAtEpoch), 5_860);
+        PoRepTypes.Deal memory deal = poRepMarket.getDeal(1);
+        assertEq(CommonTypes.ChainEpoch.unwrap(deal.proposedAtEpoch), 100);
     }
 
     function testGetDealServiceReturnsValidService() public {
@@ -830,15 +825,14 @@ contract PoRepMarketTest is Test {
     function testAcceptDealRevertsWhenDealNotInExpectedState() public {
         PoRepMarketContractMock market = createInitializedMarketMock();
         seedProposedDeal(market);
-        vm.prank(providerOwnerAddress);
-        market.rejectDeal(dealId);
+        market.setDealState(dealId, DealState.REJECTED);
 
         vm.expectRevert(
             abi.encodeWithSelector(
                 PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.REJECTED, DealState.PROPOSED
             )
         );
-        vm.prank(clientAddress);
+        vm.prank(providerOwnerAddress);
         market.acceptDeal(dealId);
     }
 
@@ -1193,7 +1187,8 @@ contract PoRepMarketTest is Test {
                 state: DealState.ACTIVE,
                 evidenceAdapter: address(dataCapEvidenceAdapterAddress),
                 validator: address(validator),
-                railId: railId
+                railId: railId,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 
@@ -1266,7 +1261,8 @@ contract PoRepMarketTest is Test {
                 state: DealState.ACTIVE,
                 evidenceAdapter: address(dataCapEvidenceAdapterAddress),
                 validator: address(validator),
-                railId: railId
+                railId: railId,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         market.setDealPayment(
@@ -1528,55 +1524,6 @@ contract PoRepMarketTest is Test {
         );
         vm.prank(adminAddress);
         poRepMarket.finalizeDeal(dealId);
-    }
-
-    function testRejectAsClientDealEmitsDealRejectedEvent() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        vm.prank(clientAddress);
-        vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.DealRejected(dealId, clientAddress);
-        market.rejectDeal(dealId);
-    }
-
-    function testRejectAsStorageProviderOwnerDealEmitsDealRejectedEvent() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        vm.prank(providerOwnerAddress);
-        vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.DealRejected(dealId, providerOwnerAddress);
-        market.rejectDeal(dealId);
-    }
-
-    function testRejectAsOperatorAuthorisedForProviderEmitsDealRejectedEvent() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        vm.prank(operatorAddress);
-        vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.DealRejected(dealId, operatorAddress);
-        market.rejectDeal(dealId);
-    }
-
-    function testRejectDealRevertsWhenDealDoesNotExist() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
-        poRepMarket.rejectDeal(dealId);
-    }
-
-    function testRejectDealRevertsWhenNotTheClientOrStorageProviderOwner() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        address notTheClientOrStorageProviderOwner = vm.addr(0x999);
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PoRepMarket.NotTheClientOrStorageProviderOrAdmin.selector, dealId, notTheClientOrStorageProviderOwner
-            )
-        );
-        vm.prank(notTheClientOrStorageProviderOwner);
-        market.rejectDeal(dealId);
     }
 
     function testAuthorizeUpgradeRevert() public {
@@ -2054,7 +2001,7 @@ contract PoRepMarketTest is Test {
 
         uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
         uint256 settlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
-        uint256 lastRefreshEpoch = settlementEndEpoch - poRepMarket.EVIDENCE_REFRESH_GRACE_EPOCHS() - 1;
+        uint256 lastRefreshEpoch = settlementEndEpoch - EVIDENCE_REFRESH_GRACE_EPOCHS - 1;
 
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
         vm.roll(settlementEndEpoch);
@@ -2076,7 +2023,7 @@ contract PoRepMarketTest is Test {
 
         uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
         uint256 settlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
-        uint256 lastRefreshEpoch = settlementEndEpoch - poRepMarket.EVIDENCE_REFRESH_GRACE_EPOCHS();
+        uint256 lastRefreshEpoch = settlementEndEpoch - EVIDENCE_REFRESH_GRACE_EPOCHS;
 
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
         vm.roll(settlementEndEpoch);
@@ -2563,125 +2510,6 @@ contract PoRepMarketTest is Test {
         poRepMarket.rejectAcceptedDeal(dealId);
     }
 
-    function testSetNewDealExpirationRevertsWhenCalledByNonAdmin() public {
-        address caller = vm.addr(0x999);
-        bytes32 adminRole = poRepMarket.DEFAULT_ADMIN_ROLE();
-
-        vm.expectRevert(
-            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, caller, adminRole)
-        );
-        vm.prank(caller);
-        poRepMarket.setNewDealExpiration(1000);
-    }
-
-    function testSetNewDealExpirationRevertsWhenZero() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealExpiration.selector));
-        vm.prank(adminAddress);
-        poRepMarket.setNewDealExpiration(0);
-    }
-
-    function testSetNewDealExpirationUpdatesExpiration() public {
-        uint256 newExpiration = 1000;
-
-        vm.prank(adminAddress);
-        poRepMarket.setNewDealExpiration(newExpiration);
-
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        PoRepTypes.DealTiming memory timing = poRepMarket.getDealTiming(dealId);
-        assertEq(uint256(uint64(CommonTypes.ChainEpoch.unwrap(timing.expiresAtEpoch))), block.number + newExpiration);
-    }
-
-    function testRejectExpiredDealEmitsDealExpiredEvent() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
-
-        vm.expectEmit(true, true, false, false);
-        emit PoRepMarket.DealExpired(dealId, block.number);
-        market.rejectExpiredDeal(dealId);
-    }
-
-    function testRejectExpiredDealSetsStateToExpired() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
-        market.rejectExpiredDeal(dealId);
-
-        PoRepTypes.Deal memory p = market.getDeal(dealId);
-        assertTrue(p.state == DealState.EXPIRED);
-    }
-
-    function testRejectExpiredDealRevertsWhenDealNotExpiredYet() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        uint256 expiresAt = uint256(uint64(CommonTypes.ChainEpoch.unwrap(market.getDealTiming(dealId).expiresAtEpoch)));
-        vm.roll(expiresAt);
-
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealNotExpiredYet.selector, dealId, block.number, expiresAt));
-        market.rejectExpiredDeal(dealId);
-    }
-
-    function testRejectExpiredDealRevertsWhenDealDoesNotExist() public {
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
-        poRepMarket.rejectExpiredDeal(999);
-    }
-
-    function testRejectExpiredDealRevertsWhenDealNotProposed() public {
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-
-        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
-
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                PoRepMarket.DealNotInExpectedState.selector, dealId, DealState.ACCEPTED, DealState.PROPOSED
-            )
-        );
-        poRepMarket.rejectExpiredDeal(dealId);
-    }
-
-    function testRejectExpiredDealOnlyAffectsTargetDeal() public {
-        PoRepMarketContractMock market = createInitializedMarketMock();
-        seedProposedDeal(market);
-
-        vm.roll(block.number + EPOCHS_IN_TWO_DAYS + 1);
-
-        market.setDeal(
-            PoRepTypes.Deal({
-                dealId: dealId + 1,
-                client: clientAddress,
-                provider: providerFilActorId,
-                offerId: selectedOfferId,
-                state: DealState.PROPOSED,
-                evidenceAdapter: address(dataCapEvidenceAdapterAddress),
-                validator: address(0),
-                railId: 0
-            })
-        );
-        market.setDealCapacity(dealId + 1, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: 0}));
-        market.setDealData(
-            dealId + 1,
-            SharedTypes.DealData({manifestHash: defaultManifestHash, manifestLocation: expectedManifestLocation})
-        );
-        market.setDealTiming(
-            dealId + 1,
-            PoRepTypes.DealTiming({
-                proposedAtEpoch: chainEpochFromBlock(block.number),
-                expiresAtEpoch: chainEpochFromBlock(block.number + EPOCHS_IN_TWO_DAYS)
-            })
-        );
-
-        market.rejectExpiredDeal(dealId);
-
-        assertTrue(market.getDeal(dealId).state == DealState.EXPIRED);
-        assertTrue(market.getDeal(dealId + 1).state == DealState.PROPOSED);
-    }
-
     function testSetDealActivationPaddingEmitsEvent() public {
         uint256 newPadding = 15;
 
@@ -2747,28 +2575,5 @@ contract PoRepMarketTest is Test {
         );
         vm.prank(clientAddress);
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
-    }
-
-    function testGetDealExpirationReturnsDefault() public view {
-        assertEq(poRepMarket.getDealExpiration(), EPOCHS_IN_TWO_DAYS);
-    }
-
-    function testGetDealExpirationReturnsUpdatedValue() public {
-        uint256 newDealExpiration = 1000;
-
-        vm.prank(adminAddress);
-        poRepMarket.setNewDealExpiration(newDealExpiration);
-
-        assertEq(poRepMarket.getDealExpiration(), newDealExpiration);
-    }
-
-    function testSetNewDealExpirationEmitsEvent() public {
-        uint256 newExpiration = 1000;
-
-        vm.expectEmit(true, false, false, false);
-        emit PoRepMarket.DealExpirationUpdated(newExpiration);
-
-        vm.prank(adminAddress);
-        poRepMarket.setNewDealExpiration(newExpiration);
     }
 }

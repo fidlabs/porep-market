@@ -131,7 +131,6 @@ contract PoRepMarketViewHelperTest is Test {
         SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
         SharedTypes.SLIThresholds memory slis = poRepMarket.getDealSLIs(dealId);
         PoRepTypes.DealTerms memory terms = poRepMarket.getDealTerms(dealId);
-        PoRepTypes.DealTiming memory timing = poRepMarket.getDealTiming(dealId);
         PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
         PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
         PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
@@ -145,8 +144,8 @@ contract PoRepMarketViewHelperTest is Test {
         assertEq(view_.requiredSLIs.retrievabilityBps, slis.retrievabilityBps);
         assertEq(view_.terms.requestedSizeBytes, terms.requestedSizeBytes);
         assertEq(
-            CommonTypes.ChainEpoch.unwrap(view_.timing.proposedAtEpoch),
-            CommonTypes.ChainEpoch.unwrap(timing.proposedAtEpoch)
+            CommonTypes.ChainEpoch.unwrap(view_.deal.proposedAtEpoch),
+            CommonTypes.ChainEpoch.unwrap(deal.proposedAtEpoch)
         );
         assertEq(
             CommonTypes.ChainEpoch.unwrap(view_.service.serviceStartEpoch),

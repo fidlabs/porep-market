@@ -76,13 +76,6 @@ interface IPoRepMarket {
     function getDealTerms(uint256 dealId) external view returns (PoRepTypes.DealTerms memory terms);
 
     /**
-     * @notice Gets the proposal timing for a deal
-     * @param dealId The id of the deal
-     * @return timing The deal timing
-     */
-    function getDealTiming(uint256 dealId) external view returns (PoRepTypes.DealTiming memory timing);
-
-    /**
      * @notice Gets the service window for a deal
      * @param dealId The id of the deal
      * @return service The deal service window
@@ -184,12 +177,6 @@ interface IPoRepMarket {
      * @param dealId The id of the deal
      */
     function terminateDeal(uint256 dealId) external;
-
-    /**
-     * @notice Rejects a deal
-     * @param dealId The id of the deal
-     */
-    function rejectDeal(uint256 dealId) external;
 
     /**
      * @notice Rejects a deal in Accepted state before rail is set
@@ -296,26 +283,6 @@ interface IPoRepMarket {
      * @return deals Array of all deals
      */
     function getDeals() external view returns (PoRepTypes.Deal[] memory deals);
-
-    /**
-     * @notice Rejects expired deal
-     * @param dealId The id of the deal
-     * @dev A deal is considered expired if it has been in the proposed state past the configured expiration
-     */
-    function rejectExpiredDeal(uint256 dealId) external;
-
-    /**
-     * @notice Sets new proposed deal expiration
-     * @dev Only callable by the admin
-     * @param newDealExpiration The new proposed deal expiration in epochs
-     */
-    function setNewDealExpiration(uint256 newDealExpiration) external;
-
-    /**
-     * @notice Retrieves the proposed deal expiration
-     * @return dealExpiration The proposed deal expiration in epochs
-     */
-    function getDealExpiration() external view returns (uint256);
 
     /**
      * @notice Validates deal settlement for a deal

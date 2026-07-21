@@ -28,10 +28,6 @@ contract PoRepMarketContractMock is PoRepMarket {
         _getStorage()._dealPayments[dealId] = payment;
     }
 
-    function setDealTiming(uint256 dealId, PoRepTypes.DealTiming calldata timing) external {
-        _getStorage()._dealTiming[dealId] = timing;
-    }
-
     function setDealService(uint256 dealId, PoRepTypes.DealService calldata service) external {
         _getStorage()._dealService[dealId] = service;
     }

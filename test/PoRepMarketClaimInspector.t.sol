@@ -63,7 +63,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapterMock)
+                evidenceAdapter: address(dataCapEvidenceAdapterMock),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 
@@ -204,7 +205,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapterMock)
+                evidenceAdapter: address(dataCapEvidenceAdapterMock),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 
@@ -227,7 +229,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapterMock)
+                evidenceAdapter: address(dataCapEvidenceAdapterMock),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 

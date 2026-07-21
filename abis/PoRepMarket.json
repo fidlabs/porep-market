@@ -32,19 +32,6 @@
   },
   {
     "type": "function",
-    "name": "EVIDENCE_REFRESH_GRACE_EPOCHS",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "MAX_DEAL_DURATION_DAYS",
     "inputs": [],
     "outputs": [
@@ -307,6 +294,11 @@
             "name": "railId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "proposedAtEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
           }
         ]
       }
@@ -416,19 +408,6 @@
         "name": "",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getDealExpiration",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "dealExpiration",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ],
     "stateMutability": "view"
@@ -681,37 +660,6 @@
   },
   {
     "type": "function",
-    "name": "getDealTiming",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "timing",
-        "type": "tuple",
-        "internalType": "struct PoRepTypes.DealTiming",
-        "components": [
-          {
-            "name": "proposedAtEpoch",
-            "type": "int64",
-            "internalType": "CommonTypes.ChainEpoch"
-          },
-          {
-            "name": "expiresAtEpoch",
-            "type": "int64",
-            "internalType": "CommonTypes.ChainEpoch"
-          }
-        ]
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getDeals",
     "inputs": [],
     "outputs": [
@@ -759,6 +707,11 @@
             "name": "railId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "proposedAtEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
           }
         ]
       }
@@ -825,6 +778,11 @@
             "name": "railId",
             "type": "uint256",
             "internalType": "uint256"
+          },
+          {
+            "name": "proposedAtEpoch",
+            "type": "int64",
+            "internalType": "CommonTypes.ChainEpoch"
           }
         ]
       }
@@ -1334,32 +1292,6 @@
   },
   {
     "type": "function",
-    "name": "rejectDeal",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "rejectExpiredDeal",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "renounceRole",
     "inputs": [
       {
@@ -1431,19 +1363,6 @@
       },
       {
         "name": "minEpochs",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "setNewDealExpiration",
-    "inputs": [
-      {
-        "name": "newDealExpiration",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -1763,38 +1682,6 @@
         "name": "proposedAtBlock",
         "type": "uint256",
         "indexed": false,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "DealExpirationUpdated",
-    "inputs": [
-      {
-        "name": "newDealExpiration",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "DealExpired",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "expiredAtBlock",
-        "type": "uint256",
-        "indexed": true,
         "internalType": "uint256"
       }
     ],
@@ -2155,27 +2042,6 @@
   },
   {
     "type": "error",
-    "name": "DealNotExpiredYet",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "currentBlock",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "expirationBlock",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "DealNotInExpectedState",
     "inputs": [
       {
@@ -2251,11 +2117,6 @@
   {
     "type": "error",
     "name": "InvalidDealDuration",
-    "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "InvalidDealExpiration",
     "inputs": []
   },
   {
@@ -2361,22 +2222,6 @@
     "type": "error",
     "name": "NotInitializing",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "NotTheClientOrStorageProviderOrAdmin",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "rejector",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
   },
   {
     "type": "error",

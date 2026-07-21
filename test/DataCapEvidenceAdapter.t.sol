@@ -131,7 +131,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapter)
+                evidenceAdapter: address(dataCapEvidenceAdapter),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapter), uint256(10000));
@@ -582,7 +583,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACTIVE,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapter)
+                evidenceAdapter: address(dataCapEvidenceAdapter),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 
@@ -711,7 +713,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapter)
+                evidenceAdapter: address(dataCapEvidenceAdapter),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         vm.prank(clientAddress);
@@ -750,7 +753,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: DealState.ACCEPTED,
                 validator: address(validatorMock),
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapter)
+                evidenceAdapter: address(dataCapEvidenceAdapter),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         reentrantMetaAllocatorMock.setAttackParams(
@@ -783,7 +787,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 1,
-                evidenceAdapter: address(dataCapEvidenceAdapter)
+                evidenceAdapter: address(dataCapEvidenceAdapter),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         // solhint-disable-next-line reentrancy
@@ -990,7 +995,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 state: DealState.ACCEPTED,
                 railId: 0,
-                evidenceAdapter: address(dataCapEvidenceAdapter)
+                evidenceAdapter: address(dataCapEvidenceAdapter),
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 

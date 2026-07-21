@@ -53,7 +53,8 @@ contract ValidatorFactoryTest is Test {
                 state: DealState.ACCEPTED,
                 evidenceAdapter: dataCapEvidenceAdapter,
                 validator: vm.addr(10),
-                railId: 200
+                railId: 200,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 

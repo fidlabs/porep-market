@@ -31,6 +31,7 @@ library PoRepTypes {
         address evidenceAdapter;
         address validator;
         uint256 railId;
+        CommonTypes.ChainEpoch proposedAtEpoch;
     }
 
     /**
@@ -101,7 +102,6 @@ library PoRepTypes {
         SharedTypes.DealData data;
         SharedTypes.SLIThresholds requiredSLIs;
         DealTerms terms;
-        DealTiming timing;
         DealService service;
         DealCapacity capacity;
         DealPayment payment;

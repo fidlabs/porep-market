@@ -69,7 +69,8 @@ contract ValidatorTest is Test {
                 state: DealState.PROPOSED,
                 evidenceAdapter: evidenceAdapter,
                 validator: address(0),
-                railId: railId
+                railId: railId,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         poRepMarketMock.setDealPayment(
@@ -351,7 +352,8 @@ contract ValidatorTest is Test {
                 state: DealState.PROPOSED,
                 evidenceAdapter: evidenceAdapter,
                 validator: address(0),
-                railId: 0
+                railId: 0,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
         freshMarket.setDealPayment(

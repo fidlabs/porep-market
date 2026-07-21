@@ -83,6 +83,11 @@
                 "name": "railId",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "proposedAtEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
               }
             ]
           },
@@ -144,23 +149,6 @@
                 "name": "durationEpochs",
                 "type": "uint64",
                 "internalType": "uint64"
-              }
-            ]
-          },
-          {
-            "name": "timing",
-            "type": "tuple",
-            "internalType": "struct PoRepTypes.DealTiming",
-            "components": [
-              {
-                "name": "proposedAtEpoch",
-                "type": "int64",
-                "internalType": "CommonTypes.ChainEpoch"
-              },
-              {
-                "name": "expiresAtEpoch",
-                "type": "int64",
-                "internalType": "CommonTypes.ChainEpoch"
               }
             ]
           },
@@ -357,6 +345,11 @@
                 "name": "railId",
                 "type": "uint256",
                 "internalType": "uint256"
+              },
+              {
+                "name": "proposedAtEpoch",
+                "type": "int64",
+                "internalType": "CommonTypes.ChainEpoch"
               }
             ]
           },
@@ -418,23 +411,6 @@
                 "name": "durationEpochs",
                 "type": "uint64",
                 "internalType": "uint64"
-              }
-            ]
-          },
-          {
-            "name": "timing",
-            "type": "tuple",
-            "internalType": "struct PoRepTypes.DealTiming",
-            "components": [
-              {
-                "name": "proposedAtEpoch",
-                "type": "int64",
-                "internalType": "CommonTypes.ChainEpoch"
-              },
-              {
-                "name": "expiresAtEpoch",
-                "type": "int64",
-                "internalType": "CommonTypes.ChainEpoch"
               }
             ]
           },

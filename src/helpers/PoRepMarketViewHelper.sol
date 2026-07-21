@@ -48,7 +48,6 @@ contract PoRepMarketViewHelper {
             data: market.getDealData(dealId),
             requiredSLIs: market.getDealSLIs(dealId),
             terms: market.getDealTerms(dealId),
-            timing: market.getDealTiming(dealId),
             service: market.getDealService(dealId),
             capacity: market.getDealCapacity(dealId),
             payment: market.getDealPayment(dealId),
