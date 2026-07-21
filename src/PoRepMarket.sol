@@ -101,7 +101,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         ISLIScorer _SLIScorer;
         uint256 _dealIdCounter;
         uint256 _dealActivationPadding;
-        // Deprecated: retained to preserve the upgradeable storage layout.
         uint256 _dealExpiration;
     }
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.PoRepMarket")) - 1)) & ~bytes32(uint256(0xff))
