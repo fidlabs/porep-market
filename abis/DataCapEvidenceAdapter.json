@@ -1145,6 +1145,11 @@
   },
   {
     "type": "error",
+    "name": "ClaimAlreadyRegistered",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {

@@ -52,6 +52,7 @@ contract DataCapEvidenceAdapter is
         mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _maxAllocationExpirationPerDeal;
         mapping(uint64 claimId => uint256 dealId) _claimDealIds;
         mapping(uint256 dealId => uint256 revision) _terminationRevisions;
+        mapping(uint64 id => bool registered) _registeredIds;
     }
 
     /**
@@ -328,6 +329,12 @@ contract DataCapEvidenceAdapter is
      */
     error InvalidAllocationState();
 
+    /**
+     * @notice Error thrown when a claim has already been registered
+     * @dev 0xc33e5e92
+     */
+    error ClaimAlreadyRegistered();
+
     struct DataCapDealEvidence {
         bool postingFinished;
         address client;
@@ -396,6 +403,7 @@ contract DataCapEvidenceAdapter is
         $._operational = true;
     }
 
+    // solhint-disable function-max-lines
     /**
      * @notice This function transfers DataCap tokens from the client to the storage provider
      * @dev This function can only be called by the client
@@ -448,6 +456,7 @@ contract DataCapEvidenceAdapter is
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
             for (uint256 i = 0; i < allocationIds.length; i++) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
+                _registerId(allocId);
                 dealEvidence.allocationIds.push(allocId);
             }
         }
@@ -455,7 +464,6 @@ contract DataCapEvidenceAdapter is
         dealEvidence.allocatedBytes += allocationsAndClaimsSize;
     }
 
-    // solhint-disable function-max-lines
     /**
      * @notice Submit one bounded batch of adapter-specific evidence for a deal
      * @dev Only callable by the PoRepMarket contract
@@ -1083,6 +1091,7 @@ contract DataCapEvidenceAdapter is
                 revert InvalidProvider();
             }
 
+            _registerId(claim.claim);
             claimIds[i] = claim.claim;
         }
         {
@@ -1181,6 +1190,14 @@ contract DataCapEvidenceAdapter is
         uint256 last = ids.length - 1;
         if (index != last) ids[index] = ids[last];
         ids.pop();
+    }
+
+    // solhint-disable-next-line use-natspec
+    function _registerId(CommonTypes.FilActorId id) internal {
+        DataCapEvidenceAdapterStorage storage $ = s();
+        uint64 actorId = CommonTypes.FilActorId.unwrap(id);
+        if ($._registeredIds[actorId]) revert ClaimAlreadyRegistered();
+        $._registeredIds[actorId] = true;
     }
 
     /**
