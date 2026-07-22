@@ -202,7 +202,7 @@ contract SPRegistryTest is Test {
             uint256[] memory offerIds = spRegistry.getOffersByProvider(provider1);
             uint256 activeCount;
             for (uint256 i = 0; i < offerIds.length; i++) {
-                if (spRegistry.getOfferView(offerIds[i], token).active) activeCount++;
+                if (spRegistry.getOfferView(offerIds[i]).active) activeCount++;
             }
             assertEq(activeCount, 4);
         }
@@ -223,7 +223,7 @@ contract SPRegistryTest is Test {
             uint256[] memory offerIds = spRegistry.getOffersByProvider(provider1);
             uint256 activeCount;
             for (uint256 i = 0; i < offerIds.length; i++) {
-                if (spRegistry.getOfferView(offerIds[i], token).active) activeCount++;
+                if (spRegistry.getOfferView(offerIds[i]).active) activeCount++;
             }
             assertEq(activeCount, 5);
         }
@@ -245,11 +245,11 @@ contract SPRegistryTest is Test {
         uint256[] memory offerIds = spRegistry.getOffersByProvider(provider1);
         uint256 activeCount;
         for (uint256 i = 0; i < offerIds.length; i++) {
-            if (spRegistry.getOfferView(offerIds[i], token).active) activeCount++;
+            if (spRegistry.getOfferView(offerIds[i]).active) activeCount++;
         }
         assertEq(activeCount, 1);
 
-        ISPRegistry.OfferView memory offer = spRegistry.getOfferView(offerId, token);
+        ISPRegistry.OfferView memory offer = spRegistry.getOfferView(offerId);
         assertTrue(offer.active);
     }
 
@@ -565,7 +565,7 @@ contract SPRegistryTest is Test {
         vm.prank(operator);
         uint256 offerId = spRegistry.createOffer(provider1, _terms(), defaultSLIs, rows);
 
-        ISPRegistry.OfferView memory offer = spRegistry.getOfferView(offerId, token);
+        ISPRegistry.OfferView memory offer = spRegistry.getOfferView(offerId);
         assertEq(offer.offerId, offerId);
         assertEq(CommonTypes.FilActorId.unwrap(offer.provider), CommonTypes.FilActorId.unwrap(provider1));
         assertTrue(offer.active);
@@ -577,9 +577,13 @@ contract SPRegistryTest is Test {
         assertEq(offer.slis.bandwidthBytesPerSecond, defaultSLIs.bandwidthBytesPerSecond);
         assertEq(offer.slis.latencyMs, defaultSLIs.latencyMs);
         assertEq(offer.slis.indexingPct, defaultSLIs.indexingPct);
-        assertEq(offer.paymentToken, token);
-        assertTrue(offer.paymentActive);
-        assertEq(offer.pricePer32GiBPerMonth, 90_000);
+        assertEq(offer.payments.length, 2);
+        assertEq(offer.payments[0].token, token);
+        assertTrue(offer.payments[0].active);
+        assertEq(offer.payments[0].pricePer32GiBPerMonth, 90_000);
+        assertEq(offer.payments[1].token, token2);
+        assertFalse(offer.payments[1].active);
+        assertEq(offer.payments[1].pricePer32GiBPerMonth, 10);
 
         assertEq(spRegistry.getOffersByProvider(provider1).length, 1);
 
@@ -588,10 +592,10 @@ contract SPRegistryTest is Test {
 
         vm.prank(operator);
         spRegistry.setOfferPayment(offerId, token2, true, 11);
-        ISPRegistry.OfferView memory updated = spRegistry.getOfferView(offerId, token2);
-        assertEq(updated.paymentToken, token2);
-        assertTrue(updated.paymentActive);
-        assertEq(updated.pricePer32GiBPerMonth, 11);
+        ISPRegistry.OfferView memory updated = spRegistry.getOfferView(offerId);
+        assertEq(updated.payments[1].token, token2);
+        assertTrue(updated.payments[1].active);
+        assertEq(updated.payments[1].pricePer32GiBPerMonth, 11);
     }
 
     function testSetOfferPayment() public {
@@ -604,10 +608,11 @@ contract SPRegistryTest is Test {
         vm.prank(operator);
         spRegistry.setOfferPayment(offerId, token2, true, 180_000);
 
-        ISPRegistry.OfferView memory updated = spRegistry.getOfferView(offerId, token2);
-        assertEq(updated.paymentToken, token2);
-        assertTrue(updated.paymentActive);
-        assertEq(updated.pricePer32GiBPerMonth, 180_000);
+        ISPRegistry.OfferView memory updated = spRegistry.getOfferView(offerId);
+        assertEq(updated.payments.length, 2);
+        assertEq(updated.payments[1].token, token2);
+        assertTrue(updated.payments[1].active);
+        assertEq(updated.payments[1].pricePer32GiBPerMonth, 180_000);
     }
 
     function testOfferCreationValidationReverts() public {

@@ -77,6 +77,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
         mapping(uint256 => mapping(address => RegistryOfferPayment)) _offerPayments;
         mapping(bytes32 manifestHash => mapping(address organization => bool)) _manifestAssignedToOrganization;
+        mapping(uint256 => EnumerableSet.AddressSet) _offerPaymentTokens;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SPRegistryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -638,10 +639,19 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function getOfferView(uint256 offerId, address paymentToken) external view returns (OfferView memory view_) {
+    function getOfferView(uint256 offerId) external view returns (OfferView memory view_) {
+        _ensureOfferExists(offerId);
         SPRegistryStorage storage $ = s();
         Offer storage offer = $._offers[offerId];
-        RegistryOfferPayment storage payment = $._offerPayments[offerId][paymentToken];
+
+        address[] memory tokens = $._offerPaymentTokens[offerId].values();
+        OfferPaymentView[] memory payments = new OfferPaymentView[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) {
+            RegistryOfferPayment storage payment = $._offerPayments[offerId][tokens[i]];
+            payments[i] = OfferPaymentView({
+                token: tokens[i], active: payment.active, pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth
+            });
+        }
 
         view_ = OfferView({
             offerId: offerId,
@@ -649,9 +659,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             active: offer.active,
             terms: $._offerTerms[offerId],
             slis: $._offerSLIs[offerId],
-            paymentToken: paymentToken,
-            paymentActive: payment.active,
-            pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth
+            payments: payments
         });
     }
 
@@ -850,6 +858,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         $._offerPayments[offerId][token] =
             RegistryOfferPayment({active: active, pricePer32GiBPerMonth: pricePer32GiBPerMonth});
+        $._offerPaymentTokens[offerId].add(token);
 
         emit OfferPaymentUpdated(offerId, token, active, pricePer32GiBPerMonth);
     }

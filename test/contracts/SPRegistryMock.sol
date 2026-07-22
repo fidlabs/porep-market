@@ -195,7 +195,7 @@ contract SPRegistryMock is ISPRegistry {
     function setOfferActive(uint256, bool) external {}
     function setOfferPayment(uint256, address, bool, uint256) external {}
 
-    function getOfferView(uint256 offerId, address paymentToken) external pure returns (OfferView memory) {
+    function getOfferView(uint256 offerId) external pure returns (OfferView memory) {
         return OfferView({
             offerId: offerId,
             provider: CommonTypes.FilActorId.wrap(0),
@@ -206,9 +206,7 @@ contract SPRegistryMock is ISPRegistry {
             slis: SharedTypes.SLIThresholds({
                 retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0
             }),
-            paymentToken: paymentToken,
-            paymentActive: false,
-            pricePer32GiBPerMonth: 0
+            payments: new OfferPaymentView[](0)
         });
     }
 
