@@ -29,6 +29,7 @@ library PoRepTypes {
         uint256 offerId;
         uint8 state;
         address evidenceAdapter;
+        uint8 dealType;
         address validator;
         uint256 railId;
         CommonTypes.ChainEpoch proposedAtEpoch;

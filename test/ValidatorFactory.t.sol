@@ -15,6 +15,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {DealType} from "../src/types/DealType.sol";
 
 contract ValidatorFactoryTest is Test {
     ValidatorFactory public factory;
@@ -54,7 +55,8 @@ contract ValidatorFactoryTest is Test {
                 evidenceAdapter: dataCapEvidenceAdapter,
                 validator: vm.addr(10),
                 railId: 200,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 

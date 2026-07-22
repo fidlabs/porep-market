@@ -52,6 +52,7 @@ library SharedTypes {
      * @param manifestLocation location of the deal manifest
      * @param paymentToken token used for payments
      * @param durationDays requested deal duration in days
+     * @param dealType type of deal requested
      * @param requiredSLIs required service-level indicators
      */
     struct DealRequest {
@@ -61,6 +62,7 @@ library SharedTypes {
         string manifestLocation;
         address paymentToken;
         uint32 durationDays; // Client-facing input; converted once before storage
+        uint8 dealType;
         SLIThresholds requiredSLIs;
     }
 

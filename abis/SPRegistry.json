@@ -713,6 +713,11 @@
             "internalType": "uint32"
           },
           {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "requiredSLIs",
             "type": "tuple",
             "internalType": "struct SharedTypes.SLIThresholds",
@@ -853,6 +858,11 @@
             "name": "durationDays",
             "type": "uint32",
             "internalType": "uint32"
+          },
+          {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
           },
           {
             "name": "requiredSLIs",
@@ -1102,6 +1112,11 @@
             "internalType": "uint32"
           },
           {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "requiredSLIs",
             "type": "tuple",
             "internalType": "struct SharedTypes.SLIThresholds",
@@ -1237,6 +1252,11 @@
             "name": "durationDays",
             "type": "uint32",
             "internalType": "uint32"
+          },
+          {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
           },
           {
             "name": "requiredSLIs",

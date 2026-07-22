@@ -75,6 +75,11 @@
                 "internalType": "address"
               },
               {
+                "name": "dealType",
+                "type": "uint8",
+                "internalType": "uint8"
+              },
+              {
                 "name": "validator",
                 "type": "address",
                 "internalType": "address"
@@ -335,6 +340,11 @@
                 "name": "evidenceAdapter",
                 "type": "address",
                 "internalType": "address"
+              },
+              {
+                "name": "dealType",
+                "type": "uint8",
+                "internalType": "uint8"
               },
               {
                 "name": "validator",

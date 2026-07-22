@@ -286,6 +286,11 @@
             "internalType": "address"
           },
           {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "validator",
             "type": "address",
             "internalType": "address"
@@ -699,6 +704,11 @@
             "internalType": "address"
           },
           {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "validator",
             "type": "address",
             "internalType": "address"
@@ -768,6 +778,11 @@
             "name": "evidenceAdapter",
             "type": "address",
             "internalType": "address"
+          },
+          {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
           },
           {
             "name": "validator",
@@ -962,6 +977,11 @@
             "internalType": "uint32"
           },
           {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "requiredSLIs",
             "type": "tuple",
             "internalType": "struct SharedTypes.SLIThresholds",
@@ -1099,6 +1119,11 @@
             "internalType": "uint32"
           },
           {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
+          },
+          {
             "name": "requiredSLIs",
             "type": "tuple",
             "internalType": "struct SharedTypes.SLIThresholds",
@@ -1174,6 +1199,11 @@
             "name": "durationDays",
             "type": "uint32",
             "internalType": "uint32"
+          },
+          {
+            "name": "dealType",
+            "type": "uint8",
+            "internalType": "uint8"
           },
           {
             "name": "requiredSLIs",
@@ -2138,6 +2168,11 @@
   {
     "type": "error",
     "name": "InvalidDealSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidDealType",
     "inputs": []
   },
   {
