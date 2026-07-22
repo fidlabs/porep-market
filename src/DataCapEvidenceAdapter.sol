@@ -52,7 +52,7 @@ contract DataCapEvidenceAdapter is
         mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _maxAllocationExpirationPerDeal;
         mapping(uint64 claimId => uint256 dealId) _claimDealIds;
         mapping(uint256 dealId => uint256 revision) _terminationRevisions;
-        mapping(uint64 id => bool registered) _registeredIds;
+        mapping(uint64 id => uint256 dealId) _dealByEvidenceId;
     }
 
     /**
@@ -434,34 +434,30 @@ contract DataCapEvidenceAdapter is
             _registerDeal(dealSnapshot);
         }
 
-        DataCapDealEvidence storage dealEvidence = $._deals[dealId];
+        uint256 allocationCount;
+        uint256 datacapSpendBytes;
+        uint256 newEvidenceBytes;
+        {
+            (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
+                _deserializeVerifregOperatorData(params.operator_data);
+            allocationCount = allocations.length;
 
-        (ProviderAllocation[] memory allocations, ProviderClaim[] memory claimExtensions) =
-            _deserializeVerifregOperatorData(params.operator_data);
+            uint256 allocatedBytes = _verifyAndRegisterAllocations(dealId, allocations);
+            (uint256 claimBytes, uint256 newClaimEvidenceBytes) =
+                _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
+            datacapSpendBytes = allocatedBytes + claimBytes;
+            newEvidenceBytes = allocatedBytes + newClaimEvidenceBytes;
+        }
 
-        uint256 allocatedBytes = _verifyAndRegisterAllocations(dealId, allocations);
-        uint256 sizeOfClaims = _verifyAndRegisterClaimExtensions(dealId, claimExtensions);
-        uint256 allocationsAndClaimsSize = allocatedBytes + sizeOfClaims;
+        $._metaAllocatorContract.addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, datacapSpendBytes);
 
-        $._metaAllocatorContract
-            .addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, allocationsAndClaimsSize);
-
-        emit DatacapSpent(msg.sender, allocationsAndClaimsSize);
+        emit DatacapSpent(msg.sender, datacapSpendBytes);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
         (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
         if (exitCode != 0) {
             revert TransferFailed(exitCode);
         }
-        if (allocations.length != 0) {
-            CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
-            for (uint256 i = 0; i < allocationIds.length; i++) {
-                CommonTypes.FilActorId allocId = allocationIds[i];
-                _registerId(allocId);
-                dealEvidence.allocationIds.push(allocId);
-            }
-        }
-        emit DataCapBatchSubmitted(dealId, allocationsAndClaimsSize);
-        dealEvidence.allocatedBytes += allocationsAndClaimsSize;
+        _recordBatchEvidence(dealId, allocationCount, transferReturn, newEvidenceBytes);
     }
 
     /**
@@ -1055,6 +1051,25 @@ contract DataCapEvidenceAdapter is
         }
     }
 
+    function _recordBatchEvidence(
+        uint256 dealId,
+        uint256 allocationCount,
+        DataCapTypes.TransferReturn memory transferReturn,
+        uint256 newEvidenceBytes
+    ) internal {
+        DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
+        if (allocationCount != 0) {
+            CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
+            for (uint256 i = 0; i < allocationIds.length; i++) {
+                CommonTypes.FilActorId allocId = allocationIds[i];
+                _registerEvidenceId(dealId, allocId);
+                dealEvidence.allocationIds.push(allocId);
+            }
+        }
+        emit DataCapBatchSubmitted(dealId, newEvidenceBytes);
+        dealEvidence.allocatedBytes += newEvidenceBytes;
+    }
+
     /**
      * @notice Validates allocation term bounds.
      * @param termMin The requested minimum claim term.
@@ -1074,11 +1089,12 @@ contract DataCapEvidenceAdapter is
      * @notice Verifies and registers claim extensions.
      * @param dealId The id of the deal.
      * @param claimExtensions The array of provider claims.
-     * @return sizeOfClaims The total size of claims
+     * @return claimBytes The total size of claims
+     * @return newEvidenceBytes The size of claims first assigned to the deal
      */
     function _verifyAndRegisterClaimExtensions(uint256 dealId, ProviderClaim[] memory claimExtensions)
         internal
-        returns (uint256 sizeOfClaims)
+        returns (uint256 claimBytes, uint256 newEvidenceBytes)
     {
         DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
         CommonTypes.FilActorId[] memory claimIds = new CommonTypes.FilActorId[](claimExtensions.length);
@@ -1091,7 +1107,6 @@ contract DataCapEvidenceAdapter is
                 revert InvalidProvider();
             }
 
-            _registerId(claim.claim);
             claimIds[i] = claim.claim;
         }
         {
@@ -1106,8 +1121,11 @@ contract DataCapEvidenceAdapter is
 
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
-                dealEvidence.allocationIds.push(claimIds[i]);
-                sizeOfClaims += claim.size;
+                claimBytes += claim.size;
+                if (_registerEvidenceId(dealId, claimIds[i])) {
+                    dealEvidence.allocationIds.push(claimIds[i]);
+                    newEvidenceBytes += claim.size;
+                }
             }
         }
     }
@@ -1193,11 +1211,16 @@ contract DataCapEvidenceAdapter is
     }
 
     // solhint-disable-next-line use-natspec
-    function _registerId(CommonTypes.FilActorId id) internal {
+    function _registerEvidenceId(uint256 dealId, CommonTypes.FilActorId id) internal returns (bool) {
         DataCapEvidenceAdapterStorage storage $ = s();
         uint64 actorId = CommonTypes.FilActorId.unwrap(id);
-        if ($._registeredIds[actorId]) revert ClaimAlreadyRegistered();
-        $._registeredIds[actorId] = true;
+        uint256 assignedDealId = $._dealByEvidenceId[actorId];
+        if (assignedDealId == 0) {
+            $._dealByEvidenceId[actorId] = dealId;
+            return true;
+        }
+        if (assignedDealId != dealId) revert ClaimAlreadyRegistered();
+        return false;
     }
 
     /**

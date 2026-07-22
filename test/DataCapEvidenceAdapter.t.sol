@@ -639,7 +639,7 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 
-    function testSubmitDataCapBatchRejectsDuplicateClaimBeforeAccounting() public {
+    function testSubmitDataCapBatchCountsDuplicateClaimOnce() public {
         // No new allocations; claim 1 for provider 10000 is submitted twice.
         transferParams.operator_data = hex"82808283192710011A005034AC83192710011A005034AC";
         // GetClaims returns the same 2 KiB claim twice. Before the fix this stored [1, 1]
@@ -648,38 +648,30 @@ contract DataCapEvidenceAdapterTest is Test {
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
         vm.prank(clientAddress);
-        vm.expectRevert(ClaimAlreadyRegistered.selector);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
 
-        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 0);
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 2048);
         (, uint256 allocationCount) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
-        assertEq(allocationCount, 0);
+        assertEq(allocationCount, 1);
+        assertEq(metaAllocatorMock.allowance(address(dataCapEvidenceAdapter)), 5904);
     }
 
-    function testSubmitDataCapBatchRevertsForDuplicateClaimAcrossBatches() public {
+    function testSubmitDataCapBatchAllowsRepeatedClaimExtensionForSameDeal() public {
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
 
         vm.prank(clientAddress);
-        vm.expectRevert(ClaimAlreadyRegistered.selector);
-        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
-    }
-
-    function testSubmitDataCapBatchRejectsClaimRegisteredToAnotherDeal() public {
-        transferParams.operator_data = hex"82808183192710011A005034AC";
-        vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
 
-        uint256 otherDealId = 2;
-        _setAcceptedDeal(otherDealId, SP1);
-        vm.prank(clientAddress);
-        vm.expectRevert(ClaimAlreadyRegistered.selector);
-        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, otherDealId);
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 2048);
+        (, uint256 allocationCount) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        assertEq(allocationCount, 1);
+        assertEq(metaAllocatorMock.allowance(address(dataCapEvidenceAdapter)), 5904);
     }
 
-    function testSubmitDataCapBatchRevertsWhenClaimMatchesRegisteredAllocation() public {
+    function testSubmitDataCapBatchAllowsRegisteredAllocationExtensionForSameDeal() public {
         actorIdMock.setGetClaimsResult(hex"8282008080");
         transferParams.operator_data =
             hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
@@ -691,8 +683,24 @@ contract DataCapEvidenceAdapterTest is Test {
         );
         transferParams.operator_data = hex"82808183192710011A005034AC";
         vm.prank(clientAddress);
-        vm.expectRevert(ClaimAlreadyRegistered.selector);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 2048);
+        (, uint256 allocationCount) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        assertEq(allocationCount, 1);
+        assertEq(metaAllocatorMock.allowance(address(dataCapEvidenceAdapter)), 5904);
+    }
+
+    function testSubmitDataCapBatchRejectsClaimAssignedToAnotherDeal() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        uint256 otherDealId = 2;
+        _setAcceptedDeal(otherDealId, SP1);
+        vm.prank(clientAddress);
+        vm.expectRevert(ClaimAlreadyRegistered.selector);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, otherDealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidTopLevelArray() public {
