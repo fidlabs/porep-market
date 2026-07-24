@@ -19,6 +19,7 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(uint256 dealId => address caller) public submitEvidenceCaller;
     mapping(uint256 dealId => uint8 result) public activationResult;
     mapping(uint256 dealId => CommonTypes.ChainEpoch epoch) public lastRefreshEpoch;
+    mapping(uint256 dealId => CommonTypes.ChainEpoch epoch) public allocationExpiration;
     bool public operational = true;
 
     function setAllocationIds(uint256 dealId, CommonTypes.FilActorId[] calldata ids_) external {
@@ -68,6 +69,14 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
 
     function setLastRefreshEpoch(uint256 dealId, CommonTypes.ChainEpoch epoch) external {
         lastRefreshEpoch[dealId] = epoch;
+    }
+
+    function setDealAllocationExpiration(uint256 dealId, CommonTypes.ChainEpoch epoch) external {
+        allocationExpiration[dealId] = epoch;
+    }
+
+    function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration) {
+        return allocationExpiration[dealId];
     }
 
     function isOperational() external view returns (bool) {

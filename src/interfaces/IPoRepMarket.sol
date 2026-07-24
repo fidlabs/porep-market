@@ -173,10 +173,11 @@ interface IPoRepMarket {
     function activatePayment(uint256 dealId) external;
 
     /**
-     * @notice Terminates an active deal early and asks its validator to terminate the rail.
+     * @notice Terminates a deal and asks its validator to terminate the rail.
      * @param dealId The id of the deal
+     * @param state The terminal state to assign to the deal
      */
-    function terminateDeal(uint256 dealId) external;
+    function terminateDeal(uint256 dealId, uint8 state) external;
 
     /**
      * @notice Rejects a deal in Accepted state before rail is set

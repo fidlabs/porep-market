@@ -14,5 +14,5 @@ library DealState {
     uint8 internal constant FINALIZED = 40;
     uint8 internal constant REJECTED = 50;
     uint8 internal constant EXPIRED = 60;
-    uint8 internal constant TERMINATED = 70;
+    uint8 internal constant EARLY_TERMINATED = 70;
 }

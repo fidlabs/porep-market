@@ -366,6 +366,25 @@
   },
   {
     "type": "function",
+    "name": "getExpiration",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "expiration",
+        "type": "int64",
+        "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "getFailedClaimIds",
     "inputs": [
       {
