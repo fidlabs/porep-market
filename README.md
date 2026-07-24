@@ -4,6 +4,32 @@
 
 The **PoRep Market** is a set of smart contracts and off-chain actors designed to automate, manage, and settle storage deals on the Filecoin network. It connects **Clients** (data owners) with **Storage Providers** (miners), ensuring that data is not only stored but maintained according to specific quality standards defined by SLI (Service Level Indicator) thresholds.
 
+## Deployment commands
+
+The supported operator commands are:
+
+```bash
+just deploy calibnet --fresh
+just finalize-deploy calibnet
+just upgrade calibnet SPRegistry PoRepMarket Validator
+just finalize-upgrade calibnet
+just verify calibnet
+```
+
+Deploy and upgrade commands write pending state under `.deployment/` and do not
+change `deployments/<network>/latest.json`. Run the matching finalizer after the
+broadcast transactions reach Filecoin finality.
+
+The upgrade command accepts one or more unique targets. It deploys every new
+implementation first, then upgrades proxies and the Validator beacon in the
+specified order. The broadcast is not atomic; a proxy-phase failure can leave
+earlier targets upgraded while canonical publication remains blocked.
+
+If a broadcast submits only part of an operation, preserve the pending and
+Foundry broadcast files. Finalize only when the complete expected state is live;
+otherwise prepare an explicit forward fix. A fresh mainnet deployment is not
+supported; `--fresh` is available only for Calibnet.
+
 ### Key Value Propositions
 
 * **Automated Matchmaking:** Automatically selects the best-fit Storage Provider based on capacity, SLI capabilities, and pricing.

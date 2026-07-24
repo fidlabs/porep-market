@@ -194,6 +194,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
      * @notice Constructor
      * @dev Constructor disables initializers
      */
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }

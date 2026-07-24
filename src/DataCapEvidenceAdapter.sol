@@ -357,6 +357,7 @@ contract DataCapEvidenceAdapter is
     /**
      * @notice Disabled constructor (proxy pattern)
      */
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }

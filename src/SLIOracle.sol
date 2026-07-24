@@ -86,6 +86,7 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
     /**
      * @notice Disabled constructor (proxy pattern)
      */
+    /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
         _disableInitializers();
     }

@@ -1,66 +1,95 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec
+// solhint-disable use-natspec, gas-small-strings
 pragma solidity =0.8.30;
 
-import {Script} from "forge-std/Script.sol";
-import {DeployUtils} from "./utils/DeployUtils.sol";
+import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {stdJson} from "forge-std/StdJson.sol";
+import {IValidatorFactory} from "../src/interfaces/IValidatorFactory.sol";
+import {DeployUtils} from "./utils/DeployUtils.sol";
 
 interface IUpgradeable {
-    function upgradeToAndCall(address newImpl, bytes calldata data) external;
+    function upgradeToAndCall(address newImplementation, bytes calldata data) external;
 }
 
-contract Upgrade is Script, DeployUtils {
+contract Upgrade is DeployUtils {
     using stdJson for string;
 
-    address internal admin;
-    address internal proxy;
-    address internal prevImpl;
-    address internal impl;
-    string internal name;
-    bytes32 internal deployedCodeHash;
-    bytes internal cd;
+    /**
+     * @dev 0xd1c4219d
+     */
+    error StaleValidatorBeacon(address manifestBeacon, address factoryBeacon);
 
-    error ContractAlreadyDeployed();
+    /**
+     * @dev 0xf0002840
+     */
+    error StaleValidatorImpl(address manifestImpl, address beaconImpl);
 
-    function run() external {
-        admin = vm.addr(vm.envUint("PRIVATE_KEY"));
-        name = vm.envString("UPGRADE_CONTRACT_NAME");
-        cd = vm.envOr("UPGRADE_CALLDATA", bytes(""));
-
-        bytes32 hash = generateContractHash(name);
-        string memory json = readLatestDeploymentArtifact();
-        (proxy, prevImpl,, deployedCodeHash) = deserializeContract(json, name);
-
-        if (hash == deployedCodeHash) {
-            revert ContractAlreadyDeployed();
-        }
-
-        vm.startBroadcast(admin);
-
-        impl = vm.deployCode(string.concat(name, ".sol:", name));
-        IUpgradeable(proxy).upgradeToAndCall(impl, cd);
-
-        vm.stopBroadcast();
-        serializeAndSaveArtifact();
+    struct Operation {
+        string target;
+        string artifact;
+        address destination;
+        address newImplementation;
+        bool beacon;
     }
 
-    function serializeAndSaveArtifact() internal {
-        string memory json = name;
+    function run() external {
+        string memory manifest = vm.readFile(vm.envString("DEPLOYMENT_MANIFEST"));
+        string[] memory names = vm.envString("UPGRADE_CONTRACT_NAMES", ",");
+        Operation[] memory operations = new Operation[](names.length);
+        for (uint256 i; i < names.length; ++i) {
+            if (keccak256(bytes(names[i])) == keccak256("Validator")) {
+                address beacon = manifest.readAddress(".contracts.ValidatorBeacon.address");
+                address factory = manifest.readAddress(".contracts.ValidatorFactory.proxy");
+                address previous = manifest.readAddress(".contracts.Validator.implementation");
+                _ensureCode(beacon);
+                _ensureCode(factory);
+                _ensureCode(previous);
+                address factoryBeacon = IValidatorFactory(factory).getBeacon();
+                if (factoryBeacon != beacon) revert StaleValidatorBeacon(beacon, factoryBeacon);
+                address live = UpgradeableBeacon(beacon).implementation();
+                if (live != previous) revert StaleValidatorImpl(previous, live);
+                operations[i] = Operation(names[i], "src/Validator.sol:Validator", beacon, address(0), true);
+            } else {
+                string memory artifact = _uupsArtifact(names[i]);
+                address proxy = _manifestUupsTarget(manifest, names[i]);
+                operations[i] = Operation(names[i], artifact, proxy, address(0), false);
+            }
+        }
+        vm.startBroadcast(vm.addr(vm.envUint("PRIVATE_KEY")));
+        for (uint256 i; i < operations.length; ++i) {
+            operations[i].newImplementation = vm.deployCode(operations[i].artifact);
+        }
+        for (uint256 i; i < operations.length; ++i) {
+            if (operations[i].beacon) {
+                UpgradeableBeacon(operations[i].destination).upgradeTo(operations[i].newImplementation);
+            } else {
+                IUpgradeable(operations[i].destination).upgradeToAndCall(operations[i].newImplementation, "");
+            }
+        }
+        vm.stopBroadcast();
+        _writeOperations(operations);
+    }
 
-        json.serialize("proxy", proxy);
-        json.serialize("prevImpl", prevImpl);
-        json.serialize("newImpl", impl);
-        json.serialize("prevCodeHash", vm.toString(prevImpl.codehash));
-        json.serialize("newCodeHash", vm.toString(impl.codehash));
-        json.serialize("upgradedAt", block.timestamp);
-        json.serialize("chainId", block.chainid);
-        json.serialize("deployer", admin);
-
-        string memory output =
-            json.serialize("deployedCodeHash", keccak256(vm.getDeployedCode(string.concat(name, ".sol:", name))));
-
-        saveUpgrade(output, name);
-        updateLatestImpl(name, impl);
+    function _writeOperations(Operation[] memory operations) private {
+        string memory json = "[";
+        for (uint256 i; i < operations.length; ++i) {
+            if (i != 0) json = string.concat(json, ",");
+            Operation memory operation = operations[i];
+            json = string.concat(
+                json,
+                "{\"target\":\"",
+                operation.target,
+                "\",\"kind\":\"",
+                operation.beacon ? "beacon" : "uups",
+                "\",\"artifact\":\"",
+                operation.artifact,
+                "\",\"newImplementation\":\"",
+                vm.toString(operation.newImplementation),
+                "\",\"newImplementationCodeHash\":\"",
+                vm.toString(operation.newImplementation.codehash),
+                "\"}"
+            );
+        }
+        vm.writeJson(string.concat(json, "]"), vm.envString("UPGRADE_OUTPUT"), ".operations");
     }
 }

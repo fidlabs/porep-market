@@ -9,71 +9,56 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 contract DeployUtils is Script {
     using stdJson for string;
 
-    function save(string memory json) internal {
-        string memory base = string.concat("./deployments/", network());
+    /**
+     * @dev 0x8123dbd5
+     */
+    error InvalidUpgradeTarget(string name);
 
-        vm.createDir(base, true);
-        vm.writeJson(json, string.concat(base, "/latest.json"));
-        vm.writeJson(json, string.concat(base, "/", vm.toString(block.number), ".json"));
+    /**
+     * @dev 0x4535258f
+     */
+    error MissingContractCode(address target);
+
+    /**
+     * @dev 0x5ab89e50
+     */
+    error StaleManifestImplementation(address manifestImplementation, address liveImplementation);
+
+    bytes32 internal constant ERC1967_IMPLEMENTATION_SLOT =
+        0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc;
+
+    function createProxy(bytes memory init, address implementation) internal returns (address) {
+        return address(new ERC1967Proxy(implementation, init));
     }
 
-    function saveUpgrade(string memory json, string memory contractName) internal {
-        string memory base = string.concat("./deployments/", network(), "/upgrades");
-        vm.createDir(base, true);
-        vm.writeJson(json, string.concat(base, "/", vm.toString(block.number), "_", contractName, ".json"));
+    function _uupsArtifact(string memory name) internal pure returns (string memory) {
+        bytes32 target = keccak256(bytes(name));
+        if (target == keccak256("PoRepMarket")) return "src/PoRepMarket.sol:PoRepMarket";
+        if (target == keccak256("ValidatorFactory")) return "src/ValidatorFactory.sol:ValidatorFactory";
+        if (target == keccak256("DataCapEvidenceAdapter")) {
+            return "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter";
+        }
+        if (target == keccak256("SPRegistry")) return "src/SPRegistry.sol:SPRegistry";
+        if (target == keccak256("SLIOracle")) return "src/SLIOracle.sol:SLIOracle";
+        if (target == keccak256("SLIScorer")) return "src/SLIScorer.sol:SLIScorer";
+        revert InvalidUpgradeTarget(name);
     }
 
-    function updateLatestImpl(string memory contractName, address newImpl) internal {
-        string memory path = string.concat("./deployments/", network(), "/latest.json");
-        vm.writeJson(vm.toString(newImpl), path, string.concat(".", contractName, ".impl"));
-        vm.writeJson(vm.toString(newImpl.codehash), path, string.concat(".", contractName, ".codeHash"));
-        vm.writeJson(
-            vm.toString(keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName)))),
-            path,
-            string.concat(".", contractName, ".deployedCodeHash")
-        );
+    function _manifestUupsTarget(string memory json, string memory name) internal view returns (address proxy) {
+        string memory key = string.concat(".contracts.", name);
+        proxy = json.readAddress(string.concat(key, ".proxy"));
+        address implementation = json.readAddress(string.concat(key, ".implementation"));
+        _ensureCode(proxy);
+        _ensureCode(implementation);
+        address live = _erc1967Implementation(proxy);
+        if (live != implementation) revert StaleManifestImplementation(implementation, live);
     }
 
-    function createProxy(bytes memory init, address impl) internal returns (address proxy) {
-        proxy = address(new ERC1967Proxy(address(impl), init));
+    function _erc1967Implementation(address proxy) internal view returns (address) {
+        return address(uint160(uint256(vm.load(proxy, ERC1967_IMPLEMENTATION_SLOT))));
     }
 
-    function serializeContract(string memory json, string memory contractName, address proxy, address impl) internal {
-        string memory obj = contractName;
-        obj.serialize("proxy", proxy);
-        obj.serialize("impl", impl);
-        obj.serialize("codeHash", vm.toString(impl.codehash));
-        string memory serialized = obj.serialize(
-            "deployedCodeHash",
-            keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName))) // <-- fix
-        );
-        json.serialize(contractName, serialized);
-    }
-
-    function readLatestDeploymentArtifact() internal view returns (string memory json) {
-        // forge-lint: disable-next-line(unsafe-cheatcode)
-        json = vm.readFile(string.concat("./deployments/", network(), "/latest.json"));
-    }
-
-    function deserializeContract(string memory json, string memory contractName)
-        internal
-        pure
-        returns (address proxy, address impl, bytes32 codeHash, bytes32 deployedCodeHash)
-    {
-        proxy = abi.decode(json.parseRaw(string.concat(".", contractName, ".proxy")), (address));
-        impl = abi.decode(json.parseRaw(string.concat(".", contractName, ".impl")), (address));
-        codeHash = abi.decode(json.parseRaw(string.concat(".", contractName, ".codeHash")), (bytes32));
-        deployedCodeHash = abi.decode(json.parseRaw(string.concat(".", contractName, ".deployedCodeHash")), (bytes32));
-    }
-
-    function generateContractHash(string memory contractName) internal view returns (bytes32 hash) {
-        hash = keccak256(vm.getDeployedCode(string.concat(contractName, ".sol:", contractName)));
-    }
-
-    function network() internal view returns (string memory) {
-        if (block.chainid == 31415926) return "devnet";
-        else if (block.chainid == 314159) return "calibnet";
-        else if (block.chainid == 314) return "mainnet";
-        else return vm.toString(block.chainid);
+    function _ensureCode(address target) internal view {
+        if (target.code.length == 0) revert MissingContractCode(target);
     }
 }

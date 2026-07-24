@@ -1,0 +1,7 @@
+{
+  "name": "porep-market-deployment-tools",
+  "private": true,
+  "devDependencies": {
+    "@openzeppelin/upgrades-core": "1.46.0"
+  }
+}

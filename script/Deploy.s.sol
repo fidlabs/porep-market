@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec, max-states-count, no-console
+// solhint-disable use-natspec, max-states-count, no-console, gas-small-strings
 pragma solidity =0.8.30;
 
-import {Script} from "forge-std/Script.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
@@ -14,7 +13,7 @@ import {SLIScorer} from "../src/SLIScorer.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {console} from "forge-std/console.sol";
 
-contract Deploy is Script, DeployUtils {
+contract Deploy is DeployUtils {
     using stdJson for string;
 
     address internal poRepMarket;
@@ -43,6 +42,9 @@ contract Deploy is Script, DeployUtils {
     address internal metaAllocator;
 
     function run() external {
+        string memory outputPath = vm.envString("DEPLOYMENT_OUTPUT");
+        string memory buildInfoSha256 = vm.envString("BUILD_INFO_SHA256");
+
         admin = vm.addr(vm.envUint("PRIVATE_KEY"));
         terminationOracle = vm.envAddress("TERMINATION_ORACLE");
         filecoinPay = vm.envAddress("FILECOIN_PAY");
@@ -76,7 +78,7 @@ contract Deploy is Script, DeployUtils {
 
         vm.stopBroadcast();
 
-        _serializeAndSaveArtifact();
+        vm.writeJson(_serializePendingManifest(buildInfoSha256), outputPath, ".result");
     }
 
     function _deployValidatorFactory(address _admin)
@@ -130,28 +132,103 @@ contract Deploy is Script, DeployUtils {
         impl = address(_impl);
     }
 
-    function _serializeAndSaveArtifact() internal {
-        string memory json = "deployment";
-
-        json.serialize("chainId", block.chainid);
-        json.serialize("block", block.number);
-        json.serialize("timestamp", block.timestamp);
+    function _serializePendingManifest(string memory buildInfoSha256) internal returns (string memory) {
+        string memory json = "pendingDeployment";
+        json.serialize("status", string("pending"));
+        json.serialize("release", _serializeRelease(buildInfoSha256));
         json.serialize("deployer", admin);
+        json.serialize("contracts", _serializeContracts());
+        return json.serialize("externalDependencies", _serializeExternalDependencies());
+    }
 
-        serializeContract(json, "PoRepMarket", poRepMarket, poRepMarketImpl);
-        serializeContract(json, "ValidatorFactory", validatorFactory, validatorFactoryImpl);
-        serializeContract(json, "DataCapEvidenceAdapter", dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl);
-        serializeContract(json, "SLIOracle", sliOracle, sliOracleImpl);
-        serializeContract(json, "SLIScorer", sliScorer, sliScorerImpl);
-        serializeContract(json, "SPRegistry", spRegistry, spRegistryImpl);
+    function _serializeRelease(string memory buildInfoSha256) private returns (string memory) {
+        string memory json = "pendingRelease";
+        return json.serialize("buildInfoSha256", buildInfoSha256);
+    }
 
-        json.serialize("ValidatorBeacon", validatorBeacon);
-        json.serialize("ValidatorImpl", validatorImpl);
+    function _serializeContracts() private returns (string memory) {
+        string memory json = "pendingContracts";
+        json.serialize(
+            "PoRepMarket",
+            _serializeUupsContract(
+                "pendingPoRepMarket", "src/PoRepMarket.sol:PoRepMarket", poRepMarket, poRepMarketImpl
+            )
+        );
+        json.serialize(
+            "ValidatorFactory",
+            _serializeUupsContract(
+                "pendingValidatorFactory",
+                "src/ValidatorFactory.sol:ValidatorFactory",
+                validatorFactory,
+                validatorFactoryImpl
+            )
+        );
+        json.serialize(
+            "DataCapEvidenceAdapter",
+            _serializeUupsContract(
+                "pendingDataCapEvidenceAdapter",
+                "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+                dataCapEvidenceAdapter,
+                dataCapEvidenceAdapterImpl
+            )
+        );
+        json.serialize(
+            "SPRegistry",
+            _serializeUupsContract("pendingSPRegistry", "src/SPRegistry.sol:SPRegistry", spRegistry, spRegistryImpl)
+        );
+        json.serialize(
+            "SLIOracle",
+            _serializeUupsContract("pendingSLIOracle", "src/SLIOracle.sol:SLIOracle", sliOracle, sliOracleImpl)
+        );
+        json.serialize(
+            "SLIScorer",
+            _serializeUupsContract("pendingSLIScorer", "src/SLIScorer.sol:SLIScorer", sliScorer, sliScorerImpl)
+        );
+        json.serialize("Validator", _serializeValidator());
+        return json.serialize("ValidatorBeacon", _serializeValidatorBeacon());
+    }
+
+    function _serializeUupsContract(
+        string memory objectKey,
+        string memory artifact,
+        address proxy,
+        address implementation
+    ) private returns (string memory) {
+        objectKey.serialize("kind", string("uups"));
+        objectKey.serialize("artifact", artifact);
+        objectKey.serialize("proxy", proxy);
+        objectKey.serialize("implementation", implementation);
+        objectKey.serialize("proxyCodeHash", proxy.codehash);
+        return objectKey.serialize("implementationCodeHash", implementation.codehash);
+    }
+
+    function _serializeValidator() private returns (string memory) {
+        string memory json = "pendingValidator";
+        json.serialize("kind", string("implementation"));
+        json.serialize("artifact", string("src/Validator.sol:Validator"));
+        json.serialize("implementation", validatorImpl);
+        return json.serialize("implementationCodeHash", validatorImpl.codehash);
+    }
+
+    function _serializeValidatorBeacon() private returns (string memory) {
+        string memory json = "pendingValidatorBeacon";
+        json.serialize("kind", string("beacon"));
+        json.serialize(
+            "artifact",
+            string("lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon")
+        );
+        json.serialize("address", validatorBeacon);
+        json.serialize("implementation", validatorImpl);
+        return json.serialize("factoryProxy", validatorFactory);
+    }
+
+    function _serializeExternalDependencies() private returns (string memory) {
+        string memory json = "pendingExternalDependencies";
         json.serialize("FilecoinPay", filecoinPay);
         json.serialize("PoRepService", poRepService);
         json.serialize("MetaAllocator", metaAllocator);
-        string memory output = json.serialize("TerminationOracle", terminationOracle);
-
-        save(output);
+        json.serialize("TerminationOracle", terminationOracle);
+        json.serialize("Oracle", oracleAddress);
+        return json.serialize("Operator", operatorAddress);
     }
 }
