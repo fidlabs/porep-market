@@ -49,22 +49,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidFilecoinPayAddress();
 
     /**
-     * @notice Error indicating that the evidence adapter address provided during initialization is the zero address
-     * @dev 0xd2178646
-     */
-    error InvalidEvidenceAdapterAddress();
-
-    /**
      * @notice Error indicating that the PoRepMarket address provided during initialization is the zero address
      * @dev 0xc9cc4a06
      */
     error InvalidPoRepMarketAddress();
-
-    /**
-     * @notice Error indicating that the PoRep service bot address provided during initialization is the zero address
-     * @dev 0x7725d473
-     */
-    error InvalidPoRepServiceAddress();
 
     /**
      * @notice Error indicating that the caller is not the client
@@ -103,12 +91,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidRateAllowance();
 
     /**
-     * @notice Error indicating that the caller is not authorized to perform the action
-     * @dev 0x5c427cd9
-     */
-    error UnauthorizedCaller();
-
-    /**
      * @notice Error indicating that the calculated amount per epoch is zero, which is invalid
      * @dev 0xdd484e70
      */
@@ -124,11 +106,10 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     error InvalidRailId(uint256 expected, uint256 actual);
 
     /**
-     * @notice Error indicating that a deal is not ready to be finished
-     * @param serviceEndEpoch The epoch at which the deal service ends
-     * @param currentEpoch The current block epoch
+     * @notice Error indicating that the payment rail is not in a status that can be terminated
+     * @param railStatus The current payment rail status
      */
-    error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
+    error InvalidRailStatusForTermination(uint8 railStatus);
 
     /**
      * @notice Error indicating that an invalid terminator address was provided
@@ -180,15 +161,9 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
         uint256 dealId;
         uint8 railStatus;
         address filecoinPay;
-        address evidenceAdapter;
         address poRepMarket;
         CommonTypes.FilActorId providerId;
     }
-
-    /**
-     * @notice Role for PoRep bot which is responsible for automating validator functions
-     */
-    bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     string private constant SERVICE_NAME = "FCSS";
     string private constant SERVICE_DESCRIPTION = "Filecoin Cold Storage Service";
@@ -227,25 +202,18 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     /**
      * @notice Initializes the contract
      * @param _admin Address to be granted the default admin role
-     * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
-     * @param _evidenceAdapter Address of the evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
-    function initialize(
-        address _admin,
-        address _porepService,
-        address _filecoinPay,
-        address _evidenceAdapter,
-        address _poRepMarket,
-        uint256 _dealId
-    ) external initializer {
-        _validateInitializeAddresses(_admin, _porepService, _filecoinPay, _evidenceAdapter, _poRepMarket);
+    function initialize(address _admin, address _filecoinPay, address _poRepMarket, uint256 _dealId)
+        external
+        initializer
+    {
+        _validateInitializeAddresses(_admin, _filecoinPay, _poRepMarket);
 
         __AccessControl_init();
         _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(POREP_SERVICE_ROLE, _porepService);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -253,7 +221,6 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
         $.providerId = deal.provider;
         $.filecoinPay = _filecoinPay;
-        $.evidenceAdapter = _evidenceAdapter;
         $.poRepMarket = _poRepMarket;
         $.dealId = _dealId;
 
@@ -384,12 +351,21 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Terminates a payment rail early and terminates its deal
-     * @dev Only callable by POREP_SERVICE bot
+     * @notice Terminates the payment rail early after PoRepMarket terminates the deal.
+     * @dev Only callable by the PoRepMarket contract.
      */
-    function earlyRailTermination() external override onlyRole(POREP_SERVICE_ROLE) {
+    function earlyRailTermination() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-        _terminateDeal();
+        if (msg.sender != $.poRepMarket) {
+            revert CallerIsNotPoRepMarket();
+        }
+
+        uint8 railStatus = $.railStatus;
+        if (railStatus != RailStatus.PREPARED && railStatus != RailStatus.ACTIVE) {
+            revert InvalidRailStatusForTermination(railStatus);
+        }
+
+        $.railStatus = RailStatus.TERMINATED;
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
         emit EarlyRailTerminated($.railId);
     }
@@ -406,36 +382,23 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     }
 
     /**
-     * @notice Terminates the deal and its payment rail.
+     * @notice Terminates the payment rail after PoRepMarket finalizes the deal.
+     * @dev Only callable by the PoRepMarket contract.
      */
     function finalizeDeal() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
-        if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
-            revert UnauthorizedCaller();
+        if (msg.sender != $.poRepMarket) {
+            revert CallerIsNotPoRepMarket();
         }
 
-        PoRepTypes.DealService memory service = IPoRepMarket($.poRepMarket).getDealService($.dealId);
-        uint256 serviceEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch)));
-        bool serviceEnded = serviceEndEpoch < block.number;
-        if (!serviceEnded) {
-            revert ServiceNotEnded(serviceEndEpoch, block.number);
+        uint8 railStatus = $.railStatus;
+        if (railStatus != RailStatus.ACTIVE) {
+            revert InvalidRailStatusForTermination(railStatus);
         }
 
         $.railStatus = RailStatus.TERMINATED;
-        IPoRepMarket($.poRepMarket).finalizeDeal($.dealId);
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
         emit DealFinalized($.dealId, $.railId);
-    }
-
-    /**
-     * @notice Terminates the deal in PoRep Market and records the early termination epoch.
-     */
-    function _terminateDeal() internal {
-        ValidatorStorage storage $ = _getValidatorStorage();
-        $.railStatus = RailStatus.TERMINATED;
-        int64 earlyTerminationEpoch = int64(uint64(block.number));
-
-        IPoRepMarket($.poRepMarket).terminateDeal($.dealId, CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch));
     }
 
     /**
@@ -494,29 +457,15 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     /**
      * @notice Validates that the provided addresses for initialization are not zero addresses
      * @param _admin Address to be granted the default admin role
-     * @param _porepService Address of the PoRep service bot
      * @param _filecoinPay Address of the FilecoinPay contract
-     * @param _evidenceAdapter Address of the evidence adapter
      * @param _poRepMarket Address of the PoRepMarket contract
      */
-    function _validateInitializeAddresses(
-        address _admin,
-        address _porepService,
-        address _filecoinPay,
-        address _evidenceAdapter,
-        address _poRepMarket
-    ) internal pure {
+    function _validateInitializeAddresses(address _admin, address _filecoinPay, address _poRepMarket) internal pure {
         if (_admin == address(0)) {
             revert InvalidAdminAddress();
         }
-        if (_porepService == address(0)) {
-            revert InvalidPoRepServiceAddress();
-        }
         if (_filecoinPay == address(0)) {
             revert InvalidFilecoinPayAddress();
-        }
-        if (_evidenceAdapter == address(0)) {
-            revert InvalidEvidenceAdapterAddress();
         }
         if (_poRepMarket == address(0)) {
             revert InvalidPoRepMarketAddress();

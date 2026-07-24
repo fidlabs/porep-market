@@ -8,6 +8,7 @@ import {RailStatus} from "../../src/types/RailStatus.sol";
 
 contract ValidatorMock is IOperator {
     uint256 public modifyRailPaymentCallCount;
+    uint256 public earlyRailTerminationCallCount;
     uint256 public lastNewRate;
     uint8 public railStatus;
 
@@ -29,7 +30,10 @@ contract ValidatorMock is IOperator {
         return railStatus;
     }
 
-    function earlyRailTermination() external {}
+    function earlyRailTermination() external {
+        earlyRailTerminationCallCount++;
+        railStatus = RailStatus.TERMINATED;
+    }
 
     function finalizeDeal() external {}
 }

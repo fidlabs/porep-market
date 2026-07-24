@@ -3,7 +3,6 @@ pragma solidity =0.8.30;
 
 import {PoRepTypes} from "../types/PoRepTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
-import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 /**
  * @title IPoRepMarket interface
@@ -75,13 +74,6 @@ interface IPoRepMarket {
      * @return terms The deal terms
      */
     function getDealTerms(uint256 dealId) external view returns (PoRepTypes.DealTerms memory terms);
-
-    /**
-     * @notice Gets the proposal timing for a deal
-     * @param dealId The id of the deal
-     * @return timing The deal timing
-     */
-    function getDealTiming(uint256 dealId) external view returns (PoRepTypes.DealTiming memory timing);
 
     /**
      * @notice Gets the service window for a deal
@@ -156,29 +148,11 @@ interface IPoRepMarket {
         returns (uint256[] memory dealIds, uint256 total);
 
     /**
-     * @notice Gets the complete generic read model for one deal.
-     * @dev External tools, oracles, CLIs, and RPC consumers use this bounded
-     * snapshot when they need all PoRepMarket-owned or PoRepMarket-frozen facts for
-     * one deal in a single eth_call. The evidence status is adapter-local stored
-     * status and does not refresh Filecoin actor state.
+     * @notice Gets the organization selected for a provider when a deal was proposed.
      * @param dealId The id of the deal.
-     * @return dealView Complete generic deal snapshot.
+     * @return organization The provider organization.
      */
-    function getDealView(uint256 dealId) external returns (PoRepTypes.DealView memory dealView);
-
-    /**
-     * @notice Gets a caller-sized page of complete generic deal views.
-     * @dev Oracle jobs and CLI tools use this for normal batch scans. The caller
-     * chooses `limit` because RPC providers and JSON-RPC clients have gas, timeout,
-     * and response-size limits for eth_call.
-     * @param offset Zero-based index in the creation-order deal ID list.
-     * @param limit Maximum number of deal views to return.
-     * @return dealViews Page of complete generic deal snapshots.
-     * @return total Total number of created deal IDs at call time.
-     */
-    function getDealViews(uint256 offset, uint256 limit)
-        external
-        returns (PoRepTypes.DealView[] memory dealViews, uint256 total);
+    function getDealOrganization(uint256 dealId) external view returns (address organization);
 
     /**
      * @notice Accepts a deal
@@ -187,7 +161,7 @@ interface IPoRepMarket {
     function acceptDeal(uint256 dealId) external;
 
     /**
-     * @notice Finalizes a deal after its assigned evidence adapter accepts its evidence
+     * @notice Finalizes an active deal after service has ended and asks its validator to terminate the rail.
      * @param dealId The id of the deal
      */
     function finalizeDeal(uint256 dealId) external;
@@ -199,18 +173,10 @@ interface IPoRepMarket {
     function activatePayment(uint256 dealId) external;
 
     /**
-     * @notice Terminate a deal
-     * @dev Terminates a deal by setting the deal state to terminated
-     * @param dealId The id of the deal
-     * @param earlyTerminationEpoch The Filecoin epoch at which the deal was terminated
-     */
-    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external;
-
-    /**
-     * @notice Rejects a deal
+     * @notice Terminates an active deal early and asks its validator to terminate the rail.
      * @param dealId The id of the deal
      */
-    function rejectDeal(uint256 dealId) external;
+    function terminateDeal(uint256 dealId) external;
 
     /**
      * @notice Rejects a deal in Accepted state before rail is set
@@ -218,13 +184,6 @@ interface IPoRepMarket {
      * @param dealId The id of the deal
      */
     function rejectAcceptedDeal(uint256 dealId) external;
-
-    /**
-     * @notice Retrieves the manifest location URL for a specific deal
-     * @param dealId The unique identifier of the deal
-     * @return manifestLocation The manifest location URL for a specific deal
-     */
-    function getManifestLocation(uint256 dealId) external view returns (string memory manifestLocation);
 
     /**
      * @notice Updates the manifest location for a specific deal
@@ -324,26 +283,6 @@ interface IPoRepMarket {
      * @return deals Array of all deals
      */
     function getDeals() external view returns (PoRepTypes.Deal[] memory deals);
-
-    /**
-     * @notice Rejects expired deal
-     * @param dealId The id of the deal
-     * @dev A deal is considered expired if it has been in the proposed state past the configured expiration
-     */
-    function rejectExpiredDeal(uint256 dealId) external;
-
-    /**
-     * @notice Sets new proposed deal expiration
-     * @dev Only callable by the admin
-     * @param newDealExpiration The new proposed deal expiration in epochs
-     */
-    function setNewDealExpiration(uint256 newDealExpiration) external;
-
-    /**
-     * @notice Retrieves the proposed deal expiration
-     * @return dealExpiration The proposed deal expiration in epochs
-     */
-    function getDealExpiration() external view returns (uint256);
 
     /**
      * @notice Validates deal settlement for a deal

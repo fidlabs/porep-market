@@ -57,7 +57,8 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
                 state: DealState.ACCEPTED,
                 evidenceAdapter: address(0),
                 validator: address(validatorMock),
-                railId: 1
+                railId: 1,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 
@@ -117,7 +118,8 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
                 state: DealState.ACCEPTED,
                 evidenceAdapter: address(0),
                 validator: address(validatorMock),
-                railId: 1
+                railId: 1,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
             })
         );
 

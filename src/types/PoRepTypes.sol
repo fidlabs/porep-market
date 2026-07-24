@@ -31,6 +31,7 @@ library PoRepTypes {
         address evidenceAdapter;
         address validator;
         uint256 railId;
+        CommonTypes.ChainEpoch proposedAtEpoch;
     }
 
     /**
@@ -80,16 +81,6 @@ library PoRepTypes {
     }
 
     /**
-     * @notice Payment fields exposed through DealView.
-     */
-    struct DealViewPayment {
-        address paymentToken;
-        uint256 pricePer32GiBPerMonth;
-        uint256 billed32GiBUnits;
-        uint256 railMaxRatePerEpoch;
-    }
-
-    /**
      * @notice Complete generic read model for one PoRepMarket deal.
      * @dev This is for offchain tools, oracles, CLIs, and RPC consumers that need
      * PoRepMarket-owned or PoRepMarket-frozen deal facts in one bounded response.
@@ -111,10 +102,9 @@ library PoRepTypes {
         SharedTypes.DealData data;
         SharedTypes.SLIThresholds requiredSLIs;
         DealTerms terms;
-        DealTiming timing;
         DealService service;
         DealCapacity capacity;
-        DealViewPayment payment;
+        DealPayment payment;
         address providerOrganization;
         SharedTypes.EvidenceStatus evidenceStatus;
     }

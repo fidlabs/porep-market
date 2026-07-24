@@ -78,8 +78,8 @@ contract PoRepMarketMock {
         deals[dealId].railId = newRailId;
     }
 
-    function terminateDeal(uint256 dealId, CommonTypes.ChainEpoch earlyTerminationEpoch) external {
+    function terminateDeal(uint256 dealId) external {
         deals[dealId].state = DealState.TERMINATED;
-        dealServices[dealId].earlyTerminationEpoch = earlyTerminationEpoch;
+        dealServices[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
     }
 }
