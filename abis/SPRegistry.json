@@ -260,11 +260,6 @@
         "name": "offerId",
         "type": "uint256",
         "internalType": "uint256"
-      },
-      {
-        "name": "paymentToken",
-        "type": "address",
-        "internalType": "address"
       }
     ],
     "outputs": [
@@ -343,19 +338,26 @@
             ]
           },
           {
-            "name": "paymentToken",
-            "type": "address",
-            "internalType": "address"
-          },
-          {
-            "name": "paymentActive",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "pricePer32GiBPerMonth",
-            "type": "uint256",
-            "internalType": "uint256"
+            "name": "payments",
+            "type": "tuple[]",
+            "internalType": "struct ISPRegistry.OfferPaymentView[]",
+            "components": [
+              {
+                "name": "token",
+                "type": "address",
+                "internalType": "address"
+              },
+              {
+                "name": "active",
+                "type": "bool",
+                "internalType": "bool"
+              },
+              {
+                "name": "pricePer32GiBPerMonth",
+                "type": "uint256",
+                "internalType": "uint256"
+              }
+            ]
           }
         ]
       }

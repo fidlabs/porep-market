@@ -48,15 +48,25 @@ interface ISPRegistry {
     }
 
     /**
-     * @notice Current offer data plus the payment row for one token.
+     * @notice Current payment configuration for one token on an offer.
+     * @param token ERC20 token address.
+     * @param active True when this token can be selected.
+     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
+     */
+    struct OfferPaymentView {
+        address token;
+        bool active;
+        uint256 pricePer32GiBPerMonth;
+    }
+
+    /**
+     * @notice Current offer data including all configured payment tokens.
      * @param offerId Offer ID.
      * @param provider Provider actor ID that owns the offer.
      * @param active True when the offer participates in matching.
      * @param terms Offer size and duration bounds.
      * @param slis Promised offer SLIs.
-     * @param paymentToken ERC20 token address used for the payment row.
-     * @param paymentActive True when this token row can be selected.
-     * @param pricePer32GiBPerMonth Monthly price per 32 GiB in token smallest units.
+     * @param payments Current payment token rows configured on the offer.
      */
     // solhint-disable-next-line gas-struct-packing
     struct OfferView {
@@ -65,9 +75,7 @@ interface ISPRegistry {
         bool active;
         SharedTypes.OfferTerms terms;
         SharedTypes.SLIThresholds slis;
-        address paymentToken;
-        bool paymentActive;
-        uint256 pricePer32GiBPerMonth;
+        OfferPaymentView[] payments;
     }
 
     /**
@@ -203,12 +211,11 @@ interface ISPRegistry {
     function setOfferPayment(uint256 offerId, address token, bool active, uint256 pricePer32GiBPerMonth) external;
 
     /**
-     * @notice Returns offer data plus the payment row for one token.
+     * @notice Returns offer data plus all configured payment token rows.
      * @param offerId Offer ID.
-     * @param paymentToken ERC20 token address to read from the offer payment map.
-     * @return view_ Current offer view for the requested payment token.
+     * @return view_ Current composed offer view.
      */
-    function getOfferView(uint256 offerId, address paymentToken) external view returns (OfferView memory view_);
+    function getOfferView(uint256 offerId) external view returns (OfferView memory view_);
 
     /**
      * @notice Returns all offer IDs created by a provider.
