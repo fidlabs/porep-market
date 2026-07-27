@@ -46,6 +46,8 @@ contract DataCapEvidenceAdapter is
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
         bool _operational;
+        mapping(uint64 claimId => uint256 dealId) _claimDealIds;
+        mapping(uint256 dealId => uint256 revision) _terminationRevisions;
     }
 
     /**
@@ -59,6 +61,8 @@ contract DataCapEvidenceAdapter is
         CommonTypes.ChainEpoch partialEvidenceRefreshEpoch;
         CommonTypes.FilActorId[] failedClaimIds;
         uint8 result;
+        uint256 pendingActiveClaimedBytes;
+        uint256 terminationRevision;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.DataCapEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -491,6 +495,7 @@ contract DataCapEvidenceAdapter is
             }
             claimPointer--;
             deal.claimIds.push(allocationsBatch[idx]);
+            s()._claimDealIds[CommonTypes.FilActorId.unwrap(allocationsBatch[idx])] = context.dealId;
             coveredBytes += result.claims[claimPointer].size;
             _deleteIdByIndex(deal.allocationIds, idx);
         }
@@ -580,15 +585,22 @@ contract DataCapEvidenceAdapter is
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
         int64 currentEpoch = int64(uint64(block.number));
         RefreshStatus storage refreshStatus = $._refreshStatus[context.dealId];
+        uint256 partialRefreshEpoch =
+            uint256(uint64(CommonTypes.ChainEpoch.unwrap(refreshStatus.partialEvidenceRefreshEpoch)));
         if (
-            refreshStatus.checkedClaims == deal.claimIds.length
-                || uint256(uint64(CommonTypes.ChainEpoch.unwrap(refreshStatus.partialEvidenceRefreshEpoch)))
+            refreshStatus.checkedClaims == deal.claimIds.length || refreshStatus.checkedClaims != 0
+                && (
                     // forge-lint: disable-next-line(unsafe-typecast)
-                    > uint256(uint64(currentEpoch)) + SharedTypes.EPOCHS_IN_MONTH
+                    uint256(uint64(currentEpoch)) > partialRefreshEpoch + SharedTypes.EPOCHS_IN_MONTH
+                    || refreshStatus.terminationRevision != $._terminationRevisions[context.dealId]
+                )
         ) {
             refreshStatus.checkedClaims = 0;
-            refreshStatus.activeClaimedBytes = 0;
+            refreshStatus.pendingActiveClaimedBytes = 0;
             delete refreshStatus.failedClaimIds;
+        }
+        if (refreshStatus.checkedClaims == 0) {
+            refreshStatus.terminationRevision = $._terminationRevisions[context.dealId];
         }
 
         uint256 batchSize = abi.decode(evidenceData, (uint256));
@@ -620,7 +632,7 @@ contract DataCapEvidenceAdapter is
                     continue;
                 }
 
-                refreshStatus.activeClaimedBytes += claim.size;
+                refreshStatus.pendingActiveClaimedBytes += claim.size;
             }
         }
 
@@ -629,20 +641,23 @@ contract DataCapEvidenceAdapter is
         uint8 evidenceResult;
 
         if (refreshStatus.checkedClaims == totalClaims) {
+            refreshStatus.activeClaimedBytes = refreshStatus.pendingActiveClaimedBytes;
             if (refreshStatus.activeClaimedBytes != deal.claimedBytes) {
                 evidenceResult = EvidenceResult.COVERED_BYTES_MISMATCH;
             } else {
                 refreshStatus.lastEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
                 evidenceResult = EvidenceResult.ACTIVE;
             }
+            refreshStatus.result = evidenceResult;
         } else {
             evidenceResult = EvidenceResult.PARTIAL;
         }
-        refreshStatus.result = evidenceResult;
         refreshStatus.partialEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
         // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: refreshStatus.activeClaimedBytes,
+            activeCoveredBytes: evidenceResult == EvidenceResult.PARTIAL
+                ? refreshStatus.pendingActiveClaimedBytes
+                : refreshStatus.activeClaimedBytes,
             lastEvidenceRefreshEpoch: refreshStatus.lastEvidenceRefreshEpoch,
             reasonCode: 0,
             result: evidenceResult,
@@ -670,10 +685,8 @@ contract DataCapEvidenceAdapter is
         uint256 lastRefresh = uint256(uint64(CommonTypes.ChainEpoch.unwrap(refreshStatus.lastEvidenceRefreshEpoch)));
 
         if (block.number > lastRefresh + SharedTypes.EPOCHS_IN_MONTH) {
-            refreshStatus.checkedClaims = 0;
             refreshStatus.activeClaimedBytes = 0;
             refreshStatus.result = EvidenceResult.INACTIVE;
-            delete refreshStatus.failedClaimIds;
         }
         // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
@@ -775,7 +788,11 @@ contract DataCapEvidenceAdapter is
     function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
         DataCapEvidenceAdapterStorage storage $ = s();
         for (uint256 i = 0; i < claims.length; ++i) {
-            $._terminatedClaims[claims[i]] = true;
+            uint64 claimId = claims[i];
+            if ($._terminatedClaims[claimId]) continue;
+            $._terminatedClaims[claimId] = true;
+            uint256 dealId = $._claimDealIds[claimId];
+            if (dealId != 0) ++$._terminationRevisions[dealId];
         }
     }
 
