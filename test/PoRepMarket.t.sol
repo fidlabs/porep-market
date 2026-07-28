@@ -15,6 +15,7 @@ import {IPoRepMarket} from "../src/interfaces/IPoRepMarket.sol";
 import {IStorageEvidenceAdapter} from "../src/interfaces/IStorageEvidenceAdapter.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {DealType} from "../src/types/DealType.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
 import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 import {SettlementReason} from "../src/types/SettlementReason.sol";
@@ -130,7 +131,8 @@ contract PoRepMarketTest is Test {
             evidenceAdapter: address(dataCapEvidenceAdapterAddress),
             validator: validatorAddress,
             railId: railId,
-            proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+            proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+            dealType: DealType.PUBLIC
         });
     }
 
@@ -146,7 +148,8 @@ contract PoRepMarketTest is Test {
             manifestLocation: manifestLocation,
             paymentToken: paymentToken,
             durationDays: terms.durationDays,
-            requiredSLIs: requirements
+            requiredSLIs: requirements,
+            dealType: DealType.PUBLIC
         });
     }
 
@@ -250,7 +253,8 @@ contract PoRepMarketTest is Test {
                 evidenceAdapter: address(dataCapEvidenceAdapterAddress),
                 validator: address(0),
                 railId: 0,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         market.setDealCapacity(dealId, PoRepTypes.DealCapacity({reservedBytes: totalDealSize, committedBytes: 0}));
@@ -313,6 +317,50 @@ contract PoRepMarketTest is Test {
         assertEq(p.railId, 0);
         assertTrue(p.state == DealState.ACCEPTED);
         assertEq(p.evidenceAdapter, address(dataCapEvidenceAdapterAddress));
+    }
+
+    function testProposeDealStoresDealType() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        request.dealType = DealType.PUBLIC;
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(request);
+
+        assertEq(poRepMarket.getDeal(dealId).dealType, DealType.PUBLIC);
+    }
+
+    function testProposeDealStoresPrivateDealType() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        request.dealType = DealType.PRIVATE;
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(request);
+
+        assertEq(poRepMarket.getDeal(dealId).dealType, DealType.PRIVATE);
+    }
+
+    function testProposeDealRevertsWhenDealTypeIsNone() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        request.dealType = DealType.NONE;
+
+        vm.prank(clientAddress);
+        vm.expectRevert(PoRepMarket.InvalidDealType.selector);
+        poRepMarket.proposeDeal(request);
+    }
+
+    function testProposeDealStoresCustomDealType() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        uint8 customDealType = 30;
+        request.dealType = customDealType;
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(request);
+
+        assertEq(poRepMarket.getDeal(dealId).dealType, customDealType);
     }
 
     function testGetDealReturnsValidDeal() public {
@@ -1189,7 +1237,8 @@ contract PoRepMarketTest is Test {
                 evidenceAdapter: address(dataCapEvidenceAdapterAddress),
                 validator: address(validator),
                 railId: railId,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 
@@ -1263,7 +1312,8 @@ contract PoRepMarketTest is Test {
                 evidenceAdapter: address(dataCapEvidenceAdapterAddress),
                 validator: address(validator),
                 railId: railId,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         market.setDealPayment(

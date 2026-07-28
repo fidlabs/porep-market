@@ -26,6 +26,7 @@ import {AllocationResponseCbor} from "../src/lib/AllocationResponseCbor.sol";
 import {DataCapEvidenceAdapterContractMock} from "./contracts/DataCapEvidenceAdapterContractMock.sol";
 import {ReentrantMetaAllocatorMock} from "./contracts/ReentrantMetaAllocatorMock.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
+import {DealType} from "../src/types/DealType.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {DataCapAllocationStatus} from "../src/types/DataCapAllocationStatus.sol";
@@ -132,7 +133,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapter), uint256(10000));
@@ -586,7 +588,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: DealState.ACTIVE,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 
@@ -716,7 +719,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         vm.prank(clientAddress);
@@ -756,7 +760,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 validator: address(validatorMock),
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         reentrantMetaAllocatorMock.setAttackParams(
@@ -790,7 +795,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapter),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         // solhint-disable-next-line reentrancy
@@ -998,7 +1004,8 @@ contract DataCapEvidenceAdapterTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 0,
                 evidenceAdapter: address(dataCapEvidenceAdapter),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 

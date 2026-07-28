@@ -15,6 +15,7 @@ import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
 import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
+import {DealType} from "../src/types/DealType.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketViewHelperTest is Test {
@@ -215,6 +216,7 @@ contract PoRepMarketViewHelperTest is Test {
             manifestLocation: manifestLocation,
             paymentToken: paymentToken,
             durationDays: defaultTerms.durationDays,
+            dealType: DealType.PUBLIC,
             requiredSLIs: defaultRequirements
         });
     }

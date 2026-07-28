@@ -8,6 +8,7 @@ import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol
 import {IPoRepMarket} from "../src/interfaces/IPoRepMarket.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {DealType} from "../src/types/DealType.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
 
@@ -70,7 +71,8 @@ contract ValidatorTest is Test {
                 evidenceAdapter: evidenceAdapter,
                 validator: address(0),
                 railId: railId,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         poRepMarketMock.setDealPayment(
@@ -353,7 +355,8 @@ contract ValidatorTest is Test {
                 evidenceAdapter: evidenceAdapter,
                 validator: address(0),
                 railId: 0,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
         freshMarket.setDealPayment(

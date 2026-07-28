@@ -14,6 +14,7 @@ import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {DealType} from "../src/types/DealType.sol";
 
 contract PoRepMarketClaimInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
@@ -64,7 +65,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 
@@ -206,7 +208,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 
@@ -230,7 +233,8 @@ contract PoRepMarketClaimInspectorTest is Test {
                 state: DealState.ACCEPTED,
                 railId: 1,
                 evidenceAdapter: address(dataCapEvidenceAdapterMock),
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 

@@ -15,6 +15,7 @@ import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol"
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
+import {DealType} from "./types/DealType.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {RailStatus} from "./types/RailStatus.sol";
 import {EvidenceResult} from "./types/EvidenceResult.sol";
@@ -313,6 +314,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error InvalidManifestHash();
 
     /**
+     * @notice Error thrown when a deal request uses the NONE deal type.
+     */
+    error InvalidDealType();
+
+    /**
      * @notice Error thrown when manifest location is too long
      * @dev 0xa76fb58b
      */
@@ -519,6 +525,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         _ensureCorrectManifestLocation(request.manifestLocation);
         _ensureCorrectRequirements(request.requiredSLIs);
         if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
+        if (request.dealType == DealType.NONE) revert InvalidDealType();
 
         _ensureCorrectTerms(request);
     }
@@ -553,7 +560,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             evidenceAdapter: address(evidenceAdapter),
             validator: address(0),
             railId: 0,
-            proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch)
+            proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch),
+            dealType: request.dealType
         });
         marketStorage._dealSLIs[dealId] = selection.promisedSLIs;
         {
@@ -608,11 +616,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         view
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
-        _ensureCorrectManifestLocation(request.manifestLocation);
-        _ensureCorrectRequirements(request.requiredSLIs);
-        if (request.manifestHash == bytes32(0)) revert InvalidManifestHash();
-        _ensureCorrectTerms(request);
-
+        _ensureValidProposalRequest(request);
         return s()._SPRegistryContract.previewProviderForDeal(request);
     }
 

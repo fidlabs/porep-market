@@ -9,6 +9,7 @@ import {SPRegistry} from "../src/SPRegistry.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {OfferMatch} from "../src/types/OfferMatch.sol";
+import {DealType} from "../src/types/DealType.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {MockProxy} from "./contracts/MockProxy.sol";
 import {ResolveAddressPrecompileMock} from "./contracts/ResolveAddressPrecompileMock.sol";
@@ -77,7 +78,8 @@ contract SPRegistryTest is Test {
             durationDays: 180,
             requiredSLIs: SharedTypes.SLIThresholds({
                 retrievabilityBps: 9000, bandwidthBytesPerSecond: 500, latencyMs: 150, indexingPct: 80
-            })
+            }),
+            dealType: DealType.PUBLIC
         });
     }
 

@@ -14,6 +14,7 @@ import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {ValidatorMock} from "./contracts/ValidatorMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {DealType} from "../src/types/DealType.sol";
 
 contract PoRepMarketSectorStatusInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
@@ -58,7 +59,8 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
                 evidenceAdapter: address(0),
                 validator: address(validatorMock),
                 railId: 1,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 
@@ -119,7 +121,8 @@ contract PoRepMarketSectorStatusInspectorTest is Test {
                 evidenceAdapter: address(0),
                 validator: address(validatorMock),
                 railId: 1,
-                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0)
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
             })
         );
 
