@@ -12,6 +12,7 @@ import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol"
 import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {ISPRegistry} from "../src/interfaces/ISPRegistry.sol";
 import {IPoRepMarket} from "../src/interfaces/IPoRepMarket.sol";
+import {IStorageEvidenceAdapter} from "../src/interfaces/IStorageEvidenceAdapter.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {RailStatus} from "../src/types/RailStatus.sol";
@@ -1903,6 +1904,7 @@ contract PoRepMarketTest is Test {
             poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), settlementEndEpoch);
 
         assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, settlementEndEpoch);
         assertEq(decision.reasonCode, SettlementReason.SCORE_BELOW_THRESHOLD);
         assertEq(decision.result, SettlementResult.REJECTED);
         assertEq(decision.note, "score below required threshold");
@@ -1920,6 +1922,7 @@ contract PoRepMarketTest is Test {
             poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), settlementEndEpoch);
 
         assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, settlementEndEpoch);
         assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
         assertEq(decision.result, SettlementResult.REJECTED);
         // solhint-disable-next-line gas-small-strings
@@ -1936,6 +1939,41 @@ contract PoRepMarketTest is Test {
 
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
         vm.roll(settlementEndEpoch);
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
+
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, settlementStartEpoch);
+        assertEq(decision.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.note, "evidence refresh too old");
+    }
+
+    function testValidateDealSettlementRejectsInactiveEvidenceWithoutAdvancing() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 settlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
+        uint256 lastRefreshEpoch = settlementEndEpoch - EVIDENCE_REFRESH_GRACE_EPOCHS;
+
+        vm.roll(lastRefreshEpoch + poRepMarket.EPOCHS_IN_MONTH() + 1);
+        vm.mockCall(
+            address(dataCapEvidenceAdapterAddress),
+            IStorageEvidenceAdapter.currentEvidenceStatus.selector,
+            abi.encode(
+                SharedTypes.EvidenceStatus({
+                    activeCoveredBytes: 0,
+                    lastEvidenceRefreshEpoch: chainEpochFromBlock(lastRefreshEpoch),
+                    reasonCode: 0,
+                    result: EvidenceResult.INACTIVE,
+                    checkedClaims: 0,
+                    totalClaims: 0
+                })
+            )
+        );
 
         vm.prank(validatorAddress);
         SharedTypes.SettlementDecision memory decision =

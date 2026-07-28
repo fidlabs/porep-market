@@ -1206,7 +1206,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // solhint-disable function-max-lines, gas-strict-inequalities, gas-small-strings
     /**
      * @notice Validates the settlement amount for a deal's service window
-     * @dev Only the deal's validator may request a settlement decision.
+     * @dev Only the deal's validator may request a settlement decision. settleUpto controls how far FilecoinPay may
+     * advance its cursor, including for rejected zero-payment windows.
      * @param dealId The deal being settled
      * @param fromEpoch The epoch at which the settlement window starts
      * @param toEpoch The epoch at which the settlement window ends
@@ -1231,87 +1232,71 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         if (fromEpoch > serviceEndEpoch) {
-            decision.settlementAmount = 0;
-            decision.settleUpto = toEpoch;
-            decision.reasonCode = SettlementReason.DEAL_ENDED;
-            decision.result = SettlementResult.REJECTED;
-            decision.note = "deal ended";
-            return decision;
+            return _rejectedSettlement(toEpoch, SettlementReason.DEAL_ENDED, "deal ended");
         }
 
+        // Resolve the payable window before making external quality calls.
         bool settlementWasCapped;
-        uint256 settlementToEpoch = toEpoch;
+        // Requested end epoch after limiting it to the deal's termination or service end.
+        uint256 effectiveToEpoch = toEpoch;
         uint256 earlyTerminationEpoch = _epochToUint(service.earlyTerminationEpoch);
+        // Terminated deals are capped at termination; active deals must also satisfy the minimum settlement interval.
         if (earlyTerminationEpoch > 0) {
             if (fromEpoch >= earlyTerminationEpoch) {
-                decision.settlementAmount = 0;
-                decision.settleUpto = toEpoch;
-                decision.reasonCode = SettlementReason.DEAL_TERMINATED;
-                decision.result = SettlementResult.REJECTED;
-                decision.note = "deal terminated";
-                return decision;
+                return _rejectedSettlement(toEpoch, SettlementReason.DEAL_TERMINATED, "deal terminated");
             }
-            if (settlementToEpoch > earlyTerminationEpoch) {
-                settlementToEpoch = earlyTerminationEpoch;
+            if (effectiveToEpoch > earlyTerminationEpoch) {
+                effectiveToEpoch = earlyTerminationEpoch;
                 decision.note = "payment limited to deal termination epoch";
                 settlementWasCapped = true;
             }
         } else {
-            if (settlementToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
-                decision.settlementAmount = 0;
-                decision.settleUpto = fromEpoch;
-                decision.reasonCode = SettlementReason.TOO_EARLY;
-                decision.result = SettlementResult.REJECTED;
-                decision.note = "too early for settlement";
-                return decision;
+            if (effectiveToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
+                return _rejectedSettlement(fromEpoch, SettlementReason.TOO_EARLY, "too early for settlement");
             }
 
-            if (settlementToEpoch > serviceEndEpoch) {
-                settlementToEpoch = serviceEndEpoch;
+            if (effectiveToEpoch > serviceEndEpoch) {
+                effectiveToEpoch = serviceEndEpoch;
                 decision.note = "payment limited to deal endepoch";
                 settlementWasCapped = true;
             }
         }
 
+        // Stale evidence keeps the cursor at fromEpoch for retry; score and size failures advance it to effectiveToEpoch.
         {
             SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
             if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
-                decision.settlementAmount = 0;
-                decision.settleUpto = settlementToEpoch;
-                decision.reasonCode = SettlementReason.SCORE_BELOW_THRESHOLD;
-                decision.result = SettlementResult.REJECTED;
-                decision.note = "score below required threshold";
-                return decision;
+                return _rejectedSettlement(
+                    effectiveToEpoch, SettlementReason.SCORE_BELOW_THRESHOLD, "score below required threshold"
+                );
             }
         }
         {
             SharedTypes.EvidenceStatus memory evidenceStatus =
                 IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
-            if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
-                decision.settlementAmount = 0;
-                decision.settleUpto = settlementToEpoch;
-                decision.reasonCode = SettlementReason.DATA_SIZE_MISMATCH;
-                decision.result = SettlementResult.REJECTED;
-                decision.note = "data size does not match the deal";
-                return decision;
+            uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
+            if (
+                evidenceStatus.result == EvidenceResult.INACTIVE
+                    || lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch
+            ) {
+                return _rejectedSettlement(fromEpoch, SettlementReason.EVIDENCE_TOO_STALE, "evidence refresh too old");
             }
 
-            uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
-            if (lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < settlementToEpoch) {
-                decision.settlementAmount = 0;
-                decision.settleUpto = fromEpoch;
-                decision.reasonCode = SettlementReason.EVIDENCE_TOO_STALE;
-                decision.result = SettlementResult.REJECTED;
-                decision.note = "evidence refresh too old";
-                return decision;
+            if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
+                return _rejectedSettlement(
+                    effectiveToEpoch, SettlementReason.DATA_SIZE_MISMATCH, "data size does not match the deal"
+                );
             }
         }
+
+        // Only successful validation updates the market's settlement tracking.
         PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
         uint256 serviceStartEpoch = _epochToUint(service.serviceStartEpoch);
-        decision.settlementAmount = _calculateDueAmount(payment, serviceStartEpoch, settlementToEpoch)
+        // Subtract cumulative amounts at both boundaries to price only the accepted settlement window.
+        decision.settlementAmount = _calculateDueAmount(payment, serviceStartEpoch, effectiveToEpoch)
             - _calculateDueAmount(payment, serviceStartEpoch, fromEpoch);
 
-        decision.settleUpto = settlementWasCapped ? toEpoch : settlementToEpoch;
+        decision.settleUpto = settlementWasCapped ? toEpoch : effectiveToEpoch;
         decision.reasonCode = SettlementReason.OK;
         decision.result = settlementWasCapped ? SettlementResult.MODIFIED : SettlementResult.ACCEPTED;
         if (!settlementWasCapped) {
@@ -1415,6 +1400,24 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         uint256 monthlyTotal = payment.pricePer32GiBPerMonth * payment.billed32GiBUnits;
         amount = Math.mulDiv(monthlyTotal, epoch - serviceStartEpoch, EPOCHS_IN_MONTH);
+    }
+
+    /**
+     * @notice Builds a zero-payment settlement rejection with an explicit cursor position
+     * @param settleUpto Epoch FilecoinPay may advance to
+     * @param reasonCode Settlement rejection reason
+     * @param note Human-readable rejection reason
+     * @return decision Rejected settlement decision
+     */
+    function _rejectedSettlement(uint256 settleUpto, uint16 reasonCode, string memory note)
+        private
+        pure
+        returns (SharedTypes.SettlementDecision memory decision)
+    {
+        decision.settleUpto = settleUpto;
+        decision.reasonCode = reasonCode;
+        decision.result = SettlementResult.REJECTED;
+        decision.note = note;
     }
 
     //  solhint-enable
