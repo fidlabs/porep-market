@@ -413,6 +413,18 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error DealActivationPaddingTooHigh(uint256 padding, uint256 maxPadding);
 
     /**
+     * @notice Error thrown when a deal's submitted evidence has not expired
+     * @dev 0x597bec1a
+     */
+    error EvidenceNotExpired(uint256 dealId);
+
+    /**
+     * @notice Error thrown when an unsupported terminal deal state is requested
+     * @dev 0x73a2ca71
+     */
+    error InvalidTerminationState(uint8 state);
+
+    /**
      * @notice Constructor
      */
     /// @custom:oz-upgrades-unsafe-allow constructor
@@ -869,26 +881,42 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @notice Terminate a deal
-     * @dev Terminates a deal by setting the deal state to terminated
+     * @notice Terminates a deal with the requested terminal state
      * @param dealId The id of the deal
+     * @param state The terminal state to assign to the deal
      */
-    function terminateDeal(uint256 dealId) external override {
+    function terminateDeal(uint256 dealId, uint8 state) external override {
         _ensurePoRepServiceOrAdmin();
-        PoRepMarketStorage storage $ = s();
-        PoRepTypes.Deal storage deal = $._deals[dealId];
-
+        PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
-
         if (deal.validator == address(0)) {
             revert ValidatorNotSet(dealId);
         }
+        if (state == DealState.EXPIRED) {
+            _ensureDealCorrectState(deal, DealState.ACCEPTED);
 
+            IStorageEvidenceAdapter adapter = IStorageEvidenceAdapter(deal.evidenceAdapter);
+            int64 expiration = CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(dealId));
+            bool evidenceExpired = expiration != 0 && expiration < int64(uint64(block.number));
+            if (!evidenceExpired) {
+                revert EvidenceNotExpired(dealId);
+            }
+        } else if (state != DealState.EARLY_TERMINATED) {
+            revert InvalidTerminationState(state);
+        }
+        _terminateDeal(deal, state);
+    }
+
+    /**
+     * @notice Terminates a deal and its payment rail
+     * @param deal The deal to terminate
+     * @param state The terminal state to assign to the deal
+     */
+    function _terminateDeal(PoRepTypes.Deal memory deal, uint8 state) internal {
+        PoRepMarketStorage storage $ = s();
+        uint256 dealId = deal.dealId;
         uint8 previousState = deal.state;
-        IOperator(deal.validator).earlyRailTermination();
-        int64 earlyTerminationEpoch = int64(uint64(block.number));
-        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch);
-        _changeDealState(dealId, DealState.TERMINATED);
+        _changeDealState(dealId, state);
         if (previousState == DealState.ACCEPTED) {
             $._SPRegistryContract
                 .releasePendingCapacity(
@@ -900,6 +928,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                     deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash
                 );
         }
+        IOperator(deal.validator).earlyRailTermination();
+        int64 earlyTerminationEpoch = int64(uint64(block.number));
+        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch);
         emit DealTerminated(dealId, $._dealService[dealId].earlyTerminationEpoch);
     }
 

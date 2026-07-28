@@ -1438,6 +1438,11 @@
         "name": "dealId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "state",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ],
     "outputs": [],
@@ -2106,6 +2111,17 @@
   },
   {
     "type": "error",
+    "name": "EvidenceNotExpired",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
@@ -2207,6 +2223,17 @@
     "type": "error",
     "name": "InvalidSLIScorerAddress",
     "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidTerminationState",
+    "inputs": [
+      {
+        "name": "state",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
   },
   {
     "type": "error",

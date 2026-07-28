@@ -5,7 +5,6 @@ pragma solidity =0.8.30;
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
-import {DealState} from "../../src/types/DealState.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
 
 contract PoRepMarketMock {
@@ -78,8 +77,8 @@ contract PoRepMarketMock {
         deals[dealId].railId = newRailId;
     }
 
-    function terminateDeal(uint256 dealId) external {
-        deals[dealId].state = DealState.TERMINATED;
+    function terminateDeal(uint256 dealId, uint8 state) external {
+        deals[dealId].state = state;
         dealServices[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
     }
 }

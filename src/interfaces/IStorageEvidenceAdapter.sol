@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
+import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
 
 /**
@@ -22,6 +23,13 @@ interface IStorageEvidenceAdapter {
      * @return True if the adapter can process new evidence, false if it is no longer operational
      */
     function isOperational() external view returns (bool);
+
+    /**
+     * @notice Retrieves the expiration epoch for a deal's submitted evidence
+     * @param dealId The id of the deal
+     * @return expiration The evidence expiration epoch
+     */
+    function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration);
 
     /**
      * @notice Submit one bounded batch of adapter-specific evidence for a deal

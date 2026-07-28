@@ -538,6 +538,7 @@ contract DataCapEvidenceAdapterTest is Test {
         (CommonTypes.FilActorId[] memory ids,) =
             dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
         assertEq(ids.length, 1);
+        assertEq(CommonTypes.ChainEpoch.unwrap(dataCapEvidenceAdapter.getExpiration(dealId)), 5_256_000);
     }
 
     function testTransferRevertsWhenAllocationExpirationIsBeforeCurrentBlock() public {
@@ -565,6 +566,7 @@ contract DataCapEvidenceAdapterTest is Test {
         (CommonTypes.FilActorId[] memory ids,) =
             dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
         assertEq(ids.length, 1);
+        assertEq(CommonTypes.ChainEpoch.unwrap(dataCapEvidenceAdapter.getExpiration(dealId)), 1_000);
     }
 
     function testClientCanCallTransfer() public {

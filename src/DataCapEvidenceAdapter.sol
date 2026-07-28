@@ -46,6 +46,7 @@ contract DataCapEvidenceAdapter is
         IPoRepMarket _poRepMarketContract;
         IMetaAllocator _metaAllocatorContract;
         bool _operational;
+        mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _maxAllocationExpirationPerDeal;
         mapping(uint64 claimId => uint256 dealId) _claimDealIds;
         mapping(uint256 dealId => uint256 revision) _terminationRevisions;
     }
@@ -900,6 +901,15 @@ contract DataCapEvidenceAdapter is
     }
 
     /**
+     * @notice Retrieves the latest expiration epoch among a deal's allocations
+     * @param dealId The id of the deal
+     * @return expiration The latest allocation expiration epoch
+     */
+    function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration) {
+        return s()._maxAllocationExpirationPerDeal[dealId];
+    }
+
+    /**
      * @notice Getter for the PoRepMarket contract address
      * @return Address of the PoRepMarket contract
      */
@@ -1013,10 +1023,12 @@ contract DataCapEvidenceAdapter is
      */
     function _verifyAndRegisterAllocations(uint256 dealId, ProviderAllocation[] memory allocations)
         internal
-        view
         returns (uint256 allocatedBytes)
     {
         DataCapDealEvidence storage dealEvidence = _getStorageDeal(dealId);
+        int64 savedExpiration = CommonTypes.ChainEpoch.unwrap(s()._maxAllocationExpirationPerDeal[dealId]);
+        int64 maximumExpiration = savedExpiration;
+
         for (uint256 i = 0; i < allocations.length; i++) {
             ProviderAllocation memory alloc = allocations[i];
             if (CommonTypes.FilActorId.unwrap(alloc.provider) != CommonTypes.FilActorId.unwrap(dealEvidence.provider)) {
@@ -1032,7 +1044,14 @@ contract DataCapEvidenceAdapter is
                 revert InvalidAllocationSize();
             }
 
+            if (alloc.expiration > maximumExpiration) {
+                maximumExpiration = alloc.expiration;
+            }
             allocatedBytes += alloc.size;
+        }
+
+        if (maximumExpiration != savedExpiration) {
+            s()._maxAllocationExpirationPerDeal[dealId] = CommonTypes.ChainEpoch.wrap(maximumExpiration);
         }
     }
 

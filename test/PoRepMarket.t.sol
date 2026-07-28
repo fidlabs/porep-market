@@ -2209,10 +2209,10 @@ contract PoRepMarketTest is Test {
         int64 endEpoch = int64(uint64(block.number));
         emit PoRepMarket.DealTerminated(dealId, CommonTypes.ChainEpoch.wrap(endEpoch));
         vm.prank(adminAddress);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
 
         PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
-        assertTrue(p.state == DealState.TERMINATED);
+        assertTrue(p.state == DealState.EARLY_TERMINATED);
         assertEq(validator.earlyRailTerminationCallCount(), 1);
     }
 
@@ -2234,7 +2234,7 @@ contract PoRepMarketTest is Test {
         setDealActive(dealId);
 
         vm.prank(adminAddress);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
 
         assertEq(spRegistry.lastReleasedCapacityProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
         assertEq(spRegistry.lastReleasedCapacityBytes(), allocatedSize);
@@ -2256,19 +2256,75 @@ contract PoRepMarketTest is Test {
         validator.setRailStatus(RailStatus.PREPARED);
 
         vm.prank(adminAddress);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
 
         assertEq(spRegistry.lastReleasedPendingProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
         assertEq(spRegistry.lastReleasedPendingBytes(), totalDealSize);
         assertEq(spRegistry.lastReleasedPendingManifestHash(), defaultManifestHash);
-        assertEq(poRepMarket.getDeal(dealId).state, DealState.TERMINATED);
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.EARLY_TERMINATED);
         assertEq(validator.earlyRailTerminationCallCount(), 1);
+    }
+
+    function testTerminateDealExpiresAcceptedDealAfterEvidenceExpiration() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+        proposeDefaultDeal();
+
+        vm.startPrank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        poRepMarket.updateRailId(dealId, railId);
+        vm.stopPrank();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        vm.roll(100);
+        dataCapEvidenceAdapterAddress.setDealAllocationExpiration(dealId, chainEpochFromBlock(block.number - 1));
+
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EXPIRED);
+
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.EXPIRED);
+        assertEq(validator.earlyRailTerminationCallCount(), 1);
+        assertEq(spRegistry.lastReleasedPendingProvider(), CommonTypes.FilActorId.unwrap(providerFilActorId));
+        assertEq(spRegistry.lastReleasedPendingBytes(), totalDealSize);
+        assertEq(spRegistry.lastReleasedPendingManifestHash(), defaultManifestHash);
+    }
+
+    function testTerminateDealRevertsWhenEvidenceExpirationIsNotSet() public {
+        proposeDefaultDeal();
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EvidenceNotExpired.selector, dealId));
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EXPIRED);
+    }
+
+    function testTerminateDealRevertsBeforeEvidenceExpiration() public {
+        proposeDefaultDeal();
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+        dataCapEvidenceAdapterAddress.setDealAllocationExpiration(dealId, chainEpochFromBlock(block.number + 1));
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EvidenceNotExpired.selector, dealId));
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EXPIRED);
+    }
+
+    function testTerminateDealRevertsForUnsupportedTerminalState() public {
+        uint8 unsupportedState = DealState.FINALIZED;
+        proposeDefaultDeal();
+        vm.prank(validatorAddress);
+        poRepMarket.updateValidator(dealId);
+
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidTerminationState.selector, unsupportedState));
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, unsupportedState);
     }
 
     function testTerminateDealRevertsWhenDealDoesNotExist() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealDoesNotExist.selector));
         vm.prank(adminAddress);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
     }
 
     function testTerminateDealRevertsWhenValidatorNotSetForDealThatIsNotActive() public {
@@ -2277,7 +2333,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ValidatorNotSet.selector, dealId));
         vm.prank(adminAddress);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
     }
 
     function testTerminateDealRevertsWhenValidatorNotSet() public {
@@ -2288,7 +2344,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ValidatorNotSet.selector, dealId));
         vm.prank(adminAddress);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
     }
 
     function testTerminateDealRevertsWhenCallerIsNotPoRepServiceOrAdmin() public {
@@ -2307,7 +2363,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(caller);
-        poRepMarket.terminateDeal(dealId);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
     }
 
     function testGetDealsForOrganizationByStateZeroAddressOfOrganizationReverts() public {
