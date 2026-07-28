@@ -122,12 +122,12 @@ library SharedTypes {
     }
 
     /**
-     * @notice ActivationContext struct represents the context for deal activation
+     * @notice Frozen deal facts PoRepMarket passes to the selected adapter
      * @param dealId ID of the deal
-     * @param requestedSizeBytes requested data size in bytes
-     * @param client address of the client
-     * @param durationEpochs requested deal duration in epochs
-     * @param activationToleranceBps activation tolerance in basis points
+     * @param requestedSizeBytes Requested data size in bytes
+     * @param client Deal client
+     * @param durationEpochs Requested deal duration in epochs
+     * @param activationToleranceBps Allowed activation shortfall in basis points
      * @param provider ID of the provider
      */
     struct ActivationContext {
@@ -140,10 +140,10 @@ library SharedTypes {
     }
 
     /**
-     * @notice ActivationDecision struct represents the decision for deal activation
-     * @param coveredBytes accepted bytes from adapter-checked allocation/claim evidence
-     * @param reasonCode code representing the reason for the decision
-     * @param result activation result code
+     * @notice Adapter result used by PoRepMarket to decide whether a deal can activate
+     * @param coveredBytes Bytes covered by the checked storage facts
+     * @param reasonCode Adapter-specific reason code
+     * @param result Activation result code
      */
     struct ActivationDecision {
         uint256 coveredBytes;
@@ -152,13 +152,13 @@ library SharedTypes {
     }
 
     /**
-     * @notice EvidenceStatus struct represents the status of evidence for a deal
-     * @param activeCoveredBytes currently active bytes from adapter-checked evidence
-     * @param lastEvidenceRefreshEpoch epoch of the last evidence refresh
-     * @param reasonCode code representing the reason for the current status
-     * @param result current result code based on submitted evidence
-     * @param checkedClaims number of claims already checked in the current refresh sweep
-     * @param totalClaims total number of claims that must be checked for the deal
+     * @notice Adapter status used by PoRepMarket during settlement
+     * @param activeCoveredBytes Bytes still covered by the last completed check
+     * @param lastEvidenceRefreshEpoch Epoch of the last completed check
+     * @param reasonCode Adapter-specific reason code
+     * @param result Current result code
+     * @param checkedClaims Claims checked in the current refresh sweep
+     * @param totalClaims Claims that must be checked for the deal
      */
     struct EvidenceStatus {
         uint256 activeCoveredBytes;

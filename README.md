@@ -46,6 +46,30 @@ Canonical lifecycle codes and data structures live in
 [`PoRepTypes`](src/types/PoRepTypes.sol), and
 [`SharedTypes`](src/types/SharedTypes.sol).
 
+### Why the adapter exists
+
+DataCap and VerifReg are the current way PoRep Market checks storage, but this
+path is being phased out. V2 cannot bake DataCap allocations and claims into
+its deal and payment model and then require another market redesign when
+Filecoin removes them.
+
+The adapter is the transition boundary. It translates whichever Filecoin
+storage mechanism is available into the few facts PoRep Market needs: how many
+deal bytes have storage coverage, whether the deal can activate, and whether
+that coverage is still current.
+
+Today `DataCapEvidenceAdapter` gets those facts from DataCap allocations and
+VerifReg claims. A later adapter can use the post-DataCap mechanism without
+changing `PoRepMarket`, `Validator`, or the existing deal ABI.
+
+Each deal keeps the adapter selected when it was created. New deals can move to
+the replacement while older deals remain tied to the path they started with.
+
+The code calls these storage facts **evidence**. Evidence here means the
+on-chain information used to check storage coverage; it does not mean that
+every adapter returns a cryptographic proof. The rest of this README calls it
+the adapter.
+
 ## Deal lifecycle
 
 ```mermaid
