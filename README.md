@@ -10,9 +10,15 @@ only the system ownership and deal lifecycle needed to navigate them.
 
 ## Deployments
 
-- [Latest V2 Calibnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/calibnet/latest.json)
+### V2
+
+- [Latest Calibnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/calibnet/latest.json)
+- Mainnet: not released yet.
+
+### V1
+
+- [Latest Calibnet deployment](https://github.com/fidlabs/porep-market/blob/v1/deployments/calibnet/latest.json)
 - [Latest mainnet deployment](https://github.com/fidlabs/porep-market/blob/v1/deployments/mainnet/latest.json)
-  — currently V1; V2 is not released on mainnet.
 
 `main` contains V2. V1 maintenance, releases, deployments, and upgrades belong
 on the separate `v1` branch.
