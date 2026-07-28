@@ -9,7 +9,9 @@ import {IStorageEvidenceAdapter} from "./IStorageEvidenceAdapter.sol";
 
 /**
  * @title IDataCapEvidenceAdapter
- * @notice Interface for DataCap evidence interactions
+ * @notice DataCap and VerifReg implementation of the storage evidence adapter
+ * @dev Owns DataCap posting, allocation and claim records, and claim refresh
+ * for deals that selected this adapter.
  */
 interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     /**
@@ -123,7 +125,8 @@ interface IDataCapEvidenceAdapter is IStorageEvidenceAdapter {
     function getPoRepMarketAddress() external view returns (address);
 
     /**
-     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already non-operational
+     * @notice Permanently closes this adapter to new DataCap posting
+     * @dev Existing allocation and claim processing, activation, and refresh remain available
      * @dev Only callable by the admin
      */
     function disableAdapter() external;

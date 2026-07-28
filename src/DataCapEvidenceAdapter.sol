@@ -15,6 +15,7 @@ import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {AllocationResponseCbor} from "./lib/AllocationResponseCbor.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
+import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
 import {DealState} from "./types/DealState.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -26,7 +27,9 @@ import {DataCapAllocationStatus} from "./types/DataCapAllocationStatus.sol";
 
 /**
  * @title DataCapEvidenceAdapter
- * @notice Contract for handling DataCap evidence interactions
+ * @notice Handles DataCap posting and VerifReg claim checks for deals using the current Filecoin Plus path
+ * @dev Keeps DataCap-specific state and actor calls outside PoRepMarket so new
+ * deals can move to a replacement adapter when DataCap is removed.
  */
 contract DataCapEvidenceAdapter is
     IDataCapEvidenceAdapter,
@@ -768,10 +771,7 @@ contract DataCapEvidenceAdapter is
         data = "";
     }
 
-    /**
-     * @notice Permanently marks the adapter as no longer operational. Reverts if the adapter is already non-operational
-     * @dev Only callable by the admin
-     */
+    /// @inheritdoc IDataCapEvidenceAdapter
     function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
         DataCapEvidenceAdapterStorage storage $ = s();
         if ($._operational == false) {
@@ -797,12 +797,7 @@ contract DataCapEvidenceAdapter is
         }
     }
 
-    /**
-     * @notice Returns whether the adapter can still process new evidence
-     * @dev Returns false when the adapter is no longer operational, for example
-     * when the DataCap adapter can no longer accept allocations or claims
-     * @return True if the adapter can process new evidence, false if it is no longer operational
-     */
+    /// @inheritdoc IStorageEvidenceAdapter
     function isOperational() external view returns (bool) {
         return s()._operational;
     }
@@ -917,10 +912,7 @@ contract DataCapEvidenceAdapter is
         return address(s()._poRepMarketContract);
     }
 
-    /**
-     * @notice Getter for the evidence type
-     * @return The evidence type as uint8
-     */
+    /// @inheritdoc IStorageEvidenceAdapter
     function getEvidenceType() external pure returns (uint8) {
         return EvidenceTypes.VERIF_REG_CLAIMS;
     }

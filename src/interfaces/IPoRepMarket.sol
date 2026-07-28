@@ -10,9 +10,9 @@ import {SharedTypes} from "../types/SharedTypes.sol";
  */
 interface IPoRepMarket {
     /**
-     * @notice Sets the global evidence adapter
-     * @dev New deals snapshot this adapter at proposal time
-     * @param _globalEvidenceAdapter The address of the global evidence adapter
+     * @notice Sets the adapter assigned to newly created deals
+     * @dev Existing deals keep the adapter selected when they were created
+     * @param _globalEvidenceAdapter New default adapter address
      */
     function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) external;
 
@@ -224,15 +224,15 @@ interface IPoRepMarket {
     function getSPRegistryContract() external view returns (address);
 
     /**
-     * @notice Gets the global evidence adapter address from storage
-     * @return The global evidence adapter address
+     * @notice Gets the adapter currently assigned to newly created deals
+     * @return Default adapter address
      */
     function getGlobalEvidenceAdapter() external view returns (address);
 
     /**
-     * @notice Gets the evidence adapter assigned to a deal
+     * @notice Gets the adapter selected when a deal was created
      * @param dealId The id of the deal
-     * @return The deal evidence adapter address
+     * @return Adapter address stored on the deal
      */
     function getDealEvidenceAdapter(uint256 dealId) external view returns (address);
 

@@ -5,22 +5,29 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {SharedTypes} from "../types/SharedTypes.sol";
 
 /**
- * @title Storage evidence adapter interface
- * @notice Defines the adapter used by PoRepMarket to submit, activate, refresh,
- * and query deal evidence for different evidence sources
+ * @title Storage evidence adapter
+ * @notice Keeps PoRepMarket independent from DataCap and the storage-checking
+ * system that replaces it.
+ * @dev DataCap and VerifReg are the current path, but they are not permanent.
+ * Each adapter converts one Filecoin storage-checking path into the activation
+ * and refresh results used by PoRepMarket. A deal keeps the adapter selected
+ * when it is created.
+ *
+ * "Evidence" means the on-chain facts used to check storage coverage. It does
+ * not mean that every adapter returns a cryptographic proof.
  */
 interface IStorageEvidenceAdapter {
     /**
-     * @notice Returns the adapter's evidence type identifier
-     * @return evidence type as a uint8; PoRepMarket uses this to route evidence to the correct adapter
+     * @notice Returns the identifier of the storage-checking mechanism implemented by this adapter
+     * @dev PoRepMarket routes calls through the adapter address stored on the deal, not through this identifier
+     * @return Adapter type identifier
      */
     function getEvidenceType() external pure returns (uint8);
 
     /**
-     * @notice Returns whether the adapter can still process new evidence
-     * @dev Returns false when the adapter is no longer operational, for example
-     * when the DataCap adapter can no longer accept allocations or claims
-     * @return True if the adapter can process new evidence, false if it is no longer operational
+     * @notice Returns whether operators should assign this adapter to new deals
+     * @dev An adapter may stop new deal setup while keeping reads and refreshes available for existing deals
+     * @return True when the adapter is available for new deals
      */
     function isOperational() external view returns (bool);
 

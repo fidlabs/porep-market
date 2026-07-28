@@ -472,11 +472,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
 
-    /**
-     * @notice Sets the global evidence adapter
-     * @dev New deals snapshot this adapter at proposal time
-     * @param _globalEvidenceAdapter The address of the global evidence adapter
-     */
+    /// @inheritdoc IPoRepMarket
     function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) public override onlyRole(DEFAULT_ADMIN_ROLE) {
         if (_globalEvidenceAdapter == address(0)) {
             revert InvalidEvidenceAdapterAddress();
