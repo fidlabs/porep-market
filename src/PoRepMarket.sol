@@ -12,6 +12,7 @@ import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IOperator} from "./interfaces/IOperator.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
+import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
@@ -185,14 +186,25 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
+    // solhint-disable gas-indexed-events
     /**
-     * @notice ManifestLocationUpdated event
-     * @dev ManifestLocationUpdated event is emitted when a manifest location is updated
+     * @notice ManifestUpdated event
+     * @dev ManifestUpdated event is emitted when a manifest location and requested size are updated
      * @param dealId The id of the deal
      * @param oldManifestLocation The old manifest location
      * @param newManifestLocation The new manifest location
+     * @param oldRequestedSizeBytes The old requested size in bytes
+     * @param newRequestedSizeBytes The new requested size in bytes
      */
-    event ManifestLocationUpdated(uint256 indexed dealId, string oldManifestLocation, string newManifestLocation);
+    event ManifestUpdated(
+        uint256 indexed dealId,
+        string oldManifestLocation,
+        string newManifestLocation,
+        uint256 oldRequestedSizeBytes,
+        uint256 newRequestedSizeBytes
+    );
+
+    // solhint-enable gas-indexed-events
 
     /**
      * @notice GlobalEvidenceAdapterUpdated event
@@ -386,6 +398,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev 0xdbe015a7
      */
     error InvalidDealSize();
+
+    /**
+     * @notice Error thrown when the new requested size is below the bytes already allocated for the deal
+     * @dev 0xb0b91a93
+     */
+    error RequestedSizeBelowAllocatedBytes();
 
     /**
      * @notice Error thrown when a deal is not in a state that allows it to be rejected
@@ -1173,18 +1191,20 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @notice Updates the manifest location for a specific deal
+     * @notice Updates the manifest location and requested size for a specific deal
      * @dev Only callable by the admin
      * @param dealId The unique identifier of the deal
      * @param newManifestLocation The new manifest location URL to be updated for the deal
+     * @param newRequestedSizeBytes The new requested size in bytes read from the updated manifest
      */
-    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation)
+    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation, uint256 newRequestedSizeBytes)
         external
         override
         onlyRole(DEFAULT_ADMIN_ROLE)
     {
         PoRepMarketStorage storage $ = s();
-        _ensureDealExists($._deals[dealId]);
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+        _ensureDealExists(deal);
 
         if (bytes(newManifestLocation).length == 0) {
             revert EmptyManifestLocation();
@@ -1194,9 +1214,24 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             revert TooLongManifestLocation();
         }
 
+        if (newRequestedSizeBytes == 0) {
+            revert InvalidDealSize();
+        }
+
+        uint256 allocatedBytes = IDataCapEvidenceAdapter(deal.evidenceAdapter).getAllocatedBytes(dealId);
+        if (newRequestedSizeBytes < allocatedBytes) {
+            revert RequestedSizeBelowAllocatedBytes();
+        }
+
         string memory oldManifestLocation = $._dealData[dealId].manifestLocation;
         $._dealData[dealId].manifestLocation = newManifestLocation;
-        emit ManifestLocationUpdated(dealId, oldManifestLocation, newManifestLocation);
+
+        uint256 oldRequestedSizeBytes = $._dealTerms[dealId].requestedSizeBytes;
+        $._dealTerms[dealId].requestedSizeBytes = newRequestedSizeBytes;
+
+        emit ManifestUpdated(
+            dealId, oldManifestLocation, newManifestLocation, oldRequestedSizeBytes, newRequestedSizeBytes
+        );
     }
 
     /**

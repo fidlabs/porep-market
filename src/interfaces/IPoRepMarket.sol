@@ -188,12 +188,14 @@ interface IPoRepMarket {
     function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
-     * @notice Updates the manifest location for a specific deal
+     * @notice Updates the manifest location and requested size for a specific deal
      * @dev Only callable by the admin
      * @param dealId The unique identifier of the deal
      * @param newManifestLocation The new manifest location URL to be updated for the deal
+     * @param newRequestedSizeBytes The new requested size in bytes read from the updated manifest
      */
-    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation) external;
+    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation, uint256 newRequestedSizeBytes)
+        external;
 
     /**
      * @notice Updates the deal activation padding

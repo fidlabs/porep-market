@@ -1652,7 +1652,7 @@ contract PoRepMarketTest is Test {
 
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EmptyManifestLocation.selector, ""));
-        poRepMarket.updateManifestLocation(dealId, "");
+        poRepMarket.updateManifestLocation(dealId, "", totalDealSize);
     }
 
     function testProposeDealRevertsWhenDealDurationIsBelowMinimum() public {
@@ -1695,20 +1695,25 @@ contract PoRepMarketTest is Test {
         SharedTypes.DealData memory data = poRepMarket.getDealData(dealId);
         assertEq(data.manifestLocation, expectedManifestLocation);
         string memory updatedManifestLocation = "updatedManifestLocation";
+        uint256 updatedRequestedSizeBytes = totalDealSize * 2;
         vm.prank(adminAddress);
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, updatedRequestedSizeBytes);
         data = poRepMarket.getDealData(dealId);
         assertEq(data.manifestLocation, updatedManifestLocation);
+        assertEq(poRepMarket.getDealTerms(dealId).requestedSizeBytes, updatedRequestedSizeBytes);
     }
 
     function testManifestLocationUpdateEmitsEvent() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         string memory updatedManifestLocation = "updatedManifestLocation";
+        uint256 updatedRequestedSizeBytes = totalDealSize * 2;
         vm.prank(adminAddress);
         vm.expectEmit(true, true, true, true);
-        emit PoRepMarket.ManifestLocationUpdated(dealId, expectedManifestLocation, updatedManifestLocation);
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
+        emit PoRepMarket.ManifestUpdated(
+            dealId, expectedManifestLocation, updatedManifestLocation, totalDealSize, updatedRequestedSizeBytes
+        );
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, updatedRequestedSizeBytes);
     }
 
     function testManifestLocationUpdateRevertsTooLongManifestLocation() public {
@@ -1717,7 +1722,7 @@ contract PoRepMarketTest is Test {
         string memory updatedManifestLocation = TestUtils.generateLongString(2049);
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.TooLongManifestLocation.selector, updatedManifestLocation));
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize);
     }
 
     function testProposeDealRevertsTooLongManifestLocation() public {
@@ -2728,6 +2733,26 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(clientAddress);
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize);
+    }
+
+    function testManifestLocationUpdateRevertsInvalidDealSize() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        string memory updatedManifestLocation = "updatedManifestLocation";
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealSize.selector));
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, 0);
+    }
+
+    function testManifestLocationUpdateRevertsWhenBelowAllocatedBytes() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        uint256 allocatedBytes = totalDealSize / 2;
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, allocatedBytes));
+        string memory updatedManifestLocation = "updatedManifestLocation";
+        vm.prank(adminAddress);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.RequestedSizeBelowAllocatedBytes.selector));
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, allocatedBytes - 1);
     }
 }
