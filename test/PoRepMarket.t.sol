@@ -2745,14 +2745,14 @@ contract PoRepMarketTest is Test {
         poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, 0);
     }
 
-    function testManifestLocationUpdateRevertsWhenBelowAllocatedBytes() public {
+    function testManifestLocationUpdateRevertsWhenDataCapAlreadyAllocated() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         uint256 allocatedBytes = totalDealSize / 2;
         dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, allocatedBytes));
         string memory updatedManifestLocation = "updatedManifestLocation";
         vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.RequestedSizeBelowAllocatedBytes.selector));
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, allocatedBytes - 1);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ManifestUpdateNotAllowedAfterAllocation.selector));
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize * 2);
     }
 }

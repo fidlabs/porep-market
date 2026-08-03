@@ -400,10 +400,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error InvalidDealSize();
 
     /**
-     * @notice Error thrown when the new requested size is below the bytes already allocated for the deal
-     * @dev 0xb0b91a93
+     * @notice Error thrown when the manifest is updated after DataCap has already been allocated for the deal
+     * @dev 0x5fe775b3
      */
-    error RequestedSizeBelowAllocatedBytes();
+    error ManifestUpdateNotAllowedAfterAllocation();
 
     /**
      * @notice Error thrown when a deal is not in a state that allows it to be rejected
@@ -1219,8 +1219,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
 
         uint256 allocatedBytes = IDataCapEvidenceAdapter(deal.evidenceAdapter).getAllocatedBytes(dealId);
-        if (newRequestedSizeBytes < allocatedBytes) {
-            revert RequestedSizeBelowAllocatedBytes();
+        if (allocatedBytes != 0) {
+            revert ManifestUpdateNotAllowedAfterAllocation();
         }
 
         string memory oldManifestLocation = $._dealData[dealId].manifestLocation;

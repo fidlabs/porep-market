@@ -2335,6 +2335,11 @@
   },
   {
     "type": "error",
+    "name": "ManifestUpdateNotAllowedAfterAllocation",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MinEpochsBetweenSettlementsExceeded",
     "inputs": []
   },
@@ -2404,6 +2409,7 @@
   {
     "type": "error",
 <<<<<<< HEAD
+<<<<<<< HEAD
     "name": "ServiceAlreadyEnded",
     "inputs": [
       {
@@ -2424,6 +2430,8 @@
   },
   {
     "type": "error",
+=======
+>>>>>>> 0ec7b06 (refactor: cannot update manifest while DataCap has been already allocated)
     "name": "ServiceNotEnded",
     "inputs": [
       {
