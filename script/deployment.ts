@@ -14,7 +14,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 import {
@@ -785,6 +785,7 @@ function ensureFile(path: string, label: string): void {
 
 async function ensureCleanCanonicalManifest(context: Context): Promise<void> {
   const path = canonicalManifestPath(context);
+  if (relative(context.root, path).startsWith("..")) return;
   const output = await runProcess(
     context.git,
     ["-C", context.root, "status", "--porcelain", "--untracked-files=all", "--", path],
