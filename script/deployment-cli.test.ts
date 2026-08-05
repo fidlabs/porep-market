@@ -1,7 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import { chmodSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
 import { test } from "node:test";
-import { networkConfigs } from "./deployment.ts";
+import { tmpdir } from "node:os";
+import {
+  installSignalHandling,
+  networkConfigs,
+  runDeploymentCli,
+  runProcess,
+  writeAtomicFile,
+} from "./deployment.ts";
 
 const scriptPath = "script/deployment.ts";
 
@@ -9,6 +18,36 @@ function runDeploymentCommand(...args: string[]) {
   return spawnSync(process.execPath, [scriptPath, ...args], {
     encoding: "utf8",
   });
+}
+
+function createTemporaryDirectory(): string {
+  return mkdtempSync(join(tmpdir(), "porep-deployment-cli-"));
+}
+
+function createFakeExecutable(directory: string, name: string, output = ""): string {
+  const path = join(directory, name);
+  writeFileSync(
+    path,
+    `#!${process.execPath}\n` +
+      "import { appendFileSync } from 'node:fs';\n" +
+      "if (process.env.FAKE_COMMAND_LOG) appendFileSync(process.env.FAKE_COMMAND_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');\n" +
+      `process.stdout.write(${JSON.stringify(output)});\n`,
+  );
+  chmodSync(path, 0o755);
+  return path;
+}
+
+function deploymentEnvironment(): NodeJS.ProcessEnv {
+  return {
+    RPC_DEVNET: "http://devnet.example",
+    PRIVATE_KEY_DEVNET: "devnet-key",
+    FILECOIN_PAY_DEVNET: "0x0000000000000000000000000000000000000001",
+    TERMINATION_ORACLE_DEVNET: "0x0000000000000000000000000000000000000002",
+    ORACLE_DEVNET: "0x0000000000000000000000000000000000000003",
+    POREP_SERVICE_DEVNET: "0x0000000000000000000000000000000000000004",
+    META_ALLOCATOR_DEVNET: "0x0000000000000000000000000000000000000005",
+    OPERATOR_ADDR_DEVNET: "0x0000000000000000000000000000000000000006",
+  };
 }
 
 test("prints usage without a command", () => {
@@ -32,28 +71,200 @@ test("rejects unsupported networks", () => {
   assert.match(result.stderr, /unsupported network: localnet/);
 });
 
-for (const command of ["deploy", "finalize-deploy", "upgrade", "finalize-upgrade", "verify"]) {
-  test(`accepts supported command: ${command}`, () => {
-    const result = runDeploymentCommand(command, "devnet");
+test("deploy accepts only its optional --fresh argument", async () => {
+  await assert.rejects(runDeploymentCli(["deploy", "devnet", "unexpected"]), /unsupported deploy arguments: unexpected/);
+});
 
-    assert.equal(result.status, 1);
-    assert.equal(result.stderr, `command is not implemented: ${command}\n`);
-  });
-}
+test("upgrade requires at least one target", async () => {
+  await assert.rejects(runDeploymentCli(["upgrade", "devnet"]), /upgrade requires at least one target/);
+});
 
-for (const network of ["devnet", "calibnet", "mainnet"]) {
-  test(`accepts supported network: ${network}`, () => {
-    const result = runDeploymentCommand("verify", network);
-
-    assert.equal(result.status, 1);
-    assert.equal(result.stderr, "command is not implemented: verify\n");
+for (const command of ["finalize-deploy", "finalize-upgrade", "verify"] as const) {
+  test(`${command} rejects extra arguments`, async () => {
+    await assert.rejects(runDeploymentCli([command, "devnet", "unexpected"]), new RegExp(`${command} does not accept arguments`));
   });
 }
 
 test("maps Filecoin networks to their chain IDs", () => {
   assert.deepEqual(networkConfigs, {
-    devnet: { chainId: 31415926 },
-    calibnet: { chainId: 314159 },
-    mainnet: { chainId: 314 },
+    devnet: {
+      chainId: 31415926,
+      rpcVariable: "RPC_DEVNET",
+      privateKeyVariable: "PRIVATE_KEY_DEVNET",
+      environmentSuffix: "DEVNET",
+    },
+    calibnet: {
+      chainId: 314159,
+      rpcVariable: "RPC_CALIBNET",
+      privateKeyVariable: "PRIVATE_KEY_CALIBNET",
+      environmentSuffix: "CALIBNET",
+    },
+    mainnet: {
+      chainId: 314,
+      rpcVariable: "RPC_MAINNET",
+      privateKeyVariable: "PRIVATE_KEY_MAINNET",
+      environmentSuffix: "MAINNET",
+    },
   });
+});
+
+test("runs an executable with an exact argument array", async () => {
+  const directory = createTemporaryDirectory();
+  const commandLog = join(directory, "commands.jsonl");
+  const forge = createFakeExecutable(directory, "forge", "forge output");
+  const previousLog = process.env.FAKE_COMMAND_LOG;
+  process.env.FAKE_COMMAND_LOG = commandLog;
+
+  try {
+    const output = await runProcess(forge, ["build", "--root", "/release", "--build-info"]);
+
+    assert.equal(output, "forge output");
+    assert.deepEqual(JSON.parse(readFileSync(commandLog, "utf8")), ["build", "--root", "/release", "--build-info"]);
+  } finally {
+    if (previousLog === undefined) delete process.env.FAKE_COMMAND_LOG;
+    else process.env.FAKE_COMMAND_LOG = previousLog;
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("reports the executable exit code and stderr", async () => {
+  const directory = createTemporaryDirectory();
+  const forge = join(directory, "forge");
+  writeFileSync(forge, `#!${process.execPath}\nprocess.stderr.write("forge failed"); process.exitCode = 2;\n`);
+  chmodSync(forge, 0o755);
+
+  try {
+    await assert.rejects(runProcess(forge, ["build"]), /forge exited with code 2: forge failed/);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("deploy preflight checks the RPC chain before tracked release paths", async () => {
+  const directory = createTemporaryDirectory();
+  const commandLog = join(directory, "commands.jsonl");
+  const cast = createFakeExecutable(directory, "cast", "31415926\n");
+  const git = createFakeExecutable(directory, "git");
+  const previousLog = process.env.FAKE_COMMAND_LOG;
+  process.env.FAKE_COMMAND_LOG = commandLog;
+
+  try {
+    await assert.rejects(
+      runDeploymentCli(["deploy", "devnet"], {
+        environment: deploymentEnvironment(),
+        executables: { cast, git },
+        root: directory,
+      }),
+      /deploy phase is not implemented/,
+    );
+
+    assert.deepEqual(
+      readFileSync(commandLog, "utf8")
+        .trim()
+        .split("\n")
+        .map((line) => JSON.parse(line)),
+      [
+        ["chain-id", "--rpc-url", "http://devnet.example"],
+        [
+          "-C",
+          directory,
+          "status",
+          "--porcelain",
+          "--untracked-files=all",
+          "--",
+          "src",
+          "script",
+          "foundry.toml",
+          "foundry.lock",
+          "remappings.txt",
+          "package.json",
+          "package-lock.json",
+          "lib",
+        ],
+      ],
+    );
+  } finally {
+    if (previousLog === undefined) delete process.env.FAKE_COMMAND_LOG;
+    else process.env.FAKE_COMMAND_LOG = previousLog;
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("rejects an RPC chain mismatch before checking release paths", async () => {
+  const directory = createTemporaryDirectory();
+  const commandLog = join(directory, "commands.jsonl");
+  const cast = createFakeExecutable(directory, "cast", "314\n");
+  const git = createFakeExecutable(directory, "git");
+  const previousLog = process.env.FAKE_COMMAND_LOG;
+  process.env.FAKE_COMMAND_LOG = commandLog;
+
+  try {
+    await assert.rejects(
+      runDeploymentCli(["deploy", "devnet"], {
+        environment: deploymentEnvironment(),
+        executables: { cast, git },
+        root: directory,
+      }),
+      /devnet RPC chain ID must be 31415926, got 314/,
+    );
+    assert.deepEqual(JSON.parse(readFileSync(commandLog, "utf8")), ["chain-id", "--rpc-url", "http://devnet.example"]);
+  } finally {
+    if (previousLog === undefined) delete process.env.FAKE_COMMAND_LOG;
+    else process.env.FAKE_COMMAND_LOG = previousLog;
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("mainnet requires CONFIRM_MAINNET=yes after confirming its RPC chain", async () => {
+  const directory = createTemporaryDirectory();
+  const commandLog = join(directory, "commands.jsonl");
+  const cast = createFakeExecutable(directory, "cast", "314\n");
+  const previousLog = process.env.FAKE_COMMAND_LOG;
+  process.env.FAKE_COMMAND_LOG = commandLog;
+
+  try {
+    await assert.rejects(
+      runDeploymentCli(["verify", "mainnet"], {
+        environment: { RPC_MAINNET: "http://mainnet.example" },
+        executables: { cast },
+        root: directory,
+      }),
+      /set CONFIRM_MAINNET=yes before operating on mainnet/,
+    );
+    assert.deepEqual(JSON.parse(readFileSync(commandLog, "utf8")), ["chain-id", "--rpc-url", "http://mainnet.example"]);
+  } finally {
+    if (previousLog === undefined) delete process.env.FAKE_COMMAND_LOG;
+    else process.env.FAKE_COMMAND_LOG = previousLog;
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("writes a file atomically without leaving its temporary file behind", () => {
+  const directory = createTemporaryDirectory();
+  const file = join(directory, "pending.json");
+
+  try {
+    writeAtomicFile(file, '{"status":"pending"}\n');
+
+    assert.equal(readFileSync(file, "utf8"), '{"status":"pending"}\n');
+    assert.deepEqual(readdirSync(directory), ["pending.json"]);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("SIGINT aborts the shared deployment signal and cleanup removes listeners", () => {
+  const sigintListeners = process.listenerCount("SIGINT");
+  const sigtermListeners = process.listenerCount("SIGTERM");
+  const signalHandling = installSignalHandling();
+
+  try {
+    process.emit("SIGINT");
+    assert.equal(signalHandling.signal.aborted, true);
+  } finally {
+    signalHandling.dispose();
+  }
+
+  assert.equal(process.listenerCount("SIGINT"), sigintListeners);
+  assert.equal(process.listenerCount("SIGTERM"), sigtermListeners);
 });
