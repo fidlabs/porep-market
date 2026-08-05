@@ -136,6 +136,12 @@ test("rejects invalid manifest fields and unknown contract kinds", () => {
   );
 });
 
+test("rejects a hostile __proto__ contract key", () => {
+  const hostile = JSON.stringify(manifest()).replace('"Market":', '"__proto__":');
+
+  assert.throws(() => parseDeploymentManifest(hostile), /manifest\.contracts\.__proto__/);
+});
+
 test("parses deploy and upgrade pending state with checked fields", () => {
   const deploy = parsePendingOperation(JSON.stringify(deployPending()));
   const upgrade = parsePendingOperation(JSON.stringify(upgradePending()));
@@ -159,6 +165,37 @@ test("parses pre-broadcast journals with null evidence fields", () => {
 
   assert.equal(parsedDeploy.operation, "deploy");
   assert.equal(parsedUpgrade.operation, "upgrade");
+});
+
+test("rejects deploy rendering without completed broadcast evidence", () => {
+  const missingBroadcast = parsePendingOperation(JSON.stringify({ ...deployPending(), broadcastSha256: null }));
+  assert.equal(missingBroadcast.operation, "deploy");
+  assert.throws(
+    () => renderDeployManifest(missingBroadcast, "2026-08-05T13:00:00Z"),
+    /pending\.broadcastSha256/,
+  );
+
+  const missingResultHash = parsePendingOperation(
+    JSON.stringify({ ...deployPending(), resultManifestSha256: null }),
+  );
+  assert.equal(missingResultHash.operation, "deploy");
+  assert.throws(
+    () => renderDeployManifest(missingResultHash, "2026-08-05T13:00:00Z"),
+    /pending\.resultManifestSha256/,
+  );
+});
+
+test("rejects upgrade rendering without completed broadcast evidence", () => {
+  const source = parseDeploymentManifest(JSON.stringify(manifest()));
+  const missingBroadcast = parsePendingOperation(JSON.stringify({ ...upgradePending(), broadcastSha256: null }));
+  assert.equal(missingBroadcast.operation, "upgrade");
+  assert.throws(() => renderUpgradedManifest(source, missingBroadcast), /pending\.broadcastSha256/);
+
+  const missingResultHash = parsePendingOperation(
+    JSON.stringify({ ...upgradePending(), resultManifestSha256: null }),
+  );
+  assert.equal(missingResultHash.operation, "upgrade");
+  assert.throws(() => renderUpgradedManifest(source, missingResultHash), /pending\.resultManifestSha256/);
 });
 
 test("rejects malformed pending fields and mismatched operation output", () => {
@@ -190,7 +227,9 @@ test("hashes raw bytes without normalizing JSON", () => {
 });
 
 test("renders a finalized deploy manifest from the recorded result", () => {
-  const pending = parsePendingOperation(JSON.stringify(deployPending()));
+  const pending = parsePendingOperation(
+    JSON.stringify({ ...deployPending(), resultManifestSha256: nextHash }),
+  );
   assert.equal(pending.operation, "deploy");
   const rendered = renderDeployManifest(pending, "2026-08-05T13:00:00Z");
   const result = pending.result;

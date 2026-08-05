@@ -126,6 +126,8 @@ export function hashRawBytes(bytes: Uint8Array): string {
 
 export function renderDeployManifest(pending: PendingDeploy, finalizedAt: string): DeploymentManifest {
   const timestamp = readNonEmptyString(finalizedAt, "finalizedAt");
+  ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
+  ensureFinalizationEvidence(pending.resultManifestSha256, "pending.resultManifestSha256");
   if (pending.result === null) {
     throw new Error("pending.result is missing broadcast output");
   }
@@ -140,6 +142,8 @@ export function renderDeployManifest(pending: PendingDeploy, finalizedAt: string
 }
 
 export function renderUpgradedManifest(source: DeploymentManifest, pending: PendingUpgrade): DeploymentManifest {
+  ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
+  ensureFinalizationEvidence(pending.resultManifestSha256, "pending.resultManifestSha256");
   const contracts = structuredClone(source.contracts);
 
   for (const operation of pending.operations) {
@@ -309,9 +313,18 @@ function parseContracts(value: unknown, path: string): Record<string, ManifestCo
   const parsed: Record<string, ManifestContract> = {};
 
   for (const [name, contract] of Object.entries(contracts)) {
+    if (name === "__proto__" || name === "constructor" || name === "prototype") {
+      throw new Error(`${path}.${name} is reserved`);
+    }
     parsed[name] = parseManifestContract(contract, `${path}.${name}`);
   }
   return parsed;
+}
+
+function ensureFinalizationEvidence(value: string | null, path: string): void {
+  if (value === null) {
+    throw new Error(`${path} is missing broadcast evidence`);
+  }
 }
 
 function parseManifestContract(value: unknown, path: string): ManifestContract {
