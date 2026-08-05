@@ -11,6 +11,7 @@ import {DeployUtils} from "./utils/DeployUtils.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
+import {PoRepMarketClaimInspector} from "../src/helpers/PoRepMarketClaimInspector.sol";
 import {console} from "forge-std/console.sol";
 
 contract Deploy is DeployUtils {
@@ -21,6 +22,7 @@ contract Deploy is DeployUtils {
     address internal dataCapEvidenceAdapter;
     address internal sliOracle;
     address internal sliScorer;
+    address internal claimInspector;
 
     address internal poRepMarketImpl;
     address internal validatorFactoryImpl;
@@ -62,6 +64,7 @@ contract Deploy is DeployUtils {
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
+        claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
@@ -185,7 +188,8 @@ contract Deploy is DeployUtils {
             _serializeUupsContract("pendingSLIScorer", "src/SLIScorer.sol:SLIScorer", sliScorer, sliScorerImpl)
         );
         json.serialize("Validator", _serializeValidator());
-        return json.serialize("ValidatorBeacon", _serializeValidatorBeacon());
+        json.serialize("ValidatorBeacon", _serializeValidatorBeacon());
+        return json.serialize("PoRepMarketClaimInspector", _serializeClaimInspector());
     }
 
     function _serializeUupsContract(
@@ -208,6 +212,14 @@ contract Deploy is DeployUtils {
         json.serialize("artifact", string("src/Validator.sol:Validator"));
         json.serialize("implementation", validatorImpl);
         return json.serialize("implementationCodeHash", validatorImpl.codehash);
+    }
+
+    function _serializeClaimInspector() private returns (string memory) {
+        string memory json = "pendingClaimInspector";
+        json.serialize("kind", string("standalone"));
+        json.serialize("artifact", string("src/helpers/PoRepMarketClaimInspector.sol:PoRepMarketClaimInspector"));
+        json.serialize("implementation", claimInspector);
+        return json.serialize("implementationCodeHash", claimInspector.codehash);
     }
 
     function _serializeValidatorBeacon() private returns (string memory) {
