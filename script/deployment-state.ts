@@ -1,7 +1,5 @@
 import { createHash } from "node:crypto";
 
-export type ManifestContract = UupsContract | ImplementationContract | StandaloneContract | BeaconContract;
-
 export type UupsContract = {
   kind: "uups";
   artifact: string;
@@ -10,21 +8,18 @@ export type UupsContract = {
   proxyCodeHash: string;
   implementationCodeHash: string;
 };
-
 export type ImplementationContract = {
   kind: "implementation";
   artifact: string;
   implementation: string;
   implementationCodeHash: string;
 };
-
 export type StandaloneContract = {
   kind: "standalone";
   artifact: string;
   implementation: string;
   implementationCodeHash: string;
 };
-
 export type BeaconContract = {
   kind: "beacon";
   artifact: string;
@@ -32,6 +27,7 @@ export type BeaconContract = {
   implementation: string;
   factoryProxy: string;
 };
+export type ManifestContract = UupsContract | ImplementationContract | StandaloneContract | BeaconContract;
 
 export type DeploymentTransaction = {
   hash: string;
@@ -40,7 +36,6 @@ export type DeploymentTransaction = {
   blockHash: string;
   contractAddress: string | null;
 };
-
 export type DeploymentManifest = {
   status: "pending" | "finalized";
   finalizedAt?: string;
@@ -50,7 +45,6 @@ export type DeploymentManifest = {
   externalDependencies: Record<string, string>;
   transactions?: DeploymentTransaction[];
 };
-
 export type UpgradeOperation = {
   target: string;
   kind: "uups" | "beacon";
@@ -58,7 +52,6 @@ export type UpgradeOperation = {
   newImplementation: string;
   newImplementationCodeHash: string;
 };
-
 export type PendingDeploy = {
   status: "pending" | "finalized";
   operation: "deploy";
@@ -71,7 +64,6 @@ export type PendingDeploy = {
   finalizedAt: string | null;
   resultManifestSha256: string | null;
 };
-
 export type PendingUpgrade = {
   status: "pending" | "finalized";
   operation: "upgrade";
@@ -84,114 +76,190 @@ export type PendingUpgrade = {
   release: { buildInfoSha256: string };
   broadcastSha256: string | null;
 };
-
 export type PendingOperation = PendingDeploy | PendingUpgrade;
-
 export type CanonicalManifestState = "absent" | "source" | "result" | "unexpected";
 
-type JsonObject = Record<string, unknown>;
-
 const addressPattern = /^0x[0-9a-fA-F]{40}$/;
-const hashPattern = /^0x[0-9a-f]{64}$/;
+const hashPattern = /^0x[0-9a-fA-F]{64}$/;
 
 export function parseDeploymentManifest(text: string): DeploymentManifest {
-  const value = parseJson(text, "manifest");
-  return parseDeploymentManifestValue(value, "manifest");
+  return manifest(parseJson(text, "manifest"), "manifest");
 }
 
 export function parsePendingOperation(text: string): PendingOperation {
-  const value = parseJson(text, "pending");
-  const pending = readObject(value, "pending");
-  const operation = readString(readField(pending, "operation", "pending"), "pending.operation");
+  const value = object(parseJson(text, "pending"), "pending");
+  const common = {
+    status: status(value.status, "pending.status"),
+    network: string(value.network, "pending.network"),
+    chainId: integer(value.chainId, "pending.chainId"),
+    release: release(value.release, "pending.release"),
+    broadcastSha256: nullableHash(value.broadcastSha256, "pending.broadcastSha256"),
+  };
 
-  if (operation === "deploy") {
-    return parsePendingDeploy(pending);
+  if (value.operation === "deploy") {
+    return {
+      ...common,
+      operation: "deploy",
+      previousManifestSha256: nullableHash(value.previousManifestSha256, "pending.previousManifestSha256"),
+      result: value.result === null ? null : manifest(value.result, "pending.result"),
+      finalizedAt: nullableString(value.finalizedAt, "pending.finalizedAt"),
+      resultManifestSha256: nullableHash(value.resultManifestSha256, "pending.resultManifestSha256"),
+    };
   }
-  if (operation === "upgrade") {
-    return parsePendingUpgrade(pending);
+  if (value.operation === "upgrade") {
+    const targets = array(value.targets, "pending.targets").map((item, index) => string(item, `pending.targets[${index}]`));
+    const operations = array(value.operations, "pending.operations").map((item, index) => operation(item, `pending.operations[${index}]`));
+    if (targets.length === 0 || new Set(targets).size !== targets.length) throw new Error("pending.targets are invalid");
+    return {
+      ...common,
+      operation: "upgrade",
+      targets,
+      operations,
+      sourceManifestSha256: hash(value.sourceManifestSha256, "pending.sourceManifestSha256"),
+      resultManifestSha256: nullableHash(value.resultManifestSha256, "pending.resultManifestSha256"),
+    };
   }
   throw new Error("pending.operation must be deploy or upgrade");
 }
 
 export function parseUpgradeOperations(text: string): UpgradeOperation[] {
-  const value = parseJson(text, "operations");
-  return readArray(value, "operations").map((entry, index) => parseUpgradeOperation(entry, `operations[${index}]`));
+  return array(parseJson(text, "operations"), "operations").map((item, index) => operation(item, `operations[${index}]`));
 }
 
 export function hashRawBytes(bytes: Uint8Array): string {
-  const hash = createHash("sha256");
-  hash.update(bytes);
-  return `0x${hash.digest("hex")}`;
+  return `0x${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
 export function renderDeployManifest(pending: PendingDeploy, finalizedAt: string): DeploymentManifest {
-  const timestamp = readNonEmptyString(finalizedAt, "finalizedAt");
-  ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
-  ensureFinalizationEvidence(pending.resultManifestSha256, "pending.resultManifestSha256");
-  if (pending.result === null) {
-    throw new Error("pending.result is missing broadcast output");
+  if (!pending.broadcastSha256 || !pending.resultManifestSha256 || !pending.result) {
+    throw new Error("pending deployment is missing finalization evidence");
   }
-  const result = structuredClone(pending.result);
-
-  return {
-    ...result,
-    status: "finalized",
-    finalizedAt: timestamp,
-    transactions: result.transactions ?? [],
-  };
+  return { ...structuredClone(pending.result), status: "finalized", finalizedAt, transactions: pending.result.transactions ?? [] };
 }
 
 export function renderUpgradedManifest(source: DeploymentManifest, pending: PendingUpgrade): DeploymentManifest {
-  ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
-  ensureFinalizationEvidence(pending.resultManifestSha256, "pending.resultManifestSha256");
+  if (!pending.resultManifestSha256) throw new Error("pending upgrade is missing result evidence");
   return renderPrepublicationUpgradedManifest(source, pending);
 }
 
-export function renderPrepublicationUpgradedManifest(
-  source: DeploymentManifest,
-  pending: PendingUpgrade,
-): DeploymentManifest {
-  ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
+export function renderPrepublicationUpgradedManifest(source: DeploymentManifest, pending: PendingUpgrade): DeploymentManifest {
+  if (!pending.broadcastSha256) throw new Error("pending upgrade is missing broadcast evidence");
   const contracts = structuredClone(source.contracts);
+  for (const item of pending.operations) applyUpgrade(contracts, item);
+  return { ...source, release: { buildInfoSha256: pending.release.buildInfoSha256 }, contracts };
+}
 
-  for (const operation of pending.operations) {
-    applyUpgradeOperation(contracts, operation);
+export function classifyDeployCanonicalState(current: string | undefined, pending: PendingDeploy): CanonicalManifestState {
+  if (current === undefined) return pending.previousManifestSha256 === null ? "absent" : "unexpected";
+  if (pending.resultManifestSha256 === current) return "result";
+  if (pending.previousManifestSha256 === current) return "source";
+  return "unexpected";
+}
+
+export function classifyUpgradeCanonicalState(current: string | undefined, pending: PendingUpgrade): CanonicalManifestState {
+  if (pending.resultManifestSha256 === current) return "result";
+  if (pending.sourceManifestSha256 === current) return "source";
+  return "unexpected";
+}
+
+function manifest(input: unknown, path: string): DeploymentManifest {
+  const value = object(input, path);
+  const contractsValue = object(value.contracts, `${path}.contracts`);
+  const contracts: Record<string, ManifestContract> = {};
+  for (const [name, item] of Object.entries(contractsValue)) {
+    if (["__proto__", "constructor", "prototype"].includes(name)) throw new Error(`${path}.contracts.${name} is reserved`);
+    contracts[name] = contract(item, `${path}.contracts.${name}`);
   }
-
+  const dependencies: Record<string, string> = {};
+  for (const [name, item] of Object.entries(object(value.externalDependencies, `${path}.externalDependencies`))) {
+    dependencies[name] = address(item, `${path}.externalDependencies.${name}`);
+  }
+  const transactions = value.transactions === undefined
+    ? undefined
+    : array(value.transactions, `${path}.transactions`).map((item, index) => transaction(item, `${path}.transactions[${index}]`));
   return {
-    ...source,
-    release: { buildInfoSha256: pending.release.buildInfoSha256 },
+    status: status(value.status, `${path}.status`),
+    ...(value.finalizedAt === undefined ? {} : { finalizedAt: string(value.finalizedAt, `${path}.finalizedAt`) }),
+    deployer: address(value.deployer, `${path}.deployer`),
+    release: release(value.release, `${path}.release`),
     contracts,
+    externalDependencies: dependencies,
+    ...(transactions === undefined ? {} : { transactions }),
   };
 }
 
-export function classifyDeployCanonicalState(
-  canonicalManifestSha256: string | undefined,
-  pending: PendingDeploy,
-): CanonicalManifestState {
-  if (canonicalManifestSha256 === undefined) {
-    return pending.previousManifestSha256 === null ? "absent" : "unexpected";
+function contract(input: unknown, path: string): ManifestContract {
+  const value = object(input, path);
+  const artifact = string(value.artifact, `${path}.artifact`);
+  switch (value.kind) {
+    case "uups":
+      return {
+        kind: "uups", artifact,
+        proxy: address(value.proxy, `${path}.proxy`),
+        implementation: address(value.implementation, `${path}.implementation`),
+        proxyCodeHash: hash(value.proxyCodeHash, `${path}.proxyCodeHash`),
+        implementationCodeHash: hash(value.implementationCodeHash, `${path}.implementationCodeHash`),
+      };
+    case "implementation":
+    case "standalone":
+      return {
+        kind: value.kind, artifact,
+        implementation: address(value.implementation, `${path}.implementation`),
+        implementationCodeHash: hash(value.implementationCodeHash, `${path}.implementationCodeHash`),
+      };
+    case "beacon":
+      return {
+        kind: "beacon", artifact,
+        address: address(value.address, `${path}.address`),
+        implementation: address(value.implementation, `${path}.implementation`),
+        factoryProxy: address(value.factoryProxy, `${path}.factoryProxy`),
+      };
+    default:
+      throw new Error(`${path}.kind is unsupported`);
   }
-  if (pending.resultManifestSha256 !== null && canonicalManifestSha256 === pending.resultManifestSha256) {
-    return "result";
-  }
-  if (pending.previousManifestSha256 !== null && canonicalManifestSha256 === pending.previousManifestSha256) {
-    return "source";
-  }
-  return "unexpected";
 }
 
-export function classifyUpgradeCanonicalState(
-  canonicalManifestSha256: string | undefined,
-  pending: PendingUpgrade,
-): CanonicalManifestState {
-  if (pending.resultManifestSha256 !== null && canonicalManifestSha256 === pending.resultManifestSha256) {
-    return "result";
+function operation(input: unknown, path: string): UpgradeOperation {
+  const value = object(input, path);
+  if (value.kind !== "uups" && value.kind !== "beacon") throw new Error(`${path}.kind is invalid`);
+  return {
+    target: string(value.target, `${path}.target`),
+    kind: value.kind,
+    artifact: string(value.artifact, `${path}.artifact`),
+    newImplementation: address(value.newImplementation, `${path}.newImplementation`),
+    newImplementationCodeHash: hash(value.newImplementationCodeHash, `${path}.newImplementationCodeHash`),
+  };
+}
+
+function transaction(input: unknown, path: string): DeploymentTransaction {
+  const value = object(input, path);
+  return {
+    hash: hash(value.hash, `${path}.hash`),
+    status: integer(value.status, `${path}.status`, 0),
+    blockNumber: integer(value.blockNumber, `${path}.blockNumber`, 0),
+    blockHash: hash(value.blockHash, `${path}.blockHash`),
+    contractAddress: value.contractAddress === null ? null : address(value.contractAddress, `${path}.contractAddress`),
+  };
+}
+
+function applyUpgrade(contracts: Record<string, ManifestContract>, item: UpgradeOperation): void {
+  const target = contracts[item.target];
+  if (!target || target.artifact !== item.artifact || !("implementation" in target)) {
+    throw new Error(`upgrade operation for ${item.target} does not match the manifest`);
   }
-  if (canonicalManifestSha256 === pending.sourceManifestSha256) {
-    return "source";
+  if (target.implementation.toLowerCase() === item.newImplementation.toLowerCase()) {
+    throw new Error(`upgrade operation for ${item.target} did not replace the implementation`);
   }
-  return "unexpected";
+  if (item.kind === "uups" && target.kind === "uups") {
+    contracts[item.target] = { ...target, implementation: item.newImplementation, implementationCodeHash: item.newImplementationCodeHash };
+    return;
+  }
+  const beacon = contracts.ValidatorBeacon;
+  if (item.target !== "Validator" || item.kind !== "beacon" || target.kind !== "implementation" || beacon?.kind !== "beacon") {
+    throw new Error(`upgrade operation kind does not match ${item.target}`);
+  }
+  contracts.Validator = { ...target, implementation: item.newImplementation, implementationCodeHash: item.newImplementationCodeHash };
+  contracts.ValidatorBeacon = { ...beacon, implementation: item.newImplementation };
 }
 
 function parseJson(text: string, path: string): unknown {
@@ -202,404 +270,51 @@ function parseJson(text: string, path: string): unknown {
   }
 }
 
-function parseDeploymentManifestValue(value: unknown, path: string): DeploymentManifest {
-  const manifest = readObject(value, path);
-  const status = readStatus(readField(manifest, "status", path), `${path}.status`);
-  const release = parseRelease(readField(manifest, "release", path), `${path}.release`);
-  const contracts = parseContracts(readField(manifest, "contracts", path), `${path}.contracts`);
-  const dependencies = parseExternalDependencies(
-    readField(manifest, "externalDependencies", path),
-    `${path}.externalDependencies`,
-  );
-  const deployer = readAddress(readField(manifest, "deployer", path), `${path}.deployer`);
-  const finalizedAt = readOptionalNonEmptyString(manifest, "finalizedAt", path);
-  const transactions = readOptionalTransactions(manifest, path);
-
-  return {
-    status,
-    ...(finalizedAt === undefined ? {} : { finalizedAt }),
-    deployer,
-    release,
-    contracts,
-    externalDependencies: dependencies,
-    ...(transactions === undefined ? {} : { transactions }),
-  };
+function object(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${path} must be an object`);
+  return value as Record<string, unknown>;
 }
 
-function parsePendingDeploy(pending: JsonObject): PendingDeploy {
-  const common = parsePendingCommon(pending);
-  const result = parseNullableManifest(readField(pending, "result", "pending"), "pending.result");
-
-  return {
-    ...common,
-    operation: "deploy",
-    previousManifestSha256: readNullableHash(
-      readField(pending, "previousManifestSha256", "pending"),
-      "pending.previousManifestSha256",
-    ),
-    result,
-    finalizedAt: readNullableNonEmptyString(
-      readField(pending, "finalizedAt", "pending"),
-      "pending.finalizedAt",
-    ),
-    resultManifestSha256: readNullableHash(
-      readField(pending, "resultManifestSha256", "pending"),
-      "pending.resultManifestSha256",
-    ),
-  };
-}
-
-function parsePendingUpgrade(pending: JsonObject): PendingUpgrade {
-  const common = parsePendingCommon(pending);
-  const targets = readArray(readField(pending, "targets", "pending"), "pending.targets").map((target, index) =>
-    readNonEmptyString(target, `pending.targets[${index}]`),
-  );
-  const operations = readArray(readField(pending, "operations", "pending"), "pending.operations").map(
-    (operation, index) => parseUpgradeOperation(operation, `pending.operations[${index}]`),
-  );
-
-  if (targets.length === 0) {
-    throw new Error("pending.targets must not be empty");
-  }
-  if (new Set(targets).size !== targets.length) {
-    throw new Error("pending.targets must not contain duplicates");
-  }
-  if (operations.length !== 0 && operations.length !== targets.length) {
-    throw new Error("pending.operations must match pending.targets");
-  }
-  for (const [index, operation] of operations.entries()) {
-    if (operation.target !== targets[index]) {
-      throw new Error(`pending.operations[${index}].target must match pending.targets[${index}]`);
-    }
-  }
-
-  return {
-    ...common,
-    operation: "upgrade",
-    targets,
-    operations,
-    sourceManifestSha256: readHash(
-      readField(pending, "sourceManifestSha256", "pending"),
-      "pending.sourceManifestSha256",
-    ),
-    resultManifestSha256: readNullableHash(
-      readField(pending, "resultManifestSha256", "pending"),
-      "pending.resultManifestSha256",
-    ),
-  };
-}
-
-function parsePendingCommon(pending: JsonObject) {
-  return {
-    status: readStatus(readField(pending, "status", "pending"), "pending.status"),
-    network: readNonEmptyString(readField(pending, "network", "pending"), "pending.network"),
-    chainId: readInteger(readField(pending, "chainId", "pending"), "pending.chainId", 1),
-    release: parseRelease(readField(pending, "release", "pending"), "pending.release"),
-    broadcastSha256: readNullableHash(
-      readField(pending, "broadcastSha256", "pending"),
-      "pending.broadcastSha256",
-    ),
-  };
-}
-
-function parseRelease(value: unknown, path: string) {
-  const release = readObject(value, path);
-  return {
-    buildInfoSha256: readHash(readField(release, "buildInfoSha256", path), `${path}.buildInfoSha256`),
-  };
-}
-
-function parseNullableManifest(value: unknown, path: string): DeploymentManifest | null {
-  if (value === null) {
-    return null;
-  }
-  return parseDeploymentManifestValue(value, path);
-}
-
-function parseContracts(value: unknown, path: string): Record<string, ManifestContract> {
-  const contracts = readObject(value, path);
-  const parsed: Record<string, ManifestContract> = {};
-
-  for (const [name, contract] of Object.entries(contracts)) {
-    if (name === "__proto__" || name === "constructor" || name === "prototype") {
-      throw new Error(`${path}.${name} is reserved`);
-    }
-    parsed[name] = parseManifestContract(contract, `${path}.${name}`);
-  }
-  return parsed;
-}
-
-function ensureFinalizationEvidence(value: string | null, path: string): void {
-  if (value === null) {
-    throw new Error(`${path} is missing broadcast evidence`);
-  }
-}
-
-function parseManifestContract(value: unknown, path: string): ManifestContract {
-  const contract = readObject(value, path);
-  const kind = readString(readField(contract, "kind", path), `${path}.kind`);
-  const artifact = readNonEmptyString(readField(contract, "artifact", path), `${path}.artifact`);
-
-  switch (kind) {
-    case "uups":
-      return {
-        kind,
-        artifact,
-        proxy: readAddress(readField(contract, "proxy", path), `${path}.proxy`),
-        implementation: readAddress(readField(contract, "implementation", path), `${path}.implementation`),
-        proxyCodeHash: readHash(readField(contract, "proxyCodeHash", path), `${path}.proxyCodeHash`),
-        implementationCodeHash: readHash(
-          readField(contract, "implementationCodeHash", path),
-          `${path}.implementationCodeHash`,
-        ),
-      };
-    case "implementation":
-      return parseImplementationContract(contract, path, kind, artifact);
-    case "standalone":
-      return parseImplementationContract(contract, path, kind, artifact);
-    case "beacon":
-      return {
-        kind,
-        artifact,
-        address: readAddress(readField(contract, "address", path), `${path}.address`),
-        implementation: readAddress(readField(contract, "implementation", path), `${path}.implementation`),
-        factoryProxy: readAddress(readField(contract, "factoryProxy", path), `${path}.factoryProxy`),
-      };
-    default:
-      throw new Error(`${path}.kind is unsupported: ${kind}`);
-  }
-}
-
-function parseImplementationContract(
-  contract: JsonObject,
-  path: string,
-  kind: "implementation" | "standalone",
-  artifact: string,
-): ImplementationContract | StandaloneContract {
-  return {
-    kind,
-    artifact,
-    implementation: readAddress(readField(contract, "implementation", path), `${path}.implementation`),
-    implementationCodeHash: readHash(
-      readField(contract, "implementationCodeHash", path),
-      `${path}.implementationCodeHash`,
-    ),
-  };
-}
-
-function parseExternalDependencies(value: unknown, path: string): Record<string, string> {
-  const dependencies = readObject(value, path);
-  const expectedNames = ["FilecoinPay", "PoRepService", "MetaAllocator", "TerminationOracle", "Oracle", "Operator"];
-  const parsed: Record<string, string> = {};
-
-  for (const name of expectedNames) {
-    parsed[name] = readAddress(readField(dependencies, name, path), `${path}.${name}`);
-  }
-  return parsed;
-}
-
-function readOptionalTransactions(manifest: JsonObject, path: string): DeploymentTransaction[] | undefined {
-  const value = manifest.transactions;
-  if (value === undefined) {
-    return undefined;
-  }
-  return readArray(value, `${path}.transactions`).map((transaction, index) =>
-    parseTransaction(transaction, `${path}.transactions[${index}]`),
-  );
-}
-
-function parseTransaction(value: unknown, path: string): DeploymentTransaction {
-  const transaction = readObject(value, path);
-  return {
-    hash: readHash(readField(transaction, "hash", path), `${path}.hash`),
-    status: readInteger(readField(transaction, "status", path), `${path}.status`, 0),
-    blockNumber: readInteger(readField(transaction, "blockNumber", path), `${path}.blockNumber`, 0),
-    blockHash: readHash(readField(transaction, "blockHash", path), `${path}.blockHash`),
-    contractAddress: readNullableAddress(
-      readField(transaction, "contractAddress", path),
-      `${path}.contractAddress`,
-    ),
-  };
-}
-
-function parseUpgradeOperation(value: unknown, path: string): UpgradeOperation {
-  const operation = readObject(value, path);
-  const target = readNonEmptyString(readField(operation, "target", path), `${path}.target`);
-  const kind = readUpgradeKind(readField(operation, "kind", path), `${path}.kind`);
-
-  if ((target === "Validator") !== (kind === "beacon")) {
-    throw new Error(`${path}.kind does not match ${path}.target`);
-  }
-
-  return {
-    target,
-    kind,
-    artifact: readNonEmptyString(readField(operation, "artifact", path), `${path}.artifact`),
-    newImplementation: readAddress(
-      readField(operation, "newImplementation", path),
-      `${path}.newImplementation`,
-    ),
-    newImplementationCodeHash: readHash(
-      readField(operation, "newImplementationCodeHash", path),
-      `${path}.newImplementationCodeHash`,
-    ),
-  };
-}
-
-function applyUpgradeOperation(contracts: Record<string, ManifestContract>, operation: UpgradeOperation) {
-  const target = contracts[operation.target];
-  if (target === undefined) {
-    throw new Error(`manifest.contracts.${operation.target} is missing`);
-  }
-
-  if (target.artifact !== operation.artifact) {
-    throw new Error(`pending operation artifact for ${operation.target} does not match source manifest`);
-  }
-  if ("implementation" in target && target.implementation.toLowerCase() === operation.newImplementation.toLowerCase()) {
-    throw new Error(`upgrade operation for ${operation.target} did not replace the implementation address`);
-  }
-  if (
-    "implementationCodeHash" in target &&
-    target.implementationCodeHash === operation.newImplementationCodeHash
-  ) {
-    throw new Error(`upgrade operation for ${operation.target} did not replace the implementation bytecode`);
-  }
-
-  if (operation.kind === "uups") {
-    if (target.kind !== "uups") {
-      throw new Error(`manifest.contracts.${operation.target}.kind must be uups`);
-    }
-    contracts[operation.target] = {
-      ...target,
-      implementation: operation.newImplementation,
-      implementationCodeHash: operation.newImplementationCodeHash,
-    };
-    return;
-  }
-
-  if (operation.target !== "Validator" || target.kind !== "implementation") {
-    throw new Error(`manifest.contracts.${operation.target}.kind must be implementation for a beacon upgrade`);
-  }
-  const beacon = contracts.ValidatorBeacon;
-  if (beacon === undefined || beacon.kind !== "beacon") {
-    throw new Error("manifest.contracts.ValidatorBeacon.kind must be beacon");
-  }
-  contracts.Validator = {
-    ...target,
-    implementation: operation.newImplementation,
-    implementationCodeHash: operation.newImplementationCodeHash,
-  };
-  contracts.ValidatorBeacon = {
-    ...beacon,
-    implementation: operation.newImplementation,
-  };
-}
-
-function readObject(value: unknown, path: string): JsonObject {
-  if (!isObject(value)) {
-    throw new Error(`${path} must be an object`);
-  }
+function array(value: unknown, path: string): unknown[] {
+  if (!Array.isArray(value)) throw new Error(`${path} must be an array`);
   return value;
 }
 
-function isObject(value: unknown): value is JsonObject {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
-}
-
-function readField(object: JsonObject, field: string, path: string): unknown {
-  const value = object[field];
-  if (value === undefined) {
-    throw new Error(`${path}.${field} is required`);
-  }
+function string(value: unknown, path: string): string {
+  if (typeof value !== "string" || value.length === 0) throw new Error(`${path} must be a non-empty string`);
   return value;
 }
 
-function readString(value: unknown, path: string): string {
-  if (typeof value !== "string") {
-    throw new Error(`${path} must be a string`);
-  }
+function nullableString(value: unknown, path: string): string | null {
+  return value === null ? null : string(value, path);
+}
+
+function address(value: unknown, path: string): string {
+  const result = string(value, path);
+  if (!addressPattern.test(result)) throw new Error(`${path} must be an address`);
+  return result;
+}
+
+function hash(value: unknown, path: string): string {
+  const result = string(value, path);
+  if (!hashPattern.test(result)) throw new Error(`${path} must be a 32-byte hash`);
+  return result;
+}
+
+function nullableHash(value: unknown, path: string): string | null {
+  return value === null ? null : hash(value, path);
+}
+
+function integer(value: unknown, path: string, minimum = 1): number {
+  if (!Number.isSafeInteger(value) || (value as number) < minimum) throw new Error(`${path} must be an integer`);
+  return value as number;
+}
+
+function status(value: unknown, path: string): "pending" | "finalized" {
+  if (value !== "pending" && value !== "finalized") throw new Error(`${path} must be pending or finalized`);
   return value;
 }
 
-function readNonEmptyString(value: unknown, path: string): string {
-  const text = readString(value, path);
-  if (text.length === 0) {
-    throw new Error(`${path} must not be empty`);
-  }
-  return text;
-}
-
-function readAddress(value: unknown, path: string): string {
-  const address = readString(value, path);
-  if (!addressPattern.test(address)) {
-    throw new Error(`${path} must be an address`);
-  }
-  return address;
-}
-
-function readNullableAddress(value: unknown, path: string): string | null {
-  if (value === null) {
-    return null;
-  }
-  return readAddress(value, path);
-}
-
-function readHash(value: unknown, path: string): string {
-  const hash = readString(value, path);
-  if (!hashPattern.test(hash)) {
-    throw new Error(`${path} must be a lowercase 0x SHA-256 hash`);
-  }
-  return hash;
-}
-
-function readNullableHash(value: unknown, path: string): string | null {
-  if (value === null) {
-    return null;
-  }
-  return readHash(value, path);
-}
-
-function readInteger(value: unknown, path: string, minimum: number): number {
-  if (typeof value !== "number" || !Number.isSafeInteger(value) || value < minimum) {
-    throw new Error(`${path} must be an integer greater than or equal to ${minimum}`);
-  }
-  return value;
-}
-
-function readArray(value: unknown, path: string): unknown[] {
-  if (!Array.isArray(value)) {
-    throw new Error(`${path} must be an array`);
-  }
-  return value;
-}
-
-function readStatus(value: unknown, path: string): "pending" | "finalized" {
-  const status = readString(value, path);
-  if (status !== "pending" && status !== "finalized") {
-    throw new Error(`${path} must be pending or finalized`);
-  }
-  return status;
-}
-
-function readUpgradeKind(value: unknown, path: string): "uups" | "beacon" {
-  const kind = readString(value, path);
-  if (kind !== "uups" && kind !== "beacon") {
-    throw new Error(`${path} must be uups or beacon`);
-  }
-  return kind;
-}
-
-function readOptionalNonEmptyString(object: JsonObject, field: string, path: string): string | undefined {
-  const value = object[field];
-  if (value === undefined) {
-    return undefined;
-  }
-  return readNonEmptyString(value, `${path}.${field}`);
-}
-
-function readNullableNonEmptyString(value: unknown, path: string): string | null {
-  if (value === null) {
-    return null;
-  }
-  return readNonEmptyString(value, path);
+function release(value: unknown, path: string): { buildInfoSha256: string } {
+  return { buildInfoSha256: hash(object(value, path).buildInfoSha256, `${path}.buildInfoSha256`) };
 }
