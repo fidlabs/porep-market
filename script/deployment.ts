@@ -19,11 +19,16 @@ import { fileURLToPath } from "node:url";
 import { gunzipSync, gzipSync } from "node:zlib";
 import {
   classifyDeployCanonicalState,
+  classifyUpgradeCanonicalState,
   hashRawBytes,
+  parseDeploymentManifest,
   parsePendingOperation,
   renderDeployManifest,
+  renderPrepublicationUpgradedManifest,
+  renderUpgradedManifest,
   type DeploymentManifest,
   type PendingDeploy,
+  type PendingUpgrade,
 } from "./deployment-state.ts";
 import {
   extractBroadcastTransactionHashes,
@@ -91,8 +96,11 @@ type DeployPaths = {
   latest: string;
 };
 
+type UpgradePaths = DeployPaths;
+
 type PreparedBuildInfo = {
   sha256: string;
+  raw: Buffer;
   compressed: Buffer;
 };
 
@@ -109,6 +117,15 @@ export type SignalHandling = {
 const networks = Object.keys(networkConfigs) as Network[];
 const usage = `Usage: deployment.ts <command> <network> [args...]\nCommands: ${commands.join(", ")}\nNetworks: ${networks.join(", ")}`;
 const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const uupsUpgradeArtifacts: Record<string, string> = {
+  PoRepMarket: "src/PoRepMarket.sol:PoRepMarket",
+  ValidatorFactory: "src/ValidatorFactory.sol:ValidatorFactory",
+  DataCapEvidenceAdapter: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+  SPRegistry: "src/SPRegistry.sol:SPRegistry",
+  SLIOracle: "src/SLIOracle.sol:SLIOracle",
+  SLIScorer: "src/SLIScorer.sol:SLIScorer",
+};
+const validatorArtifact = "src/Validator.sol:Validator";
 
 async function deploy(context: DeploymentContext, fresh: boolean): Promise<void> {
   if (fresh && context.network === "mainnet") {
@@ -224,19 +241,170 @@ async function finalizeDeploy(context: DeploymentContext, preflightCompleted = f
 }
 
 async function upgrade(context: DeploymentContext, targets: readonly string[]): Promise<void> {
-  requireEnvironment(context, networkConfigs[context.network].privateKeyVariable);
+  const privateKey = requireEnvironment(context, networkConfigs[context.network].privateKeyVariable);
   await preflightBroadcast(context);
   ensureCanonicalManifest(context);
   await ensureCleanCanonicalManifest(context);
-  void targets;
-  throw new Error("upgrade phase is not implemented");
+  const paths = upgradePaths(context);
+  const sourceBytes = readFileSync(paths.latest);
+  const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
+  const sourceManifestSha256 = hashRawBytes(sourceBytes);
+  validateUpgradeTargets(source, targets);
+  prepareUpgradeOperation(context, paths);
+
+  const previousBuildInfoPath = retainedBuildInfoPath(context, source.release.buildInfoSha256);
+  authenticatePendingBuildInfo(previousBuildInfoPath, source.release.buildInfoSha256);
+
+  const workspace = mkdtempSync(join(tmpdir(), "porep-upgrade-ts-"));
+  const forgeIoDirectory = join(context.root, ".deployment", `.typescript-upgrade-${randomUUID()}`);
+  let claim: OperationClaim | undefined;
+  try {
+    mkdirSync(forgeIoDirectory, { recursive: true });
+    const exactSourceManifestPath = join(forgeIoDirectory, "source-manifest.json");
+    const forgeOutputPath = join(forgeIoDirectory, "upgrade-output.json");
+    writeAtomicFile(exactSourceManifestPath, sourceBytes);
+    const buildInfo = await buildDeployment(context, workspace);
+    await validateUpgradeStorageLayouts(
+      context,
+      paths.latest,
+      source,
+      previousBuildInfoPath,
+      buildInfo,
+      workspace,
+    );
+    const compiledCodeHashes = await loadCompiledUpgradeCodeHashes(context, buildInfo.raw, source, targets);
+    await validateUpgradeAuthorization(context, source, targets, privateKey);
+    rejectUnchangedUpgradeBytecode(source, compiledCodeHashes);
+    if (hashFileIfPresent(paths.latest) !== sourceManifestSha256) {
+      throw new Error(`canonical ${context.network} deployment changed during upgrade preflight`);
+    }
+
+    const pending = createPendingUpgrade(context, targets, sourceManifestSha256, buildInfo.sha256);
+    claim = claimUpgradeOperation(context, paths, buildInfo, pending);
+    writeAtomicFile(forgeOutputPath, `${JSON.stringify(pending, null, 2)}\n`);
+
+    let broadcastFailure: unknown;
+    try {
+      await broadcastUpgrade(
+        context,
+        workspace,
+        forgeOutputPath,
+        exactSourceManifestPath,
+        privateKey,
+        targets,
+      );
+    } catch (error) {
+      broadcastFailure = error;
+    }
+
+    let recordedPending: PendingUpgrade | undefined;
+    let evidenceFailure: unknown;
+    try {
+      recordedPending = preserveUpgradeBroadcast(
+        context,
+        workspace,
+        paths,
+        forgeOutputPath,
+        pending,
+        source,
+        compiledCodeHashes,
+      );
+      if (broadcastFailure === undefined && recordedPending === undefined) {
+        throw new Error("Forge must produce exactly one timestamped Forge upgrade broadcast file");
+      }
+      if (recordedPending !== undefined && hashFileIfPresent(paths.latest) !== sourceManifestSha256) {
+        throw new Error(`canonical ${context.network} deployment changed during upgrade broadcast`);
+      }
+    } catch (error) {
+      evidenceFailure = error;
+    }
+
+    if (broadcastFailure !== undefined) {
+      if (evidenceFailure !== undefined) {
+        throw new AggregateError(
+          [broadcastFailure, evidenceFailure],
+          "Forge failed and upgrade broadcast evidence could not be recorded safely",
+        );
+      }
+      throw broadcastFailure;
+    }
+    if (evidenceFailure !== undefined) {
+      throw evidenceFailure;
+    }
+  } finally {
+    if (claim !== undefined) {
+      releaseOperationClaim(claim);
+    }
+    rmSync(workspace, { force: true, recursive: true });
+    rmSync(forgeIoDirectory, { force: true, recursive: true });
+  }
+
+  await finalizeUpgrade(context, true);
 }
 
-async function finalizeUpgrade(context: DeploymentContext): Promise<void> {
-  await preflightFinalize(context);
-  ensureCanonicalManifest(context);
-  await ensureCleanCanonicalManifest(context);
-  throw new Error("finalize-upgrade phase is not implemented");
+async function finalizeUpgrade(context: DeploymentContext, preflightCompleted = false): Promise<void> {
+  if (!preflightCompleted) {
+    await preflightFinalize(context);
+  }
+  const paths = upgradePaths(context);
+  let pending = loadPendingUpgrade(context, paths);
+
+  authenticatePendingBuildInfo(paths.buildInfo, pending.release.buildInfoSha256);
+  authenticatePendingBroadcast(paths.broadcast, pending.broadcastSha256);
+
+  const canonicalHash = hashFileIfPresent(paths.latest);
+  const canonicalState = classifyUpgradeCanonicalState(canonicalHash, pending);
+  if (canonicalState === "unexpected") {
+    throw new Error(`canonical ${context.network} deployment is unexpected during upgrade recovery`);
+  }
+  if (canonicalState === "result") {
+    authenticateRetainedBuildInfo(context, pending.release.buildInfoSha256);
+    markUpgradeFinalized(paths.pending, pending);
+    return;
+  }
+  if (pending.status === "finalized") {
+    throw new Error(`finalized ${context.network} upgrade manifest is missing`);
+  }
+
+  const sourceBytes = readFileSync(paths.latest);
+  if (hashRawBytes(sourceBytes) !== pending.sourceManifestSha256) {
+    throw new Error(`canonical ${context.network} deployment no longer matches pending upgrade source`);
+  }
+  const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
+  const previousBuildInfoPath = retainedBuildInfoPath(context, source.release.buildInfoSha256);
+  authenticatePendingBuildInfo(previousBuildInfoPath, source.release.buildInfoSha256);
+  const currentBuildInfo = loadAuthenticatedBuildInfo(paths.buildInfo, pending.release.buildInfoSha256);
+  const compiledCodeHashes = await loadCompiledUpgradeCodeHashes(
+    context,
+    currentBuildInfo,
+    source,
+    pending.targets,
+  );
+  validateRecordedUpgradeOperations(source, pending, compiledCodeHashes);
+  const manifestBytes = authenticateRenderedUpgradeManifest(source, pending);
+
+  const rpcUrl = requireEnvironment(context, networkConfigs[context.network].rpcVariable);
+  const run = deploymentCommandRunner(context);
+  const transactionHashes = extractBroadcastTransactionHashes(readFileSync(paths.broadcast, "utf8"));
+  const receipts = await loadTransactionReceipts(run, rpcUrl, transactionHashes);
+  await waitForFilecoinFinality(run, rpcUrl, receipts, { signal: context.signal });
+  await verifyLiveDeployment(run, rpcUrl, source, pending.operations);
+
+  const preparedCanonicalHash = hashFileIfPresent(paths.latest);
+  const preparedCanonicalState = classifyUpgradeCanonicalState(preparedCanonicalHash, pending);
+  if (preparedCanonicalState === "unexpected") {
+    throw new Error(`canonical ${context.network} deployment is unexpected during upgrade publication`);
+  }
+  if (preparedCanonicalState === "result") {
+    authenticateRetainedBuildInfo(context, pending.release.buildInfoSha256);
+  } else {
+    retainBuildInfo(context, paths.buildInfo, pending.release.buildInfoSha256);
+    writeAtomicFile(paths.latest, manifestBytes);
+  }
+
+  pending = { ...pending, status: "finalized" };
+  writePendingUpgrade(paths.pending, pending);
+  pruneBuildInfoExcept(context, [source.release.buildInfoSha256, pending.release.buildInfoSha256]);
 }
 
 async function verify(context: DeploymentContext): Promise<void> {
@@ -298,6 +466,18 @@ function deployPaths(context: DeploymentContext): DeployPaths {
     pending: join(pendingDirectory, "pending-deploy.json"),
     buildInfo: join(pendingDirectory, "pending-deploy.build-info.json.gz"),
     broadcast: join(pendingDirectory, "pending-deploy.broadcast.json"),
+    claim: join(pendingDirectory, "operation.claim"),
+    latest: canonicalManifestPath(context),
+  };
+}
+
+function upgradePaths(context: DeploymentContext): UpgradePaths {
+  const pendingDirectory = join(context.pendingRoot, context.network);
+  return {
+    pendingDirectory,
+    pending: join(pendingDirectory, "pending-upgrade.json"),
+    buildInfo: join(pendingDirectory, "pending-upgrade.build-info.json.gz"),
+    broadcast: join(pendingDirectory, "pending-upgrade.broadcast.json"),
     claim: join(pendingDirectory, "operation.claim"),
     latest: canonicalManifestPath(context),
   };
@@ -578,8 +758,439 @@ async function buildDeployment(context: DeploymentContext, workspace: string): P
   const buildInfoBytes = readFileSync(join(buildInfoDirectory, buildInfoFiles[0]));
   return {
     sha256: hashRawBytes(buildInfoBytes),
+    raw: buildInfoBytes,
     compressed: gzipSync(buildInfoBytes, { level: 9 }),
   };
+}
+
+function validateUpgradeTargets(source: DeploymentManifest, targets: readonly string[]): void {
+  if (source.status !== "finalized") {
+    throw new Error("canonical deployment manifest must be finalized before upgrade");
+  }
+  const uniqueTargets = new Set<string>();
+  for (const target of targets) {
+    if (uniqueTargets.has(target)) {
+      throw new Error(`duplicate upgrade target: ${target}`);
+    }
+    uniqueTargets.add(target);
+
+    if (target === "Validator") {
+      const validator = source.contracts.Validator;
+      if (validator === undefined || validator.kind !== "implementation") {
+        throw new Error("upgrade target Validator must have kind implementation");
+      }
+      if (validator.artifact !== validatorArtifact) {
+        throw new Error(`upgrade target Validator artifact must be ${validatorArtifact}`);
+      }
+      const beacon = source.contracts.ValidatorBeacon;
+      if (beacon === undefined || beacon.kind !== "beacon") {
+        throw new Error("upgrade target Validator requires ValidatorBeacon with kind beacon");
+      }
+      continue;
+    }
+
+    const expectedArtifact = uupsUpgradeArtifacts[target];
+    if (expectedArtifact === undefined) {
+      throw new Error(`unsupported upgrade target: ${target}`);
+    }
+    const contract = source.contracts[target];
+    if (contract === undefined || contract.kind !== "uups") {
+      throw new Error(`upgrade target ${target} must have kind uups`);
+    }
+    if (contract.artifact !== expectedArtifact) {
+      throw new Error(`upgrade target ${target} artifact must be ${expectedArtifact}`);
+    }
+  }
+}
+
+function prepareUpgradeOperation(context: DeploymentContext, paths: UpgradePaths): void {
+  if (fileExists(paths.claim)) {
+    throw new Error(`same-network operation claim already exists: ${paths.claim}`);
+  }
+  if (fileExists(paths.pending) && isAuthenticatedTerminalJournal(context, "TypeScript", paths.pending)) {
+    removeUpgradeRecoveryFiles(paths);
+  }
+  assertNoBlockingOperationJournals(context);
+}
+
+function removeUpgradeRecoveryFiles(paths: UpgradePaths): void {
+  rmSync(paths.pending, { force: true });
+  rmSync(paths.buildInfo, { force: true });
+  rmSync(paths.broadcast, { force: true });
+}
+
+async function validateUpgradeStorageLayouts(
+  context: DeploymentContext,
+  manifestPath: string,
+  source: DeploymentManifest,
+  previousBuildInfoPath: string,
+  buildInfo: PreparedBuildInfo,
+  workspace: string,
+): Promise<void> {
+  const currentBuildInfoPath = join(workspace, "current-build-info.json.gz");
+  writeAtomicFile(currentBuildInfoPath, buildInfo.compressed);
+  const storageTargets = Object.entries(source.contracts).flatMap(([name, contract]) => {
+    if (contract.kind === "uups" || name === "Validator" && contract.kind === "implementation") {
+      return [name];
+    }
+    return [];
+  });
+  if (storageTargets.length === 0) {
+    throw new Error("canonical deployment has no upgradeable implementations for storage validation");
+  }
+
+  const arguments_ = ["--manifest", manifestPath];
+  for (const target of storageTargets) {
+    arguments_.push("--target", target);
+  }
+  arguments_.push(
+    "--reference-build-info",
+    previousBuildInfoPath,
+    "--reference-sha256",
+    source.release.buildInfoSha256,
+    "--current-build-info",
+    currentBuildInfoPath,
+    "--current-sha256",
+    buildInfo.sha256,
+  );
+
+  const executable = context.environment.STORAGE_VALIDATOR ?? join(context.root, "script", "validate-storage-layout.sh");
+  try {
+    await runProcess(executable, arguments_, { environment: context.environment, signal: context.signal });
+  } catch (error) {
+    throw new Error("storage validation failed", { cause: error });
+  }
+}
+
+async function loadCompiledUpgradeCodeHashes(
+  context: DeploymentContext,
+  buildInfoBytes: Buffer,
+  source: DeploymentManifest,
+  targets: readonly string[],
+): Promise<Map<string, string>> {
+  let value: unknown;
+  try {
+    value = JSON.parse(buildInfoBytes.toString("utf8")) as unknown;
+  } catch {
+    throw new Error("current build-info JSON is invalid");
+  }
+  const hashes = new Map<string, string>();
+  for (const target of targets) {
+    const contract = source.contracts[target];
+    if (contract === undefined) {
+      throw new Error(`upgrade target ${target} is missing from source manifest`);
+    }
+    const bytecode = readBuildInfoDeployedBytecode(value, contract.artifact, target);
+    const output = (await runProcess(context.executables.cast, ["keccak", bytecode], {
+      signal: context.signal,
+    })).trim();
+    if (!/^0x[0-9a-f]{64}$/.test(output)) {
+      throw new Error(`compiled implementation code hash for ${target} is invalid`);
+    }
+    hashes.set(target, output);
+  }
+  return hashes;
+}
+
+function readBuildInfoDeployedBytecode(value: unknown, artifact: string, target: string): string {
+  const separator = artifact.lastIndexOf(":");
+  if (separator <= 0 || separator === artifact.length - 1) {
+    throw new Error(`manifest artifact for ${target} is invalid: ${artifact}`);
+  }
+  const sourceName = artifact.slice(0, separator);
+  const contractName = artifact.slice(separator + 1);
+  const buildInfo = readRecord(value, "build-info");
+  const output = readRecord(buildInfo.output, "build-info.output");
+  const contracts = readRecord(output.contracts, "build-info.output.contracts");
+  const sourceContracts = readRecord(contracts[sourceName], `build-info output for ${sourceName}`);
+  const contract = readRecord(sourceContracts[contractName], `build-info output for ${artifact}`);
+  const evm = readRecord(contract.evm, `build-info output for ${artifact}.evm`);
+  const deployedBytecode = readRecord(
+    evm.deployedBytecode,
+    `build-info output for ${artifact}.evm.deployedBytecode`,
+  );
+  const object = deployedBytecode.object;
+  if (typeof object !== "string" || object.length === 0 || object.length % 2 !== 0 || !/^[0-9a-fA-F]+$/.test(object)) {
+    throw new Error(`build-info deployed bytecode for ${target} is invalid`);
+  }
+  return `0x${object}`;
+}
+
+function readRecord(value: unknown, path: string): Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    throw new Error(`${path} must be an object`);
+  }
+  return value as Record<string, unknown>;
+}
+
+async function validateUpgradeAuthorization(
+  context: DeploymentContext,
+  source: DeploymentManifest,
+  targets: readonly string[],
+  privateKey: string,
+): Promise<void> {
+  const rpcUrl = requireEnvironment(context, networkConfigs[context.network].rpcVariable);
+  const deployer = readCommandAddress(
+    await runProcess(context.executables.cast, ["wallet", "address", "--private-key", privateKey], {
+      signal: context.signal,
+    }),
+    "upgrade deployer",
+  );
+
+  for (const target of targets) {
+    if (target === "Validator") {
+      const beacon = source.contracts.ValidatorBeacon;
+      if (beacon === undefined || beacon.kind !== "beacon") {
+        throw new Error("upgrade target Validator requires ValidatorBeacon with kind beacon");
+      }
+      const owner = readCommandAddress(
+        await runProcess(
+          context.executables.cast,
+          ["call", beacon.address, "owner()(address)", "--rpc-url", rpcUrl],
+          { signal: context.signal },
+        ),
+        "ValidatorBeacon owner",
+      );
+      if (owner !== deployer) {
+        throw new Error(`${deployer} is not authorized to upgrade Validator`);
+      }
+      continue;
+    }
+
+    const contract = source.contracts[target];
+    if (contract === undefined || contract.kind !== "uups") {
+      throw new Error(`upgrade target ${target} must have kind uups`);
+    }
+    const role = (await runProcess(
+      context.executables.cast,
+      ["call", contract.proxy, "UPGRADER_ROLE()(bytes32)", "--rpc-url", rpcUrl],
+      { signal: context.signal },
+    )).trim();
+    if (!/^0x[0-9a-fA-F]{64}$/.test(role)) {
+      throw new Error(`${target} UPGRADER_ROLE is invalid`);
+    }
+    const authorized = (await runProcess(
+      context.executables.cast,
+      ["call", contract.proxy, "hasRole(bytes32,address)(bool)", role, deployer, "--rpc-url", rpcUrl],
+      { signal: context.signal },
+    )).trim();
+    if (authorized !== "true") {
+      throw new Error(`${deployer} is not authorized to upgrade ${target}`);
+    }
+  }
+}
+
+function readCommandAddress(output: string, label: string): string {
+  const value = output.trim().toLowerCase();
+  if (!/^0x[0-9a-f]{40}$/.test(value)) {
+    throw new Error(`${label} is not an address`);
+  }
+  return value;
+}
+
+function rejectUnchangedUpgradeBytecode(
+  source: DeploymentManifest,
+  compiledCodeHashes: ReadonlyMap<string, string>,
+): void {
+  for (const [target, compiledCodeHash] of compiledCodeHashes) {
+    const contract = source.contracts[target];
+    if (contract === undefined || !("implementationCodeHash" in contract)) {
+      throw new Error(`upgrade target ${target} has no implementation code hash`);
+    }
+    if (contract.implementationCodeHash === compiledCodeHash) {
+      throw new Error(`compiled implementation for ${target} is unchanged`);
+    }
+  }
+}
+
+function createPendingUpgrade(
+  context: DeploymentContext,
+  targets: readonly string[],
+  sourceManifestSha256: string,
+  buildInfoSha256: string,
+): PendingUpgrade {
+  return {
+    status: "pending",
+    operation: "upgrade",
+    network: context.network,
+    chainId: networkConfigs[context.network].chainId,
+    targets: [...targets],
+    operations: [],
+    sourceManifestSha256,
+    resultManifestSha256: null,
+    release: { buildInfoSha256 },
+    broadcastSha256: null,
+  };
+}
+
+function claimUpgradeOperation(
+  context: DeploymentContext,
+  paths: UpgradePaths,
+  buildInfo: PreparedBuildInfo,
+  pending: PendingUpgrade,
+): OperationClaim {
+  mkdirSync(paths.pendingDirectory, { recursive: true });
+  let fileDescriptor: number;
+  try {
+    fileDescriptor = openSync(paths.claim, "wx", 0o600);
+  } catch (error) {
+    throw new Error(`could not acquire same-network operation claim: ${paths.claim}`, { cause: error });
+  }
+
+  const claim = { path: paths.claim, fileDescriptor };
+  try {
+    writeSync(fileDescriptor, `upgrade ${process.pid}\n`);
+    fsyncSync(fileDescriptor);
+    assertNoBlockingOperationJournals(context);
+    writeAtomicFile(paths.buildInfo, buildInfo.compressed);
+    writeExclusiveFile(paths.pending, `${JSON.stringify(pending, null, 2)}\n`);
+    return claim;
+  } catch (error) {
+    releaseOperationClaim(claim);
+    throw error;
+  }
+}
+
+async function broadcastUpgrade(
+  context: DeploymentContext,
+  workspace: string,
+  forgeOutputPath: string,
+  sourceManifestPath: string,
+  privateKey: string,
+  targets: readonly string[],
+): Promise<void> {
+  const rpcUrl = requireEnvironment(context, networkConfigs[context.network].rpcVariable);
+  const environment: NodeJS.ProcessEnv = {
+    ...context.environment,
+    RPC_URL: rpcUrl,
+    PRIVATE_KEY: privateKey,
+    UPGRADE_OUTPUT: forgeOutputPath,
+    DEPLOYMENT_MANIFEST: sourceManifestPath,
+    UPGRADE_CONTRACT_NAMES: targets.join(","),
+    FOUNDRY_BROADCAST: join(workspace, "broadcast"),
+  };
+  await runProcess(
+    context.executables.forge,
+    [
+      "script",
+      "script/Upgrade.s.sol:Upgrade",
+      "--root",
+      context.root,
+      "--broadcast",
+      "--rpc-url",
+      rpcUrl,
+      "--private-key",
+      privateKey,
+      "--gas-estimate-multiplier",
+      "100000",
+      "--slow",
+    ],
+    { environment, signal: context.signal },
+  );
+}
+
+function preserveUpgradeBroadcast(
+  context: DeploymentContext,
+  workspace: string,
+  paths: UpgradePaths,
+  forgeOutputPath: string,
+  expectedPending: PendingUpgrade,
+  source: DeploymentManifest,
+  compiledCodeHashes: ReadonlyMap<string, string>,
+): PendingUpgrade | undefined {
+  const broadcastSource = locateUpgradeBroadcast(context, workspace);
+  if (broadcastSource === undefined) {
+    return undefined;
+  }
+  const broadcastBytes = readFileSync(broadcastSource);
+  writeAtomicFile(paths.broadcast, broadcastBytes);
+  const broadcastSha256 = hashRawBytes(broadcastBytes);
+
+  let mutatedPending: PendingUpgrade;
+  try {
+    const parsedPending = parsePendingOperation(readFileSync(forgeOutputPath, "utf8"));
+    if (parsedPending.operation !== "upgrade") {
+      throw new Error("Forge upgrade output changed pending.operation");
+    }
+    validateForgeUpgradeRecoveryFields(parsedPending, expectedPending);
+    mutatedPending = { ...parsedPending, broadcastSha256 };
+    validateRecordedUpgradeOperations(source, mutatedPending, compiledCodeHashes);
+  } catch (error) {
+    writePendingUpgrade(paths.pending, { ...expectedPending, broadcastSha256 });
+    throw new Error("Forge upgrade output is invalid; broadcast evidence was preserved", { cause: error });
+  }
+
+  const manifest = renderPrepublicationUpgradedManifest(source, mutatedPending);
+  const manifestBytes = `${JSON.stringify(manifest, null, 2)}\n`;
+  const recordedPending = {
+    ...mutatedPending,
+    resultManifestSha256: hashRawBytes(Buffer.from(manifestBytes)),
+  };
+  writePendingUpgrade(paths.pending, recordedPending);
+  return recordedPending;
+}
+
+function locateUpgradeBroadcast(context: DeploymentContext, workspace: string): string | undefined {
+  const directory = join(
+    workspace,
+    "broadcast",
+    "Upgrade.s.sol",
+    String(networkConfigs[context.network].chainId),
+  );
+  const candidates = fileExists(directory)
+    ? readdirSync(directory).filter((name) => /^run-[0-9]+\.json$/.test(name))
+    : [];
+  if (candidates.length === 0) {
+    return undefined;
+  }
+  if (candidates.length !== 1) {
+    throw new Error("Forge must produce exactly one timestamped Forge upgrade broadcast file");
+  }
+  return join(directory, candidates[0]);
+}
+
+function validateForgeUpgradeRecoveryFields(actual: PendingUpgrade, expected: PendingUpgrade): void {
+  if (
+    actual.status !== "pending" ||
+    actual.network !== expected.network ||
+    actual.chainId !== expected.chainId ||
+    actual.sourceManifestSha256 !== expected.sourceManifestSha256 ||
+    actual.release.buildInfoSha256 !== expected.release.buildInfoSha256 ||
+    actual.broadcastSha256 !== null ||
+    actual.resultManifestSha256 !== null ||
+    actual.targets.length !== expected.targets.length ||
+    actual.targets.some((target, index) => target !== expected.targets[index])
+  ) {
+    throw new Error("Forge upgrade output changed pending recovery fields");
+  }
+}
+
+function validateRecordedUpgradeOperations(
+  source: DeploymentManifest,
+  pending: PendingUpgrade,
+  compiledCodeHashes: ReadonlyMap<string, string>,
+): void {
+  if (pending.operations.length === 0) {
+    throw new Error("pending upgrade has no completed operations");
+  }
+  if (pending.operations.length !== pending.targets.length) {
+    throw new Error("pending upgrade operations do not match requested targets");
+  }
+  for (const [index, operation] of pending.operations.entries()) {
+    const target = pending.targets[index];
+    if (operation.target !== target) {
+      throw new Error(`pending upgrade operation ${index} does not match requested target ${target}`);
+    }
+    const expectedKind = target === "Validator" ? "beacon" : "uups";
+    if (operation.kind !== expectedKind) {
+      throw new Error(`pending upgrade operation for ${target} must have kind ${expectedKind}`);
+    }
+    const expectedHash = compiledCodeHashes.get(target);
+    if (expectedHash === undefined || operation.newImplementationCodeHash !== expectedHash) {
+      throw new Error(`pending upgrade operation code hash for ${target} does not match current build-info`);
+    }
+  }
+  renderPrepublicationUpgradedManifest(source, pending);
 }
 
 function claimDeployOperation(
@@ -824,7 +1435,34 @@ function loadPendingDeploy(context: DeploymentContext, paths: DeployPaths): Pend
   return pending;
 }
 
+function loadPendingUpgrade(context: DeploymentContext, paths: UpgradePaths): PendingUpgrade {
+  if (!fileExists(paths.pending)) {
+    throw new Error(`pending ${context.network} upgrade does not exist: ${paths.pending}`);
+  }
+  const pending = parsePendingOperation(readFileSync(paths.pending, "utf8"));
+  if (pending.operation !== "upgrade") {
+    throw new Error(`pending operation is not an upgrade: ${paths.pending}`);
+  }
+  if (pending.network !== context.network || pending.chainId !== networkConfigs[context.network].chainId) {
+    throw new Error(`pending upgrade does not match ${context.network}`);
+  }
+  if (pending.broadcastSha256 === null) {
+    throw new Error("pending.broadcastSha256 is missing post-broadcast evidence");
+  }
+  if (pending.operations.length === 0) {
+    throw new Error("pending upgrade has no completed operations");
+  }
+  if (pending.resultManifestSha256 === null) {
+    throw new Error("pending.resultManifestSha256 is missing post-broadcast evidence");
+  }
+  return pending;
+}
+
 function authenticatePendingBuildInfo(path: string, expectedHash: string): void {
+  void loadAuthenticatedBuildInfo(path, expectedHash);
+}
+
+function loadAuthenticatedBuildInfo(path: string, expectedHash: string): Buffer {
   if (!fileExists(path)) {
     throw new Error(`pending deployment build-info does not exist: ${path}`);
   }
@@ -837,6 +1475,7 @@ function authenticatePendingBuildInfo(path: string, expectedHash: string): void 
   if (hashRawBytes(rawBytes) !== expectedHash) {
     throw new Error("pending deployment build-info hash does not match pending.release.buildInfoSha256");
   }
+  return rawBytes;
 }
 
 function authenticatePendingBroadcast(path: string, expectedHash: string | null): void {
@@ -926,6 +1565,18 @@ function authenticateRenderedDeployManifest(pending: PendingDeploy): string {
   return manifestBytes;
 }
 
+function authenticateRenderedUpgradeManifest(source: DeploymentManifest, pending: PendingUpgrade): string {
+  if (pending.resultManifestSha256 === null) {
+    throw new Error("pending.resultManifestSha256 is missing publication evidence");
+  }
+  const manifest = renderUpgradedManifest(source, pending);
+  const manifestBytes = `${JSON.stringify(manifest, null, 2)}\n`;
+  if (hashRawBytes(Buffer.from(manifestBytes)) !== pending.resultManifestSha256) {
+    throw new Error("rendered upgrade manifest hash does not match pending.resultManifestSha256");
+  }
+  return manifestBytes;
+}
+
 function retainedBuildInfoPath(context: DeploymentContext, buildInfoSha256: string): string {
   return join(context.deploymentsRoot, context.network, "build-info", `${buildInfoSha256.slice(2)}.json.gz`);
 }
@@ -957,13 +1608,17 @@ function markDeployFinalized(path: string, pending: PendingDeploy): void {
 }
 
 function pruneBuildInfo(context: DeploymentContext, retainedHash: string): void {
+  pruneBuildInfoExcept(context, [retainedHash]);
+}
+
+function pruneBuildInfoExcept(context: DeploymentContext, retainedHashes: readonly string[]): void {
   const directory = join(context.deploymentsRoot, context.network, "build-info");
   if (!fileExists(directory)) {
     return;
   }
-  const retainedFilename = `${retainedHash.slice(2)}.json.gz`;
+  const retainedFilenames = new Set(retainedHashes.map((hash) => `${hash.slice(2)}.json.gz`));
   for (const filename of readdirSync(directory)) {
-    if (filename.endsWith(".json.gz") && filename !== retainedFilename) {
+    if (filename.endsWith(".json.gz") && !retainedFilenames.has(filename)) {
       rmSync(join(directory, filename), { force: true });
     }
   }
@@ -975,6 +1630,17 @@ function hashFileIfPresent(path: string): string | undefined {
 
 function writePendingDeploy(path: string, pending: PendingDeploy): void {
   writeAtomicFile(path, `${JSON.stringify(pending, null, 2)}\n`);
+}
+
+function writePendingUpgrade(path: string, pending: PendingUpgrade): void {
+  writeAtomicFile(path, `${JSON.stringify(pending, null, 2)}\n`);
+}
+
+function markUpgradeFinalized(path: string, pending: PendingUpgrade): void {
+  if (pending.status === "finalized") {
+    return;
+  }
+  writePendingUpgrade(path, { ...pending, status: "finalized" });
 }
 
 function ensureCanonicalManifest(context: DeploymentContext): void {

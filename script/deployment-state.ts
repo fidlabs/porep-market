@@ -144,6 +144,14 @@ export function renderDeployManifest(pending: PendingDeploy, finalizedAt: string
 export function renderUpgradedManifest(source: DeploymentManifest, pending: PendingUpgrade): DeploymentManifest {
   ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
   ensureFinalizationEvidence(pending.resultManifestSha256, "pending.resultManifestSha256");
+  return renderPrepublicationUpgradedManifest(source, pending);
+}
+
+export function renderPrepublicationUpgradedManifest(
+  source: DeploymentManifest,
+  pending: PendingUpgrade,
+): DeploymentManifest {
+  ensureFinalizationEvidence(pending.broadcastSha256, "pending.broadcastSha256");
   const contracts = structuredClone(source.contracts);
 
   for (const operation of pending.operations) {
@@ -442,6 +450,19 @@ function applyUpgradeOperation(contracts: Record<string, ManifestContract>, oper
   const target = contracts[operation.target];
   if (target === undefined) {
     throw new Error(`manifest.contracts.${operation.target} is missing`);
+  }
+
+  if (target.artifact !== operation.artifact) {
+    throw new Error(`pending operation artifact for ${operation.target} does not match source manifest`);
+  }
+  if ("implementation" in target && target.implementation.toLowerCase() === operation.newImplementation.toLowerCase()) {
+    throw new Error(`upgrade operation for ${operation.target} did not replace the implementation address`);
+  }
+  if (
+    "implementationCodeHash" in target &&
+    target.implementationCodeHash === operation.newImplementationCodeHash
+  ) {
+    throw new Error(`upgrade operation for ${operation.target} did not replace the implementation bytecode`);
   }
 
   if (operation.kind === "uups") {

@@ -16,7 +16,7 @@ import { tmpdir } from "node:os";
 import { delimiter, dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { gunzipSync } from "node:zlib";
+import { gunzipSync, gzipSync } from "node:zlib";
 import { installSignalHandling, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
 
 const scriptPath = fileURLToPath(new URL("./deployment.ts", import.meta.url));
@@ -86,6 +86,40 @@ const testTransactionHash = `0x${"a".repeat(64)}`;
 const testTransactionHash2 = `0x${"d".repeat(64)}`;
 const testBlockHash = `0x${"b".repeat(64)}`;
 const testCodeHash = `0x${"c".repeat(64)}`;
+const testPreviousCodeHash = `0x${"e".repeat(64)}`;
+const testNewAddress = `0x${"2".repeat(40)}`;
+const upgradeTargets = [
+  "PoRepMarket",
+  "ValidatorFactory",
+  "DataCapEvidenceAdapter",
+  "SPRegistry",
+  "SLIOracle",
+  "SLIScorer",
+  "Validator",
+] as const;
+
+const upgradeArtifacts: Record<string, string> = {
+  PoRepMarket: "src/PoRepMarket.sol:PoRepMarket",
+  ValidatorFactory: "src/ValidatorFactory.sol:ValidatorFactory",
+  DataCapEvidenceAdapter: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+  SPRegistry: "src/SPRegistry.sol:SPRegistry",
+  SLIOracle: "src/SLIOracle.sol:SLIOracle",
+  SLIScorer: "src/SLIScorer.sol:SLIScorer",
+  Validator: "src/Validator.sol:Validator",
+};
+
+const currentBuildInfoText = `${JSON.stringify({
+  output: {
+    contracts: Object.fromEntries(
+      Object.values(upgradeArtifacts).map((artifact) => {
+        const separator = artifact.lastIndexOf(":");
+        const source = artifact.slice(0, separator);
+        const name = artifact.slice(separator + 1);
+        return [source, { [name]: { evm: { deployedBytecode: { object: "02" } } } }];
+      }),
+    ),
+  },
+})}\n`;
 
 function deployTestEnvironment(directory: string): NodeJS.ProcessEnv {
   const environment = deploymentEnvironment(directory);
@@ -114,6 +148,8 @@ function deployTestEnvironment(directory: string): NodeJS.ProcessEnv {
     TEST_TRANSACTION_HASH_2: testTransactionHash2,
     TEST_BLOCK_HASH: testBlockHash,
     TEST_CODE_HASH: testCodeHash,
+    TEST_PREVIOUS_CODE_HASH: testPreviousCodeHash,
+    TEST_NEW_ADDRESS: testNewAddress,
     FILECOIN_PAY_DEVNET: testAddress,
     TERMINATION_ORACLE_DEVNET: testAddress,
     ORACLE_DEVNET: testAddress,
@@ -135,10 +171,16 @@ function createDeployFakeCast(directory: string): void {
       "const txHash = process.env.TEST_TRANSACTION_HASH;\n" +
       "const blockHash = process.env.TEST_BLOCK_HASH;\n" +
       "const codeHash = process.env.TEST_CODE_HASH;\n" +
+      "const previousCodeHash = process.env.TEST_PREVIOUS_CODE_HASH;\n" +
+      "const newAddress = process.env.TEST_NEW_ADDRESS;\n" +
+      "const upgradeMode = process.env.FAKE_UPGRADE_MODE === 'yes';\n" +
       "if (args[0] === 'chain-id') process.stdout.write((process.env.FAKE_CHAIN_ID ?? '31415926') + '\\n');\n" +
-      "else if (args[0] === 'keccak') process.stdout.write(codeHash + '\\n');\n" +
-      "else if (args[0] === 'call' && args[2] === 'hasRole(bytes32,address)(bool)') process.stdout.write('true\\n');\n" +
+      "else if (args[0] === 'wallet' && args[1] === 'address') process.stdout.write(address + '\\n');\n" +
+      "else if (args[0] === 'keccak') process.stdout.write((upgradeMode && args[1] !== '0x02' ? previousCodeHash : codeHash) + '\\n');\n" +
+      "else if (args[0] === 'call' && args[2] === 'hasRole(bytes32,address)(bool)') process.stdout.write(process.env.FAKE_UNAUTHORIZED === 'yes' ? 'false\\n' : 'true\\n');\n" +
       "else if (args[0] === 'call' && (args[2].includes('ROLE') || args[2] === 'TERMINATION_ORACLE()(bytes32)')) process.stdout.write(codeHash + '\\n');\n" +
+      "else if (args[0] === 'call' && args[2] === 'owner()(address)') process.stdout.write((process.env.FAKE_UNAUTHORIZED === 'yes' ? newAddress : address) + '\\n');\n" +
+      "else if (args[0] === 'call' && args[2] === 'implementation()(address)') process.stdout.write((upgradeMode ? newAddress : address) + '\\n');\n" +
       "else if (args[0] === 'call') process.stdout.write(address + '\\n');\n" +
       "else if (args[0] === 'rpc' && args[3] === 'eth_getTransactionReceipt') process.stdout.write(JSON.stringify({transactionHash:txHash,status:'0x1',blockNumber:'0xa',blockHash,contractAddress:null}));\n" +
       "else if (args[0] === 'rpc' && args[3] === 'Filecoin.ChainGetFinalizedTipSet') {\n" +
@@ -146,8 +188,8 @@ function createDeployFakeCast(directory: string): void {
       "  process.stdout.write(JSON.stringify({Height:10}));\n" +
       "}\n" +
       "else if (args[0] === 'rpc' && args[3] === 'eth_getBlockByNumber') process.stdout.write(JSON.stringify({number:'0xa',hash:blockHash}));\n" +
-      "else if (args[0] === 'rpc' && args[3] === 'eth_getCode') process.stdout.write(JSON.stringify('0x01'));\n" +
-      "else if (args[0] === 'rpc' && args[3] === 'eth_getStorageAt') process.stdout.write(JSON.stringify('0x' + '0'.repeat(24) + address.slice(2)));\n" +
+      "else if (args[0] === 'rpc' && args[3] === 'eth_getCode') process.stdout.write(JSON.stringify(upgradeMode && args[4].toLowerCase() === newAddress.toLowerCase() ? '0x02' : '0x01'));\n" +
+      "else if (args[0] === 'rpc' && args[3] === 'eth_getStorageAt') process.stdout.write(JSON.stringify('0x' + '0'.repeat(24) + (upgradeMode ? newAddress : address).slice(2)));\n" +
       "else { process.stderr.write('unexpected cast arguments: ' + JSON.stringify(args)); process.exitCode = 2; }\n",
   );
   chmodSync(path, 0o755);
@@ -203,24 +245,33 @@ function createDeployFakeForge(directory: string): void {
       "import { join } from 'node:path';\n" +
       "const args = process.argv.slice(2);\n" +
       "const claim = process.env.PENDING_ROOT_TS && join(process.env.PENDING_ROOT_TS, 'devnet', 'operation.claim');\n" +
-      "const record = {args,claimExists:Boolean(claim && existsSync(claim)),environment:{RPC_URL:process.env.RPC_URL,PRIVATE_KEY_SET:Boolean(process.env.PRIVATE_KEY),FILECOIN_PAY:process.env.FILECOIN_PAY,TERMINATION_ORACLE:process.env.TERMINATION_ORACLE,ORACLE:process.env.ORACLE,POREP_SERVICE:process.env.POREP_SERVICE,META_ALLOCATOR:process.env.META_ALLOCATOR,OPERATOR_ADDR:process.env.OPERATOR_ADDR,BUILD_INFO_SHA256:process.env.BUILD_INFO_SHA256,DEPLOYMENT_OUTPUT:process.env.DEPLOYMENT_OUTPUT,FOUNDRY_BROADCAST:process.env.FOUNDRY_BROADCAST}};\n" +
+      "const record = {args,claimExists:Boolean(claim && existsSync(claim)),environment:{RPC_URL:process.env.RPC_URL,PRIVATE_KEY_SET:Boolean(process.env.PRIVATE_KEY),FILECOIN_PAY:process.env.FILECOIN_PAY,TERMINATION_ORACLE:process.env.TERMINATION_ORACLE,ORACLE:process.env.ORACLE,POREP_SERVICE:process.env.POREP_SERVICE,META_ALLOCATOR:process.env.META_ALLOCATOR,OPERATOR_ADDR:process.env.OPERATOR_ADDR,BUILD_INFO_SHA256:process.env.BUILD_INFO_SHA256,DEPLOYMENT_OUTPUT:process.env.DEPLOYMENT_OUTPUT,UPGRADE_OUTPUT:process.env.UPGRADE_OUTPUT,DEPLOYMENT_MANIFEST:process.env.DEPLOYMENT_MANIFEST,UPGRADE_CONTRACT_NAMES:process.env.UPGRADE_CONTRACT_NAMES,FOUNDRY_BROADCAST:process.env.FOUNDRY_BROADCAST}};\n" +
       "appendFileSync(process.env.FAKE_FORGE_LOG, JSON.stringify(record) + '\\n');\n" +
       "if (args[0] === 'build') {\n" +
       "  if (process.env.FAKE_BUILD_DELAY_MS) await new Promise(resolve => setTimeout(resolve, Number(process.env.FAKE_BUILD_DELAY_MS)));\n" +
       "  const out = args[args.indexOf('--out') + 1]; const buildDir = join(out, 'build-info'); mkdirSync(buildDir, {recursive:true});\n" +
-      "  writeFileSync(join(buildDir, 'build.json'), '{\\\"build\\\":1}\\n');\n" +
+      `  writeFileSync(join(buildDir, 'build.json'), ${JSON.stringify(currentBuildInfoText)});\n` +
       "  if (process.env.FAKE_EXTRA_BUILD_INFO === 'yes') writeFileSync(join(buildDir, 'extra.json'), '{}\\n');\n" +
       "} else if (args[0] === 'script') {\n" +
       "  if (process.env.FAKE_FAIL_BEFORE_BROADCAST === 'yes') { process.stderr.write('failed before broadcast'); process.exit(2); }\n" +
-      "  const runDir = join(process.env.FOUNDRY_BROADCAST, 'Deploy.s.sol', '31415926'); mkdirSync(runDir, {recursive:true});\n" +
+      "  const isUpgrade = args[1].includes('Upgrade.s.sol');\n" +
+      "  const runDir = join(process.env.FOUNDRY_BROADCAST, isUpgrade ? 'Upgrade.s.sol' : 'Deploy.s.sol', '31415926'); mkdirSync(runDir, {recursive:true});\n" +
       "  const broadcast = JSON.stringify({transactions:[{hash:process.env.TEST_TRANSACTION_HASH}]}) + '\\n';\n" +
       "  writeFileSync(join(runDir, 'run-latest.json'), '{}\\n');\n" +
       "  if (process.env.FAKE_LATEST_ONLY !== 'yes') writeFileSync(join(runDir, 'run-100.json'), broadcast);\n" +
-      "  const pending = JSON.parse(readFileSync(process.env.DEPLOYMENT_OUTPUT, 'utf8'));\n" +
+      "  const output = isUpgrade ? process.env.UPGRADE_OUTPUT : process.env.DEPLOYMENT_OUTPUT;\n" +
+      "  const pending = JSON.parse(readFileSync(output, 'utf8'));\n" +
       `  const result = ${JSON.stringify(manifestResult)};\n` +
-      "  result.release.buildInfoSha256 = process.env.BUILD_INFO_SHA256; pending.result = result;\n" +
-      "  if (process.env.FAKE_BAD_DEPENDENCY === 'yes') result.externalDependencies.FilecoinPay = '0x' + '2'.repeat(40);\n" +
-      "  writeFileSync(process.env.DEPLOYMENT_OUTPUT, JSON.stringify(pending, null, 2) + '\\n');\n" +
+      `  const artifacts = ${JSON.stringify(upgradeArtifacts)};\n` +
+      "  if (isUpgrade) {\n" +
+      "    const targets = process.env.UPGRADE_CONTRACT_NAMES.split(',');\n" +
+      "    pending.operations = targets.map(target => ({target,kind:target === 'Validator' ? 'beacon' : 'uups',artifact:artifacts[target],newImplementation:process.env.TEST_NEW_ADDRESS,newImplementationCodeHash:process.env.TEST_CODE_HASH}));\n" +
+      "    if (process.env.FAKE_INVALID_OPERATION === 'yes') pending.operations[0].artifact = 'src/Other.sol:Other';\n" +
+      "  } else {\n" +
+      "    result.release.buildInfoSha256 = process.env.BUILD_INFO_SHA256; pending.result = result;\n" +
+      "    if (process.env.FAKE_BAD_DEPENDENCY === 'yes') result.externalDependencies.FilecoinPay = '0x' + '2'.repeat(40);\n" +
+      "  }\n" +
+      "  writeFileSync(output, JSON.stringify(pending, null, 2) + '\\n');\n" +
       "  if (process.env.FAKE_DELAY_CLOSE_AFTER_SIGNAL === 'yes') {\n" +
       "    let terminating = false;\n" +
       "    process.on('SIGTERM', () => {\n" +
@@ -250,6 +301,98 @@ function uupsContract(artifact: string) {
     implementation: testAddress,
     proxyCodeHash: testCodeHash,
     implementationCodeHash: testCodeHash,
+  };
+}
+
+function upgradeSourceManifest(buildInfoSha256: string) {
+  const sourceUups = (artifact: string) => ({
+    kind: "uups",
+    artifact,
+    proxy: testAddress,
+    implementation: testAddress,
+    proxyCodeHash: testPreviousCodeHash,
+    implementationCodeHash: testPreviousCodeHash,
+  });
+  return {
+    status: "finalized",
+    finalizedAt: "2026-08-05T12:00:00Z",
+    deployer: testAddress,
+    release: { buildInfoSha256 },
+    contracts: {
+      PoRepMarket: sourceUups(upgradeArtifacts.PoRepMarket!),
+      ValidatorFactory: sourceUups(upgradeArtifacts.ValidatorFactory!),
+      DataCapEvidenceAdapter: sourceUups(upgradeArtifacts.DataCapEvidenceAdapter!),
+      SPRegistry: sourceUups(upgradeArtifacts.SPRegistry!),
+      SLIOracle: sourceUups(upgradeArtifacts.SLIOracle!),
+      SLIScorer: sourceUups(upgradeArtifacts.SLIScorer!),
+      Validator: {
+        kind: "implementation",
+        artifact: upgradeArtifacts.Validator,
+        implementation: testAddress,
+        implementationCodeHash: testPreviousCodeHash,
+      },
+      ValidatorBeacon: {
+        kind: "beacon",
+        artifact: "lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
+        address: testAddress,
+        implementation: testAddress,
+        factoryProxy: testAddress,
+      },
+      PoRepMarketClaimInspector: {
+        kind: "standalone",
+        artifact: "src/helpers/PoRepMarketClaimInspector.sol:PoRepMarketClaimInspector",
+        implementation: testAddress,
+        implementationCodeHash: testPreviousCodeHash,
+      },
+    },
+    externalDependencies: {
+      FilecoinPay: testAddress,
+      TerminationOracle: testAddress,
+      Oracle: testAddress,
+      PoRepService: testAddress,
+      MetaAllocator: testAddress,
+      Operator: testAddress,
+    },
+  };
+}
+
+function createFakeStorageValidator(directory: string): string {
+  const path = join(directory, "validate-storage-layout");
+  writeFileSync(
+    path,
+    `#!${process.execPath}\n` +
+      "import { appendFileSync, writeFileSync } from 'node:fs';\n" +
+      "const args = process.argv.slice(2);\n" +
+      "appendFileSync(process.env.FAKE_STORAGE_LOG, JSON.stringify(args) + '\\n');\n" +
+      "if (process.env.FAKE_MUTATE_MANIFEST === 'yes') writeFileSync(args[args.indexOf('--manifest') + 1], '{\"changed\":true}\\n');\n" +
+      "if (process.env.FAKE_STORAGE_INCOMPATIBLE === 'yes') { process.stderr.write('incompatible storage'); process.exit(2); }\n",
+  );
+  chmodSync(path, 0o755);
+  return path;
+}
+
+function upgradeTestEnvironment(directory: string): NodeJS.ProcessEnv {
+  const environment = deployTestEnvironment(directory);
+  const previousBuildInfo = '{"previousBuild":1}\n';
+  const previousBuildInfoSha256 = `0x${createHash("sha256").update(previousBuildInfo).digest("hex")}`;
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+  const previousBuildInfoPath = join(
+    environment.DEPLOYMENTS_ROOT!,
+    "devnet",
+    "build-info",
+    `${previousBuildInfoSha256.slice(2)}.json.gz`,
+  );
+  const storageLog = join(directory, "storage.jsonl");
+  mkdirSync(dirname(previousBuildInfoPath), { recursive: true });
+  writeFileSync(previousBuildInfoPath, gzipSync(previousBuildInfo, { level: 9 }));
+  writeFileSync(latest, `${JSON.stringify(upgradeSourceManifest(previousBuildInfoSha256), null, 2)}\n`);
+  writeFileSync(storageLog, "");
+
+  return {
+    ...environment,
+    FAKE_UPGRADE_MODE: "yes",
+    STORAGE_VALIDATOR: createFakeStorageValidator(directory),
+    FAKE_STORAGE_LOG: storageLog,
   };
 }
 
@@ -459,8 +602,8 @@ test("deploy completes build, broadcast, finality, live checks, and atomic publi
     const retainedBuildInfoFiles = readdirSync(retainedBuildInfoDirectory);
     assert.deepEqual(retainedBuildInfoFiles.length, 1);
     const retainedBuildInfo = readFileSync(join(retainedBuildInfoDirectory, retainedBuildInfoFiles[0]));
-    assert.equal(gunzipSync(retainedBuildInfo).toString("utf8"), '{"build":1}\n');
-    const expectedBuildHash = `0x${createHash("sha256").update('{"build":1}\n').digest("hex")}`;
+    assert.equal(gunzipSync(retainedBuildInfo).toString("utf8"), currentBuildInfoText);
+    const expectedBuildHash = `0x${createHash("sha256").update(currentBuildInfoText).digest("hex")}`;
     assert.equal((readJson(latest).release as Record<string, unknown>).buildInfoSha256, expectedBuildHash);
 
     const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
@@ -902,6 +1045,303 @@ test("deploy ignores run-latest.json as broadcast evidence", () => {
   }
 });
 
+test("upgrade completes one build, storage validation, one broadcast, live checks, and publication", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+  const pendingDirectory = join(environment.PENDING_ROOT_TS!, "devnet");
+  const pending = join(pendingDirectory, "pending-upgrade.json");
+  const broadcast = join(pendingDirectory, "pending-upgrade.broadcast.json");
+  const sourceBytes = readFileSync(latest);
+  const sourceHash = `0x${createHash("sha256").update(sourceBytes).digest("hex")}`;
+
+  try {
+    const result = runDeploymentCommand(["upgrade", "devnet", ...upgradeTargets], environment);
+
+    assert.equal(result.status, 0, result.stderr);
+    const pendingValue = readJson(pending);
+    const latestBytes = readFileSync(latest);
+    const latestValue = readJson(latest);
+    const currentBuildInfoSha256 = `0x${createHash("sha256").update(currentBuildInfoText).digest("hex")}`;
+    assert.equal(pendingValue.status, "finalized");
+    assert.equal(pendingValue.sourceManifestSha256, sourceHash);
+    assert.equal(pendingValue.resultManifestSha256, `0x${createHash("sha256").update(latestBytes).digest("hex")}`);
+    assert.equal((pendingValue.release as Record<string, unknown>).buildInfoSha256, currentBuildInfoSha256);
+    assert.deepEqual(Object.keys(pendingValue).sort(), [
+      "broadcastSha256",
+      "chainId",
+      "network",
+      "operation",
+      "operations",
+      "release",
+      "resultManifestSha256",
+      "sourceManifestSha256",
+      "status",
+      "targets",
+    ]);
+    assert.deepEqual(Object.keys(pendingValue.release as Record<string, unknown>), ["buildInfoSha256"]);
+    assert.equal((latestValue.release as Record<string, unknown>).buildInfoSha256, currentBuildInfoSha256);
+    assert.equal(
+      ((latestValue.contracts as Record<string, Record<string, unknown>>).PoRepMarket).implementation,
+      testNewAddress,
+    );
+    assert.equal(
+      ((latestValue.contracts as Record<string, Record<string, unknown>>).ValidatorBeacon).implementation,
+      testNewAddress,
+    );
+
+    const broadcastBytes = readFileSync(broadcast);
+    assert.equal(pendingValue.broadcastSha256, `0x${createHash("sha256").update(broadcastBytes).digest("hex")}`);
+    assert.equal(readdirSync(pendingDirectory).some((name) => name.includes("storage")), false);
+
+    const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "build").length, 1);
+    const broadcasts = forgeCalls.filter((call) => (call.args as string[])[0] === "script");
+    assert.equal(broadcasts.length, 1);
+    assert.deepEqual((broadcasts[0]!.args as string[]).slice(0, 2), ["script", "script/Upgrade.s.sol:Upgrade"]);
+    assert.equal(broadcasts[0]!.claimExists, true);
+    assert.equal(
+      (broadcasts[0]!.environment as Record<string, unknown>).UPGRADE_CONTRACT_NAMES,
+      upgradeTargets.join(","),
+    );
+
+    const storageArgs = JSON.parse(readFileSync(environment.FAKE_STORAGE_LOG!, "utf8")) as string[];
+    assert.deepEqual(
+      storageArgs.flatMap((value, index) => value === "--target" ? [storageArgs[index + 1]] : []),
+      [...upgradeTargets],
+    );
+    const retainedBuildInfo = readdirSync(join(environment.DEPLOYMENTS_ROOT!, "devnet", "build-info"));
+    assert.equal(retainedBuildInfo.length, 2);
+    assert.ok(retainedBuildInfo.includes(`${currentBuildInfoSha256.slice(2)}.json.gz`));
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("upgrade rejects duplicate, unknown, and wrong-kind targets before building", () => {
+  for (const scenario of ["duplicate", "unknown", "wrong-kind"] as const) {
+    const directory = createTemporaryDirectory();
+    const environment = upgradeTestEnvironment(directory);
+    const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+    let targets: readonly string[] = ["PoRepMarket"];
+    if (scenario === "duplicate") targets = ["PoRepMarket", "PoRepMarket"];
+    if (scenario === "unknown") targets = ["Unknown"];
+    if (scenario === "wrong-kind") {
+      const source = readJson(latest);
+      const contracts = source.contracts as Record<string, Record<string, unknown>>;
+      contracts.PoRepMarket = {
+        kind: "standalone",
+        artifact: upgradeArtifacts.PoRepMarket,
+        implementation: testAddress,
+        implementationCodeHash: testPreviousCodeHash,
+      };
+      writeFileSync(latest, `${JSON.stringify(source, null, 2)}\n`);
+    }
+
+    try {
+      const result = runDeploymentCommand(["upgrade", "devnet", ...targets], environment);
+
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, scenario === "duplicate" ? /duplicate upgrade target/ : scenario === "unknown" ? /unsupported upgrade target/ : /must have kind uups/);
+      assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), "");
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  }
+});
+
+test("upgrade rejects unchanged bytecode and an unauthorized deployer before broadcast", () => {
+  for (const scenario of ["unchanged", "unauthorized"] as const) {
+    const directory = createTemporaryDirectory();
+    const environment = upgradeTestEnvironment(directory);
+    const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+    if (scenario === "unchanged") {
+      const source = readJson(latest);
+      const contracts = source.contracts as Record<string, Record<string, unknown>>;
+      contracts.PoRepMarket!.implementationCodeHash = testCodeHash;
+      writeFileSync(latest, `${JSON.stringify(source, null, 2)}\n`);
+    }
+
+    try {
+      const result = runDeploymentCommand(["upgrade", "devnet", "PoRepMarket"], {
+        ...environment,
+        FAKE_UNAUTHORIZED: scenario === "unauthorized" ? "yes" : "",
+      });
+
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, scenario === "unchanged" ? /compiled implementation for PoRepMarket is unchanged/ : /is not authorized to upgrade PoRepMarket/);
+      const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+      assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "build").length, 1);
+      assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "script").length, 0);
+      assert.equal(readFileSync(environment.FAKE_STORAGE_LOG!, "utf8").trim().split("\n").length, 1);
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  }
+});
+
+test("storage incompatibility stops upgrade before pending state or broadcast", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+
+  try {
+    const result = runDeploymentCommand(["upgrade", "devnet", "PoRepMarket"], {
+      ...environment,
+      FAKE_STORAGE_INCOMPATIBLE: "yes",
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /storage validation failed/);
+    assert.equal(existsSync(pending), false);
+    const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "build").length, 1);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "script").length, 0);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("upgrade refuses a source manifest changed during preflight before broadcast", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+
+  try {
+    const result = runDeploymentCommand(["upgrade", "devnet", "PoRepMarket"], {
+      ...environment,
+      FAKE_MUTATE_MANIFEST: "yes",
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /canonical devnet deployment changed during upgrade preflight/);
+    const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "script").length, 0);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("invalid Forge upgrade output is discarded while exact broadcast evidence remains bound", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+  const broadcast = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.broadcast.json");
+
+  try {
+    const result = runDeploymentCommand(["upgrade", "devnet", "PoRepMarket"], {
+      ...environment,
+      FAKE_INVALID_OPERATION: "yes",
+    });
+
+    assert.equal(result.status, 1);
+    const pendingValue = readJson(pending);
+    assert.deepEqual(pendingValue.operations, []);
+    assert.match(String(pendingValue.broadcastSha256), /^0x[0-9a-f]{64}$/);
+    assert.equal(existsSync(broadcast), true);
+
+    const finalize = runDeploymentCommand(["finalize-upgrade", "devnet"], environment);
+    assert.equal(finalize.status, 1);
+    assert.match(finalize.stderr, /pending upgrade has no completed operations/);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("interrupted upgrade finality resumes from exact source without build, storage validation, or broadcast", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+  const sourceBytes = readFileSync(latest);
+
+  try {
+    const interrupted = runDeploymentCommand(["upgrade", "devnet", ...upgradeTargets], {
+      ...environment,
+      FAKE_INTERRUPT_FINALITY: "yes",
+    });
+
+    assert.equal(interrupted.status, 1);
+    assert.equal(readJson(pending).status, "pending");
+    assert.deepEqual(readFileSync(latest), sourceBytes);
+    const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+    const storageLog = readFileSync(environment.FAKE_STORAGE_LOG!, "utf8");
+
+    const recovered = runDeploymentCommand(["finalize-upgrade", "devnet"], {
+      ...environment,
+      FAKE_INTERRUPT_FINALITY: "",
+    });
+
+    assert.equal(recovered.status, 0, recovered.stderr);
+    assert.equal(readJson(pending).status, "finalized");
+    assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+    assert.equal(readFileSync(environment.FAKE_STORAGE_LOG!, "utf8"), storageLog);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("finalize-upgrade accepts exact-result publication retry without rewriting or chain revalidation", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+
+  try {
+    const upgraded = runDeploymentCommand(["upgrade", "devnet", ...upgradeTargets], environment);
+    assert.equal(upgraded.status, 0, upgraded.stderr);
+    const pendingValue = readJson(pending);
+    pendingValue.status = "pending";
+    writeFileSync(pending, `${JSON.stringify(pendingValue, null, 2)}\n`);
+    const latestBytes = readFileSync(latest);
+    const latestModified = statSync(latest).mtimeMs;
+    const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+    const storageLog = readFileSync(environment.FAKE_STORAGE_LOG!, "utf8");
+    const castLog = readFileSync(environment.FAKE_CAST_LOG!, "utf8");
+
+    const recovered = runDeploymentCommand(["finalize-upgrade", "devnet"], environment);
+
+    assert.equal(recovered.status, 0, recovered.stderr);
+    assert.deepEqual(readFileSync(latest), latestBytes);
+    assert.equal(statSync(latest).mtimeMs, latestModified);
+    assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+    assert.equal(readFileSync(environment.FAKE_STORAGE_LOG!, "utf8"), storageLog);
+    const recoveryCastCalls = readFileSync(environment.FAKE_CAST_LOG!, "utf8").slice(castLog.length);
+    assert.equal(recoveryCastCalls.trim().split("\n").length, 1);
+    assert.match(recoveryCastCalls, /chain-id/);
+    assert.equal(readJson(pending).status, "finalized");
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("finalize-upgrade refuses unrelated canonical state without rewriting it", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+
+  try {
+    const interrupted = runDeploymentCommand(["upgrade", "devnet", ...upgradeTargets], {
+      ...environment,
+      FAKE_INTERRUPT_FINALITY: "yes",
+    });
+    assert.equal(interrupted.status, 1);
+    writeFileSync(latest, '{"unrelated":true}\n');
+    const unrelatedBytes = readFileSync(latest);
+    const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+
+    const recovered = runDeploymentCommand(["finalize-upgrade", "devnet"], environment);
+
+    assert.equal(recovered.status, 1);
+    assert.match(recovered.stderr, /canonical devnet deployment is unexpected during upgrade recovery/);
+    assert.deepEqual(readFileSync(latest), unrelatedBytes);
+    assert.equal(readJson(pending).status, "pending");
+    assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
 test("rejects an RPC chain mismatch before checking release paths", () => {
   const directory = createTemporaryDirectory();
   const commandLog = join(directory, "commands.jsonl");
@@ -946,7 +1386,6 @@ test("mainnet requires CONFIRM_MAINNET=yes after confirming its RPC chain", () =
 
 for (const [command, arguments_] of [
   ["upgrade", ["PoRepMarket"]],
-  ["finalize-upgrade", []],
   ["verify", []],
 ] as const) {
   test(`${command} waits for the canonical manifest cleanliness check`, () => {

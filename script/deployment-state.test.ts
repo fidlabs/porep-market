@@ -9,6 +9,7 @@ import {
   parsePendingOperation,
   parseUpgradeOperations,
   renderDeployManifest,
+  renderPrepublicationUpgradedManifest,
   renderUpgradedManifest,
 } from "./deployment-state.ts";
 
@@ -254,6 +255,54 @@ test("renders an upgrade without mutating the source manifest", () => {
   assert.equal(source.contracts.Market.implementation, address);
   assert.equal(rendered.contracts.Market.implementation, nextAddress);
   assert.equal(rendered.release.buildInfoSha256, nextHash);
+});
+
+test("renders exact pre-publication upgrade bytes before the result hash exists", () => {
+  const sourceJson = manifest();
+  sourceJson.contracts.Market.implementation = address;
+  sourceJson.contracts.Market.implementationCodeHash = hash;
+  const source = parseDeploymentManifest(JSON.stringify(sourceJson));
+  const pending = parsePendingOperation(JSON.stringify({ ...upgradePending(), resultManifestSha256: null }));
+  assert.equal(pending.operation, "upgrade");
+
+  const rendered = renderPrepublicationUpgradedManifest(source, pending);
+
+  assert.equal(rendered.contracts.Market.implementation, nextAddress);
+  assert.equal(rendered.release.buildInfoSha256, nextHash);
+});
+
+test("rejects upgrade operations that do not match or replace the source implementation", () => {
+  const sourceJson = manifest();
+  sourceJson.contracts.Market.implementation = address;
+  sourceJson.contracts.Market.implementationCodeHash = hash;
+  const source = parseDeploymentManifest(JSON.stringify(sourceJson));
+
+  const wrongArtifact = upgradePending();
+  wrongArtifact.operations[0]!.artifact = "src/Other.sol:Other";
+  const parsedWrongArtifact = parsePendingOperation(JSON.stringify(wrongArtifact));
+  assert.equal(parsedWrongArtifact.operation, "upgrade");
+  assert.throws(
+    () => renderUpgradedManifest(source, parsedWrongArtifact),
+    /pending operation artifact for Market does not match source manifest/,
+  );
+
+  const unchangedAddress = upgradePending();
+  unchangedAddress.operations[0]!.newImplementation = address;
+  const parsedUnchangedAddress = parsePendingOperation(JSON.stringify(unchangedAddress));
+  assert.equal(parsedUnchangedAddress.operation, "upgrade");
+  assert.throws(
+    () => renderUpgradedManifest(source, parsedUnchangedAddress),
+    /upgrade operation for Market did not replace the implementation address/,
+  );
+
+  const unchangedCode = upgradePending();
+  unchangedCode.operations[0]!.newImplementationCodeHash = hash;
+  const parsedUnchangedCode = parsePendingOperation(JSON.stringify(unchangedCode));
+  assert.equal(parsedUnchangedCode.operation, "upgrade");
+  assert.throws(
+    () => renderUpgradedManifest(source, parsedUnchangedCode),
+    /upgrade operation for Market did not replace the implementation bytecode/,
+  );
 });
 
 test("classifies deploy retry state including completed publication and unrelated state", () => {
