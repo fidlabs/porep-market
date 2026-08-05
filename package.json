@@ -1,7 +1,10 @@
 {
   "name": "porep-market-deployment-tools",
   "private": true,
+  "type": "module",
   "devDependencies": {
-    "@openzeppelin/upgrades-core": "1.46.0"
+    "@openzeppelin/upgrades-core": "1.46.0",
+    "@types/node": "24.13.3",
+    "typescript": "7.0.2"
   }
 }

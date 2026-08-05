@@ -42,6 +42,14 @@ deployment-tests:
     bash test/scripts/deployment-finality.sh
     bash test/scripts/deployment-live.sh
     bash test/scripts/deployment-flow.sh
+    just typecheck-deployment
+    just test-deployment-ts
+
+typecheck-deployment:
+    npx tsc --noEmit
+
+test-deployment-ts:
+    node --test script/*.test.ts
 
 deploy network *args:
     ./script/deployment.sh deploy {{ network }} {{ args }}
@@ -57,6 +65,21 @@ finalize-upgrade network:
 
 verify network:
     ./script/deployment.sh verify {{ network }}
+
+deploy-ts network *args:
+    node script/deployment.ts deploy {{ network }} {{ args }}
+
+finalize-deploy-ts network:
+    node script/deployment.ts finalize-deploy {{ network }}
+
+upgrade-ts network *targets:
+    node script/deployment.ts upgrade {{ network }} {{ targets }}
+
+finalize-upgrade-ts network:
+    node script/deployment.ts finalize-upgrade {{ network }}
+
+verify-ts network:
+    node script/deployment.ts verify {{ network }}
 
 # CI equivalent check
 check: fmt-check lint test deployment-tests check-coverage build check-abis
