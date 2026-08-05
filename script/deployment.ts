@@ -1014,6 +1014,7 @@ export async function runProcess(
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let settled = false;
+    let pendingError: Error | undefined;
 
     const fail = (error: Error): void => {
       if (!settled) {
@@ -1024,9 +1025,20 @@ export async function runProcess(
 
     child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
     child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
-    child.once("error", (error) => fail(new Error(`could not run ${command}: ${error.message}`, { cause: error })));
+    child.once("error", (error) => {
+      const processError = new Error(`could not run ${command}: ${error.message}`, { cause: error });
+      if (child.pid === undefined) {
+        fail(processError);
+        return;
+      }
+      pendingError = processError;
+    });
     child.once("close", (code, signal) => {
       if (settled) return;
+      if (pendingError !== undefined) {
+        fail(pendingError);
+        return;
+      }
       if (code !== 0) {
         const details = Buffer.concat(stderr).toString("utf8").trim();
         fail(new Error(`${command} exited with code ${code ?? "unknown"}${signal === null ? "" : ` (${signal})`}${details === "" ? "" : `: ${details}`}`));

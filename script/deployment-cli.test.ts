@@ -83,6 +83,7 @@ function deploymentEnvironment(directory: string): NodeJS.ProcessEnv {
 
 const testAddress = `0x${"1".repeat(40)}`;
 const testTransactionHash = `0x${"a".repeat(64)}`;
+const testTransactionHash2 = `0x${"d".repeat(64)}`;
 const testBlockHash = `0x${"b".repeat(64)}`;
 const testCodeHash = `0x${"c".repeat(64)}`;
 
@@ -110,6 +111,7 @@ function deployTestEnvironment(directory: string): NodeJS.ProcessEnv {
     FAKE_FORGE_LOG: forgeLog,
     TEST_ADDRESS: testAddress,
     TEST_TRANSACTION_HASH: testTransactionHash,
+    TEST_TRANSACTION_HASH_2: testTransactionHash2,
     TEST_BLOCK_HASH: testBlockHash,
     TEST_CODE_HASH: testCodeHash,
     FILECOIN_PAY_DEVNET: testAddress,
@@ -219,6 +221,20 @@ function createDeployFakeForge(directory: string): void {
       "  result.release.buildInfoSha256 = process.env.BUILD_INFO_SHA256; pending.result = result;\n" +
       "  if (process.env.FAKE_BAD_DEPENDENCY === 'yes') result.externalDependencies.FilecoinPay = '0x' + '2'.repeat(40);\n" +
       "  writeFileSync(process.env.DEPLOYMENT_OUTPUT, JSON.stringify(pending, null, 2) + '\\n');\n" +
+      "  if (process.env.FAKE_DELAY_CLOSE_AFTER_SIGNAL === 'yes') {\n" +
+      "    let terminating = false;\n" +
+      "    process.on('SIGTERM', () => {\n" +
+      "      if (terminating) return; terminating = true;\n" +
+      "      setTimeout(() => {\n" +
+      "        const completedBroadcast = JSON.stringify({transactions:[{hash:process.env.TEST_TRANSACTION_HASH},{hash:process.env.TEST_TRANSACTION_HASH_2}]}) + '\\n';\n" +
+      "        writeFileSync(join(runDir, 'run-100.json'), completedBroadcast);\n" +
+      "        writeFileSync(process.env.FAKE_CLOSE_MARKER, claim && existsSync(claim) ? 'claim-present\\n' : 'claim-missing\\n');\n" +
+      "        process.exit(2);\n" +
+      "      }, 300);\n" +
+      "    });\n" +
+      "    process.kill(process.ppid, 'SIGINT');\n" +
+      "    await new Promise(resolve => setTimeout(resolve, 10000));\n" +
+      "  }\n" +
       "  if (process.env.FAKE_FORGE_SIGNAL) { process.kill(process.ppid, process.env.FAKE_FORGE_SIGNAL); await new Promise(resolve => setTimeout(resolve, 10000)); }\n" +
       "  if (process.env.FAKE_FAIL_AFTER_BROADCAST === 'yes') { process.stderr.write('failed after broadcast'); process.exit(2); }\n" +
       "} else { process.stderr.write('unexpected forge arguments'); process.exitCode = 2; }\n",
@@ -571,6 +587,37 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
     }
   });
 }
+
+test("deploy waits for interrupted Forge to close before binding evidence and releasing its claim", async () => {
+  const directory = createTemporaryDirectory();
+  const environment = deployTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.json");
+  const broadcast = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.broadcast.json");
+  const claim = join(environment.PENDING_ROOT_TS!, "devnet", "operation.claim");
+  const closeMarker = join(directory, "forge-close.marker");
+
+  try {
+    const interrupted = await runDeploymentCommandAsync(["deploy", "devnet"], {
+      ...environment,
+      FAKE_CLOSE_MARKER: closeMarker,
+      FAKE_DELAY_CLOSE_AFTER_SIGNAL: "yes",
+    });
+
+    assert.equal(interrupted.code, 1, interrupted.stderr);
+    assert.equal(readFileSync(closeMarker, "utf8"), "claim-present\n");
+    assert.equal(existsSync(claim), false);
+    const expectedBroadcast = `${JSON.stringify({
+      transactions: [{ hash: testTransactionHash }, { hash: testTransactionHash2 }],
+    })}\n`;
+    assert.equal(readFileSync(broadcast, "utf8"), expectedBroadcast);
+    assert.equal(
+      readJson(pending).broadcastSha256,
+      `0x${createHash("sha256").update(expectedBroadcast).digest("hex")}`,
+    );
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
 
 test("a nonzero Forge exit after broadcast preserves evidence for finalize-deploy", () => {
   const directory = createTemporaryDirectory();
