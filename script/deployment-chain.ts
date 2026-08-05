@@ -196,6 +196,19 @@ export async function verifyLiveDeployment(
   const sliScorer = requireUupsContract(manifest, "SLIScorer");
   const beacon = requireBeaconContract(manifest, "ValidatorBeacon");
   const claimInspector = requireStandaloneContract(manifest, "PoRepMarketClaimInspector");
+  const recordedBeaconFactory = readManifestAddress(
+    beacon.factoryProxy,
+    "manifest ValidatorBeacon factoryProxy",
+  );
+  const validatorFactoryProxy = readManifestAddress(
+    validatorFactory.proxy,
+    "manifest ValidatorFactory proxy",
+  );
+  if (recordedBeaconFactory !== validatorFactoryProxy) {
+    throw new Error(
+      `ValidatorBeacon factoryProxy does not match ValidatorFactory proxy: expected ${validatorFactoryProxy}, got ${recordedBeaconFactory}`,
+    );
+  }
 
   for (const [name, contract] of [
     ["PoRepMarket", market],
@@ -488,6 +501,13 @@ function readAddressResult(value: unknown, path: string): string {
     return `0x${value.slice(-40).toLowerCase()}`;
   }
   throw new Error(`${path} must return a zero-padded 20-byte address`);
+}
+
+function readManifestAddress(value: unknown, path: string): string {
+  if (typeof value !== "string" || !addressPattern.test(value)) {
+    throw new Error(`${path} must be a 20-byte address`);
+  }
+  return value.toLowerCase();
 }
 
 function requireUupsContract(manifest: DeploymentManifest, name: string) {

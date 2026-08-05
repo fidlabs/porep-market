@@ -610,6 +610,45 @@ test("checks every explicit role, wiring, dependency, beacon, and ClaimInspector
   );
 });
 
+test("rejects a stale ValidatorBeacon factoryProxy when all live calls are valid", async () => {
+  const manifest = completeManifest();
+  const beacon = manifest.contracts.ValidatorBeacon!;
+  assert.equal(beacon.kind, "beacon");
+  manifest.contracts.ValidatorBeacon = { ...beacon, factoryProxy: address2 };
+
+  const run: CommandRunner = async (_command, args) => {
+    if (args.includes("eth_getCode")) {
+      return JSON.stringify(runtimeCode);
+    }
+    if (args[0] === "keccak") {
+      return codeHash;
+    }
+    if (args.includes("eth_getStorageAt")) {
+      const proxy = args.at(-3)!;
+      const contract = Object.values(manifest.contracts).find((entry) => entry.kind === "uups" && entry.proxy === proxy);
+      assert.ok(contract?.kind === "uups");
+      return JSON.stringify(paddedAddress(contract.implementation));
+    }
+    if (args[0] === "call") {
+      const target = args[1]!;
+      const signature = args[2]!;
+      if (signature.endsWith("_ROLE()(bytes32)") || signature === "TERMINATION_ORACLE()(bytes32)") {
+        return hashA;
+      }
+      if (signature === "hasRole(bytes32,address)(bool)") {
+        return "true\n";
+      }
+      return paddedAddress(explicitAddressResult(manifest, target, signature));
+    }
+    throw new Error(`unexpected cast arguments: ${args.join(" ")}`);
+  };
+
+  await assert.rejects(
+    verifyLiveDeployment(run, "rpc", manifest),
+    /ValidatorBeacon factoryProxy does not match ValidatorFactory proxy/,
+  );
+});
+
 function explicitAddressResult(manifest: DeploymentManifest, target: string, signature: string): string {
   const contracts = manifest.contracts;
   if (signature === "implementation()(address)" || signature === "owner()(address)") {
