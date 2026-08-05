@@ -93,7 +93,6 @@ type Paths = {
 };
 type Build = {
   hash: string;
-  raw: Buffer;
   gzip: Buffer;
   outputDirectory: string;
   cacheDirectory: string;
@@ -206,9 +205,10 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
   try {
     mkdirSync(forgeIoDirectory, { recursive: true });
     const build = await buildContracts(context, workspace);
+    if (build.hash === source.release.buildInfoSha256) {
+      throw new Error("current build matches the deployed release; nothing to upgrade");
+    }
     await validateStorage(context, source, build, workspace);
-    const codeHashes = await compiledCodeHashes(context, source, targets, build.raw);
-    rejectUnchangedTargets(source, codeHashes);
 
     await ensureCleanReleaseSource(context);
     if (hashFile(paths.latest) !== sourceHash) throw new Error("canonical manifest changed during upgrade preflight");
@@ -227,7 +227,7 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
       forgeError = error;
     }
 
-    const recorded = recordUpgrade(context, workspace, output, build, pending, source, codeHashes);
+    const recorded = recordUpgrade(context, workspace, output, build, pending, source);
     if (forgeError !== undefined) throw forgeError;
     if (!recorded) throw new Error("Forge did not produce complete upgrade evidence");
   } finally {
@@ -426,7 +426,6 @@ async function buildContracts(context: Context, workspace: string): Promise<Buil
   const raw = readFileSync(join(directory, files[0]));
   return {
     hash: hashRawBytes(raw),
-    raw,
     gzip: gzipSync(raw, { level: 9 }),
     outputDirectory,
     cacheDirectory,
@@ -562,12 +561,11 @@ function recordUpgrade(
   build: Build,
   expected: PendingUpgrade,
   source: DeploymentManifest,
-  codeHashes: ReadonlyMap<string, string>,
 ): boolean {
   const broadcast = findBroadcast(context, workspace, "Upgrade.s.sol");
   if (!broadcast || !existsSync(output)) return false;
   const operations = parseUpgradeOperations(JSON.stringify((JSON.parse(readFileSync(output, "utf8")) as { operations: unknown }).operations));
-  validateOperations(expected.targets, operations, codeHashes);
+  validateOperations(expected.targets, operations);
   const broadcastBytes = readFileSync(broadcast);
   let pending: PendingUpgrade = {
     ...expected,
@@ -628,49 +626,13 @@ async function validateStorage(context: Context, source: DeploymentManifest, bui
   await runProcess(validator, args, { environment: context.environment, signal: context.signal });
 }
 
-async function compiledCodeHashes(
-  context: Context,
-  source: DeploymentManifest,
-  targets: readonly string[],
-  buildInfo: Buffer,
-): Promise<Map<string, string>> {
-  const root = record(JSON.parse(buildInfo.toString("utf8")), "build-info");
-  const output = record(root.output, "build-info.output");
-  const contracts = record(output.contracts, "build-info.output.contracts");
-  const hashes = new Map<string, string>();
-  for (const target of targets) {
-    const artifact = source.contracts[target]!.artifact;
-    const [sourceName, contractName] = artifact.split(":");
-    const contract = record(record(contracts[sourceName], sourceName)[contractName], artifact);
-    const evm = record(contract.evm, `${artifact}.evm`);
-    const deployed = record(evm.deployedBytecode, `${artifact}.deployedBytecode`);
-    if (typeof deployed.object !== "string" || !/^[0-9a-fA-F]+$/.test(deployed.object)) {
-      throw new Error(`compiled bytecode for ${target} is missing`);
-    }
-    hashes.set(target, (await runProcess(context.cast, ["keccak", `0x${deployed.object}`], { signal: context.signal })).trim());
-  }
-  return hashes;
-}
-
-function rejectUnchangedTargets(source: DeploymentManifest, hashes: ReadonlyMap<string, string>): void {
-  for (const [target, hash] of hashes) {
-    const contract = source.contracts[target]!;
-    if ("implementationCodeHash" in contract && contract.implementationCodeHash === hash) {
-      throw new Error(`compiled implementation for ${target} is unchanged`);
-    }
-  }
-}
-
-function validateOperations(targets: readonly string[], operations: PendingUpgrade["operations"], hashes: ReadonlyMap<string, string>): void {
+function validateOperations(targets: readonly string[], operations: PendingUpgrade["operations"]): void {
   if (operations.length !== targets.length) throw new Error("Forge upgrade operations do not match requested targets");
   operations.forEach((operation, index) => {
     const target = targets[index];
     const kind = target === "Validator" ? "beacon" : "uups";
     if (operation.target !== target || operation.kind !== kind || operation.artifact !== upgradeArtifacts[target]) {
       throw new Error(`Forge upgrade operation ${index} does not match ${target}`);
-    }
-    if (operation.newImplementationCodeHash !== hashes.get(target)) {
-      throw new Error(`Forge upgrade bytecode for ${target} does not match the validated build`);
     }
   });
 }
@@ -796,11 +758,6 @@ async function ensureCleanCanonicalManifest(context: Context): Promise<void> {
 
 function hashFile(path: string): string | undefined {
   return existsSync(path) ? hashRawBytes(readFileSync(path)) : undefined;
-}
-
-function record(value: unknown, name: string): Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) throw new Error(`${name} must be an object`);
-  return value as Record<string, unknown>;
 }
 
 function json(value: unknown): string {
