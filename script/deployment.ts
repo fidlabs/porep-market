@@ -124,11 +124,13 @@ async function deploy(context: Context, fresh: boolean): Promise<void> {
   ensureNoPendingOperation(context);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-deploy-ts-"));
+  const forgeIoDirectory = join(context.root, ".deployment", `.typescript-deploy-${randomUUID()}`);
   try {
+    mkdirSync(forgeIoDirectory, { recursive: true });
     const build = await buildContracts(context, workspace);
     ensureNoPendingOperation(context);
     const pending = newPendingDeploy(context, previousHash, build.hash);
-    const output = join(workspace, "deploy-output.json");
+    const output = join(forgeIoDirectory, "deploy-output.json");
     writeAtomicFile(output, json(pending));
 
     let forgeError: unknown;
@@ -143,6 +145,7 @@ async function deploy(context: Context, fresh: boolean): Promise<void> {
     if (!recorded) throw new Error("Forge did not produce complete deployment evidence");
   } finally {
     rmSync(workspace, { recursive: true, force: true });
+    rmSync(forgeIoDirectory, { recursive: true, force: true });
   }
 
   await finalizeDeploy(context, true);
@@ -199,7 +202,9 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
   validateTargets(source, targets);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-upgrade-ts-"));
+  const forgeIoDirectory = join(context.root, ".deployment", `.typescript-upgrade-${randomUUID()}`);
   try {
+    mkdirSync(forgeIoDirectory, { recursive: true });
     const build = await buildContracts(context, workspace);
     await validateStorage(context, source, build, workspace);
     const codeHashes = await compiledCodeHashes(context, source, targets, build.raw);
@@ -210,8 +215,8 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
     ensureNoPendingOperation(context);
 
     const pending = newPendingUpgrade(context, targets, sourceHash, build.hash);
-    const sourcePath = join(workspace, "source.json");
-    const output = join(workspace, "upgrade-output.json");
+    const sourcePath = join(forgeIoDirectory, "source.json");
+    const output = join(forgeIoDirectory, "upgrade-output.json");
     writeAtomicFile(sourcePath, sourceBytes);
     writeAtomicFile(output, json(pending));
 
@@ -227,6 +232,7 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
     if (!recorded) throw new Error("Forge did not produce complete upgrade evidence");
   } finally {
     rmSync(workspace, { recursive: true, force: true });
+    rmSync(forgeIoDirectory, { recursive: true, force: true });
   }
 
   await finalizeUpgrade(context, true);
