@@ -87,7 +87,18 @@ type DeployPaths = {
   pending: string;
   buildInfo: string;
   broadcast: string;
+  claim: string;
   latest: string;
+};
+
+type PreparedBuildInfo = {
+  sha256: string;
+  compressed: Buffer;
+};
+
+type OperationClaim = {
+  path: string;
+  fileDescriptor: number;
 };
 
 export type SignalHandling = {
@@ -109,17 +120,52 @@ async function deploy(context: DeploymentContext, fresh: boolean): Promise<void>
 
   await preflightBroadcast(context);
   const previousManifestSha256 = prepareDeployDestination(context, fresh);
-  refusePendingOperations(context);
+  preparePendingOperations(context, paths, fresh);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-deploy-ts-"));
+  let claim: OperationClaim | undefined;
   try {
-    const buildInfoSha256 = await buildDeployment(context, workspace, paths);
-    const pending = createPendingDeploy(context, previousManifestSha256, buildInfoSha256);
-    writePendingDeploy(paths.pending, pending);
+    const buildInfo = await buildDeployment(context, workspace);
+    const pending = createPendingDeploy(context, previousManifestSha256, buildInfo.sha256);
+    claim = claimDeployOperation(context, paths, buildInfo, pending);
 
-    await broadcastDeployment(context, workspace, paths, privateKey, dependencies, buildInfoSha256);
-    recordDeploymentBroadcast(context, workspace, paths, pending, dependencies);
+    let broadcastFailure: unknown;
+    try {
+      await broadcastDeployment(context, workspace, paths, privateKey, dependencies, buildInfo.sha256);
+    } catch (error) {
+      broadcastFailure = error;
+    }
+
+    let recordedPending: PendingDeploy | undefined;
+    let evidenceFailure: unknown;
+    try {
+      recordedPending = preserveDeploymentBroadcast(context, workspace, paths, pending, dependencies);
+      if (broadcastFailure === undefined && recordedPending === undefined) {
+        throw new Error("Forge must produce exactly one timestamped Forge broadcast file");
+      }
+      if (broadcastFailure === undefined && recordedPending !== undefined) {
+        validateForgeDeployResult(recordedPending, pending, dependencies);
+      }
+    } catch (error) {
+      evidenceFailure = error;
+    }
+
+    if (broadcastFailure !== undefined) {
+      if (evidenceFailure !== undefined) {
+        throw new AggregateError(
+          [broadcastFailure, evidenceFailure],
+          "Forge failed and deployment broadcast evidence could not be recorded safely",
+        );
+      }
+      throw broadcastFailure;
+    }
+    if (evidenceFailure !== undefined) {
+      throw evidenceFailure;
+    }
   } finally {
+    if (claim !== undefined) {
+      releaseOperationClaim(claim);
+    }
     rmSync(workspace, { force: true, recursive: true });
   }
 
@@ -252,6 +298,7 @@ function deployPaths(context: DeploymentContext): DeployPaths {
     pending: join(pendingDirectory, "pending-deploy.json"),
     buildInfo: join(pendingDirectory, "pending-deploy.build-info.json.gz"),
     broadcast: join(pendingDirectory, "pending-deploy.broadcast.json"),
+    claim: join(pendingDirectory, "operation.claim"),
     latest: canonicalManifestPath(context),
   };
 }
@@ -380,38 +427,128 @@ function prepareDeployDestination(context: DeploymentContext, fresh: boolean): s
   return hashRawBytes(readFileSync(path));
 }
 
-function refusePendingOperations(context: DeploymentContext): void {
-  const pendingFiles = [
+function preparePendingOperations(context: DeploymentContext, paths: DeployPaths, fresh: boolean): void {
+  if (fileExists(paths.claim)) {
+    throw new Error(`same-network operation claim already exists: ${paths.claim}`);
+  }
+
+  if (fresh && fileExists(paths.pending)) {
+    if (isAuthenticatedTerminalJournal(context, "TypeScript", paths.pending)) {
+      removeDeployRecoveryFiles(paths);
+    } else if (isDiscardablePreBroadcastDeploy(context, paths)) {
+      removeDeployRecoveryFiles(paths);
+    }
+  }
+
+  assertNoBlockingOperationJournals(context);
+}
+
+function assertNoBlockingOperationJournals(context: DeploymentContext): void {
+  const journals = [
     { kind: "TypeScript", path: join(context.pendingRoot, context.network, "pending-deploy.json") },
     { kind: "TypeScript", path: join(context.pendingRoot, context.network, "pending-upgrade.json") },
     { kind: "Bash", path: join(context.bashPendingRoot, context.network, "pending-deploy.json") },
     { kind: "Bash", path: join(context.bashPendingRoot, context.network, "pending-upgrade.json") },
   ] as const;
 
-  for (const pendingFile of pendingFiles) {
-    if (readPendingStatus(pendingFile.path) === "pending") {
-      throw new Error(`pending ${context.network} ${pendingFile.kind} operation already exists: ${pendingFile.path}`);
+  for (const journal of journals) {
+    if (fileExists(journal.path) && !isAuthenticatedTerminalJournal(context, journal.kind, journal.path)) {
+      throw new Error(
+        `pending ${context.network} ${journal.kind} operation already exists; ` +
+          `journal is not an authenticated terminal state: ${journal.path}`,
+      );
     }
   }
 }
 
-function readPendingStatus(path: string): unknown {
-  if (!fileExists(path)) {
-    return undefined;
-  }
-  let value: unknown;
+function isAuthenticatedTerminalJournal(
+  context: DeploymentContext,
+  kind: "TypeScript" | "Bash",
+  path: string,
+): boolean {
   try {
-    value = JSON.parse(readFileSync(path, "utf8")) as unknown;
+    if (kind === "Bash") {
+      return isAuthenticatedBashTerminalJournal(context, path);
+    }
+
+    const pending = parsePendingOperation(readFileSync(path, "utf8"));
+    if (
+      pending.status !== "finalized" ||
+      pending.network !== context.network ||
+      pending.chainId !== networkConfigs[context.network].chainId ||
+      pending.resultManifestSha256 === null ||
+      hashFileIfPresent(canonicalManifestPath(context)) !== pending.resultManifestSha256
+    ) {
+      return false;
+    }
+
+    const evidence = journalEvidencePaths(path);
+    authenticatePendingBuildInfo(evidence.buildInfo, pending.release.buildInfoSha256);
+    authenticatePendingBroadcast(evidence.broadcast, pending.broadcastSha256);
+    if (pending.operation === "deploy") {
+      authenticateRenderedDeployManifest(pending);
+    }
+    return true;
   } catch {
-    throw new Error(`pending operation JSON is invalid: ${path}`);
+    return false;
   }
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    throw new Error(`pending operation must be an object: ${path}`);
-  }
-  return (value as Record<string, unknown>).status;
 }
 
-async function buildDeployment(context: DeploymentContext, workspace: string, paths: DeployPaths): Promise<string> {
+function isAuthenticatedBashTerminalJournal(context: DeploymentContext, path: string): boolean {
+  const value = JSON.parse(readFileSync(path, "utf8")) as unknown;
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return false;
+  }
+  const journal = value as Record<string, unknown>;
+  const resultHash = journal.resultManifestSha256;
+  return (
+    journal.status === "finalized" &&
+    journal.network === context.network &&
+    journal.chainId === networkConfigs[context.network].chainId &&
+    typeof resultHash === "string" &&
+    /^0x[0-9a-f]{64}$/.test(resultHash) &&
+    hashFileIfPresent(canonicalManifestPath(context)) === resultHash
+  );
+}
+
+function isDiscardablePreBroadcastDeploy(context: DeploymentContext, paths: DeployPaths): boolean {
+  try {
+    const pending = parsePendingOperation(readFileSync(paths.pending, "utf8"));
+    if (
+      pending.operation !== "deploy" ||
+      pending.status !== "pending" ||
+      pending.network !== context.network ||
+      pending.chainId !== networkConfigs[context.network].chainId ||
+      pending.broadcastSha256 !== null ||
+      pending.result !== null ||
+      pending.finalizedAt !== null ||
+      pending.resultManifestSha256 !== null ||
+      fileExists(paths.broadcast)
+    ) {
+      return false;
+    }
+    authenticatePendingBuildInfo(paths.buildInfo, pending.release.buildInfoSha256);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function removeDeployRecoveryFiles(paths: DeployPaths): void {
+  rmSync(paths.pending, { force: true });
+  rmSync(paths.buildInfo, { force: true });
+  rmSync(paths.broadcast, { force: true });
+}
+
+function journalEvidencePaths(path: string): { buildInfo: string; broadcast: string } {
+  const prefix = path.slice(0, -".json".length);
+  return {
+    buildInfo: `${prefix}.build-info.json.gz`,
+    broadcast: `${prefix}.broadcast.json`,
+  };
+}
+
+async function buildDeployment(context: DeploymentContext, workspace: string): Promise<PreparedBuildInfo> {
   const outputDirectory = join(workspace, "out");
   await runProcess(
     context.executables.forge,
@@ -439,11 +576,59 @@ async function buildDeployment(context: DeploymentContext, workspace: string, pa
   }
 
   const buildInfoBytes = readFileSync(join(buildInfoDirectory, buildInfoFiles[0]));
-  const buildInfoSha256 = hashRawBytes(buildInfoBytes);
-  const compressedBuildInfo = gzipSync(buildInfoBytes, { level: 9 });
+  return {
+    sha256: hashRawBytes(buildInfoBytes),
+    compressed: gzipSync(buildInfoBytes, { level: 9 }),
+  };
+}
+
+function claimDeployOperation(
+  context: DeploymentContext,
+  paths: DeployPaths,
+  buildInfo: PreparedBuildInfo,
+  pending: PendingDeploy,
+): OperationClaim {
   mkdirSync(paths.pendingDirectory, { recursive: true });
-  writeAtomicFile(paths.buildInfo, compressedBuildInfo);
-  return buildInfoSha256;
+  let fileDescriptor: number;
+  try {
+    fileDescriptor = openSync(paths.claim, "wx", 0o600);
+  } catch (error) {
+    throw new Error(`could not acquire same-network operation claim: ${paths.claim}`, { cause: error });
+  }
+
+  const claim = { path: paths.claim, fileDescriptor };
+  try {
+    writeSync(fileDescriptor, `deploy ${process.pid}\n`);
+    fsyncSync(fileDescriptor);
+    assertNoBlockingOperationJournals(context);
+    writeAtomicFile(paths.buildInfo, buildInfo.compressed);
+    writeExclusiveFile(paths.pending, `${JSON.stringify(pending, null, 2)}\n`);
+    return claim;
+  } catch (error) {
+    releaseOperationClaim(claim);
+    throw error;
+  }
+}
+
+function releaseOperationClaim(claim: OperationClaim): void {
+  closeSync(claim.fileDescriptor);
+  rmSync(claim.path, { force: true });
+}
+
+function writeExclusiveFile(path: string, content: string): void {
+  let fileDescriptor: number | undefined;
+  try {
+    fileDescriptor = openSync(path, "wx", 0o600);
+    writeSync(fileDescriptor, content);
+    fsyncSync(fileDescriptor);
+    closeSync(fileDescriptor);
+    fileDescriptor = undefined;
+  } catch (error) {
+    if (fileDescriptor !== undefined) {
+      closeSync(fileDescriptor);
+    }
+    throw new Error(`could not create deployment operation journal exclusively: ${path}`, { cause: error });
+  }
 }
 
 function createPendingDeploy(
@@ -509,28 +694,43 @@ async function broadcastDeployment(
   );
 }
 
-function recordDeploymentBroadcast(
+function preserveDeploymentBroadcast(
   context: DeploymentContext,
   workspace: string,
   paths: DeployPaths,
   expectedPending: PendingDeploy,
   dependencies: DeploymentDependencies,
-): void {
+): PendingDeploy | undefined {
   const source = locateDeploymentBroadcast(context, workspace);
+  if (source === undefined) {
+    return undefined;
+  }
   const broadcastBytes = readFileSync(source);
   writeAtomicFile(paths.broadcast, broadcastBytes);
   const broadcastSha256 = hashRawBytes(broadcastBytes);
 
-  const mutatedPending = parsePendingOperation(readFileSync(paths.pending, "utf8"));
-  if (mutatedPending.operation !== "deploy") {
-    throw new Error("Forge deployment output changed pending.operation");
+  let mutatedPending: PendingDeploy;
+  try {
+    const parsedPending = parsePendingOperation(readFileSync(paths.pending, "utf8"));
+    if (parsedPending.operation !== "deploy") {
+      throw new Error("Forge deployment output changed pending.operation");
+    }
+    validateForgeRecoveryFields(parsedPending, expectedPending);
+    if (parsedPending.result !== null) {
+      validateForgeDeployResult(parsedPending, expectedPending, dependencies);
+    }
+    mutatedPending = parsedPending;
+  } catch (error) {
+    writePendingDeploy(paths.pending, { ...expectedPending, broadcastSha256 });
+    throw new Error("Forge deployment output is invalid; broadcast evidence was preserved", { cause: error });
   }
-  validateForgeDeployOutput(mutatedPending, expectedPending, dependencies);
 
-  writePendingDeploy(paths.pending, { ...mutatedPending, broadcastSha256 });
+  const recordedPending = { ...mutatedPending, broadcastSha256 };
+  writePendingDeploy(paths.pending, recordedPending);
+  return recordedPending;
 }
 
-function locateDeploymentBroadcast(context: DeploymentContext, workspace: string): string {
+function locateDeploymentBroadcast(context: DeploymentContext, workspace: string): string | undefined {
   const directory = join(
     workspace,
     "broadcast",
@@ -540,17 +740,16 @@ function locateDeploymentBroadcast(context: DeploymentContext, workspace: string
   const candidates = fileExists(directory)
     ? readdirSync(directory).filter((name) => /^run-[0-9]+\.json$/.test(name))
     : [];
+  if (candidates.length === 0) {
+    return undefined;
+  }
   if (candidates.length !== 1) {
     throw new Error("Forge must produce exactly one timestamped Forge broadcast file");
   }
   return join(directory, candidates[0]);
 }
 
-function validateForgeDeployOutput(
-  actual: PendingDeploy,
-  expected: PendingDeploy,
-  dependencies: DeploymentDependencies,
-): void {
+function validateForgeRecoveryFields(actual: PendingDeploy, expected: PendingDeploy): void {
   if (
     actual.status !== "pending" ||
     actual.network !== expected.network ||
@@ -563,6 +762,13 @@ function validateForgeDeployOutput(
   ) {
     throw new Error("Forge deployment output changed pending recovery fields");
   }
+}
+
+function validateForgeDeployResult(
+  actual: PendingDeploy,
+  expected: PendingDeploy,
+  dependencies: DeploymentDependencies,
+): void {
   if (actual.result === null || actual.result.status !== "pending") {
     throw new Error("Forge did not write pending.result");
   }
@@ -668,9 +874,8 @@ async function collectDeployFinalizationEvidence(
     ...pending,
     result,
     finalizedAt,
-    resultManifestSha256: pending.broadcastSha256,
   };
-  const manifestBytes = renderDeployManifestBytes(pendingWithEvidence);
+  const manifestBytes = renderPrepublicationDeployManifestBytes(pendingWithEvidence);
   const resultManifestSha256 = hashRawBytes(Buffer.from(manifestBytes));
   const completedPending = { ...pendingWithEvidence, resultManifestSha256 };
   writePendingDeploy(paths.pending, completedPending);
@@ -693,6 +898,20 @@ function renderDeployManifestBytes(pending: PendingDeploy): string {
     throw new Error("pending.finalizedAt is missing publication evidence");
   }
   const manifest = renderDeployManifest(pending, pending.finalizedAt);
+  return `${JSON.stringify(manifest, null, 2)}\n`;
+}
+
+function renderPrepublicationDeployManifestBytes(pending: PendingDeploy): string {
+  if (pending.broadcastSha256 === null || pending.result === null || pending.finalizedAt === null) {
+    throw new Error("pending deployment is missing pre-publication evidence");
+  }
+  const result = structuredClone(pending.result);
+  const manifest: DeploymentManifest = {
+    ...result,
+    status: "finalized",
+    finalizedAt: pending.finalizedAt,
+    transactions: result.transactions ?? [],
+  };
   return `${JSON.stringify(manifest, null, 2)}\n`;
 }
 

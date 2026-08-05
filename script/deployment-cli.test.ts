@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   chmodSync,
@@ -27,6 +27,21 @@ function runDeploymentCommand(args: readonly string[], environment: NodeJS.Proce
     cwd,
     encoding: "utf8",
     env: { ...process.env, ...environment },
+  });
+}
+
+function runDeploymentCommandAsync(args: readonly string[], environment: NodeJS.ProcessEnv = {}) {
+  return new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>((resolve, reject) => {
+    const child = spawn(process.execPath, [scriptPath, ...args], {
+      env: { ...process.env, ...environment },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    const stderr: Buffer[] = [];
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.once("error", reject);
+    child.once("close", (code, signal) => {
+      resolve({ code, signal, stderr: Buffer.concat(stderr).toString("utf8") });
+    });
   });
 }
 
@@ -182,16 +197,19 @@ function createDeployFakeForge(directory: string): void {
   writeFileSync(
     path,
     `#!${process.execPath}\n` +
-      "import { appendFileSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';\n" +
+      "import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';\n" +
       "import { join } from 'node:path';\n" +
       "const args = process.argv.slice(2);\n" +
-      "const record = {args, environment:{RPC_URL:process.env.RPC_URL,PRIVATE_KEY_SET:Boolean(process.env.PRIVATE_KEY),FILECOIN_PAY:process.env.FILECOIN_PAY,TERMINATION_ORACLE:process.env.TERMINATION_ORACLE,ORACLE:process.env.ORACLE,POREP_SERVICE:process.env.POREP_SERVICE,META_ALLOCATOR:process.env.META_ALLOCATOR,OPERATOR_ADDR:process.env.OPERATOR_ADDR,BUILD_INFO_SHA256:process.env.BUILD_INFO_SHA256,DEPLOYMENT_OUTPUT:process.env.DEPLOYMENT_OUTPUT,FOUNDRY_BROADCAST:process.env.FOUNDRY_BROADCAST}};\n" +
+      "const claim = process.env.PENDING_ROOT_TS && join(process.env.PENDING_ROOT_TS, 'devnet', 'operation.claim');\n" +
+      "const record = {args,claimExists:Boolean(claim && existsSync(claim)),environment:{RPC_URL:process.env.RPC_URL,PRIVATE_KEY_SET:Boolean(process.env.PRIVATE_KEY),FILECOIN_PAY:process.env.FILECOIN_PAY,TERMINATION_ORACLE:process.env.TERMINATION_ORACLE,ORACLE:process.env.ORACLE,POREP_SERVICE:process.env.POREP_SERVICE,META_ALLOCATOR:process.env.META_ALLOCATOR,OPERATOR_ADDR:process.env.OPERATOR_ADDR,BUILD_INFO_SHA256:process.env.BUILD_INFO_SHA256,DEPLOYMENT_OUTPUT:process.env.DEPLOYMENT_OUTPUT,FOUNDRY_BROADCAST:process.env.FOUNDRY_BROADCAST}};\n" +
       "appendFileSync(process.env.FAKE_FORGE_LOG, JSON.stringify(record) + '\\n');\n" +
       "if (args[0] === 'build') {\n" +
+      "  if (process.env.FAKE_BUILD_DELAY_MS) await new Promise(resolve => setTimeout(resolve, Number(process.env.FAKE_BUILD_DELAY_MS)));\n" +
       "  const out = args[args.indexOf('--out') + 1]; const buildDir = join(out, 'build-info'); mkdirSync(buildDir, {recursive:true});\n" +
       "  writeFileSync(join(buildDir, 'build.json'), '{\\\"build\\\":1}\\n');\n" +
       "  if (process.env.FAKE_EXTRA_BUILD_INFO === 'yes') writeFileSync(join(buildDir, 'extra.json'), '{}\\n');\n" +
       "} else if (args[0] === 'script') {\n" +
+      "  if (process.env.FAKE_FAIL_BEFORE_BROADCAST === 'yes') { process.stderr.write('failed before broadcast'); process.exit(2); }\n" +
       "  const runDir = join(process.env.FOUNDRY_BROADCAST, 'Deploy.s.sol', '31415926'); mkdirSync(runDir, {recursive:true});\n" +
       "  const broadcast = JSON.stringify({transactions:[{hash:process.env.TEST_TRANSACTION_HASH}]}) + '\\n';\n" +
       "  writeFileSync(join(runDir, 'run-latest.json'), '{}\\n');\n" +
@@ -199,7 +217,10 @@ function createDeployFakeForge(directory: string): void {
       "  const pending = JSON.parse(readFileSync(process.env.DEPLOYMENT_OUTPUT, 'utf8'));\n" +
       `  const result = ${JSON.stringify(manifestResult)};\n` +
       "  result.release.buildInfoSha256 = process.env.BUILD_INFO_SHA256; pending.result = result;\n" +
+      "  if (process.env.FAKE_BAD_DEPENDENCY === 'yes') result.externalDependencies.FilecoinPay = '0x' + '2'.repeat(40);\n" +
       "  writeFileSync(process.env.DEPLOYMENT_OUTPUT, JSON.stringify(pending, null, 2) + '\\n');\n" +
+      "  if (process.env.FAKE_FORGE_SIGNAL) { process.kill(process.ppid, process.env.FAKE_FORGE_SIGNAL); await new Promise(resolve => setTimeout(resolve, 10000)); }\n" +
+      "  if (process.env.FAKE_FAIL_AFTER_BROADCAST === 'yes') { process.stderr.write('failed after broadcast'); process.exit(2); }\n" +
       "} else { process.stderr.write('unexpected forge arguments'); process.exitCode = 2; }\n",
   );
   chmodSync(path, 0o755);
@@ -430,6 +451,9 @@ test("deploy completes build, broadcast, finality, live checks, and atomic publi
     assert.equal(forgeCalls.length, 2);
     assert.deepEqual((forgeCalls[0].args as string[]).slice(0, 2), ["build", "--root"]);
     assert.deepEqual((forgeCalls[1].args as string[]).slice(0, 2), ["script", "script/Deploy.s.sol:Deploy"]);
+    assert.equal(forgeCalls[0].claimExists, false);
+    assert.equal(forgeCalls[1].claimExists, true);
+    assert.ok((forgeCalls[1].args as string[]).includes("--private-key"));
     assert.deepEqual(forgeCalls[1].environment, {
       RPC_URL: "http://devnet.example",
       PRIVATE_KEY_SET: true,
@@ -510,6 +534,134 @@ test("interrupted finality wait preserves deploy evidence and finalize-deploy re
     assert.equal(recovered.status, 0, recovered.stderr);
     assert.equal(readJson(pending).status, "finalized");
     assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeCallsBeforeRecovery);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  test(`${signal} during Forge preserves and binds a completed broadcast for finalize-deploy`, () => {
+    const directory = createTemporaryDirectory();
+    const environment = deployTestEnvironment(directory);
+    const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.json");
+    const broadcast = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.broadcast.json");
+    const claim = join(environment.PENDING_ROOT_TS!, "devnet", "operation.claim");
+
+    try {
+      const interrupted = runDeploymentCommand(["deploy", "devnet"], {
+        ...environment,
+        FAKE_FORGE_SIGNAL: signal,
+      });
+
+      assert.equal(interrupted.status, 1);
+      const pendingAfterSignal = readJson(pending);
+      assert.equal(pendingAfterSignal.status, "pending");
+      assert.match(String(pendingAfterSignal.broadcastSha256), /^0x[0-9a-f]{64}$/);
+      assert.equal(existsSync(broadcast), true);
+      assert.equal(existsSync(claim), false);
+      const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+
+      const recovered = runDeploymentCommand(["finalize-deploy", "devnet"], environment);
+
+      assert.equal(recovered.status, 0, recovered.stderr);
+      assert.equal(readJson(pending).status, "finalized");
+      assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+}
+
+test("a nonzero Forge exit after broadcast preserves evidence for finalize-deploy", () => {
+  const directory = createTemporaryDirectory();
+  const environment = deployTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.json");
+
+  try {
+    const failed = runDeploymentCommand(["deploy", "devnet"], {
+      ...environment,
+      FAKE_FAIL_AFTER_BROADCAST: "yes",
+    });
+
+    assert.equal(failed.status, 1);
+    assert.match(String(readJson(pending).broadcastSha256), /^0x[0-9a-f]{64}$/);
+    const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+
+    const recovered = runDeploymentCommand(["finalize-deploy", "devnet"], environment);
+
+    assert.equal(recovered.status, 0, recovered.stderr);
+    assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("invalid Forge result is discarded while its broadcast evidence remains bound", () => {
+  const directory = createTemporaryDirectory();
+  const environment = deployTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.json");
+
+  try {
+    const failed = runDeploymentCommand(["deploy", "devnet"], {
+      ...environment,
+      FAKE_BAD_DEPENDENCY: "yes",
+    });
+
+    assert.equal(failed.status, 1);
+    assert.match(String(readJson(pending).broadcastSha256), /^0x[0-9a-f]{64}$/);
+
+    const finalize = runDeploymentCommand(["finalize-deploy", "devnet"], environment);
+    assert.equal(finalize.status, 1);
+    assert.match(finalize.stderr, /pending\.result is missing post-broadcast evidence/);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("an exclusive same-network claim allows only one concurrent deploy to broadcast", async () => {
+  const directory = createTemporaryDirectory();
+  const environment: NodeJS.ProcessEnv = {
+    ...deployTestEnvironment(directory),
+    FAKE_BUILD_DELAY_MS: "300",
+  };
+
+  try {
+    const [first, second] = await Promise.all([
+      runDeploymentCommandAsync(["deploy", "devnet"], environment),
+      runDeploymentCommandAsync(["deploy", "devnet"], environment),
+    ]);
+
+    assert.deepEqual([first.code, second.code].sort(), [0, 1]);
+    const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+    const broadcasts = forgeCalls.filter((call) => (call.args as string[])[0] === "script");
+    assert.equal(broadcasts.length, 1);
+    assert.ok([first.stderr, second.stderr].some((stderr) => /operation claim|operation already exists/.test(stderr)));
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("--fresh discards only an authenticated pre-broadcast deploy journal", () => {
+  const directory = createTemporaryDirectory();
+  const environment = deployTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.json");
+
+  try {
+    const failed = runDeploymentCommand(["deploy", "devnet"], {
+      ...environment,
+      FAKE_FAIL_BEFORE_BROADCAST: "yes",
+    });
+    assert.equal(failed.status, 1);
+    assert.equal(readJson(pending).broadcastSha256, null);
+
+    const withoutFresh = runDeploymentCommand(["deploy", "devnet"], environment);
+    assert.equal(withoutFresh.status, 1);
+    assert.match(withoutFresh.stderr, /operation already exists/);
+
+    const fresh = runDeploymentCommand(["deploy", "devnet", "--fresh"], environment);
+
+    assert.equal(fresh.status, 0, fresh.stderr);
+    assert.equal(readJson(pending).status, "finalized");
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -613,6 +765,50 @@ test("deploy refuses pending TypeScript and Bash operations before Forge", () =>
     } finally {
       rmSync(directory, { force: true, recursive: true });
     }
+  }
+});
+
+test("deploy fails closed on journals with missing, unknown, or unauthenticated finalized status", () => {
+  for (const [rootVariable, filename, journal] of [
+    ["PENDING_ROOT_TS", "pending-deploy.json", {}],
+    ["PENDING_ROOT_TS", "pending-upgrade.json", { status: "unknown" }],
+    ["PENDING_ROOT", "pending-deploy.json", { status: "finalized" }],
+  ] as const) {
+    const directory = createTemporaryDirectory();
+    const environment = deployTestEnvironment(directory);
+    const pending = join(environment[rootVariable]!, "devnet", filename);
+    mkdirSync(dirname(pending), { recursive: true });
+    writeFileSync(pending, `${JSON.stringify(journal)}\n`);
+
+    try {
+      const result = runDeploymentCommand(["deploy", "devnet"], environment);
+
+      assert.equal(result.status, 1);
+      assert.match(result.stderr, /journal is not an authenticated terminal state/);
+      assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), "");
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  }
+});
+
+test("--fresh can replace an authenticated finalized deploy journal", () => {
+  const directory = createTemporaryDirectory();
+  const environment = deployTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-deploy.json");
+
+  try {
+    const first = runDeploymentCommand(["deploy", "devnet"], environment);
+    assert.equal(first.status, 0, first.stderr);
+
+    const fresh = runDeploymentCommand(["deploy", "devnet", "--fresh"], environment);
+
+    assert.equal(fresh.status, 0, fresh.stderr);
+    assert.equal(readJson(pending).status, "finalized");
+    const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "script").length, 2);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
   }
 });
 
