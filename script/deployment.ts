@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import { closeSync, existsSync, fsyncSync, openSync, renameSync, rmSync, writeSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const commands = ["deploy", "finalize-deploy", "upgrade", "finalize-upgrade", "verify"] as const;
 const releasePaths = [
@@ -48,14 +49,6 @@ type DeploymentContext = {
   signal?: AbortSignal;
 };
 
-export type DeploymentCliOptions = {
-  root?: string;
-  deploymentsRoot?: string;
-  environment?: NodeJS.ProcessEnv;
-  executables?: Partial<Executables>;
-  signal?: AbortSignal;
-};
-
 export type SignalHandling = {
   signal: AbortSignal;
   dispose: () => void;
@@ -63,6 +56,7 @@ export type SignalHandling = {
 
 const networks = Object.keys(networkConfigs) as Network[];
 const usage = `Usage: deployment.ts <command> <network> [args...]\nCommands: ${commands.join(", ")}\nNetworks: ${networks.join(", ")}`;
+const repositoryRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 async function deploy(context: DeploymentContext, fresh: boolean): Promise<void> {
   requireEnvironment(context, networkConfigs[context.network].privateKeyVariable);
@@ -81,7 +75,7 @@ async function upgrade(context: DeploymentContext, targets: readonly string[]): 
   requireEnvironment(context, networkConfigs[context.network].privateKeyVariable);
   await preflightBroadcast(context);
   ensureCanonicalManifest(context);
-  ensureCleanCanonicalManifest(context);
+  await ensureCleanCanonicalManifest(context);
   void targets;
   throw new Error("upgrade phase is not implemented");
 }
@@ -89,25 +83,22 @@ async function upgrade(context: DeploymentContext, targets: readonly string[]): 
 async function finalizeUpgrade(context: DeploymentContext): Promise<void> {
   await preflightFinalize(context);
   ensureCanonicalManifest(context);
-  ensureCleanCanonicalManifest(context);
+  await ensureCleanCanonicalManifest(context);
   throw new Error("finalize-upgrade phase is not implemented");
 }
 
 async function verify(context: DeploymentContext): Promise<void> {
   await preflightFinalize(context);
   ensureCanonicalManifest(context);
-  ensureCleanCanonicalManifest(context);
+  await ensureCleanCanonicalManifest(context);
   throw new Error("verify phase is not implemented");
 }
 
-export async function runDeploymentCli(
-  arguments_: readonly string[],
-  options: DeploymentCliOptions = {},
-): Promise<void> {
+async function runDeploymentCli(arguments_: readonly string[], signal?: AbortSignal): Promise<void> {
   const [commandArgument, networkArgument, ...commandArguments] = arguments_;
   const command = parseCommand(commandArgument);
   const network = parseNetwork(networkArgument);
-  const context = createContext(network, options);
+  const context = createContext(network, signal);
 
   switch (command) {
     case "deploy":
@@ -130,14 +121,14 @@ export async function runDeploymentCli(
   }
 }
 
-function createContext(network: Network, options: DeploymentCliOptions): DeploymentContext {
-  const root = options.root ?? process.cwd();
+function createContext(network: Network, signal?: AbortSignal): DeploymentContext {
+  const root = repositoryRoot;
   return {
     root,
-    deploymentsRoot: options.deploymentsRoot ?? join(root, "deployments"),
-    environment: options.environment ?? process.env,
-    executables: { cast: options.executables?.cast ?? "cast", git: options.executables?.git ?? "git" },
-    signal: options.signal,
+    deploymentsRoot: process.env.DEPLOYMENTS_ROOT ?? join(root, "deployments"),
+    environment: process.env,
+    executables: { cast: process.env.CAST_BIN ?? "cast", git: process.env.GIT_BIN ?? "git" },
+    signal,
     network,
   };
 }
@@ -354,7 +345,7 @@ export function installSignalHandling(): SignalHandling {
 
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const signalHandling = installSignalHandling();
-  void runDeploymentCli(process.argv.slice(2), { signal: signalHandling.signal })
+  void runDeploymentCli(process.argv.slice(2), signalHandling.signal)
     .catch((error: unknown) => {
       console.error(error instanceof Error ? error.message : String(error));
       process.exitCode = 1;
