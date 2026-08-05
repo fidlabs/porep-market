@@ -45,6 +45,34 @@ function runDeploymentCommandAsync(args: readonly string[], environment: NodeJS.
   });
 }
 
+function runDeploymentCommandInterruptedAfterFileChange(
+  args: readonly string[],
+  environment: NodeJS.ProcessEnv,
+  watchedPath: string,
+) {
+  const original = readFileSync(watchedPath);
+  return new Promise<{ code: number | null; signal: NodeJS.Signals | null; stderr: string }>((resolve, reject) => {
+    const child = spawn(process.execPath, [scriptPath, ...args], {
+      env: { ...process.env, ...environment },
+      stdio: ["ignore", "ignore", "pipe"],
+    });
+    const stderr: Buffer[] = [];
+    let interrupted = false;
+    const watcher = setInterval(() => {
+      if (!interrupted && existsSync(watchedPath) && !readFileSync(watchedPath).equals(original)) {
+        interrupted = true;
+        child.kill("SIGINT");
+      }
+    }, 1);
+    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.once("error", reject);
+    child.once("close", (code, signal) => {
+      clearInterval(watcher);
+      resolve({ code, signal, stderr: Buffer.concat(stderr).toString("utf8") });
+    });
+  });
+}
+
 function createTemporaryDirectory(): string {
   return mkdtempSync(join(tmpdir(), "porep-deployment-cli-"));
 }
@@ -54,10 +82,20 @@ function createFakeExecutable(directory: string, name: string, output = ""): str
   writeFileSync(
     path,
     `#!${process.execPath}\n` +
-      "import { appendFileSync } from 'node:fs';\n" +
+      "import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'node:fs';\n" +
       "if (process.env.FAKE_COMMAND_LOG) appendFileSync(process.env.FAKE_COMMAND_LOG, JSON.stringify(process.argv.slice(2)) + '\\n');\n" +
+      "let dirtyOnReleaseCheck = false;\n" +
+      "if (process.env.FAKE_GIT_COUNTER && process.argv.includes('src')) {\n" +
+      "  const count = existsSync(process.env.FAKE_GIT_COUNTER) ? Number(readFileSync(process.env.FAKE_GIT_COUNTER, 'utf8')) + 1 : 1;\n" +
+      "  writeFileSync(process.env.FAKE_GIT_COUNTER, String(count));\n" +
+      "  dirtyOnReleaseCheck = count === Number(process.env.FAKE_DIRTY_ON_RELEASE_CHECK);\n" +
+      "  if (dirtyOnReleaseCheck && process.env.FAKE_CLAIM_MARKER) {\n" +
+      "    const claim = process.env.PENDING_ROOT_TS + '/devnet/operation.claim';\n" +
+      "    writeFileSync(process.env.FAKE_CLAIM_MARKER, existsSync(claim) ? 'claim-present\\n' : 'claim-missing\\n');\n" +
+      "  }\n" +
+      "}\n" +
       "const dirtyPath = process.env.FAKE_DIRTY_PATH;\n" +
-      "if (dirtyPath && process.argv.includes(dirtyPath)) process.stdout.write(' M latest.json\\n');\n" +
+      "if (dirtyOnReleaseCheck || (dirtyPath && process.argv.includes(dirtyPath))) process.stdout.write(' M latest.json\\n');\n" +
       `else process.stdout.write(${JSON.stringify(output)});\n`,
   );
   chmodSync(path, 0o755);
@@ -182,14 +220,14 @@ function createDeployFakeCast(directory: string): void {
       "else if (args[0] === 'call' && args[2] === 'owner()(address)') process.stdout.write((process.env.FAKE_UNAUTHORIZED === 'yes' ? newAddress : address) + '\\n');\n" +
       "else if (args[0] === 'call' && args[2] === 'implementation()(address)') process.stdout.write((upgradeMode ? newAddress : address) + '\\n');\n" +
       "else if (args[0] === 'call') process.stdout.write(address + '\\n');\n" +
-      "else if (args[0] === 'rpc' && args[3] === 'eth_getTransactionReceipt') process.stdout.write(JSON.stringify({transactionHash:txHash,status:'0x1',blockNumber:'0xa',blockHash,contractAddress:null}));\n" +
+      "else if (args[0] === 'rpc' && args[3] === 'eth_getTransactionReceipt') process.stdout.write(JSON.stringify({transactionHash:args[4],status:'0x1',blockNumber:'0xa',blockHash,contractAddress:null}));\n" +
       "else if (args[0] === 'rpc' && args[3] === 'Filecoin.ChainGetFinalizedTipSet') {\n" +
       "  if (process.env.FAKE_INTERRUPT_FINALITY === 'yes') { process.stderr.write('finality wait interrupted'); process.exit(2); }\n" +
       "  process.stdout.write(JSON.stringify({Height:10}));\n" +
       "}\n" +
       "else if (args[0] === 'rpc' && args[3] === 'eth_getBlockByNumber') process.stdout.write(JSON.stringify({number:'0xa',hash:blockHash}));\n" +
       "else if (args[0] === 'rpc' && args[3] === 'eth_getCode') process.stdout.write(JSON.stringify(upgradeMode && args[4].toLowerCase() === newAddress.toLowerCase() ? '0x02' : '0x01'));\n" +
-      "else if (args[0] === 'rpc' && args[3] === 'eth_getStorageAt') process.stdout.write(JSON.stringify('0x' + '0'.repeat(24) + (upgradeMode ? newAddress : address).slice(2)));\n" +
+      "else if (args[0] === 'rpc' && args[3] === 'eth_getStorageAt') process.stdout.write(JSON.stringify('0x' + '0'.repeat(24) + (process.env.FAKE_BAD_LIVE_CHECK === 'yes' ? address : upgradeMode ? newAddress : address).slice(2)));\n" +
       "else { process.stderr.write('unexpected cast arguments: ' + JSON.stringify(args)); process.exitCode = 2; }\n",
   );
   chmodSync(path, 0o755);
@@ -283,7 +321,7 @@ function createDeployFakeForge(directory: string): void {
       "        process.exit(2);\n" +
       "      }, 300);\n" +
       "    });\n" +
-      "    process.kill(process.ppid, 'SIGINT');\n" +
+      "    process.kill(process.ppid, process.env.FAKE_PARENT_SIGNAL ?? 'SIGINT');\n" +
       "    await new Promise(resolve => setTimeout(resolve, 10000));\n" +
       "  }\n" +
       "  if (process.env.FAKE_FORGE_SIGNAL) { process.kill(process.ppid, process.env.FAKE_FORGE_SIGNAL); await new Promise(resolve => setTimeout(resolve, 10000)); }\n" +
@@ -1095,10 +1133,16 @@ test("upgrade completes one build, storage validation, one broadcast, live check
     assert.equal(readdirSync(pendingDirectory).some((name) => name.includes("storage")), false);
 
     const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
-    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "build").length, 1);
+    const builds = forgeCalls.filter((call) => (call.args as string[])[0] === "build");
+    assert.equal(builds.length, 1);
     const broadcasts = forgeCalls.filter((call) => (call.args as string[])[0] === "script");
     assert.equal(broadcasts.length, 1);
     assert.deepEqual((broadcasts[0]!.args as string[]).slice(0, 2), ["script", "script/Upgrade.s.sol:Upgrade"]);
+    for (const option of ["--out", "--cache-path"]) {
+      const buildArgs = builds[0]!.args as string[];
+      const broadcastArgs = broadcasts[0]!.args as string[];
+      assert.equal(broadcastArgs[broadcastArgs.indexOf(option) + 1], buildArgs[buildArgs.indexOf(option) + 1]);
+    }
     assert.equal(broadcasts[0]!.claimExists, true);
     assert.equal(
       (broadcasts[0]!.environment as Record<string, unknown>).UPGRADE_CONTRACT_NAMES,
@@ -1111,8 +1155,7 @@ test("upgrade completes one build, storage validation, one broadcast, live check
       [...upgradeTargets],
     );
     const retainedBuildInfo = readdirSync(join(environment.DEPLOYMENTS_ROOT!, "devnet", "build-info"));
-    assert.equal(retainedBuildInfo.length, 2);
-    assert.ok(retainedBuildInfo.includes(`${currentBuildInfoSha256.slice(2)}.json.gz`));
+    assert.deepEqual(retainedBuildInfo, [`${currentBuildInfoSha256.slice(2)}.json.gz`]);
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -1221,6 +1264,33 @@ test("upgrade refuses a source manifest changed during preflight before broadcas
   }
 });
 
+test("upgrade rechecks release sources under the operation claim before invoking Forge script", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const forgeCallsPath = environment.FAKE_FORGE_LOG!;
+  const claimMarker = join(directory, "release-check-claim.marker");
+
+  try {
+    const result = runDeploymentCommand(["upgrade", "devnet", "PoRepMarket"], {
+      ...environment,
+      FAKE_GIT_COUNTER: join(directory, "release-check-count"),
+      FAKE_DIRTY_ON_RELEASE_CHECK: "2",
+      FAKE_CLAIM_MARKER: claimMarker,
+    });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /deployment source is dirty/);
+    assert.equal(readFileSync(claimMarker, "utf8"), "claim-present\n");
+    const forgeCalls = readJsonLines(forgeCallsPath);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "build").length, 1);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "script").length, 0);
+    assert.equal(existsSync(join(environment.PENDING_ROOT_TS!, "devnet", "operation.claim")), false);
+    assert.equal(existsSync(join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json")), false);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
 test("invalid Forge upgrade output is discarded while exact broadcast evidence remains bound", () => {
   const directory = createTemporaryDirectory();
   const environment = upgradeTestEnvironment(directory);
@@ -1242,6 +1312,117 @@ test("invalid Forge upgrade output is discarded while exact broadcast evidence r
     const finalize = runDeploymentCommand(["finalize-upgrade", "devnet"], environment);
     assert.equal(finalize.status, 1);
     assert.match(finalize.stderr, /pending upgrade has no completed operations/);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("a nonzero Forge exit after upgrade broadcast preserves bound evidence for recovery", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+  const sourceBytes = readFileSync(latest);
+
+  try {
+    const failed = runDeploymentCommand(["upgrade", "devnet", ...upgradeTargets], {
+      ...environment,
+      FAKE_FAIL_AFTER_BROADCAST: "yes",
+    });
+
+    assert.equal(failed.status, 1);
+    const failedPending = readJson(pending);
+    assert.match(String(failedPending.broadcastSha256), /^0x[0-9a-f]{64}$/);
+    assert.equal((failedPending.operations as unknown[]).length, upgradeTargets.length);
+    assert.deepEqual(readFileSync(latest), sourceBytes);
+    const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+
+    const recovered = runDeploymentCommand(["finalize-upgrade", "devnet"], environment);
+
+    assert.equal(recovered.status, 0, recovered.stderr);
+    assert.equal(readJson(pending).status, "finalized");
+    assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+for (const parentSignal of ["SIGINT", "SIGTERM"] as const) {
+  test(`${parentSignal} waits for Forge upgrade to close before binding evidence and releasing its claim`, async () => {
+    const directory = createTemporaryDirectory();
+    const environment = upgradeTestEnvironment(directory);
+    const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+    const broadcast = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.broadcast.json");
+    const claim = join(environment.PENDING_ROOT_TS!, "devnet", "operation.claim");
+    const closeMarker = join(directory, "forge-close.marker");
+
+    try {
+      const interrupted = await runDeploymentCommandAsync(["upgrade", "devnet", "PoRepMarket"], {
+        ...environment,
+        FAKE_CLOSE_MARKER: closeMarker,
+        FAKE_DELAY_CLOSE_AFTER_SIGNAL: "yes",
+        FAKE_PARENT_SIGNAL: parentSignal,
+      });
+
+      assert.equal(interrupted.code, 1, interrupted.stderr);
+      assert.equal(readFileSync(closeMarker, "utf8"), "claim-present\n");
+      assert.equal(existsSync(claim), false);
+      const expectedBroadcast = `${JSON.stringify({
+        transactions: [{ hash: testTransactionHash }, { hash: testTransactionHash2 }],
+      })}\n`;
+      assert.equal(readFileSync(broadcast, "utf8"), expectedBroadcast);
+      const pendingValue = readJson(pending);
+      assert.equal(
+        pendingValue.broadcastSha256,
+        `0x${createHash("sha256").update(expectedBroadcast).digest("hex")}`,
+      );
+      assert.equal((pendingValue.operations as unknown[]).length, 1);
+    } finally {
+      rmSync(directory, { force: true, recursive: true });
+    }
+  });
+}
+
+test("a failed live upgrade check blocks canonical publication", () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+  const sourceBytes = readFileSync(latest);
+
+  try {
+    const failed = runDeploymentCommand(["upgrade", "devnet", "PoRepMarket"], {
+      ...environment,
+      FAKE_BAD_LIVE_CHECK: "yes",
+    });
+
+    assert.equal(failed.status, 1);
+    assert.match(failed.stderr, /implementation slot does not match/);
+    assert.deepEqual(readFileSync(latest), sourceBytes);
+    assert.equal(readJson(join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json")).status, "pending");
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("the same-network operation claim prevents concurrent deploy and upgrade broadcasts", async () => {
+  const directory = createTemporaryDirectory();
+  const environment: NodeJS.ProcessEnv = {
+    ...upgradeTestEnvironment(directory),
+    FAKE_BUILD_DELAY_MS: "300",
+  };
+
+  try {
+    const [deployResult, upgradeResult] = await Promise.all([
+      runDeploymentCommandAsync(["deploy", "devnet", "--fresh"], environment),
+      runDeploymentCommandAsync(["upgrade", "devnet", ...upgradeTargets], environment),
+    ]);
+
+    assert.ok([deployResult.code, upgradeResult.code].every((code) => code === 0 || code === 1));
+    const forgeCalls = readJsonLines(environment.FAKE_FORGE_LOG!);
+    assert.equal(forgeCalls.filter((call) => (call.args as string[])[0] === "script").length, 1);
+    assert.ok(
+      [deployResult.stderr, upgradeResult.stderr].some((stderr) => /operation claim|operation already exists/.test(stderr)),
+    );
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }
@@ -1292,6 +1473,8 @@ test("finalize-upgrade accepts exact-result publication retry without rewriting 
     const pendingValue = readJson(pending);
     pendingValue.status = "pending";
     writeFileSync(pending, `${JSON.stringify(pendingValue, null, 2)}\n`);
+    const obsoleteBuildInfo = join(environment.DEPLOYMENTS_ROOT!, "devnet", "build-info", `${"f".repeat(64)}.json.gz`);
+    writeFileSync(obsoleteBuildInfo, gzipSync("obsolete\n", { level: 9 }));
     const latestBytes = readFileSync(latest);
     const latestModified = statSync(latest).mtimeMs;
     const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
@@ -1309,6 +1492,50 @@ test("finalize-upgrade accepts exact-result publication retry without rewriting 
     assert.equal(recoveryCastCalls.trim().split("\n").length, 1);
     assert.match(recoveryCastCalls, /chain-id/);
     assert.equal(readJson(pending).status, "finalized");
+    assert.deepEqual(readdirSync(dirname(obsoleteBuildInfo)), [
+      `${String((pendingValue.release as Record<string, unknown>).buildInfoSha256).slice(2)}.json.gz`,
+    ]);
+  } finally {
+    rmSync(directory, { force: true, recursive: true });
+  }
+});
+
+test("an interruption after latest.json rename recovers by exact-result authentication and pruning", async () => {
+  const directory = createTemporaryDirectory();
+  const environment = upgradeTestEnvironment(directory);
+  const pending = join(environment.PENDING_ROOT_TS!, "devnet", "pending-upgrade.json");
+  const latest = join(environment.DEPLOYMENTS_ROOT!, "devnet", "latest.json");
+  const originalLatest = readFileSync(latest);
+  const buildInfoDirectory = join(environment.DEPLOYMENTS_ROOT!, "devnet", "build-info");
+  writeFileSync(join(buildInfoDirectory, `${"f".repeat(64)}.json.gz`), gzipSync("obsolete\n", { level: 9 }));
+
+  try {
+    const interrupted = await runDeploymentCommandInterruptedAfterFileChange(
+      ["upgrade", "devnet", ...upgradeTargets],
+      environment,
+      latest,
+    );
+
+    assert.equal(interrupted.code, 1, interrupted.stderr);
+    assert.notDeepEqual(readFileSync(latest), originalLatest);
+    const interruptedPending = readJson(pending);
+    assert.equal(interruptedPending.status, "pending");
+    assert.equal(
+      `0x${createHash("sha256").update(readFileSync(latest)).digest("hex")}`,
+      interruptedPending.resultManifestSha256,
+    );
+    const forgeLog = readFileSync(environment.FAKE_FORGE_LOG!, "utf8");
+    const storageLog = readFileSync(environment.FAKE_STORAGE_LOG!, "utf8");
+
+    const recovered = runDeploymentCommand(["finalize-upgrade", "devnet"], environment);
+
+    assert.equal(recovered.status, 0, recovered.stderr);
+    assert.equal(readJson(pending).status, "finalized");
+    assert.equal(readFileSync(environment.FAKE_FORGE_LOG!, "utf8"), forgeLog);
+    assert.equal(readFileSync(environment.FAKE_STORAGE_LOG!, "utf8"), storageLog);
+    assert.deepEqual(readdirSync(buildInfoDirectory), [
+      `${String((interruptedPending.release as Record<string, unknown>).buildInfoSha256).slice(2)}.json.gz`,
+    ]);
   } finally {
     rmSync(directory, { force: true, recursive: true });
   }

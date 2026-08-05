@@ -102,6 +102,8 @@ type PreparedBuildInfo = {
   sha256: string;
   raw: Buffer;
   compressed: Buffer;
+  outputDirectory: string;
+  cacheDirectory: string;
 };
 
 type OperationClaim = {
@@ -281,6 +283,12 @@ async function upgrade(context: DeploymentContext, targets: readonly string[]): 
 
     const pending = createPendingUpgrade(context, targets, sourceManifestSha256, buildInfo.sha256);
     claim = claimUpgradeOperation(context, paths, buildInfo, pending);
+    try {
+      await ensureCleanReleaseSource(context);
+    } catch (error) {
+      removeUpgradeRecoveryFiles(paths);
+      throw error;
+    }
     writeAtomicFile(forgeOutputPath, `${JSON.stringify(pending, null, 2)}\n`);
 
     let broadcastFailure: unknown;
@@ -290,6 +298,7 @@ async function upgrade(context: DeploymentContext, targets: readonly string[]): 
         workspace,
         forgeOutputPath,
         exactSourceManifestPath,
+        buildInfo,
         privateKey,
         targets,
       );
@@ -360,6 +369,7 @@ async function finalizeUpgrade(context: DeploymentContext, preflightCompleted = 
   if (canonicalState === "result") {
     authenticateRetainedBuildInfo(context, pending.release.buildInfoSha256);
     markUpgradeFinalized(paths.pending, pending);
+    pruneBuildInfo(context, pending.release.buildInfoSha256);
     return;
   }
   if (pending.status === "finalized") {
@@ -400,11 +410,19 @@ async function finalizeUpgrade(context: DeploymentContext, preflightCompleted = 
   } else {
     retainBuildInfo(context, paths.buildInfo, pending.release.buildInfoSha256);
     writeAtomicFile(paths.latest, manifestBytes);
+    await observeUpgradePublicationCancellation(context.signal);
   }
 
   pending = { ...pending, status: "finalized" };
   writePendingUpgrade(paths.pending, pending);
-  pruneBuildInfoExcept(context, [source.release.buildInfoSha256, pending.release.buildInfoSha256]);
+  pruneBuildInfo(context, pending.release.buildInfoSha256);
+}
+
+async function observeUpgradePublicationCancellation(signal?: AbortSignal): Promise<void> {
+  await new Promise<void>((resolve) => setTimeout(resolve, 25));
+  if (signal?.aborted === true) {
+    throw new Error("upgrade publication interrupted after canonical manifest write");
+  }
 }
 
 async function verify(context: DeploymentContext): Promise<void> {
@@ -730,6 +748,7 @@ function journalEvidencePaths(path: string): { buildInfo: string; broadcast: str
 
 async function buildDeployment(context: DeploymentContext, workspace: string): Promise<PreparedBuildInfo> {
   const outputDirectory = join(workspace, "out");
+  const cacheDirectory = join(workspace, "cache");
   await runProcess(
     context.executables.forge,
     [
@@ -739,7 +758,7 @@ async function buildDeployment(context: DeploymentContext, workspace: string): P
       "--out",
       outputDirectory,
       "--cache-path",
-      join(workspace, "cache"),
+      cacheDirectory,
       "--build-info",
       "--extra-output",
       "storageLayout",
@@ -760,6 +779,8 @@ async function buildDeployment(context: DeploymentContext, workspace: string): P
     sha256: hashRawBytes(buildInfoBytes),
     raw: buildInfoBytes,
     compressed: gzipSync(buildInfoBytes, { level: 9 }),
+    outputDirectory,
+    cacheDirectory,
   };
 }
 
@@ -1056,6 +1077,7 @@ async function broadcastUpgrade(
   workspace: string,
   forgeOutputPath: string,
   sourceManifestPath: string,
+  buildInfo: PreparedBuildInfo,
   privateKey: string,
   targets: readonly string[],
 ): Promise<void> {
@@ -1076,6 +1098,10 @@ async function broadcastUpgrade(
       "script/Upgrade.s.sol:Upgrade",
       "--root",
       context.root,
+      "--out",
+      buildInfo.outputDirectory,
+      "--cache-path",
+      buildInfo.cacheDirectory,
       "--broadcast",
       "--rpc-url",
       rpcUrl,
