@@ -277,6 +277,14 @@ export async function verifyLiveDeployment(
   await verifyAddressCall(
     run,
     rpcUrl,
+    market.proxy,
+    "getGlobalEvidenceAdapter()(address)",
+    adapter.proxy,
+    "market evidence adapter",
+  );
+  await verifyAddressCall(
+    run,
+    rpcUrl,
     adapter.proxy,
     "getPoRepMarketAddress()(address)",
     market.proxy,

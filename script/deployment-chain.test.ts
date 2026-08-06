@@ -125,6 +125,7 @@ test("verifies the complete deployment topology", async () => {
   await verifyLiveDeployment(fullRunner(manifest, selectors), "rpc", manifest);
   assert.ok(selectors.has("getBeacon()(address)"));
   assert.ok(selectors.has("getValidatorFactoryContract()(address)"));
+  assert.ok(selectors.has("getGlobalEvidenceAdapter()(address)"));
   assert.ok(selectors.has("hasRole(bytes32,address)(bool)"));
   assert.ok(selectors.has("POREPMARKET_CONTRACT()(address)"));
 });
@@ -217,6 +218,7 @@ function addressResult(manifest: DeploymentManifest, target: string, signature: 
   if (signature === "getBeacon()(address)") return beaconAddress(c.ValidatorBeacon!);
   if (signature === "getValidatorFactoryContract()(address)") return proxy(c.ValidatorFactory!);
   if (signature === "getSPRegistryContract()(address)") return proxy(c.SPRegistry!);
+  if (signature === "getGlobalEvidenceAdapter()(address)") return proxy(c.DataCapEvidenceAdapter!);
   if (signature === "getPoRepMarketAddress()(address)") return proxy(c.PoRepMarket!);
   if (signature === "POREPMARKET_CONTRACT()(address)") return proxy(c.PoRepMarket!);
   if (signature === "DATA_CAP_EVIDENCE_ADAPTER()(address)") return proxy(c.DataCapEvidenceAdapter!);
