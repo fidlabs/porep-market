@@ -68,6 +68,7 @@ export async function loadTransactionReceipts(
 ): Promise<DeploymentTransaction[]> {
   const requestedHashes = validateRequestedHashes(hashes);
   const receipts: DeploymentTransaction[] = [];
+  const receiptHashes = new Set<string>();
 
   for (const requestedHash of requestedHashes) {
     let output: string;
@@ -80,7 +81,12 @@ export async function loadTransactionReceipts(
     } catch (error) {
       throw new Error(`could not read receipt for transaction ${requestedHash}`, { cause: error });
     }
-    receipts.push(parseTransactionReceipt(output, requestedHash));
+    const receipt = parseTransactionReceipt(output, requestedHash);
+    if (receiptHashes.has(receipt.hash)) {
+      throw new Error(`duplicate canonical receipt hash ${receipt.hash}`);
+    }
+    receiptHashes.add(receipt.hash);
+    receipts.push(receipt);
   }
 
   return receipts;
@@ -688,9 +694,6 @@ function parseTransactionReceipt(text: string, requestedHash: string): Deploymen
   }
 
   const receiptHash = readHash(value.transactionHash, `transaction ${requestedHash} receipt hash`);
-  if (receiptHash !== requestedHash) {
-    throw new Error(`receipt hash ${receiptHash} does not match transaction ${requestedHash}`);
-  }
 
   const status = readQuantity(value.status, `transaction ${requestedHash} status`);
   if (status !== 1) {
@@ -703,7 +706,7 @@ function parseTransactionReceipt(text: string, requestedHash: string): Deploymen
   const blockHash = readHash(value.blockHash, `transaction ${requestedHash} blockHash`);
   const contractAddress = readReceiptContractAddress(value.contractAddress, requestedHash);
 
-  return { hash: requestedHash, status, blockNumber, blockHash, contractAddress };
+  return { hash: receiptHash, status, blockNumber, blockHash, contractAddress };
 }
 
 function readQuantity(value: unknown, path: string): number {

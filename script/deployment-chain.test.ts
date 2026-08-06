@@ -31,7 +31,7 @@ test("accepts every unique Foundry transaction and rejects malformed entries", (
   );
 });
 
-test("loads successful receipts and rejects incomplete or failed receipts", async () => {
+test("loads successful receipts including Filecoin transaction-hash aliases", async () => {
   const valid = JSON.stringify({
     transactionHash: hashA,
     status: "0x1",
@@ -43,9 +43,13 @@ test("loads successful receipts and rejects incomplete or failed receipts", asyn
     loadTransactionReceipts(async () => output, "rpc", [hashA]);
 
   assert.deepEqual(await run(valid), [{ hash: hashA, status: 1, blockNumber: 10, blockHash: hashB, contractAddress: null }]);
+  assert.deepEqual(await run(valid.replace(hashA, hashB)), [{ hash: hashB, status: 1, blockNumber: 10, blockHash: hashB, contractAddress: null }]);
   await assert.rejects(run("null"), /receipt is missing/);
   await assert.rejects(run(valid.replace('"0x1"', '"0x0"')), /failed with status/);
-  await assert.rejects(run(valid.replace(hashA, hashB)), /does not match/);
+  await assert.rejects(
+    loadTransactionReceipts(async () => valid, "rpc", [hashA, hashB]),
+    /duplicate canonical receipt hash/,
+  );
 });
 
 function receipt(blockNumber = 10, blockHash = hashB): DeploymentTransaction {
