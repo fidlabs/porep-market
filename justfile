@@ -38,10 +38,6 @@ check-coverage:
     ./ci/check-full-coverage.sh
 
 deployment-tests:
-    bash test/scripts/deployment-commands.sh
-    bash test/scripts/deployment-finality.sh
-    bash test/scripts/deployment-live.sh
-    bash test/scripts/deployment-flow.sh
     just typecheck-deployment
     just test-deployment-ts
 
@@ -52,34 +48,22 @@ test-deployment-ts:
     node --test script/*.test.ts
 
 deploy network *args:
-    ./script/deployment.sh deploy {{ network }} {{ args }}
-
-finalize-deploy network:
-    ./script/deployment.sh finalize-deploy {{ network }}
-
-upgrade network target *targets:
-    ./script/deployment.sh upgrade {{ network }} {{ target }} {{ targets }}
-
-finalize-upgrade network:
-    ./script/deployment.sh finalize-upgrade {{ network }}
-
-verify network:
-    ./script/deployment.sh verify {{ network }}
-
-deploy-ts network *args:
     node script/deployment.ts deploy {{ network }} {{ args }}
 
-finalize-deploy-ts network:
+finalize-deploy network:
     node script/deployment.ts finalize-deploy {{ network }}
 
-upgrade-ts network *targets:
-    node script/deployment.ts upgrade {{ network }} {{ targets }}
+upgrade network target *targets:
+    node script/deployment.ts upgrade {{ network }} {{ target }} {{ targets }}
 
-finalize-upgrade-ts network:
+finalize-upgrade network:
     node script/deployment.ts finalize-upgrade {{ network }}
 
-verify-ts network:
-    node script/deployment.ts verify {{ network }}
+verify network:
+    node script/deployment.ts verify-sources {{ network }}
+
+check-live network:
+    node script/deployment.ts check-live {{ network }}
 
 # CI equivalent check
 check: fmt-check lint test deployment-tests check-coverage build check-abis
