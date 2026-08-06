@@ -73,6 +73,7 @@ export type PendingUpgrade = {
   operations: UpgradeOperation[];
   sourceManifestSha256: string;
   resultManifestSha256: string | null;
+  finalizedAt: string | null;
   release: { buildInfoSha256: string };
   broadcastSha256: string | null;
 };
@@ -117,6 +118,7 @@ export function parsePendingOperation(text: string): PendingOperation {
       operations,
       sourceManifestSha256: hash(value.sourceManifestSha256, "pending.sourceManifestSha256"),
       resultManifestSha256: nullableHash(value.resultManifestSha256, "pending.resultManifestSha256"),
+      finalizedAt: value.finalizedAt === undefined ? null : nullableString(value.finalizedAt, "pending.finalizedAt"),
     };
   }
   throw new Error("pending.operation must be deploy or upgrade");
@@ -130,23 +132,23 @@ export function hashRawBytes(bytes: Uint8Array): string {
   return `0x${createHash("sha256").update(bytes).digest("hex")}`;
 }
 
-export function renderDeployManifest(pending: PendingDeploy, finalizedAt: string): DeploymentManifest {
-  if (!pending.broadcastSha256 || !pending.resultManifestSha256 || !pending.result) {
-    throw new Error("pending deployment is missing finalization evidence");
-  }
-  return { ...structuredClone(pending.result), status: "finalized", finalizedAt, transactions: pending.result.transactions ?? [] };
-}
-
-export function renderUpgradedManifest(source: DeploymentManifest, pending: PendingUpgrade): DeploymentManifest {
-  if (!pending.resultManifestSha256) throw new Error("pending upgrade is missing result evidence");
-  return renderPrepublicationUpgradedManifest(source, pending);
-}
-
-export function renderPrepublicationUpgradedManifest(source: DeploymentManifest, pending: PendingUpgrade): DeploymentManifest {
+export function renderUpgradedManifest(
+  source: DeploymentManifest,
+  pending: PendingUpgrade,
+  transactions: readonly DeploymentTransaction[],
+  finalizedAt: string,
+): DeploymentManifest {
   if (!pending.broadcastSha256) throw new Error("pending upgrade is missing broadcast evidence");
   const contracts = structuredClone(source.contracts);
   for (const item of pending.operations) applyUpgrade(contracts, item);
-  return { ...source, release: { buildInfoSha256: pending.release.buildInfoSha256 }, contracts };
+  return {
+    ...source,
+    status: "finalized",
+    finalizedAt,
+    release: { buildInfoSha256: pending.release.buildInfoSha256 },
+    contracts,
+    transactions: transactions.map((transaction) => ({ ...transaction })),
+  };
 }
 
 export function classifyDeployCanonicalState(current: string | undefined, pending: PendingDeploy): CanonicalManifestState {

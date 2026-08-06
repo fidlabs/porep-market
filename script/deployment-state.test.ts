@@ -80,6 +80,7 @@ function upgradePending() {
     }],
     sourceManifestSha256: hash,
     resultManifestSha256: nextHash,
+    finalizedAt: null,
     release: { buildInfoSha256: nextHash },
     broadcastSha256: hash,
   };
@@ -115,9 +116,13 @@ test("renders UUPS and Validator upgrades without mutating the source", () => {
   const source = parseDeploymentManifest(JSON.stringify(manifest()));
   const uups = parsePendingOperation(JSON.stringify(upgradePending()));
   assert.equal(uups.operation, "upgrade");
-  const upgraded = renderUpgradedManifest(source, uups);
+  const receipts = [{ hash, status: 1, blockNumber: 10, blockHash: nextHash, contractAddress: nextAddress }];
+  const finalizedAt = "2026-08-06T12:00:00Z";
+  const upgraded = renderUpgradedManifest(source, uups, receipts, finalizedAt);
   assert.equal(source.contracts.Market.implementation, address);
   assert.equal(upgraded.contracts.Market.implementation, nextAddress);
+  assert.deepEqual(upgraded.transactions, receipts);
+  assert.equal(upgraded.finalizedAt, finalizedAt);
 });
 
 test("accepts retries only from the exact source or exact result", () => {

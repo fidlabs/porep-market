@@ -1,11 +1,13 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, fstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
 import { installSignalHandling, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
+import { parseDeploymentManifest } from "./deployment-state.ts";
+import { confirmBlockscoutSource, verifyContractSources } from "./deployment-sources.ts";
 
 const script = fileURLToPath(new URL("./deployment.ts", import.meta.url));
 
@@ -46,7 +48,7 @@ test("rejects invalid command lines", () => {
   assert.match(run(["deploy", "localnet"]).stderr, /unsupported network/);
   assert.match(run(["deploy", "devnet", "bad"]).stderr, /unsupported deploy arguments/);
   assert.match(run(["upgrade", "devnet"]).stderr, /requires at least one target/);
-  assert.match(run(["verify", "devnet", "bad"]).stderr, /does not accept arguments/);
+    assert.match(run(["check-live", "devnet", "bad"]).stderr, /does not accept arguments/);
 });
 
 test("maps the three Filecoin networks explicitly", () => {
@@ -63,6 +65,24 @@ test("runs subprocesses without shell interpolation and reports failures", async
     assert.deepEqual(JSON.parse(await runProcess(command, ["a b", "$HOME"])), ["a b", "$HOME"]);
     const failure = executable(directory, "failure", "process.stderr.write('failed'); process.exitCode = 2");
     await assert.rejects(runProcess(failure, []), /exited with code 2: failed/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("gives interactive subprocesses the operator terminal", async () => {
+  const directory = temporaryDirectory();
+  try {
+    const marker = join(directory, "stdout-inode");
+    const command = executable(
+      directory,
+      "interactive",
+      `require('node:fs').writeFileSync(${JSON.stringify(marker)}, String(require('node:fs').fstatSync(1).ino))`,
+    );
+
+    await runProcess(command, [], { terminal: true });
+
+    assert.equal(readFileSync(marker, "utf8"), String(fstatSync(1).ino));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -87,7 +107,7 @@ test("checks chain ID and mainnet confirmation before operating", () => {
     let result = run(["deploy", "devnet"], { ...environment(directory), CAST_BIN: cast });
     assert.match(result.stderr, /devnet RPC chain ID must be 31415926, got 314/);
 
-    result = run(["verify", "mainnet"], {
+    result = run(["finalize-deploy", "mainnet"], {
       CAST_BIN: cast,
       RPC_MAINNET: "http://mainnet.example",
       CONFIRM_MAINNET: "",
@@ -97,6 +117,69 @@ test("checks chain ID and mainnet confirmation before operating", () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("checks live mainnet state without write confirmation or a clean manifest", () => {
+  const directory = temporaryDirectory();
+  try {
+    const cast = executable(directory, "cast", "process.stdout.write('314')");
+    const git = executable(directory, "git", "process.stdout.write(' M deployments/mainnet/latest.json')");
+    const deploymentDirectory = join(directory, "deployments", "mainnet");
+    mkdirSync(deploymentDirectory, { recursive: true });
+    writeFileSync(join(deploymentDirectory, "latest.json"), "{");
+
+    const result = run(["check-live", "mainnet"], {
+      CAST_BIN: cast,
+      GIT_BIN: git,
+      RPC_MAINNET: "http://mainnet.example",
+      CONFIRM_MAINNET: "",
+      DEPLOYMENTS_ROOT: join(directory, "deployments"),
+    });
+
+    assert.match(result.stderr, /manifest JSON is invalid/);
+    assert.doesNotMatch(result.stderr, /CONFIRM_MAINNET|not clean/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("verifies every deployed Calibnet address idempotently", async () => {
+  const manifest = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
+  const calls: string[][] = [];
+  const confirmed: string[] = [];
+  await verifyContractSources(manifest, {
+    chainId: 314159,
+    root: process.cwd(),
+    rpcUrl: "http://calibnet.example",
+    verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
+    runForge: async (args) => { calls.push([...args]); },
+    confirmVerified: async (target) => { confirmed.push(target.address); },
+    progress: () => {},
+  });
+
+  assert.equal(calls.length, 15);
+  assert.equal(confirmed.length, 15);
+  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 6);
+  assert.equal(calls.filter((args) => args.includes("--constructor-args")).length, 0);
+  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 14);
+  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 14);
+  assert.equal(calls.filter((args) => args.includes("sourcify")).length, 1);
+  assert.ok(calls.every((args) => args.includes("--verifier") && args.includes("--watch")));
+});
+
+test("rejects a Blockscout source record for the wrong contract", async () => {
+  const target = {
+    label: "ValidatorBeacon",
+    address: `0x${"1".repeat(40)}`,
+    artifact: "lib/openzeppelin-contracts/contracts/proxy/beacon/UpgradeableBeacon.sol:UpgradeableBeacon",
+    verifier: "blockscout" as const,
+    guessConstructorArguments: false,
+  };
+  const response = new Response(JSON.stringify({ result: [{ ContractName: "FilecoinMarketConsumer" }] }));
+  await assert.rejects(
+    confirmBlockscoutSource("https://blockscout.example/api/", target, async () => response),
+    /expected UpgradeableBeacon, got FilecoinMarketConsumer/,
+  );
 });
 
 test("refuses an unfinished TypeScript or Bash operation", () => {
@@ -115,6 +198,71 @@ test("refuses an unfinished TypeScript or Bash operation", () => {
       assert.match(result.stderr, /pending operation already exists/);
       rmSync(pending);
     }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("fresh deployment preserves unfinished recovery evidence", () => {
+  const directory = temporaryDirectory();
+  try {
+    const cast = executable(directory, "cast", "process.stdout.write('31415926')");
+    const git = executable(directory, "git", "");
+    const forge = executable(directory, "forge", "process.exitCode = 99");
+    const env: NodeJS.ProcessEnv = { ...environment(directory), CAST_BIN: cast, GIT_BIN: git, FORGE_BIN: forge };
+    const deploymentDirectory = join(env.DEPLOYMENTS_ROOT!, "devnet");
+    const pendingDirectory = join(env.PENDING_ROOT_TS!, "devnet");
+    mkdirSync(deploymentDirectory, { recursive: true });
+    mkdirSync(pendingDirectory, { recursive: true });
+    writeFileSync(join(deploymentDirectory, "latest.json"), "{}\n");
+    writeFileSync(join(pendingDirectory, "pending-deploy.json"), '{"status":"pending"}\n');
+    writeFileSync(join(pendingDirectory, "pending-deploy.build-info.json.gz"), "build evidence");
+    writeFileSync(join(pendingDirectory, "pending-deploy.broadcast.json"), "broadcast evidence");
+
+    const result = run(["deploy", "devnet", "--fresh"], env);
+
+    assert.match(result.stderr, /pending operation already exists/);
+    assert.equal(readFileSync(join(pendingDirectory, "pending-deploy.json"), "utf8"), '{"status":"pending"}\n');
+    assert.equal(readFileSync(join(pendingDirectory, "pending-deploy.build-info.json.gz"), "utf8"), "build evidence");
+    assert.equal(readFileSync(join(pendingDirectory, "pending-deploy.broadcast.json"), "utf8"), "broadcast evidence");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("retains the pending journal and build-info before Forge broadcasts", () => {
+  const directory = temporaryDirectory();
+  try {
+    const cast = executable(directory, "cast", "process.stdout.write('31415926')");
+    const git = executable(directory, "git", "");
+    const marker = join(directory, "broadcast-preconditions");
+    const pendingDirectory = join(directory, "pending-ts", "devnet");
+    const forge = executable(directory, "forge", `
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const args = process.argv.slice(2);
+      if (args[0] === 'build') {
+        const output = args[args.indexOf('--out') + 1];
+        fs.mkdirSync(path.join(output, 'build-info'), { recursive: true });
+        fs.writeFileSync(path.join(output, 'build-info', 'build.json'), '{}');
+      } else {
+        const pending = path.join(${JSON.stringify(pendingDirectory)}, 'pending-deploy.json');
+        const build = path.join(${JSON.stringify(pendingDirectory)}, 'pending-deploy.build-info.json.gz');
+        fs.writeFileSync(${JSON.stringify(marker)}, String(fs.existsSync(pending) && fs.existsSync(build)));
+        process.exitCode = 99;
+      }
+    `);
+
+    const result = run(["deploy", "devnet"], {
+      ...environment(directory),
+      CAST_BIN: cast,
+      GIT_BIN: git,
+      FORGE_BIN: forge,
+    });
+
+    assert.equal(result.status, 1);
+    assert.equal(readFileSync(marker, "utf8"), "true");
+    assert.match(result.stderr, /Build contracts[\s\S]*Broadcast deployment/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -24,7 +24,7 @@ import {
   parseDeploymentManifest,
   parsePendingOperation,
   parseUpgradeOperations,
-  renderPrepublicationUpgradedManifest,
+  renderUpgradedManifest,
   type DeploymentManifest,
   type PendingDeploy,
   type PendingUpgrade,
@@ -36,8 +36,9 @@ import {
   waitForFilecoinFinality,
   type CommandRunner,
 } from "./deployment-chain.ts";
+import { confirmBlockscoutSource, confirmSourcifySource, verifyContractSources } from "./deployment-sources.ts";
 
-const commands = ["deploy", "finalize-deploy", "upgrade", "finalize-upgrade", "verify"] as const;
+const commands = ["deploy", "finalize-deploy", "upgrade", "finalize-upgrade", "check-live", "verify-sources"] as const;
 const releasePaths = [
   "src",
   "script",
@@ -61,12 +62,14 @@ export const networkConfigs = {
     rpcVariable: "RPC_CALIBNET",
     privateKeyVariable: "PRIVATE_KEY_CALIBNET",
     environmentSuffix: "CALIBNET",
+    verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
   },
   mainnet: {
     chainId: 314,
     rpcVariable: "RPC_MAINNET",
     privateKeyVariable: "PRIVATE_KEY_MAINNET",
     environmentSuffix: "MAINNET",
+    verifierUrl: "https://filecoin.blockscout.com/api/",
   },
 } as const;
 
@@ -103,14 +106,18 @@ export type SignalHandling = { signal: AbortSignal; dispose: () => void };
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const networks = Object.keys(networkConfigs) as Network[];
 const usage = `Usage: deployment.ts <command> <network> [args...]\nCommands: ${commands.join(", ")}\nNetworks: ${networks.join(", ")}`;
-const upgradeArtifacts: Record<string, string> = {
-  PoRepMarket: "src/PoRepMarket.sol:PoRepMarket",
-  ValidatorFactory: "src/ValidatorFactory.sol:ValidatorFactory",
-  DataCapEvidenceAdapter: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
-  SPRegistry: "src/SPRegistry.sol:SPRegistry",
-  SLIOracle: "src/SLIOracle.sol:SLIOracle",
-  SLIScorer: "src/SLIScorer.sol:SLIScorer",
-  Validator: "src/Validator.sol:Validator",
+const upgradeTargets: Record<string, {
+  artifact: string;
+  manifestKind: "uups" | "implementation";
+  operationKind: "uups" | "beacon";
+}> = {
+  PoRepMarket: { artifact: "src/PoRepMarket.sol:PoRepMarket", manifestKind: "uups", operationKind: "uups" },
+  ValidatorFactory: { artifact: "src/ValidatorFactory.sol:ValidatorFactory", manifestKind: "uups", operationKind: "uups" },
+  DataCapEvidenceAdapter: { artifact: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter", manifestKind: "uups", operationKind: "uups" },
+  SPRegistry: { artifact: "src/SPRegistry.sol:SPRegistry", manifestKind: "uups", operationKind: "uups" },
+  SLIOracle: { artifact: "src/SLIOracle.sol:SLIOracle", manifestKind: "uups", operationKind: "uups" },
+  SLIScorer: { artifact: "src/SLIScorer.sol:SLIScorer", manifestKind: "uups", operationKind: "uups" },
+  Validator: { artifact: "src/Validator.sol:Validator", manifestKind: "implementation", operationKind: "beacon" },
 };
 
 async function deploy(context: Context, fresh: boolean): Promise<void> {
@@ -118,22 +125,26 @@ async function deploy(context: Context, fresh: boolean): Promise<void> {
   const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
   const dependencies = deploymentDependencies(context);
 
+  phase("Deployment preflight");
   await broadcastPreflight(context);
-  const previousHash = prepareDeploy(context, fresh);
   ensureNoPendingOperation(context);
+  const previousHash = prepareDeploy(context, fresh);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-deploy-ts-"));
   const forgeIoDirectory = join(context.root, ".deployment", `.typescript-deploy-${randomUUID()}`);
   try {
     mkdirSync(forgeIoDirectory, { recursive: true });
+    phase("Build contracts");
     const build = await buildContracts(context, workspace);
     ensureNoPendingOperation(context);
     const pending = newPendingDeploy(context, previousHash, build.hash);
     const output = join(forgeIoDirectory, "deploy-output.json");
     writeAtomicFile(output, json(pending));
+    retainPendingStart(operationPaths(context, "deploy"), build.gzip, pending);
 
     let forgeError: unknown;
     try {
+      phase("Broadcast deployment");
       await runDeployScript(context, workspace, output, build, privateKey, dependencies);
     } catch (error) {
       forgeError = error;
@@ -161,11 +172,13 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
   if (state === "result") {
     finishPending(paths.pending, pending);
     pruneBuildInfo(context, pending.release.buildInfoSha256);
+    await verifyPublishedSources(context);
     return;
   }
   if (pending.status === "finalized") throw new Error("finalized deployment manifest is missing");
 
   const rpcUrl = rpc(context);
+  phase("Confirm transactions and Filecoin finality");
   const receipts = await finalizedReceipts(context, paths.broadcast, rpcUrl);
   const manifest: DeploymentManifest = {
     ...pending.result!,
@@ -173,6 +186,7 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
     finalizedAt: pending.finalizedAt ?? new Date().toISOString(),
     transactions: receipts,
   };
+  phase("Check live deployment");
   await verifyLiveDeployment(commandRunner(context), rpcUrl, manifest);
 
   const manifestBytes = json(manifest);
@@ -183,12 +197,15 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
     resultManifestSha256: hashRawBytes(Buffer.from(manifestBytes)),
   };
   writeAtomicFile(paths.pending, json(pending));
+  phase("Publish deployment manifest");
   publish(context, paths, pending.release.buildInfoSha256, manifestBytes);
   finishPending(paths.pending, pending);
+  await verifyPublishedSources(context);
 }
 
 async function upgrade(context: Context, targets: readonly string[]): Promise<void> {
   const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
+  phase("Upgrade preflight");
   await broadcastPreflight(context);
   ensureNoPendingOperation(context);
 
@@ -204,10 +221,12 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
   const forgeIoDirectory = join(context.root, ".deployment", `.typescript-upgrade-${randomUUID()}`);
   try {
     mkdirSync(forgeIoDirectory, { recursive: true });
+    phase("Build contracts");
     const build = await buildContracts(context, workspace);
     if (build.hash === source.release.buildInfoSha256) {
       throw new Error("current build matches the deployed release; nothing to upgrade");
     }
+    phase("Validate storage layouts");
     await validateStorage(context, source, build, workspace);
 
     await ensureCleanReleaseSource(context);
@@ -219,15 +238,17 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
     const output = join(forgeIoDirectory, "upgrade-output.json");
     writeAtomicFile(sourcePath, sourceBytes);
     writeAtomicFile(output, json(pending));
+    retainPendingStart(operationPaths(context, "upgrade"), build.gzip, pending);
 
     let forgeError: unknown;
     try {
+      phase("Broadcast upgrade");
       await runUpgradeScript(context, workspace, sourcePath, output, build, privateKey, targets);
     } catch (error) {
       forgeError = error;
     }
 
-    const recorded = recordUpgrade(context, workspace, output, build, pending, source);
+    const recorded = recordUpgrade(context, workspace, output, build, pending);
     if (forgeError !== undefined) throw forgeError;
     if (!recorded) throw new Error("Forge did not produce complete upgrade evidence");
   } finally {
@@ -241,7 +262,7 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
 async function finalizeUpgrade(context: Context, preflightDone = false): Promise<void> {
   if (!preflightDone) await finalizePreflight(context);
   const paths = operationPaths(context, "upgrade");
-  const pending = readUpgradePending(context, paths);
+  let pending = readUpgradePending(context, paths);
   authenticateEvidence(paths, pending.release.buildInfoSha256, pending.broadcastSha256);
 
   const state = classifyUpgradeCanonicalState(hashFile(paths.latest), pending);
@@ -249,30 +270,98 @@ async function finalizeUpgrade(context: Context, preflightDone = false): Promise
   if (state === "result") {
     finishPending(paths.pending, pending);
     pruneBuildInfo(context, pending.release.buildInfoSha256);
+    await verifyPublishedSources(context);
     return;
   }
   if (pending.status === "finalized") throw new Error("finalized upgrade manifest is missing");
 
   const source = parseDeploymentManifest(readFileSync(paths.latest, "utf8"));
   const rpcUrl = rpc(context);
-  await finalizedReceipts(context, paths.broadcast, rpcUrl);
+  phase("Confirm transactions and Filecoin finality");
+  const receipts = await finalizedReceipts(context, paths.broadcast, rpcUrl);
+  phase("Check live deployment");
   await verifyLiveDeployment(commandRunner(context), rpcUrl, source, pending.operations);
 
-  const manifestBytes = json(renderPrepublicationUpgradedManifest(source, pending));
-  if (hashRawBytes(Buffer.from(manifestBytes)) !== pending.resultManifestSha256) {
-    throw new Error("pending upgrade result hash is invalid");
-  }
+  const finalizedAt = pending.finalizedAt ?? new Date().toISOString();
+  const manifestBytes = json(renderUpgradedManifest(source, pending, receipts, finalizedAt));
+  pending = {
+    ...pending,
+    finalizedAt,
+    resultManifestSha256: hashRawBytes(Buffer.from(manifestBytes)),
+  };
+  writeAtomicFile(paths.pending, json(pending));
+  phase("Publish upgrade manifest");
   publish(context, paths, pending.release.buildInfoSha256, manifestBytes);
   finishPending(paths.pending, pending);
+  await verifyPublishedSources(context);
 }
 
-async function verify(context: Context): Promise<void> {
-  await finalizePreflight(context);
+async function checkLive(context: Context): Promise<void> {
+  await ensureChainId(context);
   const path = canonicalManifestPath(context);
   ensureFile(path, `canonical ${context.network} deployment`);
-  await ensureCleanCanonicalManifest(context);
   const manifest = parseDeploymentManifest(readFileSync(path, "utf8"));
   await verifyLiveDeployment(commandRunner(context), rpc(context), manifest);
+}
+
+async function verifySources(context: Context): Promise<void> {
+  await ensureChainId(context);
+  const config = networkConfigs[context.network];
+  if (!("verifierUrl" in config)) {
+    console.error("DevNet has no Blockscout verifier; skipping source verification");
+    return;
+  }
+  const path = canonicalManifestPath(context);
+  ensureFile(path, `canonical ${context.network} deployment`);
+  const manifest = parseDeploymentManifest(readFileSync(path, "utf8"));
+  phase("Verify contract sources");
+  await verifyContractSources(manifest, {
+    chainId: config.chainId,
+    root: context.root,
+    rpcUrl: rpc(context),
+    verifierUrl: config.verifierUrl,
+    confirmVerified: (target) => target.verifier === "blockscout"
+      ? confirmBlockscoutSource(config.verifierUrl, target)
+      : confirmSourcifySource(config.chainId, target),
+    runForge: async (args) => {
+      await runProcess(context.forge, args, {
+        environment: context.environment,
+        signal: context.signal,
+        terminal: true,
+      });
+    },
+  });
+  printContractAddresses(manifest);
+}
+
+async function verifyPublishedSources(context: Context): Promise<void> {
+  try {
+    await verifySources(context);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `deployment is finalized and published, but source verification failed: ${message}\n` +
+      `Retry with: just verify ${context.network}`,
+      { cause: error },
+    );
+  }
+}
+
+function phase(message: string): void {
+  console.error(`\n== ${message} ==`);
+}
+
+function printContractAddresses(manifest: DeploymentManifest): void {
+  console.error("Deployed contract addresses:");
+  for (const [name, contract] of Object.entries(manifest.contracts)) {
+    if (contract.kind === "uups") {
+      console.error(`  ${name}: proxy ${contract.proxy}, implementation ${contract.implementation}`);
+    } else if (contract.kind === "beacon") {
+      console.error(`  ${name}: ${contract.address}`);
+    } else {
+      console.error(`  ${name}: ${contract.implementation}`);
+    }
+  }
 }
 
 async function runCli(args: readonly string[], signal?: AbortSignal): Promise<void> {
@@ -297,9 +386,13 @@ async function runCli(args: readonly string[], signal?: AbortSignal): Promise<vo
       noArguments(command, rest);
       await finalizeUpgrade(context);
       return;
-    case "verify":
+    case "check-live":
       noArguments(command, rest);
-      await verify(context);
+      await checkLive(context);
+      return;
+    case "verify-sources":
+      noArguments(command, rest);
+      await verifySources(context);
   }
 }
 
@@ -387,9 +480,6 @@ function prepareDeploy(context: Context, fresh: boolean): string | null {
   const paths = operationPaths(context, "deploy");
   if (!existsSync(paths.latest)) return null;
   if (!fresh) throw new Error(`canonical ${context.network} deployment already exists; pass --fresh`);
-  rmSync(paths.pending, { force: true });
-  rmSync(paths.buildInfo, { force: true });
-  rmSync(paths.broadcast, { force: true });
   return hashFile(paths.latest) ?? null;
 }
 
@@ -418,7 +508,7 @@ async function buildContracts(context: Context, workspace: string): Promise<Buil
   await runProcess(
     context.forge,
     ["build", "--root", context.root, "--out", outputDirectory, "--cache-path", cacheDirectory, "--build-info", "--extra-output", "storageLayout"],
-    { signal: context.signal, stream: true },
+    { signal: context.signal, terminal: true },
   );
   const directory = join(outputDirectory, "build-info");
   const files = existsSync(directory) ? readdirSync(directory).filter((name) => name.endsWith(".json")) : [];
@@ -457,6 +547,7 @@ function newPendingUpgrade(context: Context, targets: readonly string[], sourceH
     operations: [],
     sourceManifestSha256: sourceHash,
     resultManifestSha256: null,
+    finalizedAt: null,
     release: { buildInfoSha256: buildHash },
     broadcastSha256: null,
   };
@@ -484,7 +575,7 @@ async function runDeployScript(
     DEPLOYMENT_OUTPUT: output,
     FOUNDRY_BROADCAST: join(workspace, "broadcast"),
   };
-  await runForgeScript(context, "script/Deploy.s.sol:Deploy", workspace, build, privateKey, environment);
+  await runForgeScript(context, "script/Deploy.s.sol:Deploy", build, privateKey, environment);
 }
 
 async function runUpgradeScript(
@@ -505,18 +596,16 @@ async function runUpgradeScript(
     UPGRADE_CONTRACT_NAMES: targets.join(","),
     FOUNDRY_BROADCAST: join(workspace, "broadcast"),
   };
-  await runForgeScript(context, "script/Upgrade.s.sol:Upgrade", workspace, build, privateKey, environment);
+  await runForgeScript(context, "script/Upgrade.s.sol:Upgrade", build, privateKey, environment);
 }
 
 async function runForgeScript(
   context: Context,
   script: string,
-  workspace: string,
   build: Build,
   privateKey: string,
   environment: NodeJS.ProcessEnv,
 ): Promise<void> {
-  void workspace;
   await runProcess(
     context.forge,
     [
@@ -525,7 +614,7 @@ async function runForgeScript(
       "--broadcast", "--rpc-url", rpc(context), "--private-key", privateKey,
       "--gas-estimate-multiplier", "100000", "--slow",
     ],
-    { environment, signal: context.signal, stream: true },
+    { environment, signal: context.signal, terminal: true },
   );
 }
 
@@ -560,20 +649,17 @@ function recordUpgrade(
   output: string,
   build: Build,
   expected: PendingUpgrade,
-  source: DeploymentManifest,
 ): boolean {
   const broadcast = findBroadcast(context, workspace, "Upgrade.s.sol");
   if (!broadcast || !existsSync(output)) return false;
   const operations = parseUpgradeOperations(JSON.stringify((JSON.parse(readFileSync(output, "utf8")) as { operations: unknown }).operations));
   validateOperations(expected.targets, operations);
   const broadcastBytes = readFileSync(broadcast);
-  let pending: PendingUpgrade = {
+  const pending: PendingUpgrade = {
     ...expected,
     operations,
     broadcastSha256: hashRawBytes(broadcastBytes),
   };
-  const resultBytes = json(renderPrepublicationUpgradedManifest(source, pending));
-  pending = { ...pending, resultManifestSha256: hashRawBytes(Buffer.from(resultBytes)) };
   retainPendingEvidence(operationPaths(context, "upgrade"), build.gzip, broadcastBytes, pending);
   return true;
 }
@@ -582,6 +668,12 @@ function retainPendingEvidence(paths: Paths, buildInfo: Buffer, broadcast: Buffe
   mkdirSync(paths.directory, { recursive: true });
   writeAtomicFile(paths.buildInfo, buildInfo);
   writeAtomicFile(paths.broadcast, broadcast);
+  writeAtomicFile(paths.pending, json(pending));
+}
+
+function retainPendingStart(paths: Paths, buildInfo: Buffer, pending: PendingDeploy | PendingUpgrade): void {
+  mkdirSync(paths.directory, { recursive: true });
+  writeAtomicFile(paths.buildInfo, buildInfo);
   writeAtomicFile(paths.pending, json(pending));
 }
 
@@ -596,11 +688,10 @@ function validateTargets(source: DeploymentManifest, targets: readonly string[])
   if (source.status !== "finalized") throw new Error("canonical manifest must be finalized before upgrade");
   if (new Set(targets).size !== targets.length) throw new Error("upgrade targets contain duplicates");
   for (const target of targets) {
-    const artifact = upgradeArtifacts[target];
+    const definition = upgradeTargets[target];
     const contract = source.contracts[target];
-    if (!artifact || !contract) throw new Error(`unsupported upgrade target: ${target}`);
-    const expectedKind = target === "Validator" ? "implementation" : "uups";
-    if (contract.kind !== expectedKind || contract.artifact !== artifact) {
+    if (!definition || !contract) throw new Error(`unsupported upgrade target: ${target}`);
+    if (contract.kind !== definition.manifestKind || contract.artifact !== definition.artifact) {
       throw new Error(`manifest entry for ${target} is not upgradeable by this command`);
     }
   }
@@ -623,15 +714,19 @@ async function validateStorage(context: Context, source: DeploymentManifest, bui
     "--current-sha256", build.hash,
   );
   const validator = context.environment.STORAGE_VALIDATOR ?? join(context.root, "script", "validate-storage-layout.sh");
-  await runProcess(validator, args, { environment: context.environment, signal: context.signal, stream: true });
+  await runProcess(validator, args, { environment: context.environment, signal: context.signal, terminal: true });
 }
 
 function validateOperations(targets: readonly string[], operations: PendingUpgrade["operations"]): void {
   if (operations.length !== targets.length) throw new Error("Forge upgrade operations do not match requested targets");
   operations.forEach((operation, index) => {
     const target = targets[index];
-    const kind = target === "Validator" ? "beacon" : "uups";
-    if (operation.target !== target || operation.kind !== kind || operation.artifact !== upgradeArtifacts[target]) {
+    const definition = upgradeTargets[target]!;
+    if (
+      operation.target !== target ||
+      operation.kind !== definition.operationKind ||
+      operation.artifact !== definition.artifact
+    ) {
       throw new Error(`Forge upgrade operation ${index} does not match ${target}`);
     }
   });
@@ -647,7 +742,7 @@ function readDeployPending(context: Context, paths: Paths): PendingDeploy {
 function readUpgradePending(context: Context, paths: Paths): PendingUpgrade {
   const pending = readPending(paths.pending);
   if (pending.operation !== "upgrade" || pending.network !== context.network) throw new Error("pending upgrade does not match command");
-  if (pending.operations.length === 0 || !pending.broadcastSha256 || !pending.resultManifestSha256) {
+  if (pending.operations.length === 0 || !pending.broadcastSha256) {
     throw new Error("pending upgrade evidence is incomplete");
   }
   return pending;
@@ -686,7 +781,8 @@ function commandRunner(context: Context): CommandRunner {
 function publish(context: Context, paths: Paths, buildHash: string, manifest: string): void {
   const destination = retainedBuildInfoPath(context, buildHash);
   mkdirSync(dirname(destination), { recursive: true });
-  if (!existsSync(destination)) writeAtomicFile(destination, readFileSync(paths.buildInfo));
+  if (existsSync(destination)) authenticateBuildInfo(destination, buildHash);
+  else writeAtomicFile(destination, readFileSync(paths.buildInfo));
   writeAtomicFile(paths.latest, manifest);
   pruneBuildInfo(context, buildHash);
 }
@@ -767,21 +863,20 @@ function json(value: unknown): string {
 export async function runProcess(
   command: string,
   args: readonly string[],
-  options: { environment?: NodeJS.ProcessEnv; signal?: AbortSignal; stream?: boolean } = {},
+  options: { environment?: NodeJS.ProcessEnv; signal?: AbortSignal; terminal?: boolean } = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, { env: options.environment, shell: false, signal: options.signal });
+    const child = spawn(command, args, {
+      env: options.environment,
+      shell: false,
+      signal: options.signal,
+      stdio: options.terminal ? "inherit" : "pipe",
+    });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let processError: Error | undefined;
-    child.stdout.on("data", (chunk: Buffer) => {
-      stdout.push(chunk);
-      if (options.stream) process.stdout.write(chunk);
-    });
-    child.stderr.on("data", (chunk: Buffer) => {
-      stderr.push(chunk);
-      if (options.stream) process.stderr.write(chunk);
-    });
+    child.stdout?.on("data", (chunk: Buffer) => stdout.push(chunk));
+    child.stderr?.on("data", (chunk: Buffer) => stderr.push(chunk));
     child.once("error", (error) => {
       processError = new Error(`could not run ${command}: ${error.message}`, { cause: error });
       if (child.pid === undefined) reject(processError);
