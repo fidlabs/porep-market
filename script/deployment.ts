@@ -100,6 +100,10 @@ type Build = {
   outputDirectory: string;
   cacheDirectory: string;
 };
+type DeployOptions = {
+  fresh: boolean;
+  confirmMainnetReplacement: boolean;
+};
 
 export type SignalHandling = { signal: AbortSignal; dispose: () => void };
 
@@ -120,15 +124,22 @@ const upgradeTargets: Record<string, {
   Validator: { artifact: "src/Validator.sol:Validator", manifestKind: "implementation", operationKind: "beacon" },
 };
 
-async function deploy(context: Context, fresh: boolean): Promise<void> {
-  if (fresh && context.network === "mainnet") throw new Error("fresh mainnet deployment is not supported");
+async function deploy(context: Context, options: DeployOptions): Promise<void> {
+  if (
+    context.network === "mainnet" &&
+    options.fresh &&
+    existsSync(canonicalManifestPath(context)) &&
+    !options.confirmMainnetReplacement
+  ) {
+    throw new Error("pass --confirm-replace-mainnet-manifest to replace the mainnet deployment manifest");
+  }
   const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
   const dependencies = deploymentDependencies(context);
 
   phase("Deployment preflight");
   await broadcastPreflight(context);
   ensureNoPendingOperation(context);
-  const previousHash = prepareDeploy(context, fresh);
+  const previousHash = prepareDeploy(context, options.fresh);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-deploy-ts-"));
   const forgeIoDirectory = join(context.root, ".deployment", `.typescript-deploy-${randomUUID()}`);
@@ -372,7 +383,7 @@ async function runCli(args: readonly string[], signal?: AbortSignal): Promise<vo
 
   switch (command) {
     case "deploy":
-      await deploy(context, parseFresh(rest));
+      await deploy(context, parseDeployOptions(rest));
       return;
     case "finalize-deploy":
       noArguments(command, rest);
@@ -434,9 +445,14 @@ function parseNetwork(value: string | undefined): Network {
   return value as Network;
 }
 
-function parseFresh(args: readonly string[]): boolean {
-  if (args.length === 0) return false;
-  if (args.length === 1 && args[0] === "--fresh") return true;
+function parseDeployOptions(args: readonly string[]): DeployOptions {
+  if (args.length === 0) return { fresh: false, confirmMainnetReplacement: false };
+  if (args.length === 1 && args[0] === "--fresh") {
+    return { fresh: true, confirmMainnetReplacement: false };
+  }
+  if (args.length === 2 && args[0] === "--fresh" && args[1] === "--confirm-replace-mainnet-manifest") {
+    return { fresh: true, confirmMainnetReplacement: true };
+  }
   throw new Error(`unsupported deploy arguments: ${args.join(" ")}`);
 }
 

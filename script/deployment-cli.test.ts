@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { chmodSync, fstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { chmodSync, existsSync, fstatSync, mkdtempSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
@@ -114,6 +114,59 @@ test("checks chain ID and mainnet confirmation before operating", () => {
       DEPLOYMENTS_ROOT: join(directory, "deployments"),
     });
     assert.match(result.stderr, /set CONFIRM_MAINNET=yes/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("requires explicit confirmation before replacing the mainnet manifest", () => {
+  const directory = temporaryDirectory();
+  try {
+    const cast = executable(directory, "cast", "process.stdout.write('314')");
+    const git = executable(directory, "git", "");
+    const marker = join(directory, "forge-ran");
+    const forge = executable(directory, "forge", `
+      const fs = require('node:fs');
+      const path = require('node:path');
+      const args = process.argv.slice(2);
+      if (args[0] === 'build') {
+        const output = args[args.indexOf('--out') + 1];
+        fs.mkdirSync(path.join(output, 'build-info'), { recursive: true });
+        fs.writeFileSync(path.join(output, 'build-info', 'build.json'), '{}');
+      } else {
+        fs.writeFileSync(${JSON.stringify(marker)}, '');
+        process.exitCode = 99;
+      }
+    `);
+    const deploymentsRoot = join(directory, "deployments");
+    const deploymentDirectory = join(deploymentsRoot, "mainnet");
+    mkdirSync(deploymentDirectory, { recursive: true });
+    writeFileSync(join(deploymentDirectory, "latest.json"), "{}\n");
+    const env: NodeJS.ProcessEnv = {
+      CAST_BIN: cast,
+      GIT_BIN: git,
+      FORGE_BIN: forge,
+      RPC_MAINNET: "http://mainnet.example",
+      PRIVATE_KEY_MAINNET: "mainnet-key",
+      FILECOIN_PAY_MAINNET: `0x${"1".repeat(40)}`,
+      TERMINATION_ORACLE_MAINNET: `0x${"2".repeat(40)}`,
+      ORACLE_MAINNET: `0x${"3".repeat(40)}`,
+      POREP_SERVICE_MAINNET: `0x${"4".repeat(40)}`,
+      META_ALLOCATOR_MAINNET: `0x${"5".repeat(40)}`,
+      OPERATOR_ADDR_MAINNET: `0x${"6".repeat(40)}`,
+      CONFIRM_MAINNET: "yes",
+      DEPLOYMENTS_ROOT: deploymentsRoot,
+      PENDING_ROOT_TS: join(directory, "pending-ts"),
+      PENDING_ROOT: join(directory, "pending-bash"),
+    };
+
+    let result = run(["deploy", "mainnet", "--fresh"], env);
+    assert.match(result.stderr, /pass --confirm-replace-mainnet-manifest/);
+    assert.equal(existsSync(marker), false);
+
+    result = run(["deploy", "mainnet", "--fresh", "--confirm-replace-mainnet-manifest"], env);
+    assert.doesNotMatch(result.stderr, /pass --confirm-replace-mainnet-manifest/);
+    assert.equal(existsSync(marker), true);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
