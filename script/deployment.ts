@@ -418,7 +418,7 @@ async function buildContracts(context: Context, workspace: string): Promise<Buil
   await runProcess(
     context.forge,
     ["build", "--root", context.root, "--out", outputDirectory, "--cache-path", cacheDirectory, "--build-info", "--extra-output", "storageLayout"],
-    { signal: context.signal },
+    { signal: context.signal, stream: true },
   );
   const directory = join(outputDirectory, "build-info");
   const files = existsSync(directory) ? readdirSync(directory).filter((name) => name.endsWith(".json")) : [];
@@ -525,7 +525,7 @@ async function runForgeScript(
       "--broadcast", "--rpc-url", rpc(context), "--private-key", privateKey,
       "--gas-estimate-multiplier", "100000", "--slow",
     ],
-    { environment, signal: context.signal },
+    { environment, signal: context.signal, stream: true },
   );
 }
 
@@ -623,7 +623,7 @@ async function validateStorage(context: Context, source: DeploymentManifest, bui
     "--current-sha256", build.hash,
   );
   const validator = context.environment.STORAGE_VALIDATOR ?? join(context.root, "script", "validate-storage-layout.sh");
-  await runProcess(validator, args, { environment: context.environment, signal: context.signal });
+  await runProcess(validator, args, { environment: context.environment, signal: context.signal, stream: true });
 }
 
 function validateOperations(targets: readonly string[], operations: PendingUpgrade["operations"]): void {
@@ -767,15 +767,21 @@ function json(value: unknown): string {
 export async function runProcess(
   command: string,
   args: readonly string[],
-  options: { environment?: NodeJS.ProcessEnv; signal?: AbortSignal } = {},
+  options: { environment?: NodeJS.ProcessEnv; signal?: AbortSignal; stream?: boolean } = {},
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, { env: options.environment, shell: false, signal: options.signal });
     const stdout: Buffer[] = [];
     const stderr: Buffer[] = [];
     let processError: Error | undefined;
-    child.stdout.on("data", (chunk: Buffer) => stdout.push(chunk));
-    child.stderr.on("data", (chunk: Buffer) => stderr.push(chunk));
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdout.push(chunk);
+      if (options.stream) process.stdout.write(chunk);
+    });
+    child.stderr.on("data", (chunk: Buffer) => {
+      stderr.push(chunk);
+      if (options.stream) process.stderr.write(chunk);
+    });
     child.once("error", (error) => {
       processError = new Error(`could not run ${command}: ${error.message}`, { cause: error });
       if (child.pid === undefined) reject(processError);
