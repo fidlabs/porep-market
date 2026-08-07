@@ -2,7 +2,7 @@
   "status": "finalized",
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",
   "release": {
-    "buildInfoSha256": "0x5699f19f21c71c0d0ee5c58e52ef7fef9a60922765a60ab40ca4592387acb2d4"
+    "buildInfoSha256": "0x0314b25a424a6ce18e519d3fb4ec84195913deeda99883ddc6c8655543fc613f"
   },
   "contracts": {
     "DataCapEvidenceAdapter": {
@@ -71,6 +71,18 @@
       "implementation": "0x2b8BdD8836e29da56EDF62a8cc492CC10c212618",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
       "implementationCodeHash": "0x3b8978e947d3a0d6b5d72ef89087033f4e813964ec93b1999aca7105b3f094d9"
+    },
+    "PoRepMarketSectorStatusInspector": {
+      "kind": "standalone",
+      "artifact": "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
+      "implementation": "0xC37B59dF11C1EbdEFEb73BA5Fcc821ccf5dD75A2",
+      "implementationCodeHash": "0x33fdacf4593fe850e20c0abb2b052f0e770d14704467c00ffc6a830566b0def8"
+    },
+    "PoRepMarketViewHelper": {
+      "kind": "standalone",
+      "artifact": "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
+      "implementation": "0x7cB6c25b78e20D790934C3308A2B7c75dB9fe374",
+      "implementationCodeHash": "0x3b63af47ca2356c05d5c7f452887929d71ab21563737ec57ab751589543bb94d"
     }
   },
   "externalDependencies": {
@@ -81,7 +93,6 @@
     "PoRepService": "0x70dA3d219CD3A55f09629c05d283E4457E5E7aeC",
     "TerminationOracle": "0x12E87EBc615a360BE31E27abE4aCC9caf6Ce894F"
   },
-  "finalizedAt": "2026-08-06T08:34:01.131Z",
   "transactions": [
     {
       "hash": "0x5a835582edfe6dcda4c71cbed158d04e2ab1677650911a6f5f051b17130c35ec",
@@ -215,6 +226,21 @@
       "blockNumber": 6256604,
       "blockHash": "0x62c35e8d49b586775b8ee68054f6a524f266803e69be441e9e812ba1e03d2132",
       "contractAddress": null
+    },
+    {
+      "hash": "0xde99b0006b8bdd0018ee1ff54d9e75063756ce068315084db113c28599ba00d0",
+      "status": 1,
+      "blockNumber": 6259672,
+      "blockHash": "0x187bf679d631d4ad66798ecb6f0dee61bd35fcc2798c9d68caaf685668451a79",
+      "contractAddress": "0xc37b59df11c1ebdefeb73ba5fcc821ccf5dd75a2"
+    },
+    {
+      "hash": "0x199034f2d845b1f104bc3d783c0031cf065d8e1de1b3530aa58e0247fbcef7d0",
+      "status": 1,
+      "blockNumber": 6259674,
+      "blockHash": "0x33e1ae766563aed1e3330c87313a6c1ebd1ea54b3c13fd6a24f7476788a9b9aa",
+      "contractAddress": "0x7cb6c25b78e20d790934c3308a2b7c75db9fe374"
     }
-  ]
+  ],
+  "finalizedAt": "2026-08-07T10:12:50.879Z"
 }
