@@ -186,6 +186,8 @@ function completeManifest(): DeploymentManifest {
     Validator: { kind: "implementation", artifact: "src/Validator.sol:Validator", implementation: a8, implementationCodeHash: codeHash },
     ValidatorBeacon: { kind: "beacon", artifact: "UpgradeableBeacon", address: a9, implementation: a8, factoryProxy: a3 },
     PoRepMarketClaimInspector: { kind: "standalone", artifact: "ClaimInspector", implementation: a7, implementationCodeHash: codeHash },
+    PoRepMarketSectorStatusInspector: { kind: "standalone", artifact: "SectorStatusInspector", implementation: a5, implementationCodeHash: codeHash },
+    PoRepMarketViewHelper: { kind: "standalone", artifact: "ViewHelper", implementation: a6, implementationCodeHash: codeHash },
   });
 }
 

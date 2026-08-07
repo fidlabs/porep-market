@@ -53,6 +53,9 @@ deploy network *args:
 finalize-deploy network:
     node script/deployment.ts finalize-deploy {{ network }}
 
+deploy-missing network:
+    node script/deployment.ts deploy-missing {{ network }}
+
 upgrade network target *targets:
     node script/deployment.ts upgrade {{ network }} {{ target }} {{ targets }}
 

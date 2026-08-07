@@ -38,7 +38,7 @@ import {
 } from "./deployment-chain.ts";
 import { confirmBlockscoutSource, confirmSourcifySource, verifyContractSources } from "./deployment-sources.ts";
 
-const commands = ["deploy", "finalize-deploy", "upgrade", "finalize-upgrade", "check-live", "verify-sources"] as const;
+const commands = ["deploy", "finalize-deploy", "deploy-missing", "upgrade", "finalize-upgrade", "check-live", "verify-sources"] as const;
 const releasePaths = [
   "src",
   "script",
@@ -123,7 +123,11 @@ const upgradeTargets: Record<string, {
   SLIScorer: { artifact: "src/SLIScorer.sol:SLIScorer", manifestKind: "uups", operationKind: "uups" },
   Validator: { artifact: "src/Validator.sol:Validator", manifestKind: "implementation", operationKind: "beacon" },
 };
-
+const missingHelperArtifacts = {
+  PoRepMarketSectorStatusInspector:
+    "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
+  PoRepMarketViewHelper: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
+} as const;
 async function deploy(context: Context, options: DeployOptions): Promise<void> {
   if (
     context.network === "mainnet" &&
@@ -212,6 +216,61 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
   publish(context, paths, pending.release.buildInfoSha256, manifestBytes);
   finishPending(paths.pending, pending);
   await verifyPublishedSources(context);
+}
+
+async function deployMissing(context: Context): Promise<void> {
+  const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
+  phase("Missing-contract deployment preflight");
+  await broadcastPreflight(context);
+  ensureNoPendingOperation(context);
+
+  const paths = operationPaths(context, "deploy");
+  ensureFile(paths.latest, `canonical ${context.network} deployment`);
+  await ensureCleanCanonicalManifest(context);
+  const sourceBytes = readFileSync(paths.latest);
+  const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
+  ensureHelpersAreMissing(source);
+  const sourceHash = hashRawBytes(sourceBytes);
+
+  const workspace = mkdtempSync(join(tmpdir(), "porep-deploy-missing-ts-"));
+  const forgeIoDirectory = join(context.root, ".deployment", `.typescript-deploy-missing-${randomUUID()}`);
+  try {
+    mkdirSync(forgeIoDirectory, { recursive: true });
+    phase("Build contracts");
+    const build = await buildContracts(context, workspace);
+
+    phase("Validate storage layouts");
+    await validateStorage(context, source, build, workspace);
+    await ensureCleanReleaseSource(context);
+    if (hashFile(paths.latest) !== sourceHash) {
+      throw new Error("canonical manifest changed during missing-contract preflight");
+    }
+    ensureNoPendingOperation(context);
+
+    const pending = newPendingDeploy(context, sourceHash, build.hash);
+    const sourcePath = join(forgeIoDirectory, "source.json");
+    const output = join(forgeIoDirectory, "deploy-missing-output.json");
+    writeAtomicFile(sourcePath, sourceBytes);
+    writeAtomicFile(output, sourceBytes);
+    retainPendingStart(paths, build.gzip, pending);
+
+    let forgeError: unknown;
+    try {
+      phase("Broadcast missing contracts");
+      await runDeployMissingScript(context, workspace, sourcePath, output, build, privateKey);
+    } catch (error) {
+      forgeError = error;
+    }
+
+    const recorded = recordDeployMissing(context, workspace, output, build, pending, source);
+    if (forgeError !== undefined) throw forgeError;
+    if (!recorded) throw new Error("Forge did not produce complete missing-contract deployment evidence");
+  } finally {
+    rmSync(workspace, { recursive: true, force: true });
+    rmSync(forgeIoDirectory, { recursive: true, force: true });
+  }
+
+  await finalizeDeploy(context, true);
 }
 
 async function upgrade(context: Context, targets: readonly string[]): Promise<void> {
@@ -388,6 +447,10 @@ async function runCli(args: readonly string[], signal?: AbortSignal): Promise<vo
     case "finalize-deploy":
       noArguments(command, rest);
       await finalizeDeploy(context);
+      return;
+    case "deploy-missing":
+      noArguments(command, rest);
+      await deployMissing(context);
       return;
     case "upgrade":
       if (rest.length === 0) throw new Error("upgrade requires at least one target");
@@ -615,6 +678,24 @@ async function runUpgradeScript(
   await runForgeScript(context, "script/Upgrade.s.sol:Upgrade", build, privateKey, environment);
 }
 
+async function runDeployMissingScript(
+  context: Context,
+  workspace: string,
+  source: string,
+  output: string,
+  build: Build,
+  privateKey: string,
+): Promise<void> {
+  await runForgeScript(context, "script/DeployMissing.s.sol:DeployMissing", build, privateKey, {
+    ...context.environment,
+    PRIVATE_KEY: privateKey,
+    RPC_URL: rpc(context),
+    DEPLOYMENT_MANIFEST: source,
+    DEPLOYMENT_OUTPUT: output,
+    FOUNDRY_BROADCAST: join(workspace, "broadcast"),
+  });
+}
+
 async function runForgeScript(
   context: Context,
   script: string,
@@ -657,6 +738,62 @@ function recordDeploy(
   const pending: PendingDeploy = { ...expected, result: parsed.result, broadcastSha256: hashRawBytes(broadcastBytes) };
   retainPendingEvidence(paths, build.gzip, broadcastBytes, pending);
   return true;
+}
+
+function recordDeployMissing(
+  context: Context,
+  workspace: string,
+  output: string,
+  build: Build,
+  expected: PendingDeploy,
+  source: DeploymentManifest,
+): boolean {
+  const broadcast = findBroadcast(context, workspace, "DeployMissing.s.sol");
+  if (!broadcast || !existsSync(output)) return false;
+
+  const deployed = parseDeploymentManifest(readFileSync(output, "utf8"));
+  const result = mergeMissingHelpers(source, deployed, build.hash);
+  const broadcastBytes = readFileSync(broadcast);
+  const pending: PendingDeploy = {
+    ...expected,
+    result,
+    broadcastSha256: hashRawBytes(broadcastBytes),
+  };
+  retainPendingEvidence(operationPaths(context, "deploy"), build.gzip, broadcastBytes, pending);
+  return true;
+}
+
+export function mergeMissingHelpers(
+  source: DeploymentManifest,
+  deployed: DeploymentManifest,
+  buildHash: string,
+): DeploymentManifest {
+  ensureHelpersAreMissing(source);
+  const contracts = structuredClone(source.contracts);
+
+  for (const [name, artifact] of Object.entries(missingHelperArtifacts)) {
+    const contract = deployed.contracts[name];
+    if (contract?.kind !== "standalone" || contract.artifact !== artifact) {
+      throw new Error(`Forge output for ${name} is invalid`);
+    }
+    contracts[name] = structuredClone(contract);
+  }
+
+  return {
+    status: "pending",
+    deployer: source.deployer,
+    release: { buildInfoSha256: buildHash },
+    contracts,
+    externalDependencies: structuredClone(source.externalDependencies),
+  };
+}
+
+function ensureHelpersAreMissing(manifest: DeploymentManifest): void {
+  for (const name of Object.keys(missingHelperArtifacts)) {
+    if (manifest.contracts[name] !== undefined) {
+      throw new Error(`${name} already exists in the canonical deployment manifest`);
+    }
+  }
 }
 
 function recordUpgrade(

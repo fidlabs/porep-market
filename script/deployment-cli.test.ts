@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { installSignalHandling, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
+import { installSignalHandling, mergeMissingHelpers, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
 import { parseDeploymentManifest } from "./deployment-state.ts";
 import { confirmBlockscoutSource, verifyContractSources } from "./deployment-sources.ts";
 
@@ -47,8 +47,9 @@ test("rejects invalid command lines", () => {
   assert.match(run(["remove", "devnet"]).stderr, /unsupported command/);
   assert.match(run(["deploy", "localnet"]).stderr, /unsupported network/);
   assert.match(run(["deploy", "devnet", "bad"]).stderr, /unsupported deploy arguments/);
+  assert.match(run(["deploy-missing", "devnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["upgrade", "devnet"]).stderr, /requires at least one target/);
-    assert.match(run(["check-live", "devnet", "bad"]).stderr, /does not accept arguments/);
+  assert.match(run(["check-live", "devnet", "bad"]).stderr, /does not accept arguments/);
 });
 
 test("maps the three Filecoin networks explicitly", () => {
@@ -56,6 +57,32 @@ test("maps the three Filecoin networks explicitly", () => {
   assert.equal(networkConfigs.calibnet.chainId, 314159);
   assert.equal(networkConfigs.mainnet.chainId, 314);
   assert.equal(networkConfigs.mainnet.rpcVariable, "RPC_MAINNET");
+});
+
+test("adds the two missing release helpers without replacing existing contracts", () => {
+  const source = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
+  delete source.contracts.PoRepMarketSectorStatusInspector;
+  delete source.contracts.PoRepMarketViewHelper;
+  const deployed = structuredClone(source);
+  deployed.contracts.PoRepMarketSectorStatusInspector = {
+    kind: "standalone",
+    artifact: "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
+    implementation: `0x${"a".repeat(40)}`,
+    implementationCodeHash: `0x${"b".repeat(64)}`,
+  };
+  deployed.contracts.PoRepMarketViewHelper = {
+    kind: "standalone",
+    artifact: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
+    implementation: `0x${"c".repeat(40)}`,
+    implementationCodeHash: `0x${"d".repeat(64)}`,
+  };
+
+  const result = mergeMissingHelpers(source, deployed, `0x${"e".repeat(64)}`);
+
+  assert.equal(source.contracts.PoRepMarketViewHelper, undefined);
+  assert.deepEqual(result.contracts.PoRepMarketViewHelper, deployed.contracts.PoRepMarketViewHelper);
+  assert.deepEqual(result.contracts.PoRepMarketSectorStatusInspector, deployed.contracts.PoRepMarketSectorStatusInspector);
+  assert.throws(() => mergeMissingHelpers(result, deployed, result.release.buildInfoSha256), /already exists/);
 });
 
 test("runs subprocesses without shell interpolation and reports failures", async () => {
@@ -212,7 +239,7 @@ test("verifies every deployed Calibnet address idempotently", async () => {
 
   assert.equal(calls.length, 15);
   assert.equal(confirmed.length, 15);
-  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 6);
+  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 7);
   assert.equal(calls.filter((args) => args.includes("--constructor-args")).length, 0);
   assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 14);
   assert.equal(calls.filter((args) => args.includes("blockscout")).length, 14);

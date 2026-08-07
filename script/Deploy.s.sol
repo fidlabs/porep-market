@@ -12,6 +12,8 @@ import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {PoRepMarketClaimInspector} from "../src/helpers/PoRepMarketClaimInspector.sol";
+import {PoRepMarketSectorStatusInspector} from "../src/helpers/PoRepMarketSectorStatusInspector.sol";
+import {PoRepMarketViewHelper} from "../src/helpers/PoRepMarketViewHelper.sol";
 import {console} from "forge-std/console.sol";
 
 contract Deploy is DeployUtils {
@@ -23,6 +25,8 @@ contract Deploy is DeployUtils {
     address internal sliOracle;
     address internal sliScorer;
     address internal claimInspector;
+    address internal sectorStatusInspector;
+    address internal viewHelper;
 
     address internal poRepMarketImpl;
     address internal validatorFactoryImpl;
@@ -65,6 +69,8 @@ contract Deploy is DeployUtils {
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
         claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
+        sectorStatusInspector = address(new PoRepMarketSectorStatusInspector(poRepMarket));
+        viewHelper = address(new PoRepMarketViewHelper(poRepMarket));
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
@@ -189,7 +195,9 @@ contract Deploy is DeployUtils {
         );
         json.serialize("Validator", _serializeValidator());
         json.serialize("ValidatorBeacon", _serializeValidatorBeacon());
-        return json.serialize("PoRepMarketClaimInspector", _serializeClaimInspector());
+        json.serialize("PoRepMarketClaimInspector", _serializeClaimInspector());
+        json.serialize("PoRepMarketSectorStatusInspector", _serializeSectorStatusInspector());
+        return json.serialize("PoRepMarketViewHelper", _serializeViewHelper());
     }
 
     function _serializeUupsContract(
@@ -220,6 +228,24 @@ contract Deploy is DeployUtils {
         json.serialize("artifact", string("src/helpers/PoRepMarketClaimInspector.sol:PoRepMarketClaimInspector"));
         json.serialize("implementation", claimInspector);
         return json.serialize("implementationCodeHash", claimInspector.codehash);
+    }
+
+    function _serializeViewHelper() private returns (string memory) {
+        string memory json = "pendingViewHelper";
+        json.serialize("kind", string("standalone"));
+        json.serialize("artifact", string("src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper"));
+        json.serialize("implementation", viewHelper);
+        return json.serialize("implementationCodeHash", viewHelper.codehash);
+    }
+
+    function _serializeSectorStatusInspector() private returns (string memory) {
+        string memory json = "pendingSectorStatusInspector";
+        json.serialize("kind", string("standalone"));
+        json.serialize(
+            "artifact", string("src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector")
+        );
+        json.serialize("implementation", sectorStatusInspector);
+        return json.serialize("implementationCodeHash", sectorStatusInspector.codehash);
     }
 
     function _serializeValidatorBeacon() private returns (string memory) {
