@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { installSignalHandling, mergeMissingHelpers, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
+import { installSignalHandling, mergeMissingHelpers, mergeTransactions, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
 import { parseDeploymentManifest } from "./deployment-state.ts";
 import { confirmBlockscoutSource, verifyContractSources } from "./deployment-sources.ts";
 
@@ -82,7 +82,22 @@ test("adds the two missing release helpers without replacing existing contracts"
   assert.equal(source.contracts.PoRepMarketViewHelper, undefined);
   assert.deepEqual(result.contracts.PoRepMarketViewHelper, deployed.contracts.PoRepMarketViewHelper);
   assert.deepEqual(result.contracts.PoRepMarketSectorStatusInspector, deployed.contracts.PoRepMarketSectorStatusInspector);
+  assert.deepEqual(result.transactions, source.transactions);
   assert.throws(() => mergeMissingHelpers(result, deployed, result.release.buildInfoSha256), /already exists/);
+});
+
+test("appends new receipts to the receipts already recorded for the deployment", () => {
+  const prior = [
+    { hash: `0x${"1".repeat(64)}`, status: 1, blockNumber: 1, blockHash: `0x${"2".repeat(64)}`, contractAddress: `0x${"3".repeat(40)}` },
+    { hash: `0x${"4".repeat(64)}`, status: 1, blockNumber: 2, blockHash: `0x${"5".repeat(64)}`, contractAddress: `0x${"6".repeat(40)}` },
+  ];
+  const receipts = [
+    { hash: `0x${"7".repeat(64)}`, status: 1, blockNumber: 3, blockHash: `0x${"8".repeat(64)}`, contractAddress: `0x${"9".repeat(40)}` },
+  ];
+
+  assert.deepEqual(mergeTransactions(prior, receipts), [...prior, ...receipts]);
+  assert.deepEqual(mergeTransactions(undefined, receipts), receipts);
+  assert.deepEqual(mergeTransactions([...prior, ...receipts], receipts), [...prior, ...receipts]);
 });
 
 test("runs subprocesses without shell interpolation and reports failures", async () => {
@@ -237,12 +252,12 @@ test("verifies every deployed Calibnet address idempotently", async () => {
     progress: () => {},
   });
 
-  assert.equal(calls.length, 15);
-  assert.equal(confirmed.length, 15);
-  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 7);
+  assert.equal(calls.length, 17);
+  assert.equal(confirmed.length, 17);
+  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 9);
   assert.equal(calls.filter((args) => args.includes("--constructor-args")).length, 0);
-  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 14);
-  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 14);
+  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 16);
+  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 16);
   assert.equal(calls.filter((args) => args.includes("sourcify")).length, 1);
   assert.ok(calls.every((args) => args.includes("--verifier") && args.includes("--watch")));
 });

@@ -26,6 +26,7 @@ import {
   parseUpgradeOperations,
   renderUpgradedManifest,
   type DeploymentManifest,
+  type DeploymentTransaction,
   type PendingDeploy,
   type PendingUpgrade,
 } from "./deployment-state.ts";
@@ -199,7 +200,7 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
     ...pending.result!,
     status: "finalized",
     finalizedAt: pending.finalizedAt ?? new Date().toISOString(),
-    transactions: receipts,
+    transactions: mergeTransactions(pending.result!.transactions, receipts),
   };
   phase("Check live deployment");
   await verifyLiveDeployment(commandRunner(context), rpcUrl, manifest);
@@ -785,7 +786,18 @@ export function mergeMissingHelpers(
     release: { buildInfoSha256: buildHash },
     contracts,
     externalDependencies: structuredClone(source.externalDependencies),
+    ...(source.transactions === undefined ? {} : { transactions: structuredClone(source.transactions) }),
   };
+}
+
+// Deduplicated because a finalize retry that got past the journal write but not the
+// publish re-appends the same broadcast receipts.
+export function mergeTransactions(
+  prior: readonly DeploymentTransaction[] | undefined,
+  receipts: readonly DeploymentTransaction[],
+): DeploymentTransaction[] {
+  const hashes = new Set(receipts.map((receipt) => receipt.hash));
+  return [...(prior ?? []).filter((transaction) => !hashes.has(transaction.hash)), ...receipts];
 }
 
 function ensureHelpersAreMissing(manifest: DeploymentManifest): void {
