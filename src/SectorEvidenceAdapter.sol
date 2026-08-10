@@ -45,11 +45,12 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         int64 minimumCommitmentEpoch;
     }
 
-    // solhint-disable-next-line gas-struct-packing
+    /**
+     * @dev Provider and size are retained so activation and refresh reject stale receipts if a future market upgrade
+     *      makes either deal field mutable. The remaining fields preserve authenticated placement history for upgrades.
+     */
     struct PlacementReceipt {
-        uint256 dealId;
         bytes32 pieceCidDigest;
-        bytes32 pieceSetCommitment;
         uint64 providerActorId;
         uint64 paddedSize;
         uint64 sectorNumber;
@@ -59,13 +60,18 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         bool activated;
     }
 
+    struct RefreshState {
+        CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
+        CommonTypes.ChainEpoch expiration;
+        uint8 result;
+    }
+
     // @custom:storage-location erc7201:porepmarket.storage.SectorEvidenceAdapterStorage
     struct SectorEvidenceAdapterStorage {
         IPoRepMarket _poRepMarket;
         mapping(uint256 dealId => PlacementReceipt receipt) _receipts;
         mapping(bytes32 placementKey => uint256 dealId) _placementDeals;
-        mapping(uint256 dealId => SharedTypes.EvidenceStatus status) _evidenceStatuses;
-        mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _expirations;
+        mapping(uint256 dealId => RefreshState state) _refreshStates;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SectorEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -332,7 +338,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     {
         PlacementReceipt storage receipt = s()._receipts[context.dealId];
         if (
-            !receipt.accepted || receipt.activated || receipt.dealId != context.dealId
+            !receipt.accepted || receipt.activated
                 || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
                 || receipt.paddedSize != context.requestedSizeBytes
         ) {
@@ -357,7 +363,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
 
         SectorEvidenceAdapterStorage storage $ = s();
         PlacementReceipt memory receipt = $._receipts[context.dealId];
-        bool receiptMatches = receipt.accepted && receipt.activated && receipt.dealId == context.dealId
+        bool receiptMatches = receipt.accepted && receipt.activated
             && receipt.providerActorId == CommonTypes.FilActorId.unwrap(context.provider)
             && receipt.paddedSize == context.requestedSizeBytes;
         bool active;
@@ -373,18 +379,16 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         }
 
         CommonTypes.ChainEpoch refreshEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
-        status = SharedTypes.EvidenceStatus({
-            activeCoveredBytes: active ? receipt.paddedSize : 0,
-            lastEvidenceRefreshEpoch: refreshEpoch,
-            reasonCode: 0,
-            result: active ? EvidenceResult.ACTIVE : EvidenceResult.INACTIVE,
-            checkedClaims: 1,
-            totalClaims: 1
-        });
-        $._evidenceStatuses[context.dealId] = status;
         // The bound above makes the Filecoin ChainEpoch conversion safe.
         // forge-lint: disable-next-line(unsafe-typecast)
-        $._expirations[context.dealId] = CommonTypes.ChainEpoch.wrap(active ? int64(expiration) : int64(0));
+        CommonTypes.ChainEpoch storedExpiration = CommonTypes.ChainEpoch.wrap(active ? int64(expiration) : int64(0));
+        RefreshState memory refreshState = RefreshState({
+            lastEvidenceRefreshEpoch: refreshEpoch,
+            expiration: storedExpiration,
+            result: active ? EvidenceResult.ACTIVE : EvidenceResult.INACTIVE
+        });
+        $._refreshStates[context.dealId] = refreshState;
+        return _evidenceStatus(refreshState, receipt.paddedSize);
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -394,13 +398,15 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        status = s()._evidenceStatuses[context.dealId];
-        if (status.result == EvidenceResult.NONE) return _inactiveStatus();
+        SectorEvidenceAdapterStorage storage $ = s();
+        RefreshState memory refreshState = $._refreshStates[context.dealId];
+        if (refreshState.result == EvidenceResult.NONE) return _inactiveStatus();
+        return _evidenceStatus(refreshState, $._receipts[context.dealId].paddedSize);
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
     function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration) {
-        return s()._expirations[dealId];
+        return s()._refreshStates[dealId].expiration;
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -485,12 +491,10 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         PlacementReceipt storage existing = s()._receipts[dealId];
         bytes32 pieceSetCommitment = keccak256(abi.encode(placement.pieceDigest, placement.paddedSize));
         if (existing.accepted) {
+            // Re-Snap support must replace this conflict rule with an authenticated receipt update policy.
             if (
-                existing.providerActorId != placement.providerActorId
-                    || existing.pieceCidDigest != placement.pieceDigest || existing.paddedSize != placement.paddedSize
-                    || existing.sectorNumber != placement.sectorNumber
+                existing.sectorNumber != placement.sectorNumber
                     || existing.minimumCommitmentEpoch != placement.minimumCommitmentEpoch
-                    || existing.pieceSetCommitment != pieceSetCommitment
             ) {
                 revert ConflictingPlacement(dealId);
             }
@@ -505,13 +509,11 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
 
         CommonTypes.ChainEpoch receiptEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
         s()._receipts[dealId] = PlacementReceipt({
-            dealId: dealId,
             providerActorId: placement.providerActorId,
             pieceCidDigest: placement.pieceDigest,
             paddedSize: placement.paddedSize,
             sectorNumber: placement.sectorNumber,
             minimumCommitmentEpoch: placement.minimumCommitmentEpoch,
-            pieceSetCommitment: pieceSetCommitment,
             receiptEpoch: receiptEpoch,
             accepted: true,
             activated: false
@@ -528,6 +530,22 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             pieceSetCommitment,
             receiptEpoch
         );
+    }
+
+    function _evidenceStatus(RefreshState memory refreshState, uint64 paddedSize)
+        private
+        pure
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
+        bool active = refreshState.result == EvidenceResult.ACTIVE;
+        return SharedTypes.EvidenceStatus({
+            activeCoveredBytes: active ? paddedSize : 0,
+            lastEvidenceRefreshEpoch: refreshState.lastEvidenceRefreshEpoch,
+            reasonCode: 0,
+            result: refreshState.result,
+            checkedClaims: 1,
+            totalClaims: 1
+        });
     }
 
     function _rejectedActivation() private pure returns (SharedTypes.ActivationDecision memory decision) {
