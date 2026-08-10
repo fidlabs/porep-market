@@ -8,4 +8,5 @@ pragma solidity =0.8.30;
 library EvidenceTypes {
     uint8 internal constant NONE = 0;
     uint8 internal constant VERIF_REG_CLAIMS = 10;
+    uint8 internal constant SECTOR_PLACEMENT = 20;
 }
