@@ -274,17 +274,7 @@
         "internalType": "struct SectorEvidenceAdapter.PlacementReceipt",
         "components": [
           {
-            "name": "dealId",
-            "type": "uint256",
-            "internalType": "uint256"
-          },
-          {
             "name": "pieceCidDigest",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "pieceSetCommitment",
             "type": "bytes32",
             "internalType": "bytes32"
           },

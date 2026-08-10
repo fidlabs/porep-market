@@ -184,13 +184,25 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
     function testUpgradePreservesPlacementReceipt() public {
         _notify(DEAL_ID, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        SectorEvidenceAdapter.PlacementReceipt memory beforeReceipt = adapter.getReceipt(DEAL_ID);
 
         SectorEvidenceAdapterV2 nextImplementation = new SectorEvidenceAdapterV2();
         adapter.upgradeToAndCall(address(nextImplementation), "");
         SectorEvidenceAdapterV2 upgraded = SectorEvidenceAdapterV2(address(adapter));
+        SectorEvidenceAdapter.PlacementReceipt memory afterReceipt = upgraded.getReceipt(DEAL_ID);
 
         assertEq(upgraded.version(), 2);
-        assertTrue(upgraded.getReceipt(DEAL_ID).accepted);
+        assertEq(afterReceipt.pieceCidDigest, beforeReceipt.pieceCidDigest);
+        assertEq(afterReceipt.providerActorId, beforeReceipt.providerActorId);
+        assertEq(afterReceipt.paddedSize, beforeReceipt.paddedSize);
+        assertEq(afterReceipt.sectorNumber, beforeReceipt.sectorNumber);
+        assertEq(afterReceipt.minimumCommitmentEpoch, beforeReceipt.minimumCommitmentEpoch);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(afterReceipt.receiptEpoch),
+            CommonTypes.ChainEpoch.unwrap(beforeReceipt.receiptEpoch)
+        );
+        assertTrue(afterReceipt.accepted);
+        assertFalse(afterReceipt.activated);
         assertEq(address(upgraded.POREP_MARKET()), address(market));
     }
 
@@ -315,7 +327,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
             CommonTypes.ChainEpoch.unwrap(afterReceipt.receiptEpoch),
             CommonTypes.ChainEpoch.unwrap(beforeReceipt.receiptEpoch)
         );
-        assertEq(afterReceipt.pieceSetCommitment, beforeReceipt.pieceSetCommitment);
         assertFalse(afterReceipt.activated);
     }
 
@@ -361,6 +372,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(first.result, EvidenceResult.ACTIVE);
         assertEq(first.activeCoveredBytes, PADDED_SIZE);
         assertEq(CommonTypes.ChainEpoch.unwrap(first.lastEvidenceRefreshEpoch), 900);
+        assertEq(first.checkedClaims, 1);
+        assertEq(first.totalClaims, 1);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), int64(uint64(expiration)));
 
         vm.roll(901);
@@ -390,6 +403,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         assertEq(refreshed.result, EvidenceResult.INACTIVE);
         assertEq(refreshed.activeCoveredBytes, 0);
+        assertEq(refreshed.checkedClaims, 1);
+        assertEq(refreshed.totalClaims, 1);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
     }
 
@@ -511,6 +526,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(current.activeCoveredBytes, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(current.lastEvidenceRefreshEpoch), 0);
         assertEq(current.result, EvidenceResult.INACTIVE);
+        assertEq(current.checkedClaims, 0);
+        assertEq(current.totalClaims, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
         assertTrue(adapter.isOperational());
         assertEq(adapter.getEvidenceType(), EvidenceTypes.SECTOR_PLACEMENT);
