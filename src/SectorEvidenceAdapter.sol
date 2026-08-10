@@ -378,17 +378,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             }
         }
 
-        CommonTypes.ChainEpoch refreshEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
-        // The bound above makes the Filecoin ChainEpoch conversion safe.
-        // forge-lint: disable-next-line(unsafe-typecast)
-        CommonTypes.ChainEpoch storedExpiration = CommonTypes.ChainEpoch.wrap(active ? int64(expiration) : int64(0));
-        RefreshState memory refreshState = RefreshState({
-            lastEvidenceRefreshEpoch: refreshEpoch,
-            expiration: storedExpiration,
-            result: active ? EvidenceResult.ACTIVE : EvidenceResult.INACTIVE
-        });
-        $._refreshStates[context.dealId] = refreshState;
-        return _evidenceStatus(refreshState, receipt.paddedSize);
+        return _storeRefreshState(context.dealId, active, expiration, receipt.paddedSize);
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -546,6 +536,22 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             checkedClaims: 1,
             totalClaims: 1
         });
+    }
+
+    function _storeRefreshState(uint256 dealId, bool active, uint64 expiration, uint64 paddedSize)
+        private
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
+        // An active sector expiration is bounded before this conversion.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        CommonTypes.ChainEpoch storedExpiration = CommonTypes.ChainEpoch.wrap(active ? int64(expiration) : int64(0));
+        RefreshState memory refreshState = RefreshState({
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(int64(uint64(block.number))),
+            expiration: storedExpiration,
+            result: active ? EvidenceResult.ACTIVE : EvidenceResult.INACTIVE
+        });
+        s()._refreshStates[dealId] = refreshState;
+        return _evidenceStatus(refreshState, paddedSize);
     }
 
     function _rejectedActivation() private pure returns (SharedTypes.ActivationDecision memory decision) {
