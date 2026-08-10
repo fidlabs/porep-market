@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
+import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {CalldataSlice, CalldataUtils} from "fvm-solidity/CalldataUtils.sol";
 import {CBOR_CODEC} from "fvm-solidity/FVMCodec.sol";
@@ -24,10 +27,10 @@ import {SharedTypes} from "./types/SharedTypes.sol";
 
 /**
  * @title Experimental sector evidence adapter
- * @notice Accepts and refreshes one authenticated sector placement for one PoRep Market deal.
- * @dev This experiment supports one FIP-0109 placement and one bounded FIP-0112 status check.
+ * @notice Accepts and refreshes authenticated sector placements for PoRep Market deals.
+ * @dev This experiment supports grouped FIP-0109 placements and bounded FIP-0112 status checks.
  */
-contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
+contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     using CalldataUtils for CalldataSlice;
     using FVMAddress for address;
     using FVMMiner for uint64;
@@ -53,6 +56,14 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         bool registered;
     }
 
+    struct PlacementInput {
+        bytes32 pieceDigest;
+        uint64 providerActorId;
+        uint64 paddedSize;
+        uint64 sectorNumber;
+        int64 minimumCommitmentEpoch;
+    }
+
     // solhint-disable-next-line gas-struct-packing
     struct PlacementReceipt {
         uint256 dealId;
@@ -68,19 +79,41 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         bool activated;
     }
 
+    // @custom:storage-location erc7201:porepmarket.storage.SectorEvidenceAdapterStorage
+    struct SectorEvidenceAdapterStorage {
+        IPoRepMarket _poRepMarket;
+        mapping(uint256 dealId => PlacementReceipt receipt) _receipts;
+        mapping(uint256 dealId => ExpectedPlacement placement) _expectedPlacements;
+        mapping(uint64 placementNonce => uint256 dealId) _placementNonces;
+        mapping(bytes32 placementKey => uint256 dealId) _placementDeals;
+        mapping(uint256 dealId => SharedTypes.EvidenceStatus status) _evidenceStatuses;
+        mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _expirations;
+    }
+
+    // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SectorEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
+    bytes32 private constant SECTOR_EVIDENCE_ADAPTER_STORAGE_LOCATION =
+        0x57516ab2e793592bec7ab2e2851e8a91b20d6fd6aebf72f1617eb8ab0e7a2000;
+
+    // solhint-disable-next-line use-natspec
+    function _getSectorEvidenceAdapterStorage() private pure returns (SectorEvidenceAdapterStorage storage $) {
+        // solhint-disable-next-line no-inline-assembly
+        assembly {
+            $.slot := SECTOR_EVIDENCE_ADAPTER_STORAGE_LOCATION
+        }
+    }
+
+    // solhint-disable-next-line use-natspec
+    function s() internal pure returns (SectorEvidenceAdapterStorage storage) {
+        return _getSectorEvidenceAdapterStorage();
+    }
+
+    /**
+     * @notice Role allowed to upgrade the adapter implementation.
+     */
+    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
+
     // FIP-0109 fixes this entry-point name.
     // solhint-disable func-name-mixedcase
-    /**
-     * @notice PoRep Market allowed to consume adapter lifecycle results.
-     */
-    IPoRepMarket public immutable POREP_MARKET;
-
-    mapping(uint256 dealId => PlacementReceipt receipt) private _receipts;
-    mapping(uint256 dealId => ExpectedPlacement placement) private _expectedPlacements;
-    mapping(uint64 placementNonce => uint256 dealId) private _placementNonces;
-    mapping(bytes32 placementKey => uint256 dealId) private _placementDeals;
-    mapping(uint256 dealId => SharedTypes.EvidenceStatus status) private _evidenceStatuses;
-    mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) private _expirations;
 
     /**
      * @notice Records the per-deal value that the notification payload must contain.
@@ -125,6 +158,14 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
      */
     error OnlyPoRepMarket();
     /**
+     * @dev 0x14d4a4e8
+     */
+    error OnlySelf();
+    /**
+     * @dev 0x05bb467c
+     */
+    error InvalidAdminAddress();
+    /**
      * @dev 0xc9cc4a06
      */
     error InvalidPoRepMarketAddress();
@@ -140,14 +181,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
      * @dev 0x6fc84408
      */
     error CallerIsNotMiner(uint64 actorId);
-    /**
-     * @dev 0xdb8ae859
-     */
-    error UnexpectedSectorCount(uint256 count);
-    /**
-     * @dev 0x10d120e5
-     */
-    error UnexpectedPieceCount(uint256 count);
     /**
      * @dev 0xf61df232
      */
@@ -230,17 +263,35 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
     error PlacementAlreadyAssigned(uint256 existingDealId, uint256 requestedDealId);
 
     modifier onlyPoRepMarket() {
-        if (msg.sender != address(POREP_MARKET)) revert OnlyPoRepMarket();
+        if (msg.sender != address(s()._poRepMarket)) revert OnlyPoRepMarket();
         _;
     }
 
-    constructor(address poRepMarketAddress) {
-        if (poRepMarketAddress == address(0)) revert InvalidPoRepMarketAddress();
-        POREP_MARKET = IPoRepMarket(poRepMarketAddress);
+    /**
+     * @notice Disables initialization of the implementation contract.
+     */
+    /// @custom:oz-upgrades-unsafe-allow constructor
+    constructor() {
+        _disableInitializers();
     }
 
     /**
-     * @notice Receives one FIP-0109 SectorContentChanged callback.
+     * @notice Initializes the proxy state.
+     * @param admin Account granted the default admin and upgrader roles.
+     * @param poRepMarketAddress PoRep Market allowed to consume adapter lifecycle results.
+     */
+    function initialize(address admin, address poRepMarketAddress) public initializer {
+        if (admin == address(0)) revert InvalidAdminAddress();
+        if (poRepMarketAddress == address(0)) revert InvalidPoRepMarketAddress();
+
+        __AccessControl_init();
+        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        _grantRole(UPGRADER_ROLE, admin);
+        s()._poRepMarket = IPoRepMarket(poRepMarketAddress);
+    }
+
+    /**
+     * @notice Receives a grouped FIP-0109 SectorContentChanged callback.
      * @dev The calldata decoder reads the final `bytes` argument directly from message calldata.
      * @param method Filecoin method number.
      * @param codec Filecoin parameter codec.
@@ -261,28 +312,73 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         if (!providerActorId.isMiner()) revert CallerIsNotMiner(providerActorId);
 
         (uint256 sectorCount, uint256 offset) = FVMSectorContentChanged.readParamsHeader();
-        if (sectorCount != 1) revert UnexpectedSectorCount(sectorCount);
-
+        SectorContentChangedReturn memory result;
+        result.sectors = new SectorReturn[](sectorCount);
         SectorChangesHeader memory sector;
-        offset = FVMSectorContentChanged.readSectorHeader(offset, sector);
-        if (sector.numPieces != 1) revert UnexpectedPieceCount(sector.numPieces);
-
-        _validatePieceCidHeader(offset);
         PieceChangeIter memory piece;
-        FVMSectorContentChanged.readPiece(offset, piece);
-        bytes memory payloadBytes = piece.payload.load();
+        for (uint256 sectorIndex = 0; sectorIndex < sectorCount; sectorIndex++) {
+            offset = FVMSectorContentChanged.readSectorHeader(offset, sector);
+            FVMSectorContentChanged.initSectorReturn(result.sectors[sectorIndex], sector.numPieces);
+
+            for (uint256 pieceIndex = 0; pieceIndex < sector.numPieces; pieceIndex++) {
+                bool canonicalPieceCid = _hasCanonicalPieceCidHeader(offset);
+                offset = FVMSectorContentChanged.readPiece(offset, piece);
+                bytes memory payloadBytes = piece.payload.load();
+                bool accepted;
+                try this.processPieceNotification(
+                    payloadBytes,
+                    canonicalPieceCid,
+                    providerActorId,
+                    piece.digest,
+                    piece.paddedSize,
+                    sector.sector,
+                    sector.minimumCommitmentEpoch
+                ) {
+                    accepted = true;
+                } catch {
+                    accepted = false;
+                }
+                if (accepted) FVMSectorContentChanged.accept(result.sectors[sectorIndex], pieceIndex);
+            }
+        }
+        return (0, CBOR_CODEC, FVMSectorContentChanged.encodeReturn(result));
+    }
+
+    /**
+     * @notice Validates and records one piece while isolating its rejection from the rest of a grouped callback.
+     * @dev Callable only through an external self-call from `handle_filecoin_method` so a revert rejects one piece.
+     * @param payloadBytes ABI-encoded receiver payload.
+     * @param canonicalPieceCid Whether the piece CID uses the canonical CommP prefix.
+     * @param providerActorId Authenticated miner actor ID.
+     * @param pieceDigest CommP digest.
+     * @param paddedSize Padded piece size.
+     * @param sectorNumber Sector containing the piece.
+     * @param minimumCommitmentEpoch Minimum sector commitment epoch.
+     */
+    function processPieceNotification(
+        bytes calldata payloadBytes,
+        bool canonicalPieceCid,
+        uint64 providerActorId,
+        bytes32 pieceDigest,
+        uint64 paddedSize,
+        uint64 sectorNumber,
+        int64 minimumCommitmentEpoch
+    ) external {
+        if (msg.sender != address(this)) revert OnlySelf();
+        if (!canonicalPieceCid) revert UnexpectedPieceCidHeader();
         if (payloadBytes.length != 192) revert InvalidPayloadLength(payloadBytes.length);
         NotificationPayload memory payload = abi.decode(payloadBytes, (NotificationPayload));
+        PlacementInput memory placement = PlacementInput({
+            providerActorId: providerActorId,
+            pieceDigest: pieceDigest,
+            paddedSize: paddedSize,
+            sectorNumber: sectorNumber,
+            minimumCommitmentEpoch: minimumCommitmentEpoch
+        });
 
         _validatePayload(payload);
-        _validateDealAndPiece(payload, providerActorId, piece, sector.minimumCommitmentEpoch);
-        _acceptPlacement(payload, providerActorId, piece, sector);
-
-        SectorContentChangedReturn memory result;
-        result.sectors = new SectorReturn[](1);
-        FVMSectorContentChanged.initSectorReturn(result.sectors[0], 1);
-        FVMSectorContentChanged.accept(result.sectors[0], 0);
-        return (0, CBOR_CODEC, FVMSectorContentChanged.encodeReturn(result));
+        _validateDealAndPiece(payload, placement);
+        _acceptPlacement(payload, placement);
     }
 
     // solhint-enable func-name-mixedcase
@@ -300,7 +396,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         if (placementNonce == 0) revert InvalidPlacementNonce();
         _validateRegistrationContext(context);
 
-        ExpectedPlacement storage expected = _expectedPlacements[context.dealId];
+        SectorEvidenceAdapterStorage storage $ = s();
+        ExpectedPlacement storage expected = $._expectedPlacements[context.dealId];
         if (expected.registered) {
             if (expected.placementNonce != placementNonce) {
                 revert ConflictingPlacementRegistration(context.dealId, expected.placementNonce, placementNonce);
@@ -308,14 +405,14 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
             return _rejectedActivation();
         }
 
-        uint256 assignedDealId = _placementNonces[placementNonce];
+        uint256 assignedDealId = $._placementNonces[placementNonce];
         if (assignedDealId != 0) {
             revert PlacementNonceAlreadyAssigned(placementNonce, assignedDealId, context.dealId);
         }
 
         expected.placementNonce = placementNonce;
         expected.registered = true;
-        _placementNonces[placementNonce] = context.dealId;
+        $._placementNonces[placementNonce] = context.dealId;
         emit PlacementRegistered(context.dealId, placementNonce);
         return _rejectedActivation();
     }
@@ -326,7 +423,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         onlyPoRepMarket
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        PlacementReceipt storage receipt = _receipts[context.dealId];
+        PlacementReceipt storage receipt = s()._receipts[context.dealId];
         if (
             !receipt.accepted || receipt.activated || receipt.dealId != context.dealId
                 || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
@@ -351,7 +448,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         if (evidenceData.length != 64) revert InvalidRefreshDataLength(evidenceData.length);
         (int64 deadline, int64 partition) = abi.decode(evidenceData, (int64, int64));
 
-        PlacementReceipt memory receipt = _receipts[context.dealId];
+        SectorEvidenceAdapterStorage storage $ = s();
+        PlacementReceipt memory receipt = $._receipts[context.dealId];
         bool receiptMatches = receipt.accepted && receipt.activated && receipt.dealId == context.dealId
             && receipt.providerActorId == CommonTypes.FilActorId.unwrap(context.provider)
             && receipt.paddedSize == context.requestedSizeBytes;
@@ -376,10 +474,10 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
             checkedClaims: 1,
             totalClaims: 1
         });
-        _evidenceStatuses[context.dealId] = status;
+        $._evidenceStatuses[context.dealId] = status;
         // The bound above makes the Filecoin ChainEpoch conversion safe.
         // forge-lint: disable-next-line(unsafe-typecast)
-        _expirations[context.dealId] = CommonTypes.ChainEpoch.wrap(active ? int64(expiration) : int64(0));
+        $._expirations[context.dealId] = CommonTypes.ChainEpoch.wrap(active ? int64(expiration) : int64(0));
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -389,13 +487,13 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        status = _evidenceStatuses[context.dealId];
+        status = s()._evidenceStatuses[context.dealId];
         if (status.result == EvidenceResult.NONE) return _inactiveStatus();
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
     function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration) {
-        return _expirations[dealId];
+        return s()._expirations[dealId];
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -408,13 +506,32 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         return EvidenceTypes.SECTOR_PLACEMENT;
     }
 
+    // solhint-disable func-name-mixedcase
+    /**
+     * @notice Returns the PoRep Market allowed to consume adapter lifecycle results.
+     * @return market PoRep Market contract.
+     */
+    function POREP_MARKET() external view returns (IPoRepMarket market) {
+        return s()._poRepMarket;
+    }
+
+    // solhint-enable func-name-mixedcase
+
+    /**
+     * @notice Returns the PoRep Market contract address.
+     * @return marketAddress PoRep Market address.
+     */
+    function getPoRepMarketAddress() external view returns (address marketAddress) {
+        return address(s()._poRepMarket);
+    }
+
     /**
      * @notice Returns the accepted placement and activation-consumption state for one deal.
      * @param dealId PoRep Market deal ID.
      * @return receipt Stored placement receipt.
      */
     function getReceipt(uint256 dealId) external view returns (PlacementReceipt memory receipt) {
-        return _receipts[dealId];
+        return s()._receipts[dealId];
     }
 
     function _validatePayload(NotificationPayload memory payload) private view {
@@ -423,38 +540,36 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         if (payload.adapter != address(this)) revert UnexpectedAdapter(address(this), payload.adapter);
     }
 
-    function _validateDealAndPiece(
-        NotificationPayload memory payload,
-        uint64 providerActorId,
-        PieceChangeIter memory piece,
-        int64 minimumCommitmentEpoch
-    ) private view {
-        PoRepTypes.Deal memory deal = POREP_MARKET.getDeal(payload.dealId);
+    function _validateDealAndPiece(NotificationPayload memory payload, PlacementInput memory placement) private view {
+        SectorEvidenceAdapterStorage storage $ = s();
+        PoRepTypes.Deal memory deal = $._poRepMarket.getDeal(payload.dealId);
         if (deal.evidenceAdapter != address(this)) {
             revert UnexpectedEvidenceAdapter(payload.dealId, deal.evidenceAdapter);
         }
 
         uint64 expectedProvider = CommonTypes.FilActorId.unwrap(deal.provider);
-        if (providerActorId != expectedProvider) revert UnexpectedProvider(expectedProvider, providerActorId);
+        if (placement.providerActorId != expectedProvider) {
+            revert UnexpectedProvider(expectedProvider, placement.providerActorId);
+        }
 
-        bytes32 reconstructedCommitment = keccak256(abi.encode(piece.digest, piece.paddedSize));
-        SharedTypes.DealData memory dealData = POREP_MARKET.getDealData(payload.dealId);
+        bytes32 reconstructedCommitment = keccak256(abi.encode(placement.pieceDigest, placement.paddedSize));
+        SharedTypes.DealData memory dealData = $._poRepMarket.getDealData(payload.dealId);
         if (payload.pieceSetCommitment != reconstructedCommitment || dealData.manifestHash != reconstructedCommitment) {
             revert UnexpectedPieceSetCommitment();
         }
 
-        PoRepTypes.DealTerms memory terms = POREP_MARKET.getDealTerms(payload.dealId);
-        if (piece.paddedSize != terms.requestedSizeBytes) {
-            revert UnexpectedPaddedSize(terms.requestedSizeBytes, piece.paddedSize);
+        PoRepTypes.DealTerms memory terms = $._poRepMarket.getDealTerms(payload.dealId);
+        if (placement.paddedSize != terms.requestedSizeBytes) {
+            revert UnexpectedPaddedSize(terms.requestedSizeBytes, placement.paddedSize);
         }
 
         int64 requiredCommitmentEpoch =
             CommonTypes.ChainEpoch.unwrap(deal.proposedAtEpoch) + int64(uint64(terms.durationEpochs));
-        if (minimumCommitmentEpoch < requiredCommitmentEpoch) {
-            revert InsufficientCommitmentEpoch(requiredCommitmentEpoch, minimumCommitmentEpoch);
+        if (placement.minimumCommitmentEpoch < requiredCommitmentEpoch) {
+            revert InsufficientCommitmentEpoch(requiredCommitmentEpoch, placement.minimumCommitmentEpoch);
         }
 
-        ExpectedPlacement memory expected = _expectedPlacements[payload.dealId];
+        ExpectedPlacement memory expected = $._expectedPlacements[payload.dealId];
         if (!expected.registered) revert PlacementNotRegistered(payload.dealId);
         if (payload.placementNonce != expected.placementNonce) {
             revert UnexpectedPlacementNonce(expected.placementNonce, payload.placementNonce);
@@ -462,7 +577,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
     }
 
     function _validateRegistrationContext(SharedTypes.ActivationContext calldata context) private view {
-        PoRepTypes.Deal memory deal = POREP_MARKET.getDeal(context.dealId);
+        SectorEvidenceAdapterStorage storage $ = s();
+        PoRepTypes.Deal memory deal = $._poRepMarket.getDeal(context.dealId);
         if (deal.evidenceAdapter != address(this)) {
             revert UnexpectedEvidenceAdapter(context.dealId, deal.evidenceAdapter);
         }
@@ -471,33 +587,30 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
         uint64 actualProvider = CommonTypes.FilActorId.unwrap(context.provider);
         if (actualProvider != expectedProvider) revert UnexpectedProvider(expectedProvider, actualProvider);
 
-        uint256 expectedSize = POREP_MARKET.getDealTerms(context.dealId).requestedSizeBytes;
+        uint256 expectedSize = $._poRepMarket.getDealTerms(context.dealId).requestedSizeBytes;
         if (context.requestedSizeBytes != expectedSize) {
             revert UnexpectedPaddedSize(expectedSize, uint64(context.requestedSizeBytes));
         }
     }
 
-    function _validatePieceCidHeader(uint256 offset) private pure {
+    function _hasCanonicalPieceCidHeader(uint256 offset) private pure returns (bool) {
         uint104 prefix;
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
             prefix := shr(152, calldataload(offset))
         }
-        if (prefix != CANONICAL_COMMP_CID_PREFIX) revert UnexpectedPieceCidHeader();
+        return prefix == CANONICAL_COMMP_CID_PREFIX;
     }
 
-    function _acceptPlacement(
-        NotificationPayload memory payload,
-        uint64 providerActorId,
-        PieceChangeIter memory piece,
-        SectorChangesHeader memory sector
-    ) private {
-        PlacementReceipt storage existing = _receipts[payload.dealId];
+    // solhint-disable-next-line function-max-lines
+    function _acceptPlacement(NotificationPayload memory payload, PlacementInput memory placement) private {
+        PlacementReceipt storage existing = s()._receipts[payload.dealId];
         if (existing.accepted) {
             if (
-                existing.providerActorId != providerActorId || existing.pieceCidDigest != piece.digest
-                    || existing.paddedSize != piece.paddedSize || existing.sectorNumber != sector.sector
-                    || existing.minimumCommitmentEpoch != sector.minimumCommitmentEpoch
+                existing.providerActorId != placement.providerActorId
+                    || existing.pieceCidDigest != placement.pieceDigest || existing.paddedSize != placement.paddedSize
+                    || existing.sectorNumber != placement.sectorNumber
+                    || existing.minimumCommitmentEpoch != placement.minimumCommitmentEpoch
                     || existing.pieceSetCommitment != payload.pieceSetCommitment
                     || existing.placementNonce != payload.placementNonce
             ) {
@@ -506,33 +619,35 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
             return;
         }
 
-        bytes32 placementKey = keccak256(abi.encode(providerActorId, sector.sector, piece.digest, piece.paddedSize));
-        uint256 existingDealId = _placementDeals[placementKey];
+        bytes32 placementKey = keccak256(
+            abi.encode(placement.providerActorId, placement.sectorNumber, placement.pieceDigest, placement.paddedSize)
+        );
+        uint256 existingDealId = s()._placementDeals[placementKey];
         if (existingDealId != 0) revert PlacementAlreadyAssigned(existingDealId, payload.dealId);
 
         CommonTypes.ChainEpoch receiptEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
-        _receipts[payload.dealId] = PlacementReceipt({
+        s()._receipts[payload.dealId] = PlacementReceipt({
             dealId: payload.dealId,
-            providerActorId: providerActorId,
-            pieceCidDigest: piece.digest,
-            paddedSize: piece.paddedSize,
-            sectorNumber: sector.sector,
-            minimumCommitmentEpoch: sector.minimumCommitmentEpoch,
+            providerActorId: placement.providerActorId,
+            pieceCidDigest: placement.pieceDigest,
+            paddedSize: placement.paddedSize,
+            sectorNumber: placement.sectorNumber,
+            minimumCommitmentEpoch: placement.minimumCommitmentEpoch,
             pieceSetCommitment: payload.pieceSetCommitment,
             placementNonce: payload.placementNonce,
             receiptEpoch: receiptEpoch,
             accepted: true,
             activated: false
         });
-        _placementDeals[placementKey] = payload.dealId;
+        s()._placementDeals[placementKey] = payload.dealId;
 
         emit PlacementAccepted(
             payload.dealId,
-            providerActorId,
-            sector.sector,
-            piece.digest,
-            piece.paddedSize,
-            sector.minimumCommitmentEpoch,
+            placement.providerActorId,
+            placement.sectorNumber,
+            placement.pieceDigest,
+            placement.paddedSize,
+            placement.minimumCommitmentEpoch,
             payload.pieceSetCommitment,
             payload.placementNonce,
             receiptEpoch
@@ -553,4 +668,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter {
             totalClaims: 0
         });
     }
+
+    // solhint-disable no-empty-blocks
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    // solhint-enable no-empty-blocks
 }
