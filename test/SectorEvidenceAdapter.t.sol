@@ -2,6 +2,8 @@
 // solhint-disable use-natspec, one-contract-per-file
 pragma solidity =0.8.30;
 
+import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {CBOR_CODEC} from "fvm-solidity/FVMCodec.sol";
 import {FVMAddress} from "fvm-solidity/FVMAddress.sol";
@@ -22,6 +24,12 @@ import {EvidenceResult} from "../src/types/EvidenceResult.sol";
 import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SharedTypes} from "../src/types/SharedTypes.sol";
+
+contract SectorEvidenceAdapterV2 is SectorEvidenceAdapter {
+    function version() external pure returns (uint256) {
+        return 2;
+    }
+}
 
 contract SectorEvidenceMarketMock {
     mapping(uint256 dealId => PoRepTypes.Deal deal) private _deals;
@@ -122,6 +130,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     uint256 internal constant DEAL_ID = 1;
     uint256 internal constant OTHER_DEAL_ID = 2;
     uint64 internal constant PLACEMENT_NONCE = 11;
+    uint64 internal constant OTHER_PLACEMENT_NONCE = 12;
 
     bytes internal constant PIECE_CID =
         hex"0181e203922020c47f5ea5e33d1ae11afb476c0cc63dba09241fcb2fb0775c33ec522e87044b2b";
@@ -130,6 +139,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     bytes internal constant OTHER_PIECE_CID =
         hex"0181e203922020cdf33e1783f2ff8261e66f95858ff85f976bbc0bf05ce8476d3e360832165cd0";
     bytes32 internal constant PIECE_DIGEST = 0xc47f5ea5e33d1ae11afb476c0cc63dba09241fcb2fb0775c33ec522e87044b2b;
+    bytes32 internal constant OTHER_PIECE_DIGEST = 0xcdf33e1783f2ff8261e66f95858ff85f976bbc0bf05ce8476d3e360832165cd0;
 
     SectorEvidenceMarketMock internal market;
     SectorEvidenceAdapter internal adapter;
@@ -139,11 +149,76 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     function setUp() public override {
         super.setUp();
         market = new SectorEvidenceMarketMock();
-        adapter = new SectorEvidenceAdapter(address(market));
+        adapter = _deployAdapter(address(this), address(market));
         miner = mockMiner(PROVIDER);
         pieceSetCommitment = keccak256(abi.encode(PIECE_DIGEST, PADDED_SIZE));
         market.setDeal(DEAL_ID, PROVIDER, address(adapter), pieceSetCommitment, PADDED_SIZE, DURATION, PROPOSED_AT);
         _registerPlacement(DEAL_ID, PLACEMENT_NONCE);
+    }
+
+    function testImplementationCannotBeInitialized() public {
+        SectorEvidenceAdapter implementation = new SectorEvidenceAdapter();
+
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        implementation.initialize(address(this), address(market));
+    }
+
+    function testInitializationRejectsZeroAdminAndMarket() public {
+        SectorEvidenceAdapter implementation = new SectorEvidenceAdapter();
+        SectorEvidenceAdapter zeroAdmin = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), "")));
+        vm.expectRevert(SectorEvidenceAdapter.InvalidAdminAddress.selector);
+        zeroAdmin.initialize(address(0), address(market));
+
+        SectorEvidenceAdapter zeroMarket = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), "")));
+        vm.expectRevert(SectorEvidenceAdapter.InvalidPoRepMarketAddress.selector);
+        zeroMarket.initialize(address(this), address(0));
+    }
+
+    function testProxyCannotBeReinitialized() public {
+        vm.expectRevert(Initializable.InvalidInitialization.selector);
+        adapter.initialize(address(this), address(market));
+    }
+
+    function testProxyInitializationSetsMarketAndUpgradeRoles() public view {
+        assertEq(address(adapter.POREP_MARKET()), address(market));
+        assertEq(adapter.getPoRepMarketAddress(), address(market));
+        assertTrue(adapter.hasRole(adapter.DEFAULT_ADMIN_ROLE(), address(this)));
+        assertTrue(adapter.hasRole(adapter.UPGRADER_ROLE(), address(this)));
+    }
+
+    function testUpgradePreservesPlacementReceipt() public {
+        _notify(
+            DEAL_ID,
+            address(adapter),
+            block.chainid,
+            pieceSetCommitment,
+            PLACEMENT_NONCE,
+            SECTOR,
+            MINIMUM_COMMITMENT_EPOCH
+        );
+
+        SectorEvidenceAdapterV2 nextImplementation = new SectorEvidenceAdapterV2();
+        adapter.upgradeToAndCall(address(nextImplementation), "");
+        SectorEvidenceAdapterV2 upgraded = SectorEvidenceAdapterV2(address(adapter));
+
+        assertEq(upgraded.version(), 2);
+        assertTrue(upgraded.getReceipt(DEAL_ID).accepted);
+        assertEq(address(upgraded.POREP_MARKET()), address(market));
+    }
+
+    function testOnlyUpgraderCanUpgrade() public {
+        SectorEvidenceAdapterV2 nextImplementation = new SectorEvidenceAdapterV2();
+
+        vm.prank(address(0xBAD));
+        vm.expectRevert();
+        adapter.upgradeToAndCall(address(nextImplementation), "");
+    }
+
+    function testOnlyAdapterCanProcessOnePiece() public {
+        vm.expectRevert(SectorEvidenceAdapter.OnlySelf.selector);
+        adapter.processPieceNotification(
+            "", false, PROVIDER, PIECE_DIGEST, PADDED_SIZE, SECTOR, MINIMUM_COMMITMENT_EPOCH
+        );
     }
 
     function testPayloadEncodingFixedVector() public pure {
@@ -196,9 +271,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
             DEAL_ID, OTHER_PROVIDER, address(adapter), pieceSetCommitment, PADDED_SIZE, DURATION, PROPOSED_AT
         );
 
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedProvider.selector, OTHER_PROVIDER, PROVIDER)
-        );
         _notify(
             DEAL_ID,
             address(adapter),
@@ -214,11 +286,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     function testWrongDealIsRejectedWithoutReceipt() public {
         market.setDeal(OTHER_DEAL_ID, PROVIDER, address(0xBAD), pieceSetCommitment, PADDED_SIZE, DURATION, PROPOSED_AT);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                SectorEvidenceAdapter.UnexpectedEvidenceAdapter.selector, OTHER_DEAL_ID, address(0xBAD)
-            )
-        );
         _notify(
             OTHER_DEAL_ID,
             address(adapter),
@@ -238,9 +305,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         _registerPlacement(DEAL_ID, PLACEMENT_NONCE);
         _registerPlacement(OTHER_DEAL_ID, 22);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedPlacementNonce.selector, uint64(22), PLACEMENT_NONCE)
-        );
         _notify(
             OTHER_DEAL_ID,
             address(adapter),
@@ -259,7 +323,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     }
 
     function testMalformedPieceCidHeaderIsRejected() public {
-        vm.expectRevert(SectorEvidenceAdapter.UnexpectedPieceCidHeader.selector);
         _notifyWithPiece(
             MALFORMED_PIECE_CID,
             PADDED_SIZE,
@@ -276,7 +339,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     }
 
     function testWrongPieceIsRejectedWithoutReceipt() public {
-        vm.expectRevert(SectorEvidenceAdapter.UnexpectedPieceSetCommitment.selector);
         _notifyWithPiece(
             OTHER_PIECE_CID,
             PADDED_SIZE,
@@ -292,7 +354,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     }
 
     function testWrongSizeIsRejectedWithoutReceipt() public {
-        vm.expectRevert(SectorEvidenceAdapter.UnexpectedPieceSetCommitment.selector);
         _notifyWithPiece(
             PIECE_CID,
             PADDED_SIZE * 2,
@@ -310,9 +371,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     function testPieceSizeDifferentFromDealTermsIsRejectedWithoutReceipt() public {
         market.setDeal(DEAL_ID, PROVIDER, address(adapter), pieceSetCommitment, PADDED_SIZE * 2, DURATION, PROPOSED_AT);
 
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedPaddedSize.selector, PADDED_SIZE * 2, PADDED_SIZE)
-        );
         _notify(
             DEAL_ID,
             address(adapter),
@@ -360,7 +418,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertFalse(afterReceipt.activated);
     }
 
-    function testConflictingDuplicateRevertsWithoutChangingReceipt() public {
+    function testConflictingDuplicateIsRejectedWithoutChangingReceipt() public {
         _notify(
             DEAL_ID,
             address(adapter),
@@ -372,8 +430,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         );
         SectorEvidenceAdapter.PlacementReceipt memory beforeReceipt = adapter.getReceipt(DEAL_ID);
 
-        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.ConflictingPlacement.selector, DEAL_ID));
-        _notify(
+        SectorContentChangedReturn memory duplicate = _notify(
             DEAL_ID,
             address(adapter),
             block.chainid,
@@ -384,6 +441,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         );
         SectorEvidenceAdapter.PlacementReceipt memory afterReceipt = adapter.getReceipt(DEAL_ID);
 
+        assertEq(duplicate.sectors[0].accepted[0], 0);
         assertEq(afterReceipt.sectorNumber, beforeReceipt.sectorNumber);
         assertEq(
             CommonTypes.ChainEpoch.unwrap(afterReceipt.receiptEpoch),
@@ -433,9 +491,6 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         );
 
         _registerPlacement(OTHER_DEAL_ID, 22);
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.PlacementAlreadyAssigned.selector, DEAL_ID, OTHER_DEAL_ID)
-        );
         _notify(
             OTHER_DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, 22, SECTOR, MINIMUM_COMMITMENT_EPOCH
         );
@@ -534,40 +589,28 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     }
 
     function testPayloadFromAnotherChainIsRejected() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedChainId.selector, block.chainid, block.chainid + 1)
-        );
         _notify(DEAL_ID, address(adapter), block.chainid + 1, pieceSetCommitment, 0, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        assertFalse(adapter.getReceipt(DEAL_ID).accepted);
     }
 
     function testPayloadForAnotherAdapterIsRejected() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedAdapter.selector, address(adapter), address(0xBAD))
-        );
         _notify(DEAL_ID, address(0xBAD), block.chainid, pieceSetCommitment, 0, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        assertFalse(adapter.getReceipt(DEAL_ID).accepted);
     }
 
     function testPayloadWithWrongPieceSetCommitmentIsRejected() public {
-        vm.expectRevert(SectorEvidenceAdapter.UnexpectedPieceSetCommitment.selector);
         _notify(DEAL_ID, address(adapter), block.chainid, bytes32(uint256(1)), 0, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        assertFalse(adapter.getReceipt(DEAL_ID).accepted);
     }
 
     function testPayloadWithWrongRegisteredNonceIsRejected() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedPlacementNonce.selector, PLACEMENT_NONCE, uint64(1))
-        );
         _notify(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, 1, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        assertFalse(adapter.getReceipt(DEAL_ID).accepted);
     }
 
     function testInsufficientCommitmentEpochIsRejected() public {
-        vm.expectRevert(
-            abi.encodeWithSelector(
-                SectorEvidenceAdapter.InsufficientCommitmentEpoch.selector,
-                MINIMUM_COMMITMENT_EPOCH,
-                MINIMUM_COMMITMENT_EPOCH - 1
-            )
-        );
         _notify(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, 0, SECTOR, MINIMUM_COMMITMENT_EPOCH - 1);
+        assertFalse(adapter.getReceipt(DEAL_ID).accepted);
     }
 
     function testUnregisteredMinerActorIsRejected() public {
@@ -587,38 +630,96 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         adapter.handle_filecoin_method(SECTOR_CONTENT_CHANGED, CBOR_CODEC, params);
     }
 
-    function testCallbackRejectsMoreThanOneSector() public {
-        SectorContentChangedParams memory params = _params(
+    function testCallbackAcceptsMultipleSectors() public {
+        bytes32 otherCommitment = keccak256(abi.encode(OTHER_PIECE_DIGEST, PADDED_SIZE));
+        _setOtherDeal(otherCommitment);
+
+        SectorChanges[] memory sectors = new SectorChanges[](2);
+        sectors[0] = _params(
             PIECE_CID,
             PADDED_SIZE,
-            _payload(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, 0),
+            _payload(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, PLACEMENT_NONCE),
             SECTOR,
             MINIMUM_COMMITMENT_EPOCH
-        );
-        SectorChanges[] memory sectors = new SectorChanges[](2);
-        sectors[0] = params.sectors[0];
-        sectors[1] = params.sectors[0];
-        params.sectors = sectors;
+        )
+        .sectors[0];
+        sectors[1] = _params(
+            OTHER_PIECE_CID,
+            PADDED_SIZE,
+            _payload(OTHER_DEAL_ID, address(adapter), block.chainid, otherCommitment, OTHER_PLACEMENT_NONCE),
+            SECTOR + 1,
+            MINIMUM_COMMITMENT_EPOCH
+        )
+        .sectors[0];
 
-        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedSectorCount.selector, uint256(2)));
-        miner.callSectorContentChanged(address(adapter), params);
+        SectorContentChangedReturn memory result =
+            miner.callSectorContentChanged(address(adapter), SectorContentChangedParams({sectors: sectors}));
+
+        assertEq(result.sectors.length, 2);
+        assertEq(result.sectors[0].numPieces, 1);
+        assertEq(result.sectors[0].accepted[0], 1);
+        assertEq(result.sectors[1].numPieces, 1);
+        assertEq(result.sectors[1].accepted[0], 1);
+        assertTrue(adapter.getReceipt(DEAL_ID).accepted);
+        assertTrue(adapter.getReceipt(OTHER_DEAL_ID).accepted);
     }
 
-    function testCallbackRejectsMoreThanOnePiece() public {
+    function testCallbackAcceptsMultiplePiecesInOneSector() public {
+        bytes32 otherCommitment = keccak256(abi.encode(OTHER_PIECE_DIGEST, PADDED_SIZE));
+        _setOtherDeal(otherCommitment);
+
         SectorContentChangedParams memory params = _params(
             PIECE_CID,
             PADDED_SIZE,
-            _payload(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, 0),
+            _payload(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, PLACEMENT_NONCE),
             SECTOR,
             MINIMUM_COMMITMENT_EPOCH
         );
         PieceChange[] memory pieces = new PieceChange[](2);
         pieces[0] = params.sectors[0].added[0];
-        pieces[1] = params.sectors[0].added[0];
+        pieces[1] = PieceChange({
+            data: OTHER_PIECE_CID,
+            size: PADDED_SIZE,
+            payload: _payload(OTHER_DEAL_ID, address(adapter), block.chainid, otherCommitment, OTHER_PLACEMENT_NONCE)
+        });
         params.sectors[0].added = pieces;
 
-        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.UnexpectedPieceCount.selector, uint256(2)));
-        miner.callSectorContentChanged(address(adapter), params);
+        SectorContentChangedReturn memory result = miner.callSectorContentChanged(address(adapter), params);
+
+        assertEq(result.sectors.length, 1);
+        assertEq(result.sectors[0].numPieces, 2);
+        assertEq(result.sectors[0].accepted[0], 3);
+        assertTrue(adapter.getReceipt(DEAL_ID).accepted);
+        assertTrue(adapter.getReceipt(OTHER_DEAL_ID).accepted);
+    }
+
+    function testCallbackRejectsOneInvalidPieceWithoutRollingBackValidPiece() public {
+        bytes32 otherCommitment = keccak256(abi.encode(OTHER_PIECE_DIGEST, PADDED_SIZE));
+        _setOtherDeal(otherCommitment);
+
+        SectorContentChangedParams memory params = _params(
+            PIECE_CID,
+            PADDED_SIZE,
+            _payload(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, PLACEMENT_NONCE),
+            SECTOR,
+            MINIMUM_COMMITMENT_EPOCH
+        );
+        PieceChange[] memory pieces = new PieceChange[](2);
+        pieces[0] = params.sectors[0].added[0];
+        pieces[1] = PieceChange({
+            data: OTHER_PIECE_CID,
+            size: PADDED_SIZE,
+            payload: _payload(
+                OTHER_DEAL_ID, address(adapter), block.chainid + 1, otherCommitment, OTHER_PLACEMENT_NONCE
+            )
+        });
+        params.sectors[0].added = pieces;
+
+        SectorContentChangedReturn memory result = miner.callSectorContentChanged(address(adapter), params);
+
+        assertEq(result.sectors[0].accepted[0], 1);
+        assertTrue(adapter.getReceipt(DEAL_ID).accepted);
+        assertFalse(adapter.getReceipt(OTHER_DEAL_ID).accepted);
     }
 
     function testOnlyPoRepMarketCanCallLifecycleEntryPoints() public {
@@ -709,11 +810,10 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     }
 
     function testUnregisteredPlacementIsRejected() public {
-        SectorEvidenceAdapter unregisteredAdapter = new SectorEvidenceAdapter(address(market));
+        SectorEvidenceAdapter unregisteredAdapter = _deployAdapter(address(this), address(market));
         adapter = unregisteredAdapter;
         market.setDeal(DEAL_ID, PROVIDER, address(adapter), pieceSetCommitment, PADDED_SIZE, DURATION, PROPOSED_AT);
 
-        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.PlacementNotRegistered.selector, DEAL_ID));
         _notify(DEAL_ID, address(adapter), block.chainid, pieceSetCommitment, 9, SECTOR, MINIMUM_COMMITMENT_EPOCH);
         assertFalse(adapter.getReceipt(DEAL_ID).accepted);
     }
@@ -734,6 +834,17 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
     function _registerPlacement(uint256 dealId, uint64 placementNonce) internal {
         market.submit(adapter, _context(dealId, PROVIDER), abi.encode(placementNonce));
+    }
+
+    function _setOtherDeal(bytes32 commitment) internal {
+        market.setDeal(OTHER_DEAL_ID, PROVIDER, address(adapter), commitment, PADDED_SIZE, DURATION, PROPOSED_AT);
+        _registerPlacement(OTHER_DEAL_ID, OTHER_PLACEMENT_NONCE);
+    }
+
+    function _deployAdapter(address admin, address poRepMarket) internal returns (SectorEvidenceAdapter deployed) {
+        SectorEvidenceAdapter implementation = new SectorEvidenceAdapter();
+        bytes memory initData = abi.encodeCall(SectorEvidenceAdapter.initialize, (admin, poRepMarket));
+        deployed = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), initData)));
     }
 
     function _notifyWithPiece(

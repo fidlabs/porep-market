@@ -15,6 +15,7 @@ import {DeployUtils} from "../../script/utils/DeployUtils.sol";
 import {ValidatorFactory} from "../../src/ValidatorFactory.sol";
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {DataCapEvidenceAdapter} from "../../src/DataCapEvidenceAdapter.sol";
+import {SectorEvidenceAdapter} from "../../src/SectorEvidenceAdapter.sol";
 import {SPRegistry} from "../../src/SPRegistry.sol";
 import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
 import {AccessManager} from "../../src/AccessManager.sol";
@@ -78,6 +79,7 @@ contract DeploymentScriptsTest is Test {
         }
     }
 
+    // solhint-disable-next-line function-max-lines
     function _assertLiveDeploymentTopology() private {
         address admin = vm.addr(1);
         address service = address(0x101);
@@ -100,14 +102,25 @@ contract DeploymentScriptsTest is Test {
         new Deploy().run();
         string memory json = vm.readFile("./.deployment/deploy-run.json");
         address managerAddress = json.readAddress(".result.contracts.AccessManager.implementation");
-        string[6] memory names =
-            ["PoRepMarket", "ValidatorFactory", "DataCapEvidenceAdapter", "SPRegistry", "SLIOracle", "SLIScorer"];
+        string[7] memory names = [
+            "PoRepMarket",
+            "ValidatorFactory",
+            "DataCapEvidenceAdapter",
+            "SectorEvidenceAdapter",
+            "SPRegistry",
+            "SLIOracle",
+            "SLIScorer"
+        ];
         for (uint256 i; i < names.length; ++i) {
             address proxy = json.readAddress(string.concat(".result.contracts.", names[i], ".proxy"));
             address implementation = json.readAddress(string.concat(".result.contracts.", names[i], ".implementation"));
             assertTrue(proxy.code.length > 0 && implementation.code.length > 0);
             assertEq(address(uint160(uint256(vm.load(proxy, SLOT)))), implementation);
-            assertEq(PoRepMarket(proxy).accessManager(), managerAddress);
+            if (keccak256(bytes(names[i])) == keccak256("SectorEvidenceAdapter")) {
+                assertTrue(IAccessProbe(proxy).hasRole(bytes32(0), admin));
+            } else {
+                assertEq(PoRepMarket(proxy).accessManager(), managerAddress);
+            }
         }
         address factory = json.readAddress(".result.contracts.ValidatorFactory.proxy");
         address beacon = json.readAddress(".result.contracts.ValidatorBeacon.address");
@@ -115,6 +128,7 @@ contract DeploymentScriptsTest is Test {
         address market = json.readAddress(".result.contracts.PoRepMarket.proxy");
         address registry = json.readAddress(".result.contracts.SPRegistry.proxy");
         address adapter = json.readAddress(".result.contracts.DataCapEvidenceAdapter.proxy");
+        address sectorAdapter = json.readAddress(".result.contracts.SectorEvidenceAdapter.proxy");
         assertEq(UpgradeableBeacon(beacon).implementation(), validator);
         assertEq(UpgradeableBeacon(beacon).owner(), managerAddress);
         assertEq(ValidatorFactory(factory).getBeacon(), beacon);
@@ -123,6 +137,7 @@ contract DeploymentScriptsTest is Test {
         assertEq(DataCapEvidenceAdapter(adapter).getPoRepMarketAddress(), market);
         assertTrue(DataCapEvidenceAdapter(adapter).isOperational());
         _assertManagerTopology(managerAddress, admin, service, oracle, termination, market);
+        assertEq(SectorEvidenceAdapter(sectorAdapter).getPoRepMarketAddress(), market);
         _assertPaymentTokens(registry, admin, json);
         _assertAdminTransferAcrossTargets(managerAddress, admin, market, registry, adapter);
     }
@@ -287,14 +302,15 @@ contract DeploymentScriptsTest is Test {
     }
 
     function _allTargets() private pure returns (string[] memory names) {
-        names = new string[](7);
+        names = new string[](8);
         names[0] = "PoRepMarket";
         names[1] = "ValidatorFactory";
         names[2] = "DataCapEvidenceAdapter";
-        names[3] = "SPRegistry";
-        names[4] = "SLIOracle";
-        names[5] = "SLIScorer";
-        names[6] = "Validator";
+        names[3] = "SectorEvidenceAdapter";
+        names[4] = "SPRegistry";
+        names[5] = "SLIOracle";
+        names[6] = "SLIScorer";
+        names[7] = "Validator";
     }
 
     function _manifestFor(string[] memory names)
@@ -355,6 +371,9 @@ contract DeploymentScriptsTest is Test {
         if (target == keccak256("ValidatorFactory")) return "src/ValidatorFactory.sol:ValidatorFactory";
         if (target == keccak256("DataCapEvidenceAdapter")) {
             return "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter";
+        }
+        if (target == keccak256("SectorEvidenceAdapter")) {
+            return "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter";
         }
         if (target == keccak256("SPRegistry")) return "src/SPRegistry.sol:SPRegistry";
         if (target == keccak256("SLIOracle")) return "src/SLIOracle.sol:SLIOracle";
