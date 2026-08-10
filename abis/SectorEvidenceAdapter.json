@@ -19,19 +19,6 @@
   },
   {
     "type": "function",
-    "name": "PAYLOAD_VERSION",
-    "inputs": [],
-    "outputs": [
-      {
-        "name": "",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "POREP_MARKET",
     "inputs": [],
     "outputs": [
@@ -317,11 +304,6 @@
             "internalType": "uint64"
           },
           {
-            "name": "placementNonce",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
             "name": "minimumCommitmentEpoch",
             "type": "int64",
             "internalType": "int64"
@@ -398,7 +380,7 @@
         "internalType": "uint64"
       },
       {
-        "name": "params",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -662,7 +644,7 @@
     "name": "submitEvidenceBatch",
     "inputs": [
       {
-        "name": "context",
+        "name": "",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -699,7 +681,7 @@
         ]
       },
       {
-        "name": "evidenceData",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -728,7 +710,7 @@
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -827,12 +809,6 @@
         "internalType": "bytes32"
       },
       {
-        "name": "placementNonce",
-        "type": "uint64",
-        "indexed": false,
-        "internalType": "uint64"
-      },
-      {
         "name": "receiptEpoch",
         "type": "int64",
         "indexed": false,
@@ -859,25 +835,6 @@
       },
       {
         "name": "coveredBytes",
-        "type": "uint64",
-        "indexed": true,
-        "internalType": "uint64"
-      }
-    ],
-    "anonymous": false
-  },
-  {
-    "type": "event",
-    "name": "PlacementRegistered",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "indexed": true,
-        "internalType": "uint256"
-      },
-      {
-        "name": "placementNonce",
         "type": "uint64",
         "indexed": true,
         "internalType": "uint64"
@@ -1034,27 +991,6 @@
   },
   {
     "type": "error",
-    "name": "ConflictingPlacementRegistration",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "expected",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "actual",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -1129,28 +1065,12 @@
   },
   {
     "type": "error",
-    "name": "InvalidPlacementNonce",
-    "inputs": []
-  },
-  {
-    "type": "error",
     "name": "InvalidPoRepMarketAddress",
     "inputs": []
   },
   {
     "type": "error",
     "name": "InvalidRefreshDataLength",
-    "inputs": [
-      {
-        "name": "length",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidRegistrationLength",
     "inputs": [
       {
         "name": "length",
@@ -1225,38 +1145,6 @@
   },
   {
     "type": "error",
-    "name": "PlacementNonceAlreadyAssigned",
-    "inputs": [
-      {
-        "name": "nonce",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "existingDealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "requestedDealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "PlacementNotRegistered",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "UUPSUnauthorizedCallContext",
     "inputs": []
   },
@@ -1273,22 +1161,6 @@
   },
   {
     "type": "error",
-    "name": "UnexpectedAdapter",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "actual",
-        "type": "address",
-        "internalType": "address"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "UnexpectedCborMajorType",
     "inputs": [
       {
@@ -1300,22 +1172,6 @@
         "name": "actual",
         "type": "uint8",
         "internalType": "uint8"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "UnexpectedChainId",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actual",
-        "type": "uint256",
-        "internalType": "uint256"
       }
     ]
   },
@@ -1375,17 +1231,6 @@
   },
   {
     "type": "error",
-    "name": "UnexpectedPayloadVersion",
-    "inputs": [
-      {
-        "name": "version",
-        "type": "uint8",
-        "internalType": "uint8"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "UnexpectedPieceCidHeader",
     "inputs": []
   },
@@ -1393,22 +1238,6 @@
     "type": "error",
     "name": "UnexpectedPieceSetCommitment",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "UnexpectedPlacementNonce",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint64",
-        "internalType": "uint64"
-      },
-      {
-        "name": "actual",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
   },
   {
     "type": "error",
