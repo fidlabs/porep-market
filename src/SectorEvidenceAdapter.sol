@@ -35,26 +35,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     using FVMAddress for address;
     using FVMMiner for uint64;
 
-    /**
-     * @notice Version of the canonical ABI-encoded notification payload.
-     */
-    uint8 public constant PAYLOAD_VERSION = 1;
-
     uint104 private constant CANONICAL_COMMP_CID_PREFIX = 0x83d82a5828000181e203922020;
-
-    struct NotificationPayload {
-        uint8 version;
-        uint64 chainId;
-        address adapter;
-        uint256 dealId;
-        bytes32 pieceSetCommitment;
-        uint64 placementNonce;
-    }
-
-    struct ExpectedPlacement {
-        uint64 placementNonce;
-        bool registered;
-    }
 
     struct PlacementInput {
         bytes32 pieceDigest;
@@ -72,7 +53,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         uint64 providerActorId;
         uint64 paddedSize;
         uint64 sectorNumber;
-        uint64 placementNonce;
         int64 minimumCommitmentEpoch;
         CommonTypes.ChainEpoch receiptEpoch;
         bool accepted;
@@ -83,8 +63,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     struct SectorEvidenceAdapterStorage {
         IPoRepMarket _poRepMarket;
         mapping(uint256 dealId => PlacementReceipt receipt) _receipts;
-        mapping(uint256 dealId => ExpectedPlacement placement) _expectedPlacements;
-        mapping(uint64 placementNonce => uint256 dealId) _placementNonces;
         mapping(bytes32 placementKey => uint256 dealId) _placementDeals;
         mapping(uint256 dealId => SharedTypes.EvidenceStatus status) _evidenceStatuses;
         mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _expirations;
@@ -116,13 +94,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     // solhint-disable func-name-mixedcase
 
     /**
-     * @notice Records the per-deal value that the notification payload must contain.
-     * @param dealId PoRep Market deal ID.
-     * @param placementNonce Non-zero value selected before sealing.
-     */
-    event PlacementRegistered(uint256 indexed dealId, uint64 indexed placementNonce);
-
-    /**
      * @notice Records an authenticated sector placement.
      * @param dealId PoRep Market deal ID.
      * @param providerActorId Authenticated miner actor ID.
@@ -131,7 +102,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @param paddedSize Padded piece size reported by the miner.
      * @param minimumCommitmentEpoch Minimum sector commitment epoch.
      * @param pieceSetCommitment Deal manifest commitment reconstructed from the piece.
-     * @param placementNonce Placement nonce from the payload.
      * @param receiptEpoch Epoch when the callback was accepted.
      */
     event PlacementAccepted(
@@ -142,7 +112,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         uint64 paddedSize,
         int64 minimumCommitmentEpoch,
         bytes32 pieceSetCommitment,
-        uint64 placementNonce,
         CommonTypes.ChainEpoch receiptEpoch
     );
     /**
@@ -186,18 +155,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      */
     error InvalidPayloadLength(uint256 length);
     /**
-     * @dev 0x3180c7dd
-     */
-    error UnexpectedPayloadVersion(uint8 version);
-    /**
-     * @dev 0x799638a8
-     */
-    error UnexpectedChainId(uint256 expected, uint256 actual);
-    /**
-     * @dev 0x14057de2
-     */
-    error UnexpectedAdapter(address expected, address actual);
-    /**
      * @dev 0x5d4cdcc4
      */
     error UnexpectedEvidenceAdapter(uint256 dealId, address actual);
@@ -213,30 +170,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @dev 0x75bda749
      */
     error UnexpectedPaddedSize(uint256 expected, uint64 actual);
-    /**
-     * @dev 0x3d015b9e
-     */
-    error UnexpectedPlacementNonce(uint64 expected, uint64 actual);
-    /**
-     * @dev 0xc91367c7
-     */
-    error PlacementNotRegistered(uint256 dealId);
-    /**
-     * @dev 0xb6c4f360
-     */
-    error ConflictingPlacementRegistration(uint256 dealId, uint64 expected, uint64 actual);
-    /**
-     * @dev 0x7834ea65
-     */
-    error PlacementNonceAlreadyAssigned(uint64 nonce, uint256 existingDealId, uint256 requestedDealId);
-    /**
-     * @dev 0x048fdc35
-     */
-    error InvalidPlacementNonce();
-    /**
-     * @dev 0x1ece0326
-     */
-    error InvalidRegistrationLength(uint256 length);
     /**
      * @dev 0xecb06d2e
      */
@@ -295,16 +228,15 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @dev The calldata decoder reads the final `bytes` argument directly from message calldata.
      * @param method Filecoin method number.
      * @param codec Filecoin parameter codec.
-     * @param params CBOR-encoded SectorContentChanged parameters.
      * @return exitCode Filecoin exit code.
      * @return returnCodec Codec for the returned acceptance bitmap.
      * @return returnData CBOR-encoded acceptance bitmap.
      */
-    function handle_filecoin_method(uint64 method, uint64 codec, bytes calldata params)
+    // solhint-disable-next-line use-natspec
+    function handle_filecoin_method(uint64 method, uint64 codec, bytes calldata)
         external
         returns (uint32 exitCode, uint64 returnCodec, bytes memory returnData)
     {
-        params;
         if (method != SECTOR_CONTENT_CHANGED) revert UnexpectedMethod(method);
         if (codec != CBOR_CODEC) revert UnexpectedCodec(codec);
 
@@ -366,8 +298,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     ) external {
         if (msg.sender != address(this)) revert OnlySelf();
         if (!canonicalPieceCid) revert UnexpectedPieceCidHeader();
-        if (payloadBytes.length != 192) revert InvalidPayloadLength(payloadBytes.length);
-        NotificationPayload memory payload = abi.decode(payloadBytes, (NotificationPayload));
+        if (payloadBytes.length != 32) revert InvalidPayloadLength(payloadBytes.length);
+        uint256 dealId = abi.decode(payloadBytes, (uint256));
         PlacementInput memory placement = PlacementInput({
             providerActorId: providerActorId,
             pieceDigest: pieceDigest,
@@ -376,44 +308,19 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             minimumCommitmentEpoch: minimumCommitmentEpoch
         });
 
-        _validatePayload(payload);
-        _validateDealAndPiece(payload, placement);
-        _acceptPlacement(payload, placement);
+        _validateDealAndPiece(dealId, placement);
+        _acceptPlacement(dealId, placement);
     }
 
     // solhint-enable func-name-mixedcase
 
     /// @inheritdoc IStorageEvidenceAdapter
-    function submitEvidenceBatch(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
+    function submitEvidenceBatch(SharedTypes.ActivationContext calldata, bytes calldata)
         external
+        view
         onlyPoRepMarket
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        if (evidenceData.length == 0) return _rejectedActivation();
-        if (evidenceData.length != 32) revert InvalidRegistrationLength(evidenceData.length);
-
-        uint64 placementNonce = abi.decode(evidenceData, (uint64));
-        if (placementNonce == 0) revert InvalidPlacementNonce();
-        _validateRegistrationContext(context);
-
-        SectorEvidenceAdapterStorage storage $ = s();
-        ExpectedPlacement storage expected = $._expectedPlacements[context.dealId];
-        if (expected.registered) {
-            if (expected.placementNonce != placementNonce) {
-                revert ConflictingPlacementRegistration(context.dealId, expected.placementNonce, placementNonce);
-            }
-            return _rejectedActivation();
-        }
-
-        uint256 assignedDealId = $._placementNonces[placementNonce];
-        if (assignedDealId != 0) {
-            revert PlacementNonceAlreadyAssigned(placementNonce, assignedDealId, context.dealId);
-        }
-
-        expected.placementNonce = placementNonce;
-        expected.registered = true;
-        $._placementNonces[placementNonce] = context.dealId;
-        emit PlacementRegistered(context.dealId, placementNonce);
         return _rejectedActivation();
     }
 
@@ -534,17 +441,11 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         return s()._receipts[dealId];
     }
 
-    function _validatePayload(NotificationPayload memory payload) private view {
-        if (payload.version != PAYLOAD_VERSION) revert UnexpectedPayloadVersion(payload.version);
-        if (payload.chainId != block.chainid) revert UnexpectedChainId(block.chainid, payload.chainId);
-        if (payload.adapter != address(this)) revert UnexpectedAdapter(address(this), payload.adapter);
-    }
-
-    function _validateDealAndPiece(NotificationPayload memory payload, PlacementInput memory placement) private view {
+    function _validateDealAndPiece(uint256 dealId, PlacementInput memory placement) private view {
         SectorEvidenceAdapterStorage storage $ = s();
-        PoRepTypes.Deal memory deal = $._poRepMarket.getDeal(payload.dealId);
+        PoRepTypes.Deal memory deal = $._poRepMarket.getDeal(dealId);
         if (deal.evidenceAdapter != address(this)) {
-            revert UnexpectedEvidenceAdapter(payload.dealId, deal.evidenceAdapter);
+            revert UnexpectedEvidenceAdapter(dealId, deal.evidenceAdapter);
         }
 
         uint64 expectedProvider = CommonTypes.FilActorId.unwrap(deal.provider);
@@ -553,12 +454,12 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         }
 
         bytes32 reconstructedCommitment = keccak256(abi.encode(placement.pieceDigest, placement.paddedSize));
-        SharedTypes.DealData memory dealData = $._poRepMarket.getDealData(payload.dealId);
-        if (payload.pieceSetCommitment != reconstructedCommitment || dealData.manifestHash != reconstructedCommitment) {
+        SharedTypes.DealData memory dealData = $._poRepMarket.getDealData(dealId);
+        if (dealData.manifestHash != reconstructedCommitment) {
             revert UnexpectedPieceSetCommitment();
         }
 
-        PoRepTypes.DealTerms memory terms = $._poRepMarket.getDealTerms(payload.dealId);
+        PoRepTypes.DealTerms memory terms = $._poRepMarket.getDealTerms(dealId);
         if (placement.paddedSize != terms.requestedSizeBytes) {
             revert UnexpectedPaddedSize(terms.requestedSizeBytes, placement.paddedSize);
         }
@@ -567,29 +468,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             CommonTypes.ChainEpoch.unwrap(deal.proposedAtEpoch) + int64(uint64(terms.durationEpochs));
         if (placement.minimumCommitmentEpoch < requiredCommitmentEpoch) {
             revert InsufficientCommitmentEpoch(requiredCommitmentEpoch, placement.minimumCommitmentEpoch);
-        }
-
-        ExpectedPlacement memory expected = $._expectedPlacements[payload.dealId];
-        if (!expected.registered) revert PlacementNotRegistered(payload.dealId);
-        if (payload.placementNonce != expected.placementNonce) {
-            revert UnexpectedPlacementNonce(expected.placementNonce, payload.placementNonce);
-        }
-    }
-
-    function _validateRegistrationContext(SharedTypes.ActivationContext calldata context) private view {
-        SectorEvidenceAdapterStorage storage $ = s();
-        PoRepTypes.Deal memory deal = $._poRepMarket.getDeal(context.dealId);
-        if (deal.evidenceAdapter != address(this)) {
-            revert UnexpectedEvidenceAdapter(context.dealId, deal.evidenceAdapter);
-        }
-
-        uint64 expectedProvider = CommonTypes.FilActorId.unwrap(deal.provider);
-        uint64 actualProvider = CommonTypes.FilActorId.unwrap(context.provider);
-        if (actualProvider != expectedProvider) revert UnexpectedProvider(expectedProvider, actualProvider);
-
-        uint256 expectedSize = $._poRepMarket.getDealTerms(context.dealId).requestedSizeBytes;
-        if (context.requestedSizeBytes != expectedSize) {
-            revert UnexpectedPaddedSize(expectedSize, uint64(context.requestedSizeBytes));
         }
     }
 
@@ -603,18 +481,18 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     }
 
     // solhint-disable-next-line function-max-lines
-    function _acceptPlacement(NotificationPayload memory payload, PlacementInput memory placement) private {
-        PlacementReceipt storage existing = s()._receipts[payload.dealId];
+    function _acceptPlacement(uint256 dealId, PlacementInput memory placement) private {
+        PlacementReceipt storage existing = s()._receipts[dealId];
+        bytes32 pieceSetCommitment = keccak256(abi.encode(placement.pieceDigest, placement.paddedSize));
         if (existing.accepted) {
             if (
                 existing.providerActorId != placement.providerActorId
                     || existing.pieceCidDigest != placement.pieceDigest || existing.paddedSize != placement.paddedSize
                     || existing.sectorNumber != placement.sectorNumber
                     || existing.minimumCommitmentEpoch != placement.minimumCommitmentEpoch
-                    || existing.pieceSetCommitment != payload.pieceSetCommitment
-                    || existing.placementNonce != payload.placementNonce
+                    || existing.pieceSetCommitment != pieceSetCommitment
             ) {
-                revert ConflictingPlacement(payload.dealId);
+                revert ConflictingPlacement(dealId);
             }
             return;
         }
@@ -623,33 +501,31 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             abi.encode(placement.providerActorId, placement.sectorNumber, placement.pieceDigest, placement.paddedSize)
         );
         uint256 existingDealId = s()._placementDeals[placementKey];
-        if (existingDealId != 0) revert PlacementAlreadyAssigned(existingDealId, payload.dealId);
+        if (existingDealId != 0) revert PlacementAlreadyAssigned(existingDealId, dealId);
 
         CommonTypes.ChainEpoch receiptEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
-        s()._receipts[payload.dealId] = PlacementReceipt({
-            dealId: payload.dealId,
+        s()._receipts[dealId] = PlacementReceipt({
+            dealId: dealId,
             providerActorId: placement.providerActorId,
             pieceCidDigest: placement.pieceDigest,
             paddedSize: placement.paddedSize,
             sectorNumber: placement.sectorNumber,
             minimumCommitmentEpoch: placement.minimumCommitmentEpoch,
-            pieceSetCommitment: payload.pieceSetCommitment,
-            placementNonce: payload.placementNonce,
+            pieceSetCommitment: pieceSetCommitment,
             receiptEpoch: receiptEpoch,
             accepted: true,
             activated: false
         });
-        s()._placementDeals[placementKey] = payload.dealId;
+        s()._placementDeals[placementKey] = dealId;
 
         emit PlacementAccepted(
-            payload.dealId,
+            dealId,
             placement.providerActorId,
             placement.sectorNumber,
             placement.pieceDigest,
             placement.paddedSize,
             placement.minimumCommitmentEpoch,
-            payload.pieceSetCommitment,
-            payload.placementNonce,
+            pieceSetCommitment,
             receiptEpoch
         );
     }
