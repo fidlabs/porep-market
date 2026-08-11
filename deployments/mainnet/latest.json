@@ -1,5 +1,6 @@
 {
   "status": "finalized",
+  "finalizedAt": "2026-08-07T10:12:50.879Z",
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",
   "release": {
     "buildInfoSha256": "0x0314b25a424a6ce18e519d3fb4ec84195913deeda99883ddc6c8655543fc613f"
@@ -91,7 +92,9 @@
     "Operator": "0x49973179b491d9fF46A0a63148403578AcCb98bA",
     "Oracle": "0x8982B31cA0D5534E7202b1D55884aD300c3d5d93",
     "PoRepService": "0x70dA3d219CD3A55f09629c05d283E4457E5E7aeC",
-    "TerminationOracle": "0x12E87EBc615a360BE31E27abE4aCC9caf6Ce894F"
+    "TerminationOracle": "0x12E87EBc615a360BE31E27abE4aCC9caf6Ce894F",
+    "USDFC": "0x80B98d3aa09ffff255c3ba4A241111Ff1262F045",
+    "AxlUSDC": "0xEB466342C4d449BC9f53A865D5Cb90586f405215"
   },
   "transactions": [
     {
@@ -240,7 +243,20 @@
       "blockNumber": 6259674,
       "blockHash": "0x33e1ae766563aed1e3330c87313a6c1ebd1ea54b3c13fd6a24f7476788a9b9aa",
       "contractAddress": "0x7cb6c25b78e20d790934c3308a2b7c75db9fe374"
+    },
+    {
+      "hash": "0x59a7bdf458d9748806dc9e65247ab69cee3b09625f08e762922a004bebdad9d0",
+      "status": 1,
+      "blockNumber": 6271268,
+      "blockHash": "0x9bc6a5835b648294c5867b85bbb98077c12f4466f95883d71f5ec78fe1e1dd49",
+      "contractAddress": null
+    },
+    {
+      "hash": "0x300bfc143b87d5439e644b9ed74c40b90dd40c4e8ab0b1a74e8fb359afefc655",
+      "status": 1,
+      "blockNumber": 6271270,
+      "blockHash": "0x7b9d11ba3a2f687ade1135f5e4afd366dc08e311b1a77d7fe8b8e4c46e9a442b",
+      "contractAddress": null
     }
-  ],
-  "finalizedAt": "2026-08-07T10:12:50.879Z"
+  ]
 }
