@@ -46,6 +46,8 @@ contract Deploy is DeployUtils {
     address internal poRepService;
     address internal operatorAddress;
     address internal metaAllocator;
+    address internal usdfc;
+    address internal axlUsdc;
 
     function run() external {
         string memory outputPath = vm.envString("DEPLOYMENT_OUTPUT");
@@ -58,6 +60,8 @@ contract Deploy is DeployUtils {
         poRepService = vm.envAddress("POREP_SERVICE");
         operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
         metaAllocator = vm.envAddress("META_ALLOCATOR");
+        usdfc = vm.envOr("USDFC", address(0));
+        axlUsdc = vm.envOr("AXL_USDC", address(0));
 
         vm.startBroadcast(admin);
 
@@ -77,6 +81,8 @@ contract Deploy is DeployUtils {
         PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
         ValidatorFactory(validatorFactory).initialize2(filecoinPay, poRepMarket);
         SPRegistry(spRegistry).initialize2(poRepMarket);
+        _configurePaymentToken(usdfc);
+        _configurePaymentToken(axlUsdc);
 
         if (operatorAddress != address(0)) {
             SPRegistry(spRegistry).grantRole(SPRegistry(spRegistry).OPERATOR_ROLE(), operatorAddress);
@@ -88,6 +94,10 @@ contract Deploy is DeployUtils {
         vm.stopBroadcast();
 
         vm.writeJson(_serializePendingManifest(buildInfoSha256), outputPath, ".result");
+    }
+
+    function _configurePaymentToken(address token) private {
+        if (token != address(0)) SPRegistry(spRegistry).setPaymentToken(token, true, 1);
     }
 
     function _deployValidatorFactory(address _admin)
@@ -267,6 +277,8 @@ contract Deploy is DeployUtils {
         json.serialize("MetaAllocator", metaAllocator);
         json.serialize("TerminationOracle", terminationOracle);
         json.serialize("Oracle", oracleAddress);
+        if (usdfc != address(0)) json.serialize("USDFC", usdfc);
+        if (axlUsdc != address(0)) json.serialize("AxlUSDC", axlUsdc);
         return json.serialize("Operator", operatorAddress);
     }
 }

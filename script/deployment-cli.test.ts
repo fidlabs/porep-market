@@ -5,7 +5,15 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
-import { installSignalHandling, mergeMissingHelpers, mergeTransactions, networkConfigs, runProcess, writeAtomicFile } from "./deployment.ts";
+import {
+  applyPaymentTokenPolicy,
+  installSignalHandling,
+  mergeMissingHelpers,
+  mergeTransactions,
+  networkConfigs,
+  runProcess,
+  writeAtomicFile,
+} from "./deployment.ts";
 import { parseDeploymentManifest } from "./deployment-state.ts";
 import { confirmBlockscoutSource, verifyContractSources } from "./deployment-sources.ts";
 
@@ -48,6 +56,7 @@ test("rejects invalid command lines", () => {
   assert.match(run(["deploy", "localnet"]).stderr, /unsupported network/);
   assert.match(run(["deploy", "devnet", "bad"]).stderr, /unsupported deploy arguments/);
   assert.match(run(["deploy-missing", "devnet", "bad"]).stderr, /does not accept arguments/);
+  assert.match(run(["configure-payment-tokens", "devnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["upgrade", "devnet"]).stderr, /requires at least one target/);
   assert.match(run(["check-live", "devnet", "bad"]).stderr, /does not accept arguments/);
 });
@@ -57,6 +66,23 @@ test("maps the three Filecoin networks explicitly", () => {
   assert.equal(networkConfigs.calibnet.chainId, 314159);
   assert.equal(networkConfigs.mainnet.chainId, 314);
   assert.equal(networkConfigs.mainnet.rpcVariable, "RPC_MAINNET");
+  assert.deepEqual(networkConfigs.calibnet.paymentTokens, [
+    { name: "USDFC", address: "0xb3042734b608a1B16e9e86B374A3f3e389B4cDf0" },
+  ]);
+  assert.deepEqual(networkConfigs.mainnet.paymentTokens, [
+    { name: "USDFC", address: "0x80B98d3aa09ffff255c3ba4A241111Ff1262F045" },
+    { name: "AxlUSDC", address: "0xEB466342C4d449BC9f53A865D5Cb90586f405215" },
+  ]);
+});
+
+test("adds the configured payment tokens without replacing deployment state", () => {
+  const source = parseDeploymentManifest(readFileSync("deployments/mainnet/latest.json", "utf8"));
+  const result = applyPaymentTokenPolicy(source, networkConfigs.mainnet.paymentTokens, []);
+
+  assert.deepEqual(result.contracts, source.contracts);
+  assert.deepEqual(result.transactions, source.transactions);
+  assert.equal(result.externalDependencies.USDFC, networkConfigs.mainnet.paymentTokens[0].address);
+  assert.equal(result.externalDependencies.AxlUSDC, networkConfigs.mainnet.paymentTokens[1].address);
 });
 
 test("adds the two missing release helpers without replacing existing contracts", () => {

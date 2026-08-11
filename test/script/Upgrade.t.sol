@@ -8,12 +8,14 @@ import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/U
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {Deploy} from "../../script/Deploy.s.sol";
+import {ConfigurePaymentTokens} from "../../script/ConfigurePaymentTokens.s.sol";
 import {Upgrade} from "../../script/Upgrade.s.sol";
 import {DeployUtils} from "../../script/utils/DeployUtils.sol";
 import {ValidatorFactory} from "../../src/ValidatorFactory.sol";
 import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {DataCapEvidenceAdapter} from "../../src/DataCapEvidenceAdapter.sol";
 import {SPRegistry} from "../../src/SPRegistry.sol";
+import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
 
 interface IAccessProbe {
     function hasRole(bytes32 role, address account) external view returns (bool);
@@ -88,6 +90,8 @@ contract DeploymentScriptsTest is Test {
         _envAddress("TERMINATION_ORACLE", termination);
         _envAddress("META_ALLOCATOR", address(0x104));
         _envAddress("OPERATOR_ADDR", address(0));
+        _envAddress("USDFC", address(0x105));
+        _envAddress("AXL_USDC", address(0x106));
         if (vm.exists("./.deployment/deploy-run.json")) vm.removeFile("./.deployment/deploy-run.json");
         vm.writeFile("./.deployment/deploy-run.json", "{\"result\":{}}");
 
@@ -117,11 +121,36 @@ contract DeploymentScriptsTest is Test {
         assertTrue(DataCapEvidenceAdapter(adapter).isOperational());
         assertTrue(IAccessProbe(market).hasRole(PoRepMarket(market).POREP_SERVICE_ROLE(), service));
         assertTrue(IAccessProbe(registry).hasRole(SPRegistry(registry).MARKET_ROLE(), market));
+        _assertPaymentTokens(registry, admin, json);
         assertTrue(
             IAccessProbe(json.readAddress(".result.contracts.SLIOracle.proxy"))
                 .hasRole(keccak256("ORACLE_ROLE"), oracle)
         );
         assertTrue(IAccessProbe(adapter).hasRole(keccak256("TERMINATION_ORACLE"), termination));
+    }
+
+    function _assertPaymentTokens(address registry, address admin, string memory json) private {
+        address usdfc = address(0x105);
+        address axlUsdc = address(0x106);
+        assertEq(json.readAddress(".result.externalDependencies.USDFC"), usdfc);
+        assertEq(json.readAddress(".result.externalDependencies.AxlUSDC"), axlUsdc);
+
+        ISPRegistry.TokenConfig memory config = SPRegistry(registry).getPaymentTokenConfig(usdfc);
+        assertTrue(config.allowed);
+        assertEq(config.minPricePer32GiBPerMonth, 1);
+
+        vm.prank(admin);
+        SPRegistry(registry).setPaymentToken(usdfc, true, 2);
+        _envAddress("SP_REGISTRY", registry);
+        new ConfigurePaymentTokens().run();
+        new ConfigurePaymentTokens().run();
+
+        config = SPRegistry(registry).getPaymentTokenConfig(usdfc);
+        assertTrue(config.allowed);
+        assertEq(config.minPricePer32GiBPerMonth, 1);
+        config = SPRegistry(registry).getPaymentTokenConfig(axlUsdc);
+        assertTrue(config.allowed);
+        assertEq(config.minPricePer32GiBPerMonth, 1);
     }
 
     function _assertUnsupportedTargetRejected() private {

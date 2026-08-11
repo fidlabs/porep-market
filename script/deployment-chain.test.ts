@@ -128,6 +128,7 @@ test("verifies the complete deployment topology", async () => {
   assert.ok(selectors.has("getGlobalEvidenceAdapter()(address)"));
   assert.ok(selectors.has("hasRole(bytes32,address)(bool)"));
   assert.ok(selectors.has("POREPMARKET_CONTRACT()(address)"));
+  assert.ok(selectors.has("getPaymentTokenConfig(address)(bool,uint256)"));
 });
 
 test("rejects a stale Validator beacon-to-factory binding", async () => {
@@ -151,6 +152,7 @@ function manifestWith(contracts: Record<string, ManifestContract>): DeploymentMa
       Oracle: a6,
       TerminationOracle: a7,
       Operator: a4,
+      USDFC: a2,
     },
   };
 }
@@ -207,6 +209,7 @@ function fullRunner(manifest: DeploymentManifest, selectors = new Set<string>())
       selectors.add(signature);
       if (signature.endsWith("_ROLE()(bytes32)") || signature === "TERMINATION_ORACLE()(bytes32)") return hashA;
       if (signature === "hasRole(bytes32,address)(bool)") return "true\n";
+      if (signature === "getPaymentTokenConfig(address)(bool,uint256)") return "true\n1\n";
       return padded(addressResult(manifest, target, signature));
     }
     throw new Error(`unexpected cast arguments: ${args.join(" ")}`);

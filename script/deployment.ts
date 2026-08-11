@@ -39,7 +39,16 @@ import {
 } from "./deployment-chain.ts";
 import { confirmBlockscoutSource, confirmSourcifySource, verifyContractSources } from "./deployment-sources.ts";
 
-const commands = ["deploy", "finalize-deploy", "deploy-missing", "upgrade", "finalize-upgrade", "check-live", "verify-sources"] as const;
+const commands = [
+  "deploy",
+  "finalize-deploy",
+  "deploy-missing",
+  "configure-payment-tokens",
+  "upgrade",
+  "finalize-upgrade",
+  "check-live",
+  "verify-sources",
+] as const;
 const releasePaths = [
   "src",
   "script",
@@ -57,6 +66,7 @@ export const networkConfigs = {
     rpcVariable: "RPC_DEVNET",
     privateKeyVariable: "PRIVATE_KEY_DEVNET",
     environmentSuffix: "DEVNET",
+    paymentTokens: [],
   },
   calibnet: {
     chainId: 314159,
@@ -64,6 +74,9 @@ export const networkConfigs = {
     privateKeyVariable: "PRIVATE_KEY_CALIBNET",
     environmentSuffix: "CALIBNET",
     verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
+    paymentTokens: [
+      { name: "USDFC", address: "0xb3042734b608a1B16e9e86B374A3f3e389B4cDf0" },
+    ],
   },
   mainnet: {
     chainId: 314,
@@ -71,11 +84,16 @@ export const networkConfigs = {
     privateKeyVariable: "PRIVATE_KEY_MAINNET",
     environmentSuffix: "MAINNET",
     verifierUrl: "https://filecoin.blockscout.com/api/",
+    paymentTokens: [
+      { name: "USDFC", address: "0x80B98d3aa09ffff255c3ba4A241111Ff1262F045" },
+      { name: "AxlUSDC", address: "0xEB466342C4d449BC9f53A865D5Cb90586f405215" },
+    ],
   },
 } as const;
 
 type Network = keyof typeof networkConfigs;
 type Command = (typeof commands)[number];
+type PaymentToken = { name: "USDFC" | "AxlUSDC"; address: string };
 type Context = {
   network: Network;
   root: string;
@@ -106,9 +124,21 @@ type DeployOptions = {
   confirmMainnetReplacement: boolean;
 };
 
+type DeploymentDependencies = Record<string, string> & {
+  FilecoinPay: string;
+  TerminationOracle: string;
+  Oracle: string;
+  PoRepService: string;
+  MetaAllocator: string;
+  Operator: string;
+  USDFC?: string;
+  AxlUSDC?: string;
+};
+
 export type SignalHandling = { signal: AbortSignal; dispose: () => void };
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
+const zeroAddress = `0x${"0".repeat(40)}`;
 const networks = Object.keys(networkConfigs) as Network[];
 const usage = `Usage: deployment.ts <command> <network> [args...]\nCommands: ${commands.join(", ")}\nNetworks: ${networks.join(", ")}`;
 const upgradeTargets: Record<string, {
@@ -272,6 +302,61 @@ async function deployMissing(context: Context): Promise<void> {
   }
 
   await finalizeDeploy(context, true);
+}
+
+async function configurePaymentTokens(context: Context): Promise<void> {
+  const policy = paymentTokenPolicy(context);
+  if (policy.length === 0) throw new Error(`no payment tokens are defined for ${context.network}`);
+
+  const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
+  phase("Payment-token configuration preflight");
+  await broadcastPreflight(context);
+  ensureNoPendingOperation(context);
+
+  const path = canonicalManifestPath(context);
+  ensureFile(path, `canonical ${context.network} deployment`);
+  await ensureCleanCanonicalManifest(context);
+  const sourceBytes = readFileSync(path);
+  const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
+  if (source.status !== "finalized") throw new Error("canonical manifest must be finalized");
+  const registry = spRegistryProxy(source);
+
+  for (const token of policy) await ensureTokenHasCode(context, token);
+  const needsBroadcast = (await Promise.all(
+    policy.map((token) => paymentTokenIsConfigured(context, registry, token.address)),
+  )).some((configured) => !configured);
+
+  let receipts: DeploymentTransaction[] = [];
+  if (needsBroadcast) {
+    console.error(`SPRegistry: ${registry}`);
+    for (const token of policy) console.error(`  ${token.name}: ${token.address}, allowed=true, minimum=1`);
+
+    const workspace = mkdtempSync(join(tmpdir(), "porep-configure-payment-tokens-"));
+    try {
+      phase("Broadcast payment-token configuration");
+      await runConfigurePaymentTokensScript(context, workspace, registry, privateKey, policy);
+      const broadcast = findBroadcast(context, workspace, "ConfigurePaymentTokens.s.sol");
+      if (broadcast === undefined) throw new Error("Forge did not produce payment-token broadcast evidence");
+      phase("Confirm transactions and Filecoin finality");
+      receipts = await finalizedReceipts(context, broadcast, rpc(context));
+    } finally {
+      rmSync(workspace, { recursive: true, force: true });
+    }
+  }
+
+  for (const token of policy) {
+    if (!(await paymentTokenIsConfigured(context, registry, token.address))) {
+      throw new Error(`${token.name} payment-token configuration did not match after broadcast`);
+    }
+  }
+
+  const result = applyPaymentTokenPolicy(source, policy, receipts);
+  const resultBytes = json(result);
+  if (resultBytes !== sourceBytes.toString("utf8")) {
+    phase("Update deployment manifest");
+    writeAtomicFile(path, resultBytes);
+  }
+  console.error(needsBroadcast ? "Payment tokens configured" : "Payment tokens already configured");
 }
 
 async function upgrade(context: Context, targets: readonly string[]): Promise<void> {
@@ -452,6 +537,10 @@ async function runCli(args: readonly string[], signal?: AbortSignal): Promise<vo
     case "deploy-missing":
       noArguments(command, rest);
       await deployMissing(context);
+      return;
+    case "configure-payment-tokens":
+      noArguments(command, rest);
+      await configurePaymentTokens(context);
       return;
     case "upgrade":
       if (rest.length === 0) throw new Error("upgrade requires at least one target");
@@ -651,11 +740,44 @@ async function runDeployScript(
     POREP_SERVICE: dependencies.PoRepService,
     META_ALLOCATOR: dependencies.MetaAllocator,
     OPERATOR_ADDR: dependencies.Operator,
+    USDFC: dependencies.USDFC ?? zeroAddress,
+    AXL_USDC: dependencies.AxlUSDC ?? zeroAddress,
     BUILD_INFO_SHA256: build.hash,
     DEPLOYMENT_OUTPUT: output,
     FOUNDRY_BROADCAST: join(workspace, "broadcast"),
   };
   await runForgeScript(context, "script/Deploy.s.sol:Deploy", build, privateKey, environment);
+}
+
+async function runConfigurePaymentTokensScript(
+  context: Context,
+  workspace: string,
+  registry: string,
+  privateKey: string,
+  policy: readonly PaymentToken[],
+): Promise<void> {
+  const dependencies = Object.fromEntries(policy.map((token) => [token.name, token.address]));
+  await runProcess(
+    context.forge,
+    [
+      "script", "script/ConfigurePaymentTokens.s.sol:ConfigurePaymentTokens", "--root", context.root,
+      "--broadcast", "--rpc-url", rpc(context), "--private-key", privateKey,
+      "--gas-estimate-multiplier", "100000", "--slow",
+    ],
+    {
+      environment: {
+        ...context.environment,
+        PRIVATE_KEY: privateKey,
+        RPC_URL: rpc(context),
+        SP_REGISTRY: registry,
+        USDFC: dependencies.USDFC ?? zeroAddress,
+        AXL_USDC: dependencies.AxlUSDC ?? zeroAddress,
+        FOUNDRY_BROADCAST: join(workspace, "broadcast"),
+      },
+      signal: context.signal,
+      terminal: true,
+    },
+  );
 }
 
 async function runUpgradeScript(
@@ -798,6 +920,20 @@ export function mergeTransactions(
 ): DeploymentTransaction[] {
   const hashes = new Set(receipts.map((receipt) => receipt.hash));
   return [...(prior ?? []).filter((transaction) => !hashes.has(transaction.hash)), ...receipts];
+}
+
+export function applyPaymentTokenPolicy(
+  source: DeploymentManifest,
+  policy: readonly PaymentToken[],
+  receipts: readonly DeploymentTransaction[],
+): DeploymentManifest {
+  const externalDependencies = structuredClone(source.externalDependencies);
+  for (const token of policy) externalDependencies[token.name] = token.address;
+  return {
+    ...source,
+    externalDependencies,
+    transactions: mergeTransactions(source.transactions, receipts),
+  };
 }
 
 function ensureHelpersAreMissing(manifest: DeploymentManifest): void {
@@ -969,16 +1105,9 @@ function pruneBuildInfo(context: Context, retainedHash: string): void {
   }
 }
 
-function deploymentDependencies(context: Context): Record<string, string> & {
-  FilecoinPay: string;
-  TerminationOracle: string;
-  Oracle: string;
-  PoRepService: string;
-  MetaAllocator: string;
-  Operator: string;
-} {
+function deploymentDependencies(context: Context): DeploymentDependencies {
   const suffix = networkConfigs[context.network].environmentSuffix;
-  return {
+  const dependencies: DeploymentDependencies = {
     FilecoinPay: required(context, `FILECOIN_PAY_${suffix}`),
     TerminationOracle: required(context, `TERMINATION_ORACLE_${suffix}`),
     Oracle: required(context, `ORACLE_${suffix}`),
@@ -986,6 +1115,43 @@ function deploymentDependencies(context: Context): Record<string, string> & {
     MetaAllocator: required(context, `META_ALLOCATOR_${suffix}`),
     Operator: required(context, `OPERATOR_ADDR_${suffix}`),
   };
+  for (const token of paymentTokenPolicy(context)) dependencies[token.name] = token.address;
+  return dependencies;
+}
+
+function paymentTokenPolicy(context: Context): readonly PaymentToken[] {
+  return networkConfigs[context.network].paymentTokens;
+}
+
+function spRegistryProxy(manifest: DeploymentManifest): string {
+  const registry = manifest.contracts.SPRegistry;
+  if (registry === undefined || registry.kind !== "uups") {
+    throw new Error("manifest SPRegistry must be a uups contract");
+  }
+  return registry.proxy;
+}
+
+async function ensureTokenHasCode(context: Context, token: PaymentToken): Promise<void> {
+  const code = (await runProcess(
+    context.cast,
+    ["code", token.address, "--rpc-url", rpc(context)],
+    { signal: context.signal },
+  )).trim();
+  if (!/^0x(?:[0-9a-fA-F]{2})+$/.test(code)) {
+    throw new Error(`${token.name} has no runtime bytecode at ${token.address}`);
+  }
+}
+
+async function paymentTokenIsConfigured(context: Context, registry: string, token: string): Promise<boolean> {
+  const output = (await runProcess(
+    context.cast,
+    ["call", registry, "getPaymentTokenConfig(address)(bool,uint256)", token, "--rpc-url", rpc(context)],
+    { signal: context.signal },
+  )).trim().split(/\s+/);
+  if (output.length !== 2 || !["true", "false"].includes(output[0]!) || !/^\d+$/.test(output[1]!)) {
+    throw new Error(`SPRegistry returned an invalid payment-token configuration for ${token}`);
+  }
+  return output[0] === "true" && output[1] === "1";
 }
 
 function required(context: Context, name: string): string {
