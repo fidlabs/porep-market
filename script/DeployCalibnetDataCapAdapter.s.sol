@@ -6,12 +6,6 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {CalibnetDataCapAdapter} from "../src/CalibnetDataCapAdapter.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 
-interface ICalibnetDataCapAdapterProxy {
-    function UPGRADER_ROLE() external view returns (bytes32);
-    function hasRole(bytes32 role, address account) external view returns (bool);
-    function upgradeToAndCall(address newImplementation, bytes calldata data) external;
-}
-
 contract DeployCalibnetDataCapAdapter is DeployUtils {
     using stdJson for string;
 
@@ -53,7 +47,7 @@ contract DeployCalibnetDataCapAdapter is DeployUtils {
 
         uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(privateKey);
-        ICalibnetDataCapAdapterProxy adapter = ICalibnetDataCapAdapterProxy(proxy);
+        CalibnetDataCapAdapter adapter = CalibnetDataCapAdapter(proxy);
         if (!adapter.hasRole(adapter.UPGRADER_ROLE(), deployer)) revert MissingUpgraderRole(deployer);
 
         vm.startBroadcast(deployer);
