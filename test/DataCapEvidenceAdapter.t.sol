@@ -3,6 +3,7 @@
 pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
+import {CalibnetDataCapAdapter} from "../src/CalibnetDataCapAdapter.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
@@ -1381,6 +1382,31 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.prank(clientAddress);
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAllocatedBytes.selector));
         dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+    }
+
+    function testCalibnetAdapterAllowsNoAllocations() public {
+        vm.chainId(314159);
+        dataCapEvidenceAdapter = DataCapEvidenceAdapter(setupProxy(address(new CalibnetDataCapAdapter())));
+        poRepMarketMock.setDealTerms(dealId, PoRepTypes.DealTerms({requestedSizeBytes: 2048, durationEpochs: 0}));
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.finishDataCapPosting(dealId);
+
+        assertTrue(dataCapEvidenceAdapter.isDataCapPostingFinished(dealId));
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 0);
+        assertEq(dataCapEvidenceAdapter.getDealAllocationStatus(dealId), DataCapAllocationStatus.ALLOCATED);
+    }
+
+    function testCalibnetAdapterDeploymentRevertsOutsideCalibnet() public {
+        vm.chainId(314);
+        vm.expectRevert(abi.encodeWithSelector(CalibnetDataCapAdapter.UnsupportedChainId.selector, 314));
+        new CalibnetDataCapAdapter();
+    }
+
+    function testCalibnetAdapterDeploymentRevertsOnDevnet() public {
+        vm.chainId(31415926);
+        vm.expectRevert(abi.encodeWithSelector(CalibnetDataCapAdapter.UnsupportedChainId.selector, 31415926));
+        new CalibnetDataCapAdapter();
     }
 
     function testRefreshEvidenceStatusActiveWhenAllClaimsValid() public {
