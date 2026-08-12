@@ -31,6 +31,12 @@ contract SectorEvidenceAdapterV2 is SectorEvidenceAdapter {
     }
 }
 
+contract CompactableFVMMinerActor is FVMMinerActor {
+    function mockSectorCompacted(uint64 sector) external {
+        delete _sectors[sector];
+    }
+}
+
 contract SectorEvidenceMarketMock {
     mapping(uint256 dealId => PoRepTypes.Deal deal) private _deals;
     mapping(uint256 dealId => SharedTypes.DealData data) private _dealData;
@@ -377,9 +383,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), int64(uint64(expiration)));
 
         vm.roll(901);
-        vm.expectRevert(
-            abi.encodeWithSelector(FVMSector.ValidateSectorStatusFailed.selector, int256(uint256(USR_NOT_FOUND)))
-        );
+        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.SectorStatusUnavailable.selector, SECTOR));
         market.refresh(adapter, _context(DEAL_ID, PROVIDER), abi.encode(deadline + 1, partition));
 
         SharedTypes.EvidenceStatus memory current = market.current(adapter, _context(DEAL_ID, PROVIDER));
@@ -408,6 +412,29 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
     }
 
+    function testCompactedSectorOverwritesActiveEvidence() public {
+        int64 deadline = 4;
+        int64 partition = 7;
+        _notify(DEAL_ID, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        market.activate(adapter, _context(DEAL_ID, PROVIDER));
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, 600_000);
+
+        vm.roll(900);
+        market.refresh(adapter, _context(DEAL_ID, PROVIDER), abi.encode(deadline, partition));
+        _compactSector(SECTOR);
+
+        vm.roll(901);
+        SharedTypes.EvidenceStatus memory refreshed =
+            market.refresh(adapter, _context(DEAL_ID, PROVIDER), abi.encode(deadline, partition));
+
+        assertEq(refreshed.result, EvidenceResult.INACTIVE);
+        assertEq(refreshed.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(refreshed.lastEvidenceRefreshEpoch), 901);
+        assertEq(refreshed.checkedClaims, 1);
+        assertEq(refreshed.totalClaims, 1);
+        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
+    }
+
     function testExpirationLookupFailureDoesNotStoreActiveEvidence() public {
         int64 deadline = 4;
         int64 partition = 7;
@@ -426,6 +453,39 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(current.activeCoveredBytes, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(current.lastEvidenceRefreshEpoch), 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
+    }
+
+    function testZeroExpirationDoesNotStoreActiveEvidence() public {
+        int64 deadline = 4;
+        int64 partition = 7;
+        _notify(DEAL_ID, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        market.activate(adapter, _context(DEAL_ID, PROVIDER));
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, 0);
+
+        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.InvalidSectorExpiration.selector, uint64(0)));
+        market.refresh(adapter, _context(DEAL_ID, PROVIDER), abi.encode(deadline, partition));
+
+        SharedTypes.EvidenceStatus memory current = market.current(adapter, _context(DEAL_ID, PROVIDER));
+        assertEq(current.result, EvidenceResult.INACTIVE);
+        assertEq(current.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(current.lastEvidenceRefreshEpoch), 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
+    }
+
+    function testExpirationAboveInt64DoesNotStoreActiveEvidence() public {
+        int64 deadline = 4;
+        int64 partition = 7;
+        uint64 expiration = uint64(1) << 63;
+        _notify(DEAL_ID, SECTOR, MINIMUM_COMMITMENT_EPOCH);
+        market.activate(adapter, _context(DEAL_ID, PROVIDER));
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, expiration);
+
+        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.InvalidSectorExpiration.selector, expiration));
+        market.refresh(adapter, _context(DEAL_ID, PROVIDER), abi.encode(deadline, partition));
+
+        SharedTypes.EvidenceStatus memory current = market.current(adapter, _context(DEAL_ID, PROVIDER));
+        assertEq(current.result, EvidenceResult.INACTIVE);
+        assertEq(CommonTypes.ChainEpoch.unwrap(current.lastEvidenceRefreshEpoch), 0);
     }
 
     function testInsufficientCommitmentEpochIsRejected() public {
@@ -562,6 +622,13 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         SectorEvidenceAdapter implementation = new SectorEvidenceAdapter();
         bytes memory initData = abi.encodeCall(SectorEvidenceAdapter.initialize, (admin, poRepMarket));
         deployed = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), initData)));
+    }
+
+    function _compactSector(uint64 sector) internal {
+        address minerAddress = PROVIDER.maskedAddress();
+        vm.etch(minerAddress, address(new CompactableFVMMinerActor()).code);
+        CompactableFVMMinerActor(minerAddress).mockSectorCompacted(sector);
+        miner = FVMMinerActor(minerAddress);
     }
 
     function _notifyWithPiece(
