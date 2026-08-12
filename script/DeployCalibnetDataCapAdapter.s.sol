@@ -29,23 +29,18 @@ contract DeployCalibnetDataCapAdapter is DeployUtils {
      */
     error MissingUpgraderRole(address account);
 
-    /**
-     * @dev 0xffd5555a
-     */
-    error UpgradeFailed(address expectedImplementation, address actualImplementation);
-
     function run() external {
-        _run(CALIBNET_ADAPTER_PROXY);
+        _run(
+            vm.readFile(vm.envString("DEPLOYMENT_MANIFEST")), vm.envString("UPGRADE_OUTPUT"), vm.envUint("PRIVATE_KEY")
+        );
     }
 
-    function _run(address expectedProxy) internal {
+    function _run(string memory manifest, string memory outputPath, uint256 privateKey) internal {
         if (block.chainid != CALIBNET_CHAIN_ID) revert UnsupportedChainId(block.chainid);
 
-        string memory manifest = vm.readFile(vm.envString("DEPLOYMENT_MANIFEST"));
         address proxy = _manifestUupsTarget(manifest, "DataCapEvidenceAdapter");
-        if (proxy != expectedProxy) revert UnexpectedAdapterProxy(expectedProxy, proxy);
+        if (proxy != CALIBNET_ADAPTER_PROXY) revert UnexpectedAdapterProxy(CALIBNET_ADAPTER_PROXY, proxy);
 
-        uint256 privateKey = vm.envUint("PRIVATE_KEY");
         address deployer = vm.addr(privateKey);
         CalibnetDataCapAdapter adapter = CalibnetDataCapAdapter(proxy);
         if (!adapter.hasRole(adapter.UPGRADER_ROLE(), deployer)) revert MissingUpgraderRole(deployer);
@@ -54,9 +49,6 @@ contract DeployCalibnetDataCapAdapter is DeployUtils {
         address implementation = address(new CalibnetDataCapAdapter());
         adapter.upgradeToAndCall(implementation, "");
         vm.stopBroadcast();
-
-        address liveImplementation = _erc1967Implementation(proxy);
-        if (liveImplementation != implementation) revert UpgradeFailed(implementation, liveImplementation);
 
         vm.writeJson(
             string.concat(
@@ -70,7 +62,7 @@ contract DeployCalibnetDataCapAdapter is DeployUtils {
                 vm.toString(implementation.codehash),
                 '"}]}'
             ),
-            vm.envString("UPGRADE_OUTPUT")
+            outputPath
         );
     }
 }

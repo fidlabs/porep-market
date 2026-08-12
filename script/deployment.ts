@@ -364,6 +364,9 @@ async function configurePaymentTokens(context: Context): Promise<void> {
 }
 
 async function upgrade(context: Context, targets: readonly string[], variant: UpgradeVariant = "standard"): Promise<void> {
+  if (variant === "calibnet-adapter" && context.network !== "calibnet") {
+    throw new Error("CalibnetDataCapAdapter can only be deployed on calibnet");
+  }
   const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
   phase("Upgrade preflight");
   await broadcastPreflight(context);
@@ -376,7 +379,7 @@ async function upgrade(context: Context, targets: readonly string[], variant: Up
   const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
   const sourceHash = hashRawBytes(sourceBytes);
   validateTargets(source, targets);
-  if (variant === "calibnet-adapter") validateCalibnetAdapterTarget(context, source, targets);
+  if (variant === "calibnet-adapter") validateCalibnetAdapterTarget(source, targets);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-upgrade-ts-"));
   const forgeIoDirectory = join(context.root, ".deployment", `.typescript-upgrade-${randomUUID()}`);
@@ -1037,11 +1040,9 @@ function validateTargets(source: DeploymentManifest, targets: readonly string[])
 }
 
 function validateCalibnetAdapterTarget(
-  context: Context,
   source: DeploymentManifest,
   targets: readonly string[],
 ): void {
-  if (context.network !== "calibnet") throw new Error("CalibnetDataCapAdapter can only be deployed on calibnet");
   if (targets.length !== 1 || targets[0] !== "DataCapEvidenceAdapter") {
     throw new Error("CalibnetDataCapAdapter upgrade target is invalid");
   }

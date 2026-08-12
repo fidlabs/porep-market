@@ -126,19 +126,39 @@ test("renders UUPS and Validator upgrades without mutating the source", () => {
 });
 
 test("records an implementation artifact change for the Calibnet-only adapter", () => {
-  const source = parseDeploymentManifest(JSON.stringify(manifest()));
+  const base = manifest();
+  const { Market, ...contracts } = base.contracts;
+  const source = parseDeploymentManifest(JSON.stringify({
+    ...base,
+    contracts: {
+      ...contracts,
+      DataCapEvidenceAdapter: {
+        ...Market,
+        artifact: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+      },
+    },
+  }));
   const pending = parsePendingOperation(JSON.stringify({
     ...upgradePending(),
+    targets: ["DataCapEvidenceAdapter"],
     operations: [{
       ...upgradePending().operations[0],
-      newArtifact: "src/CalibnetMarket.sol:CalibnetMarket",
+      target: "DataCapEvidenceAdapter",
+      artifact: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+      newArtifact: "src/CalibnetDataCapAdapter.sol:CalibnetDataCapAdapter",
     }],
   }));
   assert.equal(pending.operation, "upgrade");
 
   const upgraded = renderUpgradedManifest(source, pending, [], "2026-08-12T12:00:00Z");
-  assert.equal(upgraded.contracts.Market.artifact, "src/CalibnetMarket.sol:CalibnetMarket");
-  assert.equal(source.contracts.Market.artifact, "src/Market.sol:Market");
+  assert.equal(
+    upgraded.contracts.DataCapEvidenceAdapter.artifact,
+    "src/CalibnetDataCapAdapter.sol:CalibnetDataCapAdapter",
+  );
+  assert.equal(
+    source.contracts.DataCapEvidenceAdapter.artifact,
+    "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+  );
 });
 
 test("accepts retries only from the exact source or exact result", () => {
