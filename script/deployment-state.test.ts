@@ -125,6 +125,22 @@ test("renders UUPS and Validator upgrades without mutating the source", () => {
   assert.equal(upgraded.finalizedAt, finalizedAt);
 });
 
+test("records an implementation artifact change for the Calibnet-only adapter", () => {
+  const source = parseDeploymentManifest(JSON.stringify(manifest()));
+  const pending = parsePendingOperation(JSON.stringify({
+    ...upgradePending(),
+    operations: [{
+      ...upgradePending().operations[0],
+      newArtifact: "src/CalibnetMarket.sol:CalibnetMarket",
+    }],
+  }));
+  assert.equal(pending.operation, "upgrade");
+
+  const upgraded = renderUpgradedManifest(source, pending, [], "2026-08-12T12:00:00Z");
+  assert.equal(upgraded.contracts.Market.artifact, "src/CalibnetMarket.sol:CalibnetMarket");
+  assert.equal(source.contracts.Market.artifact, "src/Market.sol:Market");
+});
+
 test("accepts retries only from the exact source or exact result", () => {
   const deploy = parsePendingOperation(JSON.stringify({ ...deployPending(), resultManifestSha256: nextHash }));
   const upgrade = parsePendingOperation(JSON.stringify(upgradePending()));

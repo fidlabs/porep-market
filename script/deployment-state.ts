@@ -49,6 +49,7 @@ export type UpgradeOperation = {
   target: string;
   kind: "uups" | "beacon";
   artifact: string;
+  newArtifact?: string;
   newImplementation: string;
   newImplementationCodeHash: string;
 };
@@ -228,6 +229,7 @@ function operation(input: unknown, path: string): UpgradeOperation {
     target: string(value.target, `${path}.target`),
     kind: value.kind,
     artifact: string(value.artifact, `${path}.artifact`),
+    ...(value.newArtifact === undefined ? {} : { newArtifact: string(value.newArtifact, `${path}.newArtifact`) }),
     newImplementation: address(value.newImplementation, `${path}.newImplementation`),
     newImplementationCodeHash: hash(value.newImplementationCodeHash, `${path}.newImplementationCodeHash`),
   };
@@ -253,7 +255,12 @@ function applyUpgrade(contracts: Record<string, ManifestContract>, item: Upgrade
     throw new Error(`upgrade operation for ${item.target} did not replace the implementation`);
   }
   if (item.kind === "uups" && target.kind === "uups") {
-    contracts[item.target] = { ...target, implementation: item.newImplementation, implementationCodeHash: item.newImplementationCodeHash };
+    contracts[item.target] = {
+      ...target,
+      artifact: item.newArtifact ?? target.artifact,
+      implementation: item.newImplementation,
+      implementationCodeHash: item.newImplementationCodeHash,
+    };
     return;
   }
   const beacon = contracts.ValidatorBeacon;

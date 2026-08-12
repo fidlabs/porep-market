@@ -57,6 +57,7 @@ test("rejects invalid command lines", () => {
   assert.match(run(["deploy", "devnet", "bad"]).stderr, /unsupported deploy arguments/);
   assert.match(run(["deploy-missing", "devnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["configure-payment-tokens", "devnet", "bad"]).stderr, /does not accept arguments/);
+  assert.match(run(["deploy-calibnet-adapter", "calibnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["upgrade", "devnet"]).stderr, /requires at least one target/);
   assert.match(run(["check-live", "devnet", "bad"]).stderr, /does not accept arguments/);
 });
