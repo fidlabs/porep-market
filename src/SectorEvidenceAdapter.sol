@@ -10,7 +10,7 @@ import {CBOR_CODEC} from "fvm-solidity/FVMCodec.sol";
 import {FVMAddress} from "fvm-solidity/FVMAddress.sol";
 import {SECTOR_CONTENT_CHANGED} from "fvm-solidity/FVMMethod.sol";
 import {FVMMiner} from "fvm-solidity/FVMMiner.sol";
-import {FVMSector, SectorStatus} from "fvm-solidity/FVMSector.sol";
+import {FVMSector, SectorStatus, NO_DEADLINE, NO_PARTITION} from "fvm-solidity/FVMSector.sol";
 import {
     FVMSectorContentChanged,
     PieceChangeIter,
@@ -188,6 +188,10 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @dev 0xaf605f93
      */
     error InvalidSectorExpiration(uint64 expiration);
+    /**
+     * @dev 0x7d44fc3b
+     */
+    error SectorStatusUnavailable(uint64 sectorNumber);
     /**
      * @dev 0x8599d34e
      */
@@ -369,12 +373,20 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         bool active;
         uint64 expiration;
         if (receiptMatches) {
-            active = FVMSector.validateSectorStatus(
+            (bool statusAvailable, bool isActive) = FVMSector.tryValidateSectorStatus(
                 receipt.providerActorId, receipt.sectorNumber, SectorStatus.Active, deadline, partition
             );
+            if (!statusAvailable) {
+                (bool absenceAvailable, bool isDead) = FVMSector.tryValidateSectorStatus(
+                    receipt.providerActorId, receipt.sectorNumber, SectorStatus.Dead, NO_DEADLINE, NO_PARTITION
+                );
+                if (!absenceAvailable || !isDead) revert SectorStatusUnavailable(receipt.sectorNumber);
+            } else {
+                active = isActive;
+            }
             if (active) {
                 expiration = FVMSector.getNominalSectorExpiration(receipt.providerActorId, receipt.sectorNumber);
-                if (expiration >> 63 != 0) revert InvalidSectorExpiration(expiration);
+                if (expiration == 0 || expiration >> 63 != 0) revert InvalidSectorExpiration(expiration);
             }
         }
 

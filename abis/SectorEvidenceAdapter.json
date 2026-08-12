@@ -1135,6 +1135,17 @@
   },
   {
     "type": "error",
+    "name": "SectorStatusUnavailable",
+    "inputs": [
+      {
+        "name": "sectorNumber",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "UUPSUnauthorizedCallContext",
     "inputs": []
   },
@@ -1258,17 +1269,6 @@
         "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "ValidateSectorStatusFailed",
-    "inputs": [
-      {
-        "name": "exitCode",
-        "type": "int256",
-        "internalType": "int256"
       }
     ]
   }
