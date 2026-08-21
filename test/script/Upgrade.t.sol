@@ -251,7 +251,12 @@ contract DeploymentScriptsTest is Test {
         UpgradeableBeacon beacon = new UpgradeableBeacon(validator, vm.addr(1));
         string memory contractsJson = "{";
         for (uint256 i; i < names.length - 1; ++i) {
-            address previous = i == 1 ? address(new LegacyValidatorFactory(address(beacon))) : address(new LegacyUups());
+            address previous;
+            if (i == 1) {
+                previous = address(new LegacyValidatorFactory(address(beacon)));
+            } else {
+                previous = address(new LegacyUups());
+            }
             address proxy = address(new ERC1967Proxy(previous, ""));
             destinations[i] = proxy;
             if (i != 0) contractsJson = string.concat(contractsJson, ",");
