@@ -68,6 +68,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         IPoRepMarket _poRepMarket;
         mapping(uint256 dealId => ManifestReceipt receipt) _manifestReceipts;
         mapping(uint256 dealId => mapping(uint256 wordIndex => uint256 word)) _acceptedPieceIndexes;
+        mapping(uint256 dealId => int64 epoch) _minimumCommitmentEpochs;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SectorEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -334,11 +335,15 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         onlyPoRepMarket
         returns (SharedTypes.ActivationDecision memory decision)
     {
-        ManifestReceipt storage receipt = s()._manifestReceipts[context.dealId];
+        SectorEvidenceAdapterStorage storage $ = s();
+        ManifestReceipt storage receipt = $._manifestReceipts[context.dealId];
+        int64 minimumCommitmentEpoch = $._minimumCommitmentEpochs[context.dealId];
         if (
             receipt.activated || receipt.pieceCount == 0 || receipt.acceptedPieceCount != receipt.pieceCount
                 || receipt.acceptedBytes != context.requestedSizeBytes
                 || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
+                || minimumCommitmentEpoch < 1
+                || uint256(uint64(minimumCommitmentEpoch)) < block.number + context.durationEpochs
         ) {
             return _rejectedActivation();
         }
@@ -477,6 +482,12 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         if (word & bitMask != 0) return;
 
         $._acceptedPieceIndexes[dealId][wordIndex] = word | bitMask;
+        int64 minimumCommitmentEpoch = $._minimumCommitmentEpochs[dealId];
+        if (receipt.acceptedPieceCount == 0) {
+            $._minimumCommitmentEpochs[dealId] = placement.minimumCommitmentEpoch;
+        } else if (minimumCommitmentEpoch != 0 && placement.minimumCommitmentEpoch < minimumCommitmentEpoch) {
+            $._minimumCommitmentEpochs[dealId] = placement.minimumCommitmentEpoch;
+        }
         receipt.acceptedPieceCount += 1;
         receipt.acceptedBytes += placement.paddedSize;
 

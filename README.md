@@ -38,7 +38,9 @@ on the separate `v1` branch.
   [`IStorageEvidenceAdapter`](src/interfaces/IStorageEvidenceAdapter.sol).
 - [`SectorEvidenceAdapter`](src/SectorEvidenceAdapter.sol) validates authenticated
   FIP-0109 placement callbacks against the complete piece-set commitment stored
-  in a deal's `manifestHash`. It records only receipt counts, bytes, and a bitmap.
+  in a deal's `manifestHash`. It records receipt counts, exact bytes, a piece
+  bitmap, and the earliest accepted minimum commitment epoch. Activation requires
+  that epoch to cover the activation block plus the complete deal duration.
 - [`Validator`](src/Validator.sol) is the per-deal FilecoinPay operator. It
   controls the payment rail and delegates settlement decisions to
   `PoRepMarket`.
