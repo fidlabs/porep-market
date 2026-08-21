@@ -180,6 +180,83 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         assertEq(settlement.settleUpto, settlementStartEpoch);
     }
 
+    function testDelayedActivationRejectsProposalBoundCommitmentWithoutStartingService() public {
+        vm.prank(client);
+        market.proposeDeal(_request());
+
+        PoRepTypes.Deal memory proposedDeal = market.getDeal(DEAL_ID);
+        vm.startPrank(validatorAddress);
+        market.updateValidator(DEAL_ID);
+        market.updateRailId(DEAL_ID, 1);
+        vm.stopPrank();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        int64 proposedAtEpoch = CommonTypes.ChainEpoch.unwrap(proposedDeal.proposedAtEpoch);
+        int64 minimumCommitmentEpoch = proposedAtEpoch + DURATION_EPOCHS;
+        assertEq(_notify(PIECE_CID_0, 0, _proof(LEAF_1), SECTOR, minimumCommitmentEpoch).sectors[0].accepted[0], 1);
+        assertEq(_notify(PIECE_CID_1, 1, _proof(LEAF_0), SECTOR + 1, minimumCommitmentEpoch).sectors[0].accepted[0], 1);
+
+        vm.roll(uint256(uint64(proposedAtEpoch + 1)));
+        SharedTypes.ActivationDecision memory decision = market.activateEvidence(DEAL_ID, "");
+
+        assertEq(decision.result, EvidenceResult.REJECTED);
+        assertEq(decision.coveredBytes, 0);
+        assertEq(market.getDeal(DEAL_ID).state, DealState.ACCEPTED);
+        assertEq(market.getDealCapacity(DEAL_ID).committedBytes, 0);
+        assertEq(registry.lastCommittedActualBytes(), 0);
+        assertEq(validator.getRailStatus(), RailStatus.PREPARED);
+        assertEq(validator.modifyRailPaymentCallCount(), 0);
+        PoRepTypes.DealService memory service = market.getDealService(DEAL_ID);
+        assertEq(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch), 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch), 0);
+        assertFalse(adapter.getManifestReceipt(DEAL_ID).activated);
+    }
+
+    function testActivationAcceptsExactBoundaryAndDuplicateReplayDoesNotLowerCommitment() public {
+        vm.prank(client);
+        market.proposeDeal(_request());
+
+        PoRepTypes.Deal memory proposedDeal = market.getDeal(DEAL_ID);
+        vm.startPrank(validatorAddress);
+        market.updateValidator(DEAL_ID);
+        market.updateRailId(DEAL_ID, 1);
+        vm.stopPrank();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        int64 proposedAtEpoch = CommonTypes.ChainEpoch.unwrap(proposedDeal.proposedAtEpoch);
+        int64 activationEpoch = proposedAtEpoch + 10;
+        int64 activationBoundary = activationEpoch + DURATION_EPOCHS;
+        assertEq(_notify(PIECE_CID_0, 0, _proof(LEAF_1), SECTOR, activationBoundary).sectors[0].accepted[0], 1);
+        assertEq(
+            _notify(PIECE_CID_1, 1, _proof(LEAF_0), SECTOR + 1, activationBoundary + 100).sectors[0].accepted[0], 1
+        );
+
+        SectorEvidenceAdapter.ManifestReceipt memory beforeReplay = adapter.getManifestReceipt(DEAL_ID);
+        assertEq(
+            _notify(PIECE_CID_1, 1, _proof(LEAF_0), SECTOR + 99, proposedAtEpoch + DURATION_EPOCHS)
+            .sectors[0].accepted[0],
+            1
+        );
+        SectorEvidenceAdapter.ManifestReceipt memory afterReplay = adapter.getManifestReceipt(DEAL_ID);
+        assertEq(afterReplay.acceptedPieceCount, beforeReplay.acceptedPieceCount);
+        assertEq(afterReplay.acceptedBytes, beforeReplay.acceptedBytes);
+
+        vm.roll(uint256(uint64(activationEpoch)));
+        SharedTypes.ActivationDecision memory decision = market.activateEvidence(DEAL_ID, "");
+
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(decision.coveredBytes, REQUESTED_SIZE);
+        assertEq(market.getDeal(DEAL_ID).state, DealState.ACTIVE);
+        assertEq(market.getDealCapacity(DEAL_ID).committedBytes, REQUESTED_SIZE);
+        assertEq(registry.lastCommittedActualBytes(), REQUESTED_SIZE);
+        assertEq(validator.getRailStatus(), RailStatus.ACTIVE);
+        assertEq(validator.modifyRailPaymentCallCount(), 1);
+        PoRepTypes.DealService memory service = market.getDealService(DEAL_ID);
+        assertEq(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch), activationEpoch);
+        assertEq(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch), activationBoundary);
+        assertTrue(adapter.getManifestReceipt(DEAL_ID).activated);
+    }
+
     function _request() private view returns (SharedTypes.DealRequest memory) {
         return SharedTypes.DealRequest({
             manifestHash: PIECE_SET_COMMITMENT,

@@ -28,6 +28,10 @@ contract SectorEvidenceAdapterV2 is SectorEvidenceAdapter {
     function version() external pure returns (uint256) {
         return 2;
     }
+
+    function clearMinimumCommitmentEpochForTest(uint256 dealId) external {
+        s()._minimumCommitmentEpochs[dealId] = 0;
+    }
 }
 
 contract SectorEvidenceMarketMock {
@@ -226,6 +230,31 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertFalse(afterReceipt.activated);
         assertTrue(upgraded.isPieceAccepted(DEAL_ID, 1));
         assertEq(address(upgraded.POREP_MARKET()), address(market));
+
+        _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR + 1);
+        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 2);
+        SharedTypes.ActivationDecision memory decision =
+            market.activate(upgraded, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(decision.coveredBytes, REQUESTED_SIZE);
+    }
+
+    function testUpgradeLeavesReceiptWithoutCommitmentEpochFailClosed() public {
+        _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
+
+        SectorEvidenceAdapterV2 nextImplementation = new SectorEvidenceAdapterV2();
+        adapter.upgradeToAndCall(address(nextImplementation), "");
+        SectorEvidenceAdapterV2 upgraded = SectorEvidenceAdapterV2(address(adapter));
+        upgraded.clearMinimumCommitmentEpochForTest(DEAL_ID);
+
+        _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR + 1);
+        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 2);
+
+        SectorEvidenceAdapter.ManifestReceipt memory receipt = upgraded.getManifestReceipt(DEAL_ID);
+        assertEq(receipt.acceptedPieceCount, PIECE_COUNT);
+        assertEq(receipt.acceptedBytes, REQUESTED_SIZE);
+        assertRejectedActivation(DEAL_ID, PROVIDER, REQUESTED_SIZE);
+        assertFalse(upgraded.getManifestReceipt(DEAL_ID).activated);
     }
 
     function testOnlyUpgraderCanUpgrade() public {
@@ -306,6 +335,17 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(logs.length, 0);
         assertEq(afterReceipt.acceptedPieceCount, beforeReceipt.acceptedPieceCount);
         assertEq(afterReceipt.acceptedBytes, beforeReceipt.acceptedBytes);
+    }
+
+    function testEarliestUniquePieceCommitmentControlsActivation() public {
+        int64 activationEpoch = PROPOSED_AT + 10;
+        int64 exactBoundary = activationEpoch + int64(uint64(DURATION));
+        _assertAccepted(_notifyAtEpoch(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR, exactBoundary + 100));
+        _assertAccepted(_notifyAtEpoch(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR + 1, exactBoundary - 1));
+        _assertAccepted(_notifyAtEpoch(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 2, exactBoundary + 200));
+
+        vm.roll(uint256(uint64(activationEpoch)));
+        assertRejectedActivation(DEAL_ID, PROVIDER, REQUESTED_SIZE);
     }
 
     function testInvalidProofDoesNotRejectValidSiblingInGroupedCallback() public {
