@@ -134,7 +134,7 @@
     "name": "currentEvidenceStatus",
     "inputs": [
       {
-        "name": "context",
+        "name": "",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -230,7 +230,7 @@
     "name": "getExpiration",
     "inputs": [
       {
-        "name": "dealId",
+        "name": "",
         "type": "uint256",
         "internalType": "uint256"
       }
@@ -240,6 +240,52 @@
         "name": "expiration",
         "type": "int64",
         "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "stateMutability": "pure"
+  },
+  {
+    "type": "function",
+    "name": "getManifestReceipt",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "receipt",
+        "type": "tuple",
+        "internalType": "struct SectorEvidenceAdapter.ManifestReceipt",
+        "components": [
+          {
+            "name": "providerActorId",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "pieceCount",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "acceptedPieceCount",
+            "type": "uint32",
+            "internalType": "uint32"
+          },
+          {
+            "name": "activated",
+            "type": "bool",
+            "internalType": "bool"
+          },
+          {
+            "name": "acceptedBytes",
+            "type": "uint256",
+            "internalType": "uint256"
+          }
+        ]
       }
     ],
     "stateMutability": "view"
@@ -253,67 +299,6 @@
         "name": "marketAddress",
         "type": "address",
         "internalType": "address"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
-    "name": "getReceipt",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "receipt",
-        "type": "tuple",
-        "internalType": "struct SectorEvidenceAdapter.PlacementReceipt",
-        "components": [
-          {
-            "name": "pieceCidDigest",
-            "type": "bytes32",
-            "internalType": "bytes32"
-          },
-          {
-            "name": "providerActorId",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "paddedSize",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "sectorNumber",
-            "type": "uint64",
-            "internalType": "uint64"
-          },
-          {
-            "name": "minimumCommitmentEpoch",
-            "type": "int64",
-            "internalType": "int64"
-          },
-          {
-            "name": "receiptEpoch",
-            "type": "int64",
-            "internalType": "CommonTypes.ChainEpoch"
-          },
-          {
-            "name": "accepted",
-            "type": "bool",
-            "internalType": "bool"
-          },
-          {
-            "name": "activated",
-            "type": "bool",
-            "internalType": "bool"
-          }
-        ]
       }
     ],
     "stateMutability": "view"
@@ -451,6 +436,30 @@
   },
   {
     "type": "function",
+    "name": "isPieceAccepted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "pieceIndex",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "accepted",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "processPieceNotification",
     "inputs": [
       {
@@ -510,7 +519,7 @@
     "name": "refreshEvidenceStatus",
     "inputs": [
       {
-        "name": "context",
+        "name": "",
         "type": "tuple",
         "internalType": "struct SharedTypes.ActivationContext",
         "components": [
@@ -547,7 +556,7 @@
         ]
       },
       {
-        "name": "evidenceData",
+        "name": "",
         "type": "bytes",
         "internalType": "bytes"
       }
@@ -591,7 +600,7 @@
         ]
       }
     ],
-    "stateMutability": "nonpayable"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -754,13 +763,19 @@
   },
   {
     "type": "event",
-    "name": "PlacementAccepted",
+    "name": "PiecePlacementAccepted",
     "inputs": [
       {
         "name": "dealId",
         "type": "uint256",
         "indexed": true,
         "internalType": "uint256"
+      },
+      {
+        "name": "pieceIndex",
+        "type": "uint32",
+        "indexed": true,
+        "internalType": "uint32"
       },
       {
         "name": "providerActorId",
@@ -771,7 +786,7 @@
       {
         "name": "sectorNumber",
         "type": "uint64",
-        "indexed": true,
+        "indexed": false,
         "internalType": "uint64"
       },
       {
@@ -793,16 +808,35 @@
         "internalType": "int64"
       },
       {
-        "name": "pieceSetCommitment",
-        "type": "bytes32",
-        "indexed": false,
-        "internalType": "bytes32"
-      },
-      {
         "name": "receiptEpoch",
         "type": "int64",
         "indexed": false,
         "internalType": "CommonTypes.ChainEpoch"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "PieceSetCompleted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
+      },
+      {
+        "name": "pieceCount",
+        "type": "uint32",
+        "indexed": true,
+        "internalType": "uint32"
+      },
+      {
+        "name": "acceptedBytes",
+        "type": "uint256",
+        "indexed": true,
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -818,16 +852,16 @@
         "internalType": "uint256"
       },
       {
-        "name": "sectorNumber",
-        "type": "uint64",
+        "name": "pieceCount",
+        "type": "uint32",
         "indexed": true,
-        "internalType": "uint64"
+        "internalType": "uint32"
       },
       {
         "name": "coveredBytes",
-        "type": "uint64",
+        "type": "uint256",
         "indexed": true,
-        "internalType": "uint64"
+        "internalType": "uint256"
       }
     ],
     "anonymous": false
@@ -970,17 +1004,6 @@
   },
   {
     "type": "error",
-    "name": "ConflictingPlacement",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "ERC1967InvalidImplementation",
     "inputs": [
       {
@@ -999,17 +1022,6 @@
     "type": "error",
     "name": "FailedCall",
     "inputs": []
-  },
-  {
-    "type": "error",
-    "name": "GetNominalSectorExpirationFailed",
-    "inputs": [
-      {
-        "name": "exitCode",
-        "type": "int256",
-        "internalType": "int256"
-      }
-    ]
   },
   {
     "type": "error",
@@ -1060,23 +1072,17 @@
   },
   {
     "type": "error",
-    "name": "InvalidRefreshDataLength",
+    "name": "InvalidProofLength",
     "inputs": [
       {
-        "name": "length",
+        "name": "expected",
         "type": "uint256",
         "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "InvalidSectorExpiration",
-    "inputs": [
+      },
       {
-        "name": "expiration",
-        "type": "uint64",
-        "internalType": "uint64"
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
       }
     ]
   },
@@ -1119,28 +1125,17 @@
   },
   {
     "type": "error",
-    "name": "PlacementAlreadyAssigned",
+    "name": "PieceIndexOutOfBounds",
     "inputs": [
       {
-        "name": "existingDealId",
-        "type": "uint256",
-        "internalType": "uint256"
+        "name": "pieceIndex",
+        "type": "uint32",
+        "internalType": "uint32"
       },
       {
-        "name": "requestedDealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ]
-  },
-  {
-    "type": "error",
-    "name": "SectorStatusUnavailable",
-    "inputs": [
-      {
-        "name": "sectorNumber",
-        "type": "uint64",
-        "internalType": "uint64"
+        "name": "pieceCount",
+        "type": "uint32",
+        "internalType": "uint32"
       }
     ]
   },
@@ -1216,22 +1211,6 @@
   },
   {
     "type": "error",
-    "name": "UnexpectedPaddedSize",
-    "inputs": [
-      {
-        "name": "expected",
-        "type": "uint256",
-        "internalType": "uint256"
-      },
-      {
-        "name": "actual",
-        "type": "uint64",
-        "internalType": "uint64"
-      }
-    ]
-  },
-  {
-    "type": "error",
     "name": "UnexpectedPieceCidHeader",
     "inputs": []
   },
@@ -1243,6 +1222,38 @@
   {
     "type": "error",
     "name": "UnexpectedProvider",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint64",
+        "internalType": "uint64"
+      },
+      {
+        "name": "actual",
+        "type": "uint64",
+        "internalType": "uint64"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnexpectedReceiptPieceCount",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "actual",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "UnexpectedReceiptProvider",
     "inputs": [
       {
         "name": "expected",
@@ -1271,5 +1282,10 @@
         "internalType": "uint256"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "ZeroPieceCount",
+    "inputs": []
   }
 ]

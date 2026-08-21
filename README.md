@@ -36,6 +36,9 @@ on the separate `v1` branch.
   allocations, records Filecoin claims, and reports covered bytes. Evidence
   adapters implement
   [`IStorageEvidenceAdapter`](src/interfaces/IStorageEvidenceAdapter.sol).
+- [`SectorEvidenceAdapter`](src/SectorEvidenceAdapter.sol) validates authenticated
+  FIP-0109 placement callbacks against the complete piece-set commitment stored
+  in a deal's `manifestHash`. It records only receipt counts, bytes, and a bitmap.
 - [`Validator`](src/Validator.sol) is the per-deal FilecoinPay operator. It
   controls the payment rail and delegates settlement decisions to
   `PoRepMarket`.
@@ -75,6 +78,44 @@ The code calls these storage facts **evidence**. Evidence here means the
 on-chain information used to check storage coverage; it does not mean that
 every adapter returns a cryptographic proof. The rest of this README calls it
 the adapter.
+
+### Sector piece-set commitment v1
+
+Before proposing a Sector evidence deal, tooling rejects duplicate rows and
+sorts every data and DAG row by `(PieceCID digest bytes32, paddedSize uint64)`.
+The zero-based index after sorting is part of the leaf. The tree is padded to
+the next power of two with a fixed empty leaf and uses ordered, not commutative,
+left/right hashes:
+
+Duplicate rejection is required because one physical sector piece may carry
+multiple notifications. If the commitment contained the same `(PieceCID,
+paddedSize)` row more than once, those notifications could satisfy several
+bitmap indexes without several stored copies.
+
+```text
+leaf = keccak256(abi.encode(keccak256("PoRepMarket.PieceSet.Leaf"), uint8(1), index, digest, size))
+empty = keccak256(abi.encode(keccak256("PoRepMarket.PieceSet.Empty"), uint8(1)))
+node = keccak256(abi.encode(keccak256("PoRepMarket.PieceSet.Node"), left, right))
+manifestHash = keccak256(abi.encode(
+  keccak256("PoRepMarket.PieceSet.Commitment"), uint8(1), uint32(pieceCount), requestedSizeBytes, root
+))
+```
+
+Each FIP-0109 notification payload is
+`abi.encode(uint256 dealId, uint32 pieceIndex, uint32 pieceCount, bytes32[] proof)`.
+Activation requires every unique index and the exact requested byte total. This
+adapter currently proves initial placement only: current and refreshed evidence
+remain inactive, so paid settlement fails closed until an ongoing-evidence
+policy is implemented.
+
+Before sealing, SP tooling must fetch the complete manifest, recompute
+`manifestHash`, verify that the padded sizes sum to `requestedSizeBytes`, and
+prepare exactly one notification for each row. The ProveCommit or replica-update
+call must set `require_notification_success` to `true`; otherwise a rejected
+notification does not abort sector activation and there is no callback retry
+path. The commitment proves membership in the client-selected piece set, not
+retrievability, continued storage after initial placement, or physical
+placement exclusivity between different deals.
 
 ## Deal lifecycle
 
