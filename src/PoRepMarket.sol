@@ -67,8 +67,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice The maximum value allowed for deal activation padding, in basis points.
+     * @dev 2000 basis points equals 20%.
      */
-    uint256 private constant MAX_DEAL_ACTIVATION_PADDING = 10_000;
+    uint256 private constant MAX_DEAL_ACTIVATION_PADDING = 2_000;
 
     /**
      * @notice Minimum Filecoin deal duration equals 180 days (6 months)
@@ -476,6 +477,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
         $._SLIScorer = ISLIScorer(_SLIScorer);
+        $._dealActivationPadding = 1_000; // 10% default padding
 
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }

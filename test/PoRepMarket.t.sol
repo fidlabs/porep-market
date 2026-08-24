@@ -1266,7 +1266,7 @@ contract PoRepMarketTest is Test {
         );
 
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(5000);
+        poRepMarket.setDealActivationPadding(50);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, terms, expectedManifestLocation));
         vm.prank(address(validator));
@@ -1339,7 +1339,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
@@ -1358,7 +1358,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
@@ -1374,7 +1374,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(10000);
+        poRepMarket.setDealActivationPadding(2_000);
 
         dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
         vm.expectRevert(
@@ -1390,10 +1390,10 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
         uint256 dealAllocationSizeAtTheBottomLimit =
-            defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100 - 1;
+            defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 50) / 10_000 - 1;
 
         dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheBottomLimit)
@@ -1411,9 +1411,10 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
-        uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100 + 1;
+        uint256 dealAllocationSizeAtTheUpperLimit =
+            defaultTerms.dealSizeBytes + (defaultTerms.dealSizeBytes * 50) / 10_000 + 1;
 
         dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheUpperLimit)
@@ -1467,7 +1468,9 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
         dataCapEvidenceAdapterAddress.setDeal(
-            createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1)
+            createClientDealWithAllocationSize(
+                dealId, defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 1_000) / 10_000 - 1
+            )
         );
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -1483,7 +1486,9 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
         dataCapEvidenceAdapterAddress.setDeal(
-            createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1)
+            createClientDealWithAllocationSize(
+                dealId, defaultTerms.dealSizeBytes + (defaultTerms.dealSizeBytes * 1_000) / 10_000 + 1
+            )
         );
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -2644,15 +2649,15 @@ contract PoRepMarketTest is Test {
         uint256 newPadding = 15;
 
         vm.expectEmit(true, false, false, false);
-        emit PoRepMarket.DealActivationPaddingUpdated(0, newPadding);
+        emit PoRepMarket.DealActivationPaddingUpdated(1_000, newPadding);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(newPadding);
     }
 
     function testSetDealActivationPaddingRevertsWhenPaddingTooHigh() public {
-        uint256 newPadding = 10_001;
+        uint256 newPadding = 2_001;
 
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealActivationPaddingTooHigh.selector, newPadding, 10_000));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealActivationPaddingTooHigh.selector, newPadding, 2_000));
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(newPadding);
     }
@@ -2672,7 +2677,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testGetDealActivationPaddingReturnsUpdatedValue() public {
-        assertEq(poRepMarket.getDealActivationPadding(), 0);
+        assertEq(poRepMarket.getDealActivationPadding(), 1_000);
 
         uint256 newPadding = 15;
         vm.prank(adminAddress);
