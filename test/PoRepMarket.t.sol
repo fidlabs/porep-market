@@ -2304,6 +2304,61 @@ contract PoRepMarketTest is Test {
         assertEq(validator.earlyRailTerminationCallCount(), 1);
     }
 
+    function testTerminateDealAtServiceEndEpoch() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        setDealActive(dealId);
+
+        int64 serviceEndEpoch = int64(uint64(block.number + 1));
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+        service.serviceEndEpoch = CommonTypes.ChainEpoch.wrap(serviceEndEpoch);
+        PoRepMarketContractMock(address(poRepMarket)).setDealService(dealId, service);
+        vm.roll(block.number + 1);
+
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
+
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.EARLY_TERMINATED);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealService(dealId).earlyTerminationEpoch), serviceEndEpoch
+        );
+        assertEq(validator.earlyRailTerminationCallCount(), 1);
+    }
+
+    function testTerminateDealRevertsAfterServiceEndEpoch() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        setDealActive(dealId);
+
+        int64 serviceEndEpoch = int64(uint64(block.number + 1));
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+        service.serviceEndEpoch = CommonTypes.ChainEpoch.wrap(serviceEndEpoch);
+        PoRepMarketContractMock(address(poRepMarket)).setDealService(dealId, service);
+        vm.roll(block.number + 2);
+        int64 earlyTerminationEpoch = int64(uint64(block.number));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.ServiceAlreadyEnded.selector, serviceEndEpoch, earlyTerminationEpoch)
+        );
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
+
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.ACTIVE);
+        assertEq(validator.earlyRailTerminationCallCount(), 0);
+    }
+
     function testTerminateDealReleasesCommittedCapacityWithManifestHash() public {
         ValidatorMock validator = new ValidatorMock();
         validatorFactory.setValidator(address(validator), true);

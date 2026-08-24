@@ -395,6 +395,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
 
     /**
+     * @notice Error indicating that a deal can no longer be terminated early because its service has ended
+     * @param serviceEndEpoch The epoch at which the deal service ended
+     * @param currentEpoch The current block epoch
+     * @dev 0x284d2b90
+     */
+    error ServiceAlreadyEnded(int64 serviceEndEpoch, int64 currentEpoch);
+
+    /**
      * @notice Error thrown when there are no billable 32 GiB units for a deal
      * @dev 0x418600bd
      */
@@ -916,6 +924,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         PoRepMarketStorage storage $ = s();
         uint256 dealId = deal.dealId;
         uint8 previousState = deal.state;
+        int64 blockNumber = int64(uint64(block.number));
+        int64 serviceEndEpoch = CommonTypes.ChainEpoch.unwrap($._dealService[dealId].serviceEndEpoch);
+        if (
+            serviceEndEpoch != 0
+                && blockNumber > serviceEndEpoch
+        ) {
+            revert ServiceAlreadyEnded(serviceEndEpoch, blockNumber);
+        }
         _changeDealState(dealId, state);
         if (previousState == DealState.ACCEPTED) {
             $._SPRegistryContract
@@ -929,8 +945,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 );
         }
         IOperator(deal.validator).earlyRailTermination();
-        int64 earlyTerminationEpoch = int64(uint64(block.number));
-        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch);
+        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(blockNumber);
         emit DealTerminated(dealId, $._dealService[dealId].earlyTerminationEpoch);
     }
 
