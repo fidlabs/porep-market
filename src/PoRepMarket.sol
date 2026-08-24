@@ -344,6 +344,18 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error DealServiceNotStarted(uint256 dealId);
 
     /**
+     * @notice Error indicating that the requested settlement window is too short
+     * @dev 0xf92bf145
+     */
+    error SettlementTooEarly();
+
+    /**
+     * @notice Error indicating that the deal evidence is too stale for settlement
+     * @dev 0x5e885a2d
+     */
+    error EvidenceTooStale();
+
+    /**
      * @notice Error indicating that the minimum time between settlements is invalid
      * @dev 0xf90f5b8f
      */
@@ -1269,7 +1281,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             }
         } else {
             if (effectiveToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
-                return _rejectedSettlement(fromEpoch, SettlementReason.TOO_EARLY, "too early for settlement");
+                revert SettlementTooEarly();
             }
 
             if (effectiveToEpoch > serviceEndEpoch) {
@@ -1279,7 +1291,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             }
         }
 
-        // Stale evidence keeps the cursor at fromEpoch for retry; score and size failures advance it to effectiveToEpoch.
+        // Score and size failures advance the cursor to effectiveToEpoch; stale evidence reverts for a later retry.
         {
             SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
             if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
@@ -1296,7 +1308,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 evidenceStatus.result == EvidenceResult.INACTIVE
                     || lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch
             ) {
-                return _rejectedSettlement(fromEpoch, SettlementReason.EVIDENCE_TOO_STALE, "evidence refresh too old");
+                revert EvidenceTooStale();
             }
 
             if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {

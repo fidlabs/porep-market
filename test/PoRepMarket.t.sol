@@ -1934,19 +1934,13 @@ contract PoRepMarketTest is Test {
         poRepMarket.validateDealSettlement(dealId, 0, settlementEndEpoch);
     }
 
-    function testValidateDealSettlementReturnsTooEarlyBeforeMinimumSettlementWindow() public {
+    function testValidateDealSettlementRevertsTooEarlyBeforeMinimumSettlementWindow() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
 
+        vm.expectRevert(PoRepMarket.SettlementTooEarly.selector);
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), 200);
-
-        assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, _epochToUint(service.serviceStartEpoch));
-        assertEq(decision.reasonCode, SettlementReason.TOO_EARLY);
-        assertEq(decision.result, SettlementResult.REJECTED);
-        assertEq(decision.note, "too early for settlement");
+        poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), 200);
     }
 
     function testValidateDealSettlementReturnsScoreFailureNote() public {
@@ -1984,7 +1978,7 @@ contract PoRepMarketTest is Test {
         assertEq(decision.note, "data size does not match the deal");
     }
 
-    function testValidateDealSettlementRejectsWhenEvidenceRefreshTooOld() public {
+    function testValidateDealSettlementRevertsWhenEvidenceRefreshTooOld() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
 
@@ -1995,18 +1989,12 @@ contract PoRepMarketTest is Test {
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
         vm.roll(settlementEndEpoch);
 
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
-
-        assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, settlementStartEpoch);
-        assertEq(decision.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
-        assertEq(decision.result, SettlementResult.REJECTED);
-        assertEq(decision.note, "evidence refresh too old");
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
     }
 
-    function testValidateDealSettlementRejectsInactiveEvidenceWithoutAdvancing() public {
+    function testValidateDealSettlementRevertsWithInactiveEvidence() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
 
@@ -2030,15 +2018,9 @@ contract PoRepMarketTest is Test {
             )
         );
 
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
-
-        assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, settlementStartEpoch);
-        assertEq(decision.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
-        assertEq(decision.result, SettlementResult.REJECTED);
-        assertEq(decision.note, "evidence refresh too old");
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
     }
 
     function testValidateDealSettlementAcceptsEvidenceAtRefreshMarginBoundary() public {
