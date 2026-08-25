@@ -901,9 +901,19 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         }
         if (count == 0) return best;
 
+        uint256 bestOfferId = _pickBestOfferId(eligibleOfferIds, eligibleProviders, eligiblePrices, count, cheapest);
+        (best,) = _evaluateOffer(bestOfferId, client, request);
+    }
+
+    function _pickBestOfferId(
+        uint256[] memory eligibleOfferIds,
+        CommonTypes.FilActorId[] memory eligibleProviders,
+        uint256[] memory eligiblePrices,
+        uint256 count,
+        uint256 cheapest
+    ) internal view returns (uint256 bestOfferId) {
         uint256 maxBandPrice = (cheapest * (MAX_BPS + MATCH_PRICE_BAND_BPS)) / MAX_BPS;
         CommonTypes.FilActorId bestProvider;
-        uint256 bestOfferId;
         uint256 bestPrice;
         uint256 bestLoad = type(uint256).max;
         for (uint256 i = 0; i < count; i++) {
@@ -919,7 +929,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
                 bestOfferId = offerId;
             }
         }
-        (best,) = _evaluateOffer(bestOfferId, client, request);
     }
 
     /**
@@ -956,24 +965,56 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @return selection Offer snapshot returned when the offer is eligible.
      * @return reason Match result code describing eligibility or the first rejection reason.
      */
-    // solhint-disable-next-line function-max-lines
     function _evaluateOffer(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         internal
         view
         returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason)
     {
+        CommonTypes.FilActorId provider;
+        address payee;
+        uint256 pricePer32GiBPerMonth;
+        (reason, provider, payee, pricePer32GiBPerMonth) = _checkOfferEligibility(offerId, client, request);
+        if (reason != OfferMatch.OK) return (selection, reason);
+
+        selection = SharedTypes.ProviderDealSelection({
+            provider: provider,
+            offerId: offerId,
+            paymentToken: request.paymentToken,
+            payee: payee,
+            pricePer32GiBPerMonth: pricePer32GiBPerMonth,
+            promisedSLIs: s()._offerSLIs[offerId],
+            reservedBytes: request.requestedSizeBytes
+        });
+    }
+
+    /**
+     * @notice Checks whether an offer is eligible for a deal request.
+     * @param offerId Offer ID to evaluate.
+     * @param client Client the manifest assignment is scoped to.
+     * @param request Deal request to evaluate against the offer.
+     * @return reason Match result code; OfferMatch.OK when the offer is eligible.
+     * @return provider Offer provider, set when reason is OfferMatch.OK.
+     * @return payee Provider payee, set when reason is OfferMatch.OK.
+     * @return pricePer32GiBPerMonth Offer price, set when reason is OfferMatch.OK.
+     */
+    // solhint-disable-next-line function-max-lines
+    function _checkOfferEligibility(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
+        internal
+        view
+        returns (uint16 reason, CommonTypes.FilActorId provider, address payee, uint256 pricePer32GiBPerMonth)
+    {
         SPRegistryStorage storage $ = s();
         Offer storage offer = $._offers[offerId];
         if (offerId == 0 || _providerId(offer.provider) == 0) {
-            return (selection, OfferMatch.OFFER_NOT_FOUND);
+            return (OfferMatch.OFFER_NOT_FOUND, provider, payee, pricePer32GiBPerMonth);
         }
-        if (!offer.active) return (selection, OfferMatch.OFFER_INACTIVE);
+        if (!offer.active) return (OfferMatch.OFFER_INACTIVE, provider, payee, pricePer32GiBPerMonth);
 
         Provider storage providerInfo = $._providers[_providerId(offer.provider)];
-        if (providerInfo.blocked) return (selection, OfferMatch.PROVIDER_BLOCKED);
-        if (providerInfo.paused) return (selection, OfferMatch.PROVIDER_PAUSED);
+        if (providerInfo.blocked) return (OfferMatch.PROVIDER_BLOCKED, provider, payee, pricePer32GiBPerMonth);
+        if (providerInfo.paused) return (OfferMatch.PROVIDER_PAUSED, provider, payee, pricePer32GiBPerMonth);
         if ($._manifestAssignedToOrganization[client][request.manifestHash][providerInfo.organization]) {
-            return (selection, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
+            return (OfferMatch.MANIFEST_ALREADY_ASSIGNED, provider, payee, pricePer32GiBPerMonth);
         }
 
         SharedTypes.OfferTerms storage terms = $._offerTerms[offerId];
@@ -981,7 +1022,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             request.requestedSizeBytes < terms.minSizeBytes
                 || (terms.maxSizeBytes != 0 && request.requestedSizeBytes > terms.maxSizeBytes)
         ) {
-            return (selection, OfferMatch.SIZE_OUT_OF_BOUNDS);
+            return (OfferMatch.SIZE_OUT_OF_BOUNDS, provider, payee, pricePer32GiBPerMonth);
         }
 
         uint64 durationEpochs = uint64(uint256(request.durationDays) * SharedTypes.EPOCHS_IN_DAY);
@@ -989,38 +1030,34 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             durationEpochs < terms.minDurationEpochs
                 || (terms.maxDurationEpochs != 0 && durationEpochs > terms.maxDurationEpochs)
         ) {
-            return (selection, OfferMatch.DURATION_OUT_OF_BOUNDS);
+            return (OfferMatch.DURATION_OUT_OF_BOUNDS, provider, payee, pricePer32GiBPerMonth);
         }
 
         if (!_meetsRequirements($._offerSLIs[offerId], request.requiredSLIs)) {
-            return (selection, OfferMatch.SLIS_NOT_MET);
+            return (OfferMatch.SLIS_NOT_MET, provider, payee, pricePer32GiBPerMonth);
         }
 
         ISPRegistry.TokenConfig storage config = $._tokenConfig[request.paymentToken];
         RegistryOfferPayment storage payment = $._offerPayments[offerId][request.paymentToken];
-        if (!config.allowed || !payment.active) return (selection, OfferMatch.TOKEN_NOT_ALLOWED);
+        if (!config.allowed || !payment.active) {
+            return (OfferMatch.TOKEN_NOT_ALLOWED, provider, payee, pricePer32GiBPerMonth);
+        }
         uint256 minimum = config.minPricePer32GiBPerMonth == 0 ? 1 : config.minPricePer32GiBPerMonth;
         if (payment.pricePer32GiBPerMonth < minimum) {
-            return (selection, OfferMatch.PRICE_BELOW_TOKEN_MIN);
+            return (OfferMatch.PRICE_BELOW_TOKEN_MIN, provider, payee, pricePer32GiBPerMonth);
         }
         if (payment.pricePer32GiBPerMonth > request.maxPricePer32GiBPerMonth) {
-            return (selection, OfferMatch.PRICE_ABOVE_CLIENT_MAX);
+            return (OfferMatch.PRICE_ABOVE_CLIENT_MAX, provider, payee, pricePer32GiBPerMonth);
         }
 
         if (_remainingCapacity(offer.provider) < request.requestedSizeBytes) {
-            return (selection, OfferMatch.INSUFFICIENT_CAPACITY);
+            return (OfferMatch.INSUFFICIENT_CAPACITY, provider, payee, pricePer32GiBPerMonth);
         }
 
-        selection = SharedTypes.ProviderDealSelection({
-            provider: offer.provider,
-            offerId: offerId,
-            paymentToken: request.paymentToken,
-            payee: providerInfo.payee,
-            pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth,
-            promisedSLIs: $._offerSLIs[offerId],
-            reservedBytes: request.requestedSizeBytes
-        });
         reason = OfferMatch.OK;
+        provider = offer.provider;
+        payee = providerInfo.payee;
+        pricePer32GiBPerMonth = payment.pricePer32GiBPerMonth;
     }
 
     /**
