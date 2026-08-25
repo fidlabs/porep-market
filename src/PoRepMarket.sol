@@ -489,7 +489,8 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     function proposeDeal(SharedTypes.DealRequest calldata request) external override {
         PoRepMarketStorage storage $ = s();
         _ensureValidProposalRequest(request);
-        SharedTypes.ProviderDealSelection memory selection = $._SPRegistryContract.reserveProviderForDeal(request);
+        SharedTypes.ProviderDealSelection memory selection =
+            $._SPRegistryContract.reserveProviderForDeal(msg.sender, request);
 
         _createDeal(request, selection, $);
     }
@@ -508,7 +509,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         PoRepMarketStorage storage $ = s();
         _ensureValidProposalRequest(request);
         SharedTypes.ProviderDealSelection memory reservedProvider =
-            $._SPRegistryContract.reserveOfferForDeal(offerId, request);
+            $._SPRegistryContract.reserveOfferForDeal(offerId, msg.sender, request);
 
         _createDeal(request, reservedProvider, $);
     }
@@ -607,13 +608,13 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // solhint-enable function-max-lines
 
     /// @inheritdoc IPoRepMarket
-    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+    function previewProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
         _ensureValidProposalRequest(request);
-        return s()._SPRegistryContract.previewProviderForDeal(request);
+        return s()._SPRegistryContract.previewProviderForDeal(client, request);
     }
 
     /**
@@ -826,7 +827,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         IOperator(deal.validator).finalizeDeal();
         _changeDealState(dealId, DealState.FINALIZED);
         $._SPRegistryContract
-            .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
+            .releaseCapacity(
+                deal.provider, $._dealCapacity[dealId].committedBytes, deal.client, $._dealData[dealId].manifestHash
+            );
         emit DealFinalized(dealId, deal.validator);
     }
 
@@ -920,12 +923,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         if (previousState == DealState.ACCEPTED) {
             $._SPRegistryContract
                 .releasePendingCapacity(
-                    deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+                    deal.provider, $._dealCapacity[dealId].reservedBytes, deal.client, $._dealData[dealId].manifestHash
                 );
         } else {
             $._SPRegistryContract
                 .releaseCapacity(
-                    deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash
+                    deal.provider, $._dealCapacity[dealId].committedBytes, deal.client, $._dealData[dealId].manifestHash
                 );
         }
         IOperator(deal.validator).earlyRailTermination();
@@ -952,7 +955,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
         $._SPRegistryContract
             .releasePendingCapacity(
-                deal.provider, $._dealCapacity[dealId].reservedBytes, $._dealData[dealId].manifestHash
+                deal.provider, $._dealCapacity[dealId].reservedBytes, deal.client, $._dealData[dealId].manifestHash
             );
         _changeDealState(dealId, DealState.REJECTED);
         emit DealRejected(dealId, msg.sender);

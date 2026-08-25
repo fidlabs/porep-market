@@ -138,7 +138,7 @@ contract SPRegistryMock is ISPRegistry {
         _providerViews[providerId].payee = payee;
     }
 
-    function previewProviderForDeal(SharedTypes.DealRequest calldata)
+    function previewProviderForDeal(address, SharedTypes.DealRequest calldata)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory)
@@ -146,7 +146,7 @@ contract SPRegistryMock is ISPRegistry {
         return nextSelection;
     }
 
-    function reserveProviderForDeal(SharedTypes.DealRequest calldata request)
+    function reserveProviderForDeal(address, SharedTypes.DealRequest calldata request)
         external
         returns (SharedTypes.ProviderDealSelection memory)
     {
@@ -155,7 +155,7 @@ contract SPRegistryMock is ISPRegistry {
         return nextSelection;
     }
 
-    function previewOfferForDeal(uint256, SharedTypes.DealRequest calldata)
+    function previewOfferForDeal(uint256, address, SharedTypes.DealRequest calldata)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory, uint16)
@@ -163,7 +163,7 @@ contract SPRegistryMock is ISPRegistry {
         return (nextSelection, 0);
     }
 
-    function reserveOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function reserveOfferForDeal(uint256 offerId, address, SharedTypes.DealRequest calldata request)
         external
         returns (SharedTypes.ProviderDealSelection memory)
     {
@@ -214,17 +214,21 @@ contract SPRegistryMock is ISPRegistry {
         return new uint256[](0);
     }
 
-    function isManifestAssignedToOrganization(bytes32, address) external pure returns (bool) {
+    function isManifestAssignedToOrganization(address, bytes32, address) external pure returns (bool) {
         return false;
     }
 
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external {
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, address, bytes32 manifestHash)
+        external
+    {
         lastReleasedCapacityProvider = CommonTypes.FilActorId.unwrap(provider);
         lastReleasedCapacityBytes = sizeBytes;
         lastReleasedCapacityManifestHash = manifestHash;
     }
 
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external {
+    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, address, bytes32 manifestHash)
+        external
+    {
         lastReleasedPendingProvider = CommonTypes.FilActorId.unwrap(provider);
         lastReleasedPendingBytes = sizeBytes;
         lastReleasedPendingManifestHash = manifestHash;
