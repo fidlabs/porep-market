@@ -2152,6 +2152,11 @@
   },
   {
     "type": "error",
+    "name": "EvidenceTooStale",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "FailedCall",
     "inputs": []
   },
@@ -2345,6 +2350,22 @@
   },
   {
     "type": "error",
+    "name": "ServiceAlreadyEnded",
+    "inputs": [
+      {
+        "name": "serviceEndEpoch",
+        "type": "int64",
+        "internalType": "int64"
+      },
+      {
+        "name": "currentEpoch",
+        "type": "int64",
+        "internalType": "int64"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ServiceNotEnded",
     "inputs": [
       {
@@ -2354,6 +2375,22 @@
       },
       {
         "name": "currentEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "SettlementTooEarly",
+    "inputs": [
+      {
+        "name": "requestedToEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "earliestSettlementEpoch",
         "type": "uint256",
         "internalType": "uint256"
       }

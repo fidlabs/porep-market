@@ -345,9 +345,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Error indicating that the requested settlement window is too short
-     * @dev 0xf92bf145
+     * @param requestedToEpoch The requested settlement end epoch
+     * @param earliestSettlementEpoch The earliest epoch at which settlement may end
+     * @dev 0xf5342533
      */
-    error SettlementTooEarly();
+    error SettlementTooEarly(uint256 requestedToEpoch, uint256 earliestSettlementEpoch);
 
     /**
      * @notice Error indicating that the deal evidence is too stale for settlement
@@ -940,10 +942,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         uint8 previousState = deal.state;
         int64 blockNumber = int64(uint64(block.number));
         int64 serviceEndEpoch = CommonTypes.ChainEpoch.unwrap($._dealService[dealId].serviceEndEpoch);
-        if (
-            serviceEndEpoch != 0
-                && blockNumber > serviceEndEpoch
-        ) {
+        if (serviceEndEpoch != 0 && blockNumber > serviceEndEpoch) {
             revert ServiceAlreadyEnded(serviceEndEpoch, blockNumber);
         }
         _changeDealState(dealId, state);
@@ -1280,8 +1279,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 settlementWasCapped = true;
             }
         } else {
-            if (effectiveToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
-                revert SettlementTooEarly();
+            uint256 earliestSettlementEpoch = fromEpoch + service.minTimeBetweenSettlementsInEpochs;
+            if (effectiveToEpoch < earliestSettlementEpoch) {
+                revert SettlementTooEarly(effectiveToEpoch, earliestSettlementEpoch);
             }
 
             if (effectiveToEpoch > serviceEndEpoch) {

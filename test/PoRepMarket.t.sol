@@ -1937,10 +1937,15 @@ contract PoRepMarketTest is Test {
     function testValidateDealSettlementRevertsTooEarlyBeforeMinimumSettlementWindow() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 settlementEndEpoch = 200;
+        uint256 earliestSettlementEpoch = settlementStartEpoch + service.minTimeBetweenSettlementsInEpochs;
 
-        vm.expectRevert(PoRepMarket.SettlementTooEarly.selector);
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.SettlementTooEarly.selector, settlementEndEpoch, earliestSettlementEpoch)
+        );
         vm.prank(validatorAddress);
-        poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), 200);
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
     }
 
     function testValidateDealSettlementReturnsScoreFailureNote() public {
