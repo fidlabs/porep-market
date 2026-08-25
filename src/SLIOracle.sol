@@ -38,6 +38,12 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
     error InvalidIndexingPct(uint8 value);
 
     /**
+     * @notice Error thrown when an attestation carries no usable latency measurement
+     * @dev 0xaa19791c
+     */
+    error InvalidLatencyMs(uint16 value);
+
+    /**
      * @notice Error indicating that an invalid deal ID was provided
      * @dev 0xb06db32a
      */
@@ -115,6 +121,9 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
         if (dealId == 0) revert InvalidDealId();
         if (slis.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(slis.retrievabilityBps);
         if (slis.indexingPct > 100) revert InvalidIndexingPct(slis.indexingPct);
+        if (slis.latencyMs == 0 || slis.latencyMs == SharedTypes.LATENCY_UNMEASURED) {
+            revert InvalidLatencyMs(slis.latencyMs);
+        }
 
         uint256 currentEpoch = block.number;
         s().attestations[dealId] = SharedTypes.Attestation({lastUpdate: currentEpoch, slis: slis});

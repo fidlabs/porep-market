@@ -148,7 +148,9 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
 
         if (required.latencyMs != 0) {
             slasDefined++;
-            if (required.latencyMs >= attestation.slis.latencyMs) slasMet++;
+            uint16 measuredLatencyMs = attestation.slis.latencyMs;
+            bool latencyMeasured = measuredLatencyMs != 0 && measuredLatencyMs != SharedTypes.LATENCY_UNMEASURED;
+            if (latencyMeasured && required.latencyMs >= measuredLatencyMs) slasMet++;
         }
 
         if (required.indexingPct != 0) {
