@@ -6,6 +6,7 @@ import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.s
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {FVMMinerActor} from "fvm-solidity/mocks/FVMMinerActor.sol";
 import {MockFVMTest} from "fvm-solidity/mocks/MockFVMTest.sol";
+import {SectorStatus} from "fvm-solidity/FVMSector.sol";
 import {
     PieceChange,
     SectorChanges,
@@ -169,6 +170,7 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         PoRepTypes.DealService memory service = market.getDealService(DEAL_ID);
         uint256 settlementStartEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch)));
         uint256 settlementEndEpoch = settlementStartEpoch + market.EPOCHS_IN_MONTH();
+        int64 settlementCursorBefore = CommonTypes.ChainEpoch.unwrap(service.lastSettledEpoch);
         vm.roll(settlementEndEpoch);
 
         vm.prank(validatorAddress);
@@ -178,6 +180,33 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         assertEq(settlement.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
         assertEq(settlement.settlementAmount, 0);
         assertEq(settlement.settleUpto, settlementStartEpoch);
+        assertEq(CommonTypes.ChainEpoch.unwrap(market.getDealService(DEAL_ID).lastSettledEpoch), settlementCursorBefore);
+
+        int64 deadline = 4;
+        int64 partition = 7;
+        uint64 expiration = uint64(uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceEndEpoch))));
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, expiration);
+        miner.mockSector(SECTOR + 1, SectorStatus.Active, deadline, partition + 1, expiration);
+        SectorEvidenceAdapter.SectorLocation[] memory locations = new SectorEvidenceAdapter.SectorLocation[](2);
+        locations[0] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition});
+        locations[1] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition + 1});
+
+        SharedTypes.EvidenceStatus memory refreshed = market.refreshEvidenceStatus(DEAL_ID, abi.encode(locations));
+        assertEq(refreshed.result, EvidenceResult.ACTIVE);
+        assertEq(refreshed.activeCoveredBytes, REQUESTED_SIZE);
+        assertEq(CommonTypes.ChainEpoch.unwrap(refreshed.lastEvidenceRefreshEpoch), int64(uint64(settlementEndEpoch)));
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory retried =
+            market.validateDealSettlement(DEAL_ID, settlementStartEpoch, settlementEndEpoch);
+        assertEq(retried.result, SettlementResult.ACCEPTED);
+        assertEq(retried.reasonCode, SettlementReason.OK);
+        assertEq(retried.settlementAmount, 86_400);
+        assertEq(retried.settleUpto, settlementEndEpoch);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(market.getDealService(DEAL_ID).lastSettledEpoch),
+            int64(uint64(settlementEndEpoch))
+        );
     }
 
     function testDelayedActivationRejectsProposalBoundCommitmentWithoutStartingService() public {
@@ -212,7 +241,7 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         assertFalse(adapter.getManifestReceipt(DEAL_ID).activated);
     }
 
-    function testActivationAcceptsExactBoundaryAndDuplicateReplayDoesNotLowerCommitment() public {
+    function testActivationAcceptsExactBoundaryAndRejectsConflictingReplay() public {
         vm.prank(client);
         market.proposeDeal(_request());
 
@@ -235,7 +264,7 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         assertEq(
             _notify(PIECE_CID_1, 1, _proof(LEAF_0), SECTOR + 99, proposedAtEpoch + DURATION_EPOCHS)
             .sectors[0].accepted[0],
-            1
+            0
         );
         SectorEvidenceAdapter.ManifestReceipt memory afterReplay = adapter.getManifestReceipt(DEAL_ID);
         assertEq(afterReplay.acceptedPieceCount, beforeReplay.acceptedPieceCount);

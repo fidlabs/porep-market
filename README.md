@@ -38,9 +38,10 @@ on the separate `v1` branch.
   [`IStorageEvidenceAdapter`](src/interfaces/IStorageEvidenceAdapter.sol).
 - [`SectorEvidenceAdapter`](src/SectorEvidenceAdapter.sol) validates authenticated
   FIP-0109 placement callbacks against the complete piece-set commitment stored
-  in a deal's `manifestHash`. It records receipt counts, exact bytes, a piece
-  bitmap, and the earliest accepted minimum commitment epoch. Activation requires
-  that epoch to cover the activation block plus the complete deal duration.
+  in a deal's `manifestHash`. It records each piece placement, unique sector
+  numbers, covered bytes per sector, and the earliest accepted minimum commitment
+  epoch. Activation requires that epoch to cover the activation block plus the
+  complete deal duration. FIP-0112 refreshes run over the stored sector list.
 - [`Validator`](src/Validator.sol) is the per-deal FilecoinPay operator. It
   controls the payment rail and delegates settlement decisions to
   `PoRepMarket`.
@@ -106,9 +107,9 @@ manifestHash = keccak256(abi.encode(
 Each FIP-0109 notification payload is
 `abi.encode(uint256 dealId, uint32 pieceIndex, uint32 pieceCount, bytes32[] proof)`.
 Activation requires every unique index and the exact requested byte total. This
-adapter currently proves initial placement only: current and refreshed evidence
-remain inactive, so paid settlement fails closed until an ongoing-evidence
-policy is implemented.
+adapter stores the authenticated PieceCID, sector number, padded size, and
+minimum commitment epoch for every accepted index. Exact callback replay is a
+no-op. A replay that changes any stored placement field is rejected.
 
 Before sealing, SP tooling must fetch the complete manifest, recompute
 `manifestHash`, verify that the padded sizes sum to `requestedSizeBytes`, and
@@ -118,6 +119,44 @@ notification does not abort sector activation and there is no callback retry
 path. The commitment proves membership in the client-selected piece set, not
 retrievability, continued storage after initial placement, or physical
 placement exclusivity between different deals.
+
+### Sector evidence refresh
+
+`PoRepMarket.refreshEvidenceStatus` is permissionless. The caller supplies the
+current deadline and partition for each consecutive sector selected by the
+adapter's stored cursor:
+
+```solidity
+struct SectorLocation {
+    int64 deadline;
+    int64 partition;
+}
+
+abi.encode(SectorLocation[] locations)
+```
+
+The adapter verifies each stored sector through FIP-0112 and reads its nominal
+expiration. It returns `PARTIAL` when the batch stops before the end of the
+sector list. Partial progress does not replace the last completed status used by
+settlement. A complete sweep publishes `ACTIVE` only when the accumulated sector
+bytes equal the authenticated manifest receipt. One verified non-Active or Dead
+sector publishes `INACTIVE`. A bad location or actor-call failure reverts and
+preserves the previous completed status.
+
+Operators read `getRefreshState`, `getSectorCount`, and `getSectorNumber`, resolve
+the current sector locations off chain, estimate the exact refresh transaction,
+and submit as many consecutive locations as fit. There is no contract-level
+piece, sector, or batch cap. Repeat until `EvidenceRefreshCompleted` reports
+`ACTIVE` or `INACTIVE`. `getPiecePlacement` and `getSectorCoveredBytes` let a new
+operator reconstruct the placement inventory from chain state without the
+original manifest host or a private database.
+
+Stale or `INACTIVE` evidence makes settlement return `EVIDENCE_TOO_STALE` without
+advancing its stored settlement cursor. A later completed `ACTIVE` sweep lets the
+same interval be retried. This adapter relies on the current pre-Re-Snap rule that
+sector content cannot change while the sector number stays Active. It must be
+replaced or upgraded with authenticated current-content membership before
+Re-Snap is enabled for these deals.
 
 ## Deal lifecycle
 
@@ -152,7 +191,7 @@ submits claim evidence and calls [`activateEvidence`](src/PoRepMarket.sol).
 Successful activation commits the covered capacity, moves the deal to `ACTIVE`,
 sets its service window, and starts payment.
 
-While the deal is `ACTIVE`, the PoRep service calls
+While the deal is `ACTIVE`, any caller can call
 [`refreshEvidenceStatus`](src/PoRepMarket.sol) to keep evidence current.
 FilecoinPay calls [`Validator.validatePayment`](src/Validator.sol), which asks
 [`PoRepMarket.validateDealSettlement`](src/PoRepMarket.sol) for the accepted
