@@ -585,6 +585,9 @@ contract DataCapEvidenceAdapter is
         onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
+        uint256 batchSize = abi.decode(evidenceData, (uint256));
+        if (batchSize == 0) revert InvalidBatchSize();
+
         DataCapEvidenceAdapterStorage storage $ = s();
         if ($._allocationStatusPerDeal[context.dealId] != DataCapAllocationStatus.CLAIMED) {
             revert InvalidAllocationState();
@@ -610,9 +613,6 @@ contract DataCapEvidenceAdapter is
         if (refreshStatus.checkedClaims == 0) {
             refreshStatus.terminationRevision = $._terminationRevisions[context.dealId];
         }
-
-        uint256 batchSize = abi.decode(evidenceData, (uint256));
-        if (batchSize == 0) revert InvalidBatchSize();
 
         uint256 offset = refreshStatus.checkedClaims;
 
