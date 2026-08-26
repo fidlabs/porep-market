@@ -439,7 +439,7 @@ contract DataCapEvidenceAdapter is
             revert InvalidClient();
         }
 
-        if ($._deals[dealId].postingFinished) {
+        if (_getStorageDeal(dealId).postingFinished) {
             revert PostingAlreadyFinished();
         }
 
@@ -716,7 +716,7 @@ contract DataCapEvidenceAdapter is
             reasonCode: 0,
             result: refreshStatus.result,
             checkedClaims: refreshStatus.checkedClaims,
-            totalClaims: s()._deals[context.dealId].claimIds.length
+            totalClaims: _getStorageDeal(context.dealId).claimIds.length
         });
     }
 
@@ -737,7 +737,7 @@ contract DataCapEvidenceAdapter is
             revert InvalidClient();
         }
 
-        DataCapDealEvidence storage deal = $._deals[dealId];
+        DataCapDealEvidence storage deal = _getStorageDeal(dealId);
         if (deal.postingFinished) {
             revert PostingAlreadyFinished();
         }
@@ -829,7 +829,7 @@ contract DataCapEvidenceAdapter is
      * @return True if posting is finished, false otherwise
      */
     function isDataCapPostingFinished(uint256 dealId) external view returns (bool) {
-        return s()._deals[dealId].postingFinished;
+        return _getStorageDeal(dealId).postingFinished;
     }
 
     /**
@@ -856,7 +856,7 @@ contract DataCapEvidenceAdapter is
     {
         if (limit == 0) revert InvalidLimit();
         if (dealId == 0) revert InvalidDealId();
-        CommonTypes.FilActorId[] storage allocationIds = s()._deals[dealId].allocationIds;
+        CommonTypes.FilActorId[] storage allocationIds = _getStorageDeal(dealId).allocationIds;
         sumOfAllocations = allocationIds.length;
 
         // solhint-disable-next-line gas-strict-inequalities
@@ -886,7 +886,7 @@ contract DataCapEvidenceAdapter is
         view
         returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
     {
-        (ids, sumOfClaims) = _getClaimIds(dealId, offset, limit, s()._deals[dealId].claimIds);
+        (ids, sumOfClaims) = _getClaimIds(dealId, offset, limit, _getStorageDeal(dealId).claimIds);
     }
 
     /**
@@ -904,7 +904,7 @@ contract DataCapEvidenceAdapter is
      * @return allocatedBytes allocated bytes for the selected deal
      */
     function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
-        return s()._deals[dealId].allocatedBytes;
+        return _getStorageDeal(dealId).allocatedBytes;
     }
 
     /**
