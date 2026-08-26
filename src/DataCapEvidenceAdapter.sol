@@ -414,7 +414,7 @@ contract DataCapEvidenceAdapter is
         DataCapEvidenceAdapterStorage storage $ = s();
         PoRepTypes.Deal memory dealSnapshot = $._poRepMarketContract.getDeal(dealId);
 
-        if ($._operational == false) {
+        if (!$._operational) {
             revert AdapterNotOperational();
         }
 
@@ -480,7 +480,7 @@ contract DataCapEvidenceAdapter is
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
-        if (deal.postingFinished == false) {
+        if (!deal.postingFinished) {
             revert PostingNotFinished();
         }
 
@@ -782,7 +782,7 @@ contract DataCapEvidenceAdapter is
     /// @inheritdoc IDataCapEvidenceAdapter
     function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
         DataCapEvidenceAdapterStorage storage $ = s();
-        if ($._operational == false) {
+        if (!$._operational) {
             revert AdapterAlreadyNonOperational();
         }
         $._operational = false;
