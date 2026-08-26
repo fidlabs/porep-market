@@ -483,87 +483,48 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             revert RefreshUnavailable(context.dealId);
         }
 
-        DealRefreshState storage refreshState = $._refreshStates[context.dealId];
-        uint256 startIndex = refreshState.nextSectorIndex;
-        uint256 remaining = totalSectors - startIndex;
-        if (locations.length == 0 || locations.length > remaining) {
-            revert InvalidSectorLocationCount(locations.length, remaining);
+        DealRefreshState storage storedState = $._refreshStates[context.dealId];
+        DealRefreshState memory sweep = storedState;
+        uint256 startIndex = sweep.nextSectorIndex;
+        if (locations.length == 0 || locations.length > totalSectors - startIndex) {
+            revert InvalidSectorLocationCount(locations.length, totalSectors - startIndex);
         }
 
-        uint256 pendingCoveredBytes = refreshState.pendingCoveredBytes;
-        int64 pendingMinimumExpiration = refreshState.pendingMinimumExpiration;
-        int64 sweepStartEpoch = refreshState.sweepStartEpoch;
         if (startIndex == 0) {
-            pendingCoveredBytes = 0;
-            pendingMinimumExpiration = 0;
+            sweep.pendingCoveredBytes = 0;
+            sweep.pendingMinimumExpiration = 0;
             // Filecoin epochs cannot approach the signed 64-bit boundary.
             // forge-lint: disable-next-line(unsafe-typecast)
-            sweepStartEpoch = int64(uint64(block.number));
+            sweep.sweepStartEpoch = int64(uint64(block.number));
         }
 
-        for (uint256 i = 0; i < locations.length; ++i) {
-            uint64 sectorNumber = $._sectorNumbers[context.dealId][startIndex + i];
-            (bool statusAvailable, bool active) = FVMSector.tryValidateSectorStatus(
-                receipt.providerActorId,
-                sectorNumber,
-                SectorStatus.Active,
-                locations[i].deadline,
-                locations[i].partition
-            );
-            if (!statusAvailable) {
-                (bool absenceAvailable, bool dead) = FVMSector.tryValidateSectorStatus(
-                    receipt.providerActorId, sectorNumber, SectorStatus.Dead, NO_DEADLINE, NO_PARTITION
-                );
-                if (!absenceAvailable || !dead) revert SectorStatusUnavailable(sectorNumber);
-                return _completeRefresh(
-                    context.dealId, refreshState, EvidenceResult.INACTIVE, sweepStartEpoch, 0, 0, totalSectors
-                );
-            }
-            if (!active) {
-                return _completeRefresh(
-                    context.dealId, refreshState, EvidenceResult.INACTIVE, sweepStartEpoch, 0, 0, totalSectors
-                );
-            }
-
-            uint64 expiration = FVMSector.getNominalSectorExpiration(receipt.providerActorId, sectorNumber);
-            if (expiration == 0 || expiration >> 63 != 0) revert InvalidSectorExpiration(expiration);
-            pendingCoveredBytes += $._sectorCoveredBytes[context.dealId][sectorNumber];
-            if (pendingMinimumExpiration == 0 || expiration < uint64(pendingMinimumExpiration)) {
-                // The high-bit check above proves this conversion is safe.
-                // forge-lint: disable-next-line(unsafe-typecast)
-                pendingMinimumExpiration = int64(expiration);
-            }
+        bool allActive;
+        (sweep, allActive) = _checkRefreshBatch(context.dealId, startIndex, locations, sweep);
+        if (!allActive) {
+            return _completeRefresh(context.dealId, storedState, sweep, EvidenceResult.INACTIVE, totalSectors);
         }
 
-        uint256 nextSectorIndex = startIndex + locations.length;
-        if (nextSectorIndex == totalSectors) {
-            if (pendingCoveredBytes != receipt.acceptedBytes) {
-                revert RefreshCoveredBytesMismatch(receipt.acceptedBytes, pendingCoveredBytes);
+        sweep.nextSectorIndex = startIndex + locations.length;
+        if (sweep.nextSectorIndex == totalSectors) {
+            if (sweep.pendingCoveredBytes != receipt.acceptedBytes) {
+                revert RefreshCoveredBytesMismatch(receipt.acceptedBytes, sweep.pendingCoveredBytes);
             }
-            return _completeRefresh(
-                context.dealId,
-                refreshState,
-                EvidenceResult.ACTIVE,
-                sweepStartEpoch,
-                pendingCoveredBytes,
-                pendingMinimumExpiration,
-                totalSectors
-            );
+            return _completeRefresh(context.dealId, storedState, sweep, EvidenceResult.ACTIVE, totalSectors);
         }
 
-        refreshState.nextSectorIndex = nextSectorIndex;
-        refreshState.pendingCoveredBytes = pendingCoveredBytes;
-        refreshState.sweepStartEpoch = sweepStartEpoch;
-        refreshState.pendingMinimumExpiration = pendingMinimumExpiration;
+        storedState.nextSectorIndex = sweep.nextSectorIndex;
+        storedState.pendingCoveredBytes = sweep.pendingCoveredBytes;
+        storedState.sweepStartEpoch = sweep.sweepStartEpoch;
+        storedState.pendingMinimumExpiration = sweep.pendingMinimumExpiration;
         emit EvidenceRefreshProgress(
-            context.dealId, nextSectorIndex, totalSectors, pendingCoveredBytes, sweepStartEpoch
+            context.dealId, sweep.nextSectorIndex, totalSectors, sweep.pendingCoveredBytes, sweep.sweepStartEpoch
         );
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: pendingCoveredBytes,
-            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(refreshState.lastCompletedEpoch),
+            activeCoveredBytes: sweep.pendingCoveredBytes,
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(sweep.lastCompletedEpoch),
             reasonCode: 0,
             result: EvidenceResult.PARTIAL,
-            checkedClaims: nextSectorIndex,
+            checkedClaims: sweep.nextSectorIndex,
             totalClaims: totalSectors
         });
     }
@@ -795,26 +756,73 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: EvidenceResult.REJECTED});
     }
 
+    function _checkSector(uint64 providerActorId, uint64 sectorNumber, SectorLocation memory location)
+        private
+        returns (bool active, int64 expiration)
+    {
+        (bool statusAvailable, bool isActive) = FVMSector.tryValidateSectorStatus(
+            providerActorId, sectorNumber, SectorStatus.Active, location.deadline, location.partition
+        );
+        if (!statusAvailable) {
+            (bool absenceAvailable, bool dead) = FVMSector.tryValidateSectorStatus(
+                providerActorId, sectorNumber, SectorStatus.Dead, NO_DEADLINE, NO_PARTITION
+            );
+            if (!absenceAvailable || !dead) revert SectorStatusUnavailable(sectorNumber);
+            return (false, 0);
+        }
+        if (!isActive) return (false, 0);
+
+        uint64 nominalExpiration = FVMSector.getNominalSectorExpiration(providerActorId, sectorNumber);
+        if (nominalExpiration == 0 || nominalExpiration >> 63 != 0) {
+            revert InvalidSectorExpiration(nominalExpiration);
+        }
+        // The high-bit check above proves this conversion is safe.
+        // forge-lint: disable-next-line(unsafe-typecast)
+        return (true, int64(nominalExpiration));
+    }
+
+    function _checkRefreshBatch(
+        uint256 dealId,
+        uint256 startIndex,
+        SectorLocation[] memory locations,
+        DealRefreshState memory sweep
+    ) private returns (DealRefreshState memory updatedSweep, bool allActive) {
+        SectorEvidenceAdapterStorage storage $ = s();
+        uint64 providerActorId = $._manifestReceipts[dealId].providerActorId;
+        for (uint256 i = 0; i < locations.length; ++i) {
+            uint64 sectorNumber = $._sectorNumbers[dealId][startIndex + i];
+            (bool active, int64 expiration) = _checkSector(providerActorId, sectorNumber, locations[i]);
+            if (!active) return (sweep, false);
+
+            sweep.pendingCoveredBytes += $._sectorCoveredBytes[dealId][sectorNumber];
+            if (sweep.pendingMinimumExpiration == 0 || expiration < sweep.pendingMinimumExpiration) {
+                sweep.pendingMinimumExpiration = expiration;
+            }
+        }
+        return (sweep, true);
+    }
+
     function _completeRefresh(
         uint256 dealId,
         DealRefreshState storage refreshState,
+        DealRefreshState memory sweep,
         uint8 result,
-        int64 refreshEpoch,
-        uint256 activeCoveredBytes,
-        int64 expiration,
         uint256 totalSectors
     ) private returns (SharedTypes.EvidenceStatus memory status) {
-        refreshState.lastCompletedEpoch = refreshEpoch;
+        bool active = result == EvidenceResult.ACTIVE;
+        uint256 activeCoveredBytes = active ? sweep.pendingCoveredBytes : 0;
+        int64 expiration = active ? sweep.pendingMinimumExpiration : int64(0);
+        refreshState.lastCompletedEpoch = sweep.sweepStartEpoch;
         refreshState.completedExpiration = expiration;
         refreshState.completedResult = result;
         refreshState.nextSectorIndex = 0;
         refreshState.pendingCoveredBytes = 0;
         refreshState.sweepStartEpoch = 0;
         refreshState.pendingMinimumExpiration = 0;
-        emit EvidenceRefreshCompleted(dealId, result, activeCoveredBytes, refreshEpoch, expiration);
+        emit EvidenceRefreshCompleted(dealId, result, activeCoveredBytes, sweep.sweepStartEpoch, expiration);
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: activeCoveredBytes,
-            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(refreshEpoch),
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(sweep.sweepStartEpoch),
             reasonCode: 0,
             result: result,
             checkedClaims: totalSectors,
