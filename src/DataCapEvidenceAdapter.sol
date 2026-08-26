@@ -306,6 +306,12 @@ contract DataCapEvidenceAdapter is
     error AdapterNotOperational();
 
     /**
+     * @notice Error thrown when the transfer destination is not the VerifReg actor
+     * @dev 0x4c93c0b7
+     */
+    error InvalidTransferDestination();
+
+    /**
      * @notice Error thrown when DataCap posting has already been finished for the deal
      * @dev 0xd12572b1
      */
@@ -416,6 +422,13 @@ contract DataCapEvidenceAdapter is
 
         if (!$._operational) {
             revert AdapterNotOperational();
+        }
+
+        if (
+            keccak256(params.to.data)
+                != keccak256(FilAddresses.fromActorID(CommonTypes.FilActorId.unwrap(VerifRegTypes.ActorID)).data)
+        ) {
+            revert InvalidTransferDestination();
         }
 
         if (dealSnapshot.state != DealState.ACCEPTED) {

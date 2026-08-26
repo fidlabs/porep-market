@@ -46,7 +46,7 @@ contract DataCapEvidenceAdapterTest is Test {
     address public datacapContract = address(0xfF00000000000000000000000000000000000007);
     address public clientAddress;
     address public terminationOracle;
-    bytes public transferTo = abi.encodePacked(vm.addr(2));
+    bytes public transferTo = hex"0006";
     uint256 public dealId;
     uint256 public totalDealSize;
     uint256 public pricePerSectorPerMonth;
@@ -1719,5 +1719,12 @@ contract DataCapEvidenceAdapterTest is Test {
     function testCurrentEvidenceStatusRevertsWhenCallerIsNotPoRepMarket() public {
         vm.expectRevert(DataCapEvidenceAdapter.CallerIsNotPoRepMarket.selector);
         dataCapEvidenceAdapter.currentEvidenceStatus(_activationContext());
+    }
+
+    function testShouldRevertWhenTransferDestinationIsNotVerifReg() public {
+        transferParams.to = CommonTypes.FilAddress(abi.encodePacked(vm.addr(2)));
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidTransferDestination.selector));
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 }
