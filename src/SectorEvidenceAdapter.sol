@@ -10,6 +10,7 @@ import {CBOR_CODEC} from "fvm-solidity/FVMCodec.sol";
 import {FVMAddress} from "fvm-solidity/FVMAddress.sol";
 import {SECTOR_CONTENT_CHANGED} from "fvm-solidity/FVMMethod.sol";
 import {FVMMiner} from "fvm-solidity/FVMMiner.sol";
+import {FVMSector, NO_DEADLINE, NO_PARTITION, SectorStatus} from "fvm-solidity/FVMSector.sol";
 import {
     FVMSectorContentChanged,
     PieceChangeIter,
@@ -26,9 +27,9 @@ import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 
 /**
- * @title Experimental sector evidence adapter
- * @notice Accepts authenticated placements for every piece in a committed PoRep Market piece set.
- * @dev This initial-placement experiment intentionally reports current evidence as inactive.
+ * @title Sector evidence adapter
+ * @notice Records authenticated piece placements and refreshes their sectors through FIP-0112.
+ * @dev This pre-Re-Snap adapter relies on sector content remaining unchanged while a sector number is Active.
  */
 contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
     using CalldataUtils for CalldataSlice;
@@ -64,6 +65,36 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     }
 
     /**
+     * @notice Current miner-state location supplied for one stored sector.
+     * @param deadline Deadline index containing the sector.
+     * @param partition Partition index containing the sector.
+     */
+    struct SectorLocation {
+        int64 deadline;
+        int64 partition;
+    }
+
+    /**
+     * @notice Pending sweep progress and the last completed evidence snapshot.
+     * @param nextSectorIndex Next stored sector index to check.
+     * @param pendingCoveredBytes Active bytes accumulated by the pending sweep.
+     * @param sweepStartEpoch Epoch of the first batch in the pending sweep.
+     * @param pendingMinimumExpiration Lowest expiration found by the pending sweep.
+     * @param lastCompletedEpoch Epoch of the first batch in the last completed sweep.
+     * @param completedExpiration Lowest expiration in the last completed Active sweep.
+     * @param completedResult Result of the last completed sweep.
+     */
+    struct DealRefreshState {
+        uint256 nextSectorIndex;
+        uint256 pendingCoveredBytes;
+        int64 sweepStartEpoch;
+        int64 pendingMinimumExpiration;
+        int64 lastCompletedEpoch;
+        int64 completedExpiration;
+        uint8 completedResult;
+    }
+
+    /**
      * @notice Compact per-deal progress for the committed piece set.
      * @param providerActorId Provider authenticated by the first accepted callback.
      * @param pieceCount Number of committed pieces.
@@ -88,6 +119,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         mapping(uint256 dealId => mapping(uint32 pieceIndex => PiecePlacement placement)) _piecePlacements;
         mapping(uint256 dealId => uint64[] sectorNumbers) _sectorNumbers;
         mapping(uint256 dealId => mapping(uint64 sectorNumber => uint64 coveredBytes)) _sectorCoveredBytes;
+        mapping(uint256 dealId => DealRefreshState state) _refreshStates;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SectorEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -152,6 +184,36 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @param coveredBytes Exact activated byte total.
      */
     event PlacementActivated(uint256 indexed dealId, uint32 indexed pieceCount, uint256 indexed coveredBytes);
+
+    // solhint-disable gas-indexed-events
+    /**
+     * @notice Records progress of a refresh sweep that needs another transaction.
+     * @param dealId PoRep Market deal ID.
+     * @param nextSectorIndex Next stored sector index to check.
+     * @param totalSectors Number of unique stored sectors.
+     * @param pendingCoveredBytes Active bytes checked in the pending sweep.
+     * @param sweepStartEpoch Epoch of the first batch in the pending sweep.
+     */
+    event EvidenceRefreshProgress(
+        uint256 indexed dealId,
+        uint256 nextSectorIndex,
+        uint256 totalSectors,
+        uint256 pendingCoveredBytes,
+        int64 sweepStartEpoch
+    );
+
+    /**
+     * @notice Records a completed Active or Inactive evidence sweep.
+     * @param dealId PoRep Market deal ID.
+     * @param result Completed evidence result.
+     * @param activeCoveredBytes Active deal bytes, or zero for Inactive.
+     * @param refreshEpoch Epoch of the first batch in the completed sweep.
+     * @param expiration Lowest sector expiration, or zero for Inactive.
+     */
+    event EvidenceRefreshCompleted(
+        uint256 indexed dealId, uint8 indexed result, uint256 activeCoveredBytes, int64 refreshEpoch, int64 expiration
+    );
+    // solhint-enable gas-indexed-events
 
     /**
      * @dev 0xa31f4508
@@ -221,6 +283,26 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @dev 0xd61193d3
      */
     error ConflictingPiecePlacement(uint256 dealId, uint32 pieceIndex);
+    /**
+     * @dev 0x3def09a5
+     */
+    error InvalidSectorLocationCount(uint256 provided, uint256 remaining);
+    /**
+     * @dev 0x24bf2ed6
+     */
+    error RefreshUnavailable(uint256 dealId);
+    /**
+     * @dev 0xaf605f93
+     */
+    error InvalidSectorExpiration(uint64 expiration);
+    /**
+     * @dev 0x7d44fc3b
+     */
+    error SectorStatusUnavailable(uint64 sectorNumber);
+    /**
+     * @dev 0x9c4810ad
+     */
+    error RefreshCoveredBytesMismatch(uint256 expected, uint256 actual);
 
     modifier onlyPoRepMarket() {
         if (msg.sender != address(s()._poRepMarket)) revert OnlyPoRepMarket();
@@ -382,29 +464,125 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         });
     }
 
+    // The refresh stays sequential so the actor checks and state publication can be audited in one place.
+    // solhint-disable function-max-lines
     /// @inheritdoc IStorageEvidenceAdapter
-    function refreshEvidenceStatus(SharedTypes.ActivationContext calldata, bytes calldata)
+    function refreshEvidenceStatus(SharedTypes.ActivationContext calldata context, bytes calldata evidenceData)
+        external
+        onlyPoRepMarket
+        returns (SharedTypes.EvidenceStatus memory status)
+    {
+        SectorLocation[] memory locations = abi.decode(evidenceData, (SectorLocation[]));
+        SectorEvidenceAdapterStorage storage $ = s();
+        ManifestReceipt storage receipt = $._manifestReceipts[context.dealId];
+        uint256 totalSectors = $._sectorNumbers[context.dealId].length;
+        if (
+            !receipt.activated || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
+                || receipt.acceptedBytes != context.requestedSizeBytes || totalSectors == 0
+        ) {
+            revert RefreshUnavailable(context.dealId);
+        }
+
+        DealRefreshState storage refreshState = $._refreshStates[context.dealId];
+        uint256 startIndex = refreshState.nextSectorIndex;
+        uint256 remaining = totalSectors - startIndex;
+        if (locations.length == 0 || locations.length > remaining) {
+            revert InvalidSectorLocationCount(locations.length, remaining);
+        }
+
+        uint256 pendingCoveredBytes = refreshState.pendingCoveredBytes;
+        int64 pendingMinimumExpiration = refreshState.pendingMinimumExpiration;
+        int64 sweepStartEpoch = refreshState.sweepStartEpoch;
+        if (startIndex == 0) {
+            pendingCoveredBytes = 0;
+            pendingMinimumExpiration = 0;
+            // Filecoin epochs cannot approach the signed 64-bit boundary.
+            // forge-lint: disable-next-line(unsafe-typecast)
+            sweepStartEpoch = int64(uint64(block.number));
+        }
+
+        for (uint256 i = 0; i < locations.length; ++i) {
+            uint64 sectorNumber = $._sectorNumbers[context.dealId][startIndex + i];
+            (bool statusAvailable, bool active) = FVMSector.tryValidateSectorStatus(
+                receipt.providerActorId,
+                sectorNumber,
+                SectorStatus.Active,
+                locations[i].deadline,
+                locations[i].partition
+            );
+            if (!statusAvailable) {
+                (bool absenceAvailable, bool dead) = FVMSector.tryValidateSectorStatus(
+                    receipt.providerActorId, sectorNumber, SectorStatus.Dead, NO_DEADLINE, NO_PARTITION
+                );
+                if (!absenceAvailable || !dead) revert SectorStatusUnavailable(sectorNumber);
+                return _completeRefresh(
+                    context.dealId, refreshState, EvidenceResult.INACTIVE, sweepStartEpoch, 0, 0, totalSectors
+                );
+            }
+            if (!active) {
+                return _completeRefresh(
+                    context.dealId, refreshState, EvidenceResult.INACTIVE, sweepStartEpoch, 0, 0, totalSectors
+                );
+            }
+
+            uint64 expiration = FVMSector.getNominalSectorExpiration(receipt.providerActorId, sectorNumber);
+            if (expiration == 0 || expiration >> 63 != 0) revert InvalidSectorExpiration(expiration);
+            pendingCoveredBytes += $._sectorCoveredBytes[context.dealId][sectorNumber];
+            if (pendingMinimumExpiration == 0 || expiration < uint64(pendingMinimumExpiration)) {
+                // The high-bit check above proves this conversion is safe.
+                // forge-lint: disable-next-line(unsafe-typecast)
+                pendingMinimumExpiration = int64(expiration);
+            }
+        }
+
+        uint256 nextSectorIndex = startIndex + locations.length;
+        if (nextSectorIndex == totalSectors) {
+            if (pendingCoveredBytes != receipt.acceptedBytes) {
+                revert RefreshCoveredBytesMismatch(receipt.acceptedBytes, pendingCoveredBytes);
+            }
+            return _completeRefresh(
+                context.dealId,
+                refreshState,
+                EvidenceResult.ACTIVE,
+                sweepStartEpoch,
+                pendingCoveredBytes,
+                pendingMinimumExpiration,
+                totalSectors
+            );
+        }
+
+        refreshState.nextSectorIndex = nextSectorIndex;
+        refreshState.pendingCoveredBytes = pendingCoveredBytes;
+        refreshState.sweepStartEpoch = sweepStartEpoch;
+        refreshState.pendingMinimumExpiration = pendingMinimumExpiration;
+        emit EvidenceRefreshProgress(
+            context.dealId, nextSectorIndex, totalSectors, pendingCoveredBytes, sweepStartEpoch
+        );
+        return SharedTypes.EvidenceStatus({
+            activeCoveredBytes: pendingCoveredBytes,
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(refreshState.lastCompletedEpoch),
+            reasonCode: 0,
+            result: EvidenceResult.PARTIAL,
+            checkedClaims: nextSectorIndex,
+            totalClaims: totalSectors
+        });
+    }
+
+    // solhint-enable function-max-lines
+
+    /// @inheritdoc IStorageEvidenceAdapter
+    function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
         view
         onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        return _inactiveStatus();
+        return _completedEvidenceStatus(context.dealId);
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
-    function currentEvidenceStatus(SharedTypes.ActivationContext calldata)
-        external
-        view
-        onlyPoRepMarket
-        returns (SharedTypes.EvidenceStatus memory status)
-    {
-        return _inactiveStatus();
-    }
-
-    /// @inheritdoc IStorageEvidenceAdapter
-    function getExpiration(uint256) external pure returns (CommonTypes.ChainEpoch expiration) {
-        return CommonTypes.ChainEpoch.wrap(0);
+    function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration) {
+        return CommonTypes.ChainEpoch.wrap(s()._refreshStates[dealId].completedExpiration);
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -498,6 +676,15 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         return s()._sectorCoveredBytes[dealId][sectorNumber];
     }
 
+    /**
+     * @notice Returns pending refresh progress and the last completed snapshot.
+     * @param dealId PoRep Market deal ID.
+     * @return state Stored refresh state.
+     */
+    function getRefreshState(uint256 dealId) external view returns (DealRefreshState memory state) {
+        return s()._refreshStates[dealId];
+    }
+
     function _validateDealAndPiece(uint256 dealId, PlacementInput memory placement, bytes32[] memory proof)
         private
         view
@@ -531,6 +718,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         return terms.requestedSizeBytes;
     }
 
+    // solhint-disable-next-line function-max-lines
     function _acceptPlacement(uint256 dealId, PlacementInput memory placement, uint256 requestedSizeBytes) private {
         SectorEvidenceAdapterStorage storage $ = s();
         ManifestReceipt storage receipt = $._manifestReceipts[dealId];
@@ -607,14 +795,46 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: EvidenceResult.REJECTED});
     }
 
-    function _inactiveStatus() private pure returns (SharedTypes.EvidenceStatus memory status) {
+    function _completeRefresh(
+        uint256 dealId,
+        DealRefreshState storage refreshState,
+        uint8 result,
+        int64 refreshEpoch,
+        uint256 activeCoveredBytes,
+        int64 expiration,
+        uint256 totalSectors
+    ) private returns (SharedTypes.EvidenceStatus memory status) {
+        refreshState.lastCompletedEpoch = refreshEpoch;
+        refreshState.completedExpiration = expiration;
+        refreshState.completedResult = result;
+        refreshState.nextSectorIndex = 0;
+        refreshState.pendingCoveredBytes = 0;
+        refreshState.sweepStartEpoch = 0;
+        refreshState.pendingMinimumExpiration = 0;
+        emit EvidenceRefreshCompleted(dealId, result, activeCoveredBytes, refreshEpoch, expiration);
         return SharedTypes.EvidenceStatus({
-            activeCoveredBytes: 0,
-            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(0),
+            activeCoveredBytes: activeCoveredBytes,
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(refreshEpoch),
             reasonCode: 0,
-            result: EvidenceResult.INACTIVE,
-            checkedClaims: 0,
-            totalClaims: 0
+            result: result,
+            checkedClaims: totalSectors,
+            totalClaims: totalSectors
+        });
+    }
+
+    function _completedEvidenceStatus(uint256 dealId) private view returns (SharedTypes.EvidenceStatus memory status) {
+        SectorEvidenceAdapterStorage storage $ = s();
+        DealRefreshState storage refreshState = $._refreshStates[dealId];
+        uint256 totalSectors = $._sectorNumbers[dealId].length;
+        bool completed = refreshState.completedResult != EvidenceResult.NONE;
+        bool active = refreshState.completedResult == EvidenceResult.ACTIVE;
+        return SharedTypes.EvidenceStatus({
+            activeCoveredBytes: active ? $._manifestReceipts[dealId].acceptedBytes : 0,
+            lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(refreshState.lastCompletedEpoch),
+            reasonCode: 0,
+            result: completed ? refreshState.completedResult : EvidenceResult.INACTIVE,
+            checkedClaims: completed ? totalSectors : 0,
+            totalClaims: totalSectors
         });
     }
 
