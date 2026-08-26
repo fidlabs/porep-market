@@ -48,11 +48,28 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     }
 
     /**
+     * @notice Authenticated placement of one committed piece.
+     * @param pieceCidDigest CommP multihash digest.
+     * @param sectorNumber Sector reported by the miner callback.
+     * @param paddedSize Padded piece size in bytes.
+     * @param minimumCommitmentEpoch Minimum sector commitment epoch.
+     * @param accepted Whether this piece index has been accepted.
+     */
+    struct PiecePlacement {
+        bytes32 pieceCidDigest;
+        uint64 sectorNumber;
+        uint64 paddedSize;
+        int64 minimumCommitmentEpoch;
+        bool accepted;
+    }
+
+    /**
      * @notice Compact per-deal progress for the committed piece set.
      * @param providerActorId Provider authenticated by the first accepted callback.
      * @param pieceCount Number of committed pieces.
      * @param acceptedPieceCount Number of unique accepted piece indexes.
      * @param activated Whether PoRep Market consumed the completed receipt.
+     * @param minimumCommitmentEpoch Lowest commitment epoch across accepted pieces.
      * @param acceptedBytes Sum of padded sizes for unique accepted indexes.
      */
     struct ManifestReceipt {
@@ -60,6 +77,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         uint32 pieceCount;
         uint32 acceptedPieceCount;
         bool activated;
+        int64 minimumCommitmentEpoch;
         uint256 acceptedBytes;
     }
 
@@ -67,8 +85,9 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     struct SectorEvidenceAdapterStorage {
         IPoRepMarket _poRepMarket;
         mapping(uint256 dealId => ManifestReceipt receipt) _manifestReceipts;
-        mapping(uint256 dealId => mapping(uint256 wordIndex => uint256 word)) _acceptedPieceIndexes;
-        mapping(uint256 dealId => int64 epoch) _minimumCommitmentEpochs;
+        mapping(uint256 dealId => mapping(uint32 pieceIndex => PiecePlacement placement)) _piecePlacements;
+        mapping(uint256 dealId => uint64[] sectorNumbers) _sectorNumbers;
+        mapping(uint256 dealId => mapping(uint64 sectorNumber => uint64 coveredBytes)) _sectorCoveredBytes;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SectorEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -194,6 +213,14 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @dev 0x5b47989c
      */
     error UnexpectedReceiptPieceCount(uint32 expected, uint32 actual);
+    /**
+     * @dev 0xd8b4f967
+     */
+    error InvalidPaddedSize();
+    /**
+     * @dev 0xd61193d3
+     */
+    error ConflictingPiecePlacement(uint256 dealId, uint32 pieceIndex);
 
     modifier onlyPoRepMarket() {
         if (msg.sender != address(s()._poRepMarket)) revert OnlyPoRepMarket();
@@ -298,6 +325,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     ) external {
         if (msg.sender != address(this)) revert OnlySelf();
         if (!canonicalPieceCid) revert UnexpectedPieceCidHeader();
+        if (paddedSize == 0) revert InvalidPaddedSize();
         if (payloadBytes.length < 160) revert InvalidPayloadLength(payloadBytes.length);
 
         (uint256 dealId, uint32 pieceIndex, uint32 pieceCount, bytes32[] memory proof) =
@@ -337,13 +365,12 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     {
         SectorEvidenceAdapterStorage storage $ = s();
         ManifestReceipt storage receipt = $._manifestReceipts[context.dealId];
-        int64 minimumCommitmentEpoch = $._minimumCommitmentEpochs[context.dealId];
         if (
             receipt.activated || receipt.pieceCount == 0 || receipt.acceptedPieceCount != receipt.pieceCount
                 || receipt.acceptedBytes != context.requestedSizeBytes
                 || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
-                || minimumCommitmentEpoch < 1
-                || uint256(uint64(minimumCommitmentEpoch)) < block.number + context.durationEpochs
+                || receipt.minimumCommitmentEpoch < 1
+                || uint256(uint64(receipt.minimumCommitmentEpoch)) < block.number + context.durationEpochs
         ) {
             return _rejectedActivation();
         }
@@ -419,14 +446,56 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     }
 
     /**
+     * @notice Returns one authenticated piece placement.
+     * @param dealId PoRep Market deal ID.
+     * @param pieceIndex Zero-based piece index.
+     * @return placement Stored placement, or an empty placement when the index has not been accepted.
+     */
+    function getPiecePlacement(uint256 dealId, uint32 pieceIndex)
+        external
+        view
+        returns (PiecePlacement memory placement)
+    {
+        return s()._piecePlacements[dealId][pieceIndex];
+    }
+
+    /**
      * @notice Returns whether one piece index has already been accepted for a deal.
      * @param dealId PoRep Market deal ID.
      * @param pieceIndex Zero-based piece index.
-     * @return accepted Whether the bitmap bit is set.
+     * @return accepted Whether a placement is stored for this index.
      */
     function isPieceAccepted(uint256 dealId, uint32 pieceIndex) public view returns (bool accepted) {
-        (uint256 wordIndex, uint256 bitMask) = _bitmapPosition(pieceIndex);
-        return s()._acceptedPieceIndexes[dealId][wordIndex] & bitMask != 0;
+        return s()._piecePlacements[dealId][pieceIndex].accepted;
+    }
+
+    /**
+     * @notice Returns the number of unique sectors recorded for a deal.
+     * @param dealId PoRep Market deal ID.
+     * @return count Number of stored sector numbers.
+     */
+    function getSectorCount(uint256 dealId) external view returns (uint256 count) {
+        return s()._sectorNumbers[dealId].length;
+    }
+
+    /**
+     * @notice Returns one stored sector number by insertion index.
+     * @param dealId PoRep Market deal ID.
+     * @param sectorIndex Zero-based sector-list index.
+     * @return sectorNumber Stored sector number.
+     */
+    function getSectorNumber(uint256 dealId, uint256 sectorIndex) external view returns (uint64 sectorNumber) {
+        return s()._sectorNumbers[dealId][sectorIndex];
+    }
+
+    /**
+     * @notice Returns the deal bytes placed in one sector.
+     * @param dealId PoRep Market deal ID.
+     * @param sectorNumber Sector number to query.
+     * @return coveredBytes Sum of accepted padded piece sizes in the sector.
+     */
+    function getSectorCoveredBytes(uint256 dealId, uint64 sectorNumber) external view returns (uint64 coveredBytes) {
+        return s()._sectorCoveredBytes[dealId][sectorNumber];
     }
 
     function _validateDealAndPiece(uint256 dealId, PlacementInput memory placement, bytes32[] memory proof)
@@ -477,16 +546,34 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             }
         }
 
-        (uint256 wordIndex, uint256 bitMask) = _bitmapPosition(placement.pieceIndex);
-        uint256 word = $._acceptedPieceIndexes[dealId][wordIndex];
-        if (word & bitMask != 0) return;
+        PiecePlacement storage stored = $._piecePlacements[dealId][placement.pieceIndex];
+        if (stored.accepted) {
+            if (
+                stored.pieceCidDigest != placement.pieceDigest || stored.sectorNumber != placement.sectorNumber
+                    || stored.paddedSize != placement.paddedSize
+                    || stored.minimumCommitmentEpoch != placement.minimumCommitmentEpoch
+            ) {
+                revert ConflictingPiecePlacement(dealId, placement.pieceIndex);
+            }
+            return;
+        }
 
-        $._acceptedPieceIndexes[dealId][wordIndex] = word | bitMask;
-        int64 minimumCommitmentEpoch = $._minimumCommitmentEpochs[dealId];
+        stored.pieceCidDigest = placement.pieceDigest;
+        stored.sectorNumber = placement.sectorNumber;
+        stored.paddedSize = placement.paddedSize;
+        stored.minimumCommitmentEpoch = placement.minimumCommitmentEpoch;
+        stored.accepted = true;
+
+        uint64 sectorCoveredBytes = $._sectorCoveredBytes[dealId][placement.sectorNumber];
+        if (sectorCoveredBytes == 0) $._sectorNumbers[dealId].push(placement.sectorNumber);
+        $._sectorCoveredBytes[dealId][placement.sectorNumber] = sectorCoveredBytes + placement.paddedSize;
+
         if (receipt.acceptedPieceCount == 0) {
-            $._minimumCommitmentEpochs[dealId] = placement.minimumCommitmentEpoch;
-        } else if (minimumCommitmentEpoch != 0 && placement.minimumCommitmentEpoch < minimumCommitmentEpoch) {
-            $._minimumCommitmentEpochs[dealId] = placement.minimumCommitmentEpoch;
+            receipt.minimumCommitmentEpoch = placement.minimumCommitmentEpoch;
+        } else if (
+            receipt.minimumCommitmentEpoch != 0 && placement.minimumCommitmentEpoch < receipt.minimumCommitmentEpoch
+        ) {
+            receipt.minimumCommitmentEpoch = placement.minimumCommitmentEpoch;
         }
         receipt.acceptedPieceCount += 1;
         receipt.acceptedBytes += placement.paddedSize;
@@ -514,11 +601,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
             prefix := shr(152, calldataload(offset))
         }
         return prefix == CANONICAL_COMMP_CID_PREFIX;
-    }
-
-    function _bitmapPosition(uint32 pieceIndex) private pure returns (uint256 wordIndex, uint256 bitMask) {
-        wordIndex = uint256(pieceIndex) >> 8;
-        bitMask = uint256(1) << (pieceIndex & 255);
     }
 
     function _rejectedActivation() private pure returns (SharedTypes.ActivationDecision memory decision) {

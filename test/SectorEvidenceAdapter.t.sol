@@ -30,7 +30,7 @@ contract SectorEvidenceAdapterV2 is SectorEvidenceAdapter {
     }
 
     function clearMinimumCommitmentEpochForTest(uint256 dealId) external {
-        s()._minimumCommitmentEpochs[dealId] = 0;
+        s()._manifestReceipts[dealId].minimumCommitmentEpoch = 0;
     }
 }
 
@@ -213,7 +213,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         adapter.initialize(address(this), address(market));
     }
 
-    function testUpgradePreservesManifestReceiptAndBitmap() public {
+    function testUpgradePreservesManifestReceiptAndPlacementInventory() public {
         _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
         SectorEvidenceAdapter.ManifestReceipt memory beforeReceipt = adapter.getManifestReceipt(DEAL_ID);
 
@@ -227,8 +227,12 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(afterReceipt.pieceCount, beforeReceipt.pieceCount);
         assertEq(afterReceipt.acceptedPieceCount, beforeReceipt.acceptedPieceCount);
         assertEq(afterReceipt.acceptedBytes, beforeReceipt.acceptedBytes);
+        assertEq(afterReceipt.minimumCommitmentEpoch, beforeReceipt.minimumCommitmentEpoch);
         assertFalse(afterReceipt.activated);
         assertTrue(upgraded.isPieceAccepted(DEAL_ID, 1));
+        assertEq(upgraded.getPiecePlacement(DEAL_ID, 1).sectorNumber, SECTOR);
+        assertEq(upgraded.getSectorCount(DEAL_ID), 1);
+        assertEq(upgraded.getSectorCoveredBytes(DEAL_ID, SECTOR), PADDED_SIZE);
         assertEq(address(upgraded.POREP_MARKET()), address(market));
 
         _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR + 1);
@@ -300,6 +304,32 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertTrue(adapter.getManifestReceipt(DEAL_ID).activated);
     }
 
+    function testStoresPiecePlacementsAndUniqueSectorCoverage() public {
+        _assertAccepted(_notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR));
+        _assertAccepted(_notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR));
+        _assertAccepted(_notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1));
+
+        SectorEvidenceAdapter.PiecePlacement memory first = adapter.getPiecePlacement(DEAL_ID, 0);
+        SectorEvidenceAdapter.PiecePlacement memory second = adapter.getPiecePlacement(DEAL_ID, 1);
+        SectorEvidenceAdapter.PiecePlacement memory third = adapter.getPiecePlacement(DEAL_ID, 2);
+
+        assertEq(first.pieceCidDigest, DIGEST_0);
+        assertEq(first.sectorNumber, SECTOR);
+        assertEq(first.paddedSize, PADDED_SIZE);
+        assertEq(first.minimumCommitmentEpoch, MINIMUM_COMMITMENT_EPOCH);
+        assertTrue(first.accepted);
+        assertEq(second.pieceCidDigest, DIGEST_1);
+        assertEq(second.sectorNumber, SECTOR);
+        assertEq(third.pieceCidDigest, DIGEST_2);
+        assertEq(third.sectorNumber, SECTOR + 1);
+
+        assertEq(adapter.getSectorCount(DEAL_ID), 2);
+        assertEq(adapter.getSectorNumber(DEAL_ID, 0), SECTOR);
+        assertEq(adapter.getSectorNumber(DEAL_ID, 1), SECTOR + 1);
+        assertEq(adapter.getSectorCoveredBytes(DEAL_ID, SECTOR), uint256(PADDED_SIZE) * 2);
+        assertEq(adapter.getSectorCoveredBytes(DEAL_ID, SECTOR + 1), PADDED_SIZE);
+    }
+
     function testPlacementCompletionAndActivationEvents() public {
         CommonTypes.ChainEpoch receiptEpoch = CommonTypes.ChainEpoch.wrap(int64(uint64(block.number)));
         vm.expectEmit(true, true, true, true, address(adapter));
@@ -322,19 +352,25 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         market.activate(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
     }
 
-    function testValidReplayIsAcceptedWithoutMutationOrEvents() public {
+    function testExactReplayIsNoOpAndConflictingReplayIsRejected() public {
         _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
         SectorEvidenceAdapter.ManifestReceipt memory beforeReceipt = adapter.getManifestReceipt(DEAL_ID);
 
         vm.recordLogs();
-        SectorContentChangedReturn memory replay = _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR + 99);
+        SectorContentChangedReturn memory replay = _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
+        SectorContentChangedReturn memory conflict = _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR + 99);
         Vm.Log[] memory logs = vm.getRecordedLogs();
         SectorEvidenceAdapter.ManifestReceipt memory afterReceipt = adapter.getManifestReceipt(DEAL_ID);
 
         _assertAccepted(replay);
+        _assertRejected(conflict);
         assertEq(logs.length, 0);
         assertEq(afterReceipt.acceptedPieceCount, beforeReceipt.acceptedPieceCount);
         assertEq(afterReceipt.acceptedBytes, beforeReceipt.acceptedBytes);
+        assertEq(adapter.getSectorCount(DEAL_ID), 1);
+        assertEq(adapter.getSectorNumber(DEAL_ID, 0), SECTOR);
+        assertEq(adapter.getSectorCoveredBytes(DEAL_ID, SECTOR), PADDED_SIZE);
+        assertEq(adapter.getSectorCoveredBytes(DEAL_ID, SECTOR + 99), 0);
     }
 
     function testEarliestUniquePieceCommitmentControlsActivation() public {
@@ -478,7 +514,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertRejectedActivation(DEAL_ID, PROVIDER, mismatchedRequested);
     }
 
-    function testBitmapBoundaries255And256AndLastIndex1392() public {
+    function testPlacementIndexes255And256AndLastIndex1392() public {
         uint32 count = 1393;
         uint64 size = 128;
         uint256 requestedSize = uint256(count) * size;
