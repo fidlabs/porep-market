@@ -1350,6 +1350,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidTransferDestination",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "MethodNotHandled",
     "inputs": [
       {
