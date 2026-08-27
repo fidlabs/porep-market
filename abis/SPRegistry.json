@@ -2378,6 +2378,17 @@
   },
   {
     "type": "error",
+    "name": "ProviderIsPaused",
+    "inputs": [
+      {
+        "name": "provider",
+        "type": "uint64",
+        "internalType": "CommonTypes.FilActorId"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "ProviderNotRegistered",
     "inputs": [
       {

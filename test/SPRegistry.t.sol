@@ -257,6 +257,50 @@ contract SPRegistryTest is Test {
         assertTrue(offer.active);
     }
 
+    function testPausedProviderCannotCreateOffer() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+
+        vm.prank(operator);
+        spRegistry.pauseProvider(provider1);
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsPaused.selector, provider1));
+        spRegistry.createOffer(provider1, _terms(), defaultSLIs, _paymentRows(90_000));
+
+        assertEq(spRegistry.getOffersByProvider(provider1).length, 0);
+    }
+
+    function testPausedProviderCannotActivateOffer() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, 90_000);
+
+        vm.prank(operator);
+        spRegistry.setOfferActive(offerId, false);
+        vm.prank(operator);
+        spRegistry.pauseProvider(provider1);
+
+        vm.prank(operator);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.ProviderIsPaused.selector, provider1));
+        spRegistry.setOfferActive(offerId, true);
+
+        assertFalse(spRegistry.getOfferView(offerId).active);
+    }
+
+    function testPausedProviderCanDeactivateOffer() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 offerId = _createOffer(provider1, 90_000);
+
+        vm.prank(operator);
+        spRegistry.pauseProvider(provider1);
+        vm.prank(operator);
+        spRegistry.setOfferActive(offerId, false);
+
+        assertFalse(spRegistry.getOfferView(offerId).active);
+    }
+
     function testPreviewAndReserveProviderSelectSameOfferButOnlyReserveMutatesPending() public {
         _allowToken();
         _registerProvider(provider1, owner1);
