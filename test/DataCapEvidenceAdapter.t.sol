@@ -1727,4 +1727,31 @@ contract DataCapEvidenceAdapterTest is Test {
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidTransferDestination.selector));
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
+
+    function testPartialEvidenceRefreshEpochIsSetOnlyAtSweepStart() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+
+        uint256 sweepStartBlock = block.number + 10;
+        vm.roll(sweepStartBlock);
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory first =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(first.result, EvidenceResult.PARTIAL);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(mock.getPartialEvidenceRefreshEpoch(dealId)),
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int64(uint64(sweepStartBlock))
+        );
+
+        vm.roll(sweepStartBlock + 10);
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory second =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(second.result, EvidenceResult.ACTIVE);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(mock.getPartialEvidenceRefreshEpoch(dealId)),
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int64(uint64(sweepStartBlock))
+        );
+    }
 }

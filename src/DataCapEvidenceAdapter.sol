@@ -625,6 +625,7 @@ contract DataCapEvidenceAdapter is
         }
         if (refreshStatus.checkedClaims == 0) {
             refreshStatus.terminationRevision = $._terminationRevisions[context.dealId];
+            refreshStatus.partialEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
         }
 
         uint256 offset = refreshStatus.checkedClaims;
@@ -673,7 +674,6 @@ contract DataCapEvidenceAdapter is
         } else {
             evidenceResult = EvidenceResult.PARTIAL;
         }
-        refreshStatus.partialEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
         // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: evidenceResult == EvidenceResult.PARTIAL
