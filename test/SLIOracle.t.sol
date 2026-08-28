@@ -132,4 +132,40 @@ contract SLIOracleTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidDealId.selector));
         sliOracle.getAttestation(0);
     }
+
+    function testSetSLIRevertsUnsetLatencyMs() public {
+        SharedTypes.SLIThresholds memory invalidSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: 0, indexingPct: 90
+        });
+
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidLatencyMs.selector, uint16(0)));
+        sliOracle.setSLI(dealId, invalidSlis);
+    }
+
+    function testSetSLIRevertsUnmeasuredLatencySentinel() public {
+        SharedTypes.SLIThresholds memory invalidSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 8000,
+            bandwidthBytesPerSecond: 500,
+            latencyMs: SharedTypes.LATENCY_UNMEASURED,
+            indexingPct: 90
+        });
+
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidLatencyMs.selector, SharedTypes.LATENCY_UNMEASURED));
+        sliOracle.setSLI(dealId, invalidSlis);
+    }
+
+    function testSetSLIAcceptsHighestValidLatencyMs() public {
+        uint16 highestValidLatencyMs = SharedTypes.LATENCY_UNMEASURED - 1;
+        SharedTypes.SLIThresholds memory maxSlis = SharedTypes.SLIThresholds({
+            retrievabilityBps: 8000, bandwidthBytesPerSecond: 500, latencyMs: highestValidLatencyMs, indexingPct: 90
+        });
+
+        vm.prank(oracle);
+        sliOracle.setSLI(dealId, maxSlis);
+
+        SharedTypes.Attestation memory stored = sliOracle.getAttestation(dealId);
+        assertEq(stored.slis.latencyMs, highestValidLatencyMs);
+    }
 }

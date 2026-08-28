@@ -17,6 +17,13 @@ library SharedTypes {
     uint256 internal constant EPOCHS_IN_MONTH = EPOCHS_IN_DAY * 30;
 
     /**
+     * @notice Designated sentinel meaning "latency was not measured"
+     * @dev Never a valid attested latency. Attestations carrying it (or 0) are rejected by SLIOracle
+     *      and never scored as meeting a latency SLA by SLIScorer.
+     */
+    uint16 internal constant LATENCY_UNMEASURED = type(uint16).max;
+
+    /**
      * @notice Unified SLI thresholds for requirements, capabilities, and attestations
      * @dev STRUCT EXTENSION PROTOCOL:
      *      - This struct may be extended by appending new fields
@@ -39,6 +46,8 @@ library SharedTypes {
         uint16 retrievabilityBps;
         /// @dev Capped at ~64 Gbps
         uint64 bandwidthBytesPerSecond;
+        /// @dev In requirements/capabilities 0 means "don't care". In attestations a measurement is
+        ///      mandatory: 0 (unset) and {LATENCY_UNMEASURED} are invalid and never satisfy an SLA.
         uint16 latencyMs;
         /// @dev Valid range: 0-100. 0 means "don't care".
         uint8 indexingPct;

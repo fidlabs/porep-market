@@ -111,4 +111,34 @@ contract SLIScorerTest is Test {
         vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidDealId.selector));
         sliScorer.calculateScore(0, sliParams);
     }
+
+    function testCalculateScoreUnsetLatencyDoesNotMeetSLA() public {
+        sliParams = SharedTypes.SLIThresholds({
+            retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 40, indexingPct: 0
+        });
+        oracle.setAttestations(1000, 0, 0, 0, 0);
+        vm.roll(1001);
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
+        assertEq(score, 0);
+    }
+
+    function testCalculateScoreUnmeasuredLatencySentinelDoesNotMeetSLA() public {
+        sliParams = SharedTypes.SLIThresholds({
+            retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: SharedTypes.LATENCY_UNMEASURED, indexingPct: 0
+        });
+        oracle.setAttestations(1000, 0, 0, SharedTypes.LATENCY_UNMEASURED, 0);
+        vm.roll(1001);
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
+        assertEq(score, 0);
+    }
+
+    function testCalculateScoreUnsetLatencyOnlyLosesItsOwnDimension() public {
+        sliParams = SharedTypes.SLIThresholds({
+            retrievabilityBps: 9900, bandwidthBytesPerSecond: 99, latencyMs: 99, indexingPct: 99
+        });
+        oracle.setAttestations(1000, 10000, 100, 0, 100);
+        vm.roll(1001);
+        uint256 score = sliScorer.calculateScore(dealId, sliParams);
+        assertEq(score, 75);
+    }
 }
