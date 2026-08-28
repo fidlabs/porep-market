@@ -93,10 +93,16 @@ interface ISPRegistry {
     ) external;
 
     /**
-     * @notice Returns all registered provider actor IDs.
-     * @return Array of provider actor IDs.
+     * @notice Returns a page of registered provider actor IDs.
+     * @param offset Zero-based index in the provider list.
+     * @param limit Maximum number of provider actor IDs to return.
+     * @return providers Page of provider actor IDs in the existing index order.
+     * @return total Total number of registered providers at call time.
      */
-    function getProviders() external view returns (CommonTypes.FilActorId[] memory);
+    function getProviders(uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory providers, uint256 total);
 
     /**
      * @notice Returns current provider registration and capacity data.

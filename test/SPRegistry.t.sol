@@ -420,6 +420,40 @@ contract SPRegistryTest is Test {
         spRegistry.reserveOfferForDeal(offerId, _request(100_000));
     }
 
+    function testGetProvidersReturnsEmptyWhenNoProviders() public view {
+        (CommonTypes.FilActorId[] memory providers, uint256 total) = spRegistry.getProviders(0, type(uint256).max);
+
+        assertEq(total, 0);
+        assertEq(providers.length, 0);
+    }
+
+    function testGetProvidersReturnsEmptyWhenLimitIsZero() public {
+        _registerProvider(provider1, owner1);
+
+        (CommonTypes.FilActorId[] memory providers, uint256 total) = spRegistry.getProviders(0, 0);
+
+        assertEq(total, 1);
+        assertEq(providers.length, 0);
+    }
+
+    function testGetProvidersReturnsMiddleAndLastPartialPages() public {
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
+        _registerProvider(provider3, owner1);
+
+        (CommonTypes.FilActorId[] memory providers, uint256 total) = spRegistry.getProviders(1, 1);
+
+        assertEq(total, 3);
+        assertEq(providers.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(providers[0]), CommonTypes.FilActorId.unwrap(provider2));
+
+        (providers, total) = spRegistry.getProviders(2, type(uint256).max);
+
+        assertEq(total, 3);
+        assertEq(providers.length, 1);
+        assertEq(CommonTypes.FilActorId.unwrap(providers[0]), CommonTypes.FilActorId.unwrap(provider3));
+    }
+
     function testProviderAdminViewsAndMutableState() public {
         _registerProvider(provider1, owner1);
         _registerProvider(provider2, owner1);
@@ -427,7 +461,7 @@ contract SPRegistryTest is Test {
         assertTrue(spRegistry.isProviderRegistered(provider1));
         assertFalse(spRegistry.isProviderRegistered(provider3));
 
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
+        (CommonTypes.FilActorId[] memory providers,) = spRegistry.getProviders(0, type(uint256).max);
         assertEq(providers.length, 2);
         uint256 committedCount;
         for (uint256 i = 0; i < providers.length; i++) {
@@ -712,7 +746,7 @@ contract SPRegistryTest is Test {
         ISPRegistry.ProviderView memory capacity = spRegistry.getProviderView(provider1);
         assertEq(capacity.pendingBytes, 0);
         assertEq(capacity.committedBytes, 500_000);
-        CommonTypes.FilActorId[] memory providers = spRegistry.getProviders();
+        (CommonTypes.FilActorId[] memory providers,) = spRegistry.getProviders(0, type(uint256).max);
         uint256 committedCount;
         for (uint256 i = 0; i < providers.length; i++) {
             if (spRegistry.getProviderView(providers[i]).committedBytes > 0) committedCount++;

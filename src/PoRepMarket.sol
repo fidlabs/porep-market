@@ -962,13 +962,16 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Gets deals for a specific organization by state
      * @param organization The address of the organization
      * @param state The state of the deals to retrieve
-     * @return deals Array of deals for the organization in the specified state (from all providers associated with the organization)
+     * @param offset Zero-based index in the organization's state-specific deal list
+     * @param limit Maximum number of deals to return
+     * @return deals Array of deals for the organization in the specified state
+     * @return total Total number of deals for the organization in the specified state
      */
-    function getDealsForOrganizationByState(address organization, uint8 state)
+    function getDealsForOrganizationByState(address organization, uint8 state, uint256 offset, uint256 limit)
         external
         view
         override
-        returns (PoRepTypes.Deal[] memory deals)
+        returns (PoRepTypes.Deal[] memory deals, uint256 total)
     {
         if (organization == address(0)) {
             revert InvalidOrganizationAddress();
@@ -977,25 +980,35 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         PoRepMarketStorage storage $ = s();
         EnumerableSet.UintSet storage ids = $._dealIdsByStateByOrganization[state][organization];
 
-        uint256 lengthOfDeals = ids.length();
-        deals = new PoRepTypes.Deal[](lengthOfDeals);
+        total = ids.length();
+        uint256 length = _pageLength(total, offset, limit);
+        deals = new PoRepTypes.Deal[](length);
 
-        for (uint256 i = 0; i < lengthOfDeals; i++) {
-            deals[i] = $._deals[ids.at(i)];
+        for (uint256 i = 0; i < length; i++) {
+            deals[i] = $._deals[ids.at(offset + i)];
         }
     }
 
     /**
-     * @notice Gets all deals
-     * @return deals Array of all deals
+     * @notice Gets a page of all deals in creation order
+     * @param offset Zero-based index in the creation-order deal list
+     * @param limit Maximum number of deals to return
+     * @return deals Array of deals in creation order
+     * @return total Total number of created deals
      */
-    function getDeals() external view override returns (PoRepTypes.Deal[] memory deals) {
+    function getDeals(uint256 offset, uint256 limit)
+        external
+        view
+        override
+        returns (PoRepTypes.Deal[] memory deals, uint256 total)
+    {
         PoRepMarketStorage storage $ = s();
-        uint256 totalDeals = $._dealIdCounter;
-        deals = new PoRepTypes.Deal[](totalDeals);
+        total = $._dealIdCounter;
+        uint256 length = _pageLength(total, offset, limit);
+        deals = new PoRepTypes.Deal[](length);
 
-        for (uint256 deal = 0; deal < totalDeals; deal++) {
-            deals[deal] = $._deals[deal + 1];
+        for (uint256 i = 0; i < length; i++) {
+            deals[i] = $._deals[offset + i + 1];
         }
     }
 
