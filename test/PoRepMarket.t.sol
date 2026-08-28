@@ -1266,7 +1266,7 @@ contract PoRepMarketTest is Test {
         );
 
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(5000);
+        poRepMarket.setDealActivationPadding(50);
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, terms, expectedManifestLocation));
         vm.prank(address(validator));
@@ -1339,7 +1339,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
@@ -1358,7 +1358,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
         vm.prank(address(validator));
         poRepMarket.updateValidator(dealId);
@@ -1374,7 +1374,7 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(10000);
+        poRepMarket.setDealActivationPadding(2_000);
 
         dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, 0));
         vm.expectRevert(
@@ -1390,10 +1390,10 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
         uint256 dealAllocationSizeAtTheBottomLimit =
-            defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 10) / 100 - 1;
+            defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 50) / 10_000 - 1;
 
         dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheBottomLimit)
@@ -1411,9 +1411,10 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         vm.prank(adminAddress);
-        poRepMarket.setDealActivationPadding(1000);
+        poRepMarket.setDealActivationPadding(50);
 
-        uint256 dealAllocationSizeAtTheUpperLimit = (defaultTerms.dealSizeBytes * 110) / 100 + 1;
+        uint256 dealAllocationSizeAtTheUpperLimit =
+            defaultTerms.dealSizeBytes + (defaultTerms.dealSizeBytes * 50) / 10_000 + 1;
 
         dataCapEvidenceAdapterAddress.setDeal(
             createClientDealWithAllocationSize(dealId, dealAllocationSizeAtTheUpperLimit)
@@ -1467,7 +1468,9 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
         dataCapEvidenceAdapterAddress.setDeal(
-            createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes - 1)
+            createClientDealWithAllocationSize(
+                dealId, defaultTerms.dealSizeBytes - (defaultTerms.dealSizeBytes * 1_000) / 10_000 - 1
+            )
         );
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -1483,7 +1486,9 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
         dataCapEvidenceAdapterAddress.setDeal(
-            createClientDealWithAllocationSize(dealId, defaultTerms.dealSizeBytes + 1)
+            createClientDealWithAllocationSize(
+                dealId, defaultTerms.dealSizeBytes + (defaultTerms.dealSizeBytes * 1_000) / 10_000 + 1
+            )
         );
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -1929,19 +1934,18 @@ contract PoRepMarketTest is Test {
         poRepMarket.validateDealSettlement(dealId, 0, settlementEndEpoch);
     }
 
-    function testValidateDealSettlementReturnsTooEarlyBeforeMinimumSettlementWindow() public {
+    function testValidateDealSettlementRevertsTooEarlyBeforeMinimumSettlementWindow() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
+        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 settlementEndEpoch = 200;
+        uint256 earliestSettlementEpoch = settlementStartEpoch + service.minTimeBetweenSettlementsInEpochs;
 
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.SettlementTooEarly.selector, settlementEndEpoch, earliestSettlementEpoch)
+        );
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, _epochToUint(service.serviceStartEpoch), 200);
-
-        assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, _epochToUint(service.serviceStartEpoch));
-        assertEq(decision.reasonCode, SettlementReason.TOO_EARLY);
-        assertEq(decision.result, SettlementResult.REJECTED);
-        assertEq(decision.note, "too early for settlement");
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
     }
 
     function testValidateDealSettlementReturnsScoreFailureNote() public {
@@ -1979,7 +1983,7 @@ contract PoRepMarketTest is Test {
         assertEq(decision.note, "data size does not match the deal");
     }
 
-    function testValidateDealSettlementRejectsWhenEvidenceRefreshTooOld() public {
+    function testValidateDealSettlementRevertsWhenEvidenceRefreshTooOld() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
 
@@ -1990,18 +1994,12 @@ contract PoRepMarketTest is Test {
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
         vm.roll(settlementEndEpoch);
 
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
-
-        assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, settlementStartEpoch);
-        assertEq(decision.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
-        assertEq(decision.result, SettlementResult.REJECTED);
-        assertEq(decision.note, "evidence refresh too old");
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
     }
 
-    function testValidateDealSettlementRejectsInactiveEvidenceWithoutAdvancing() public {
+    function testValidateDealSettlementRevertsWithInactiveEvidence() public {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 100);
 
@@ -2025,15 +2023,9 @@ contract PoRepMarketTest is Test {
             )
         );
 
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory decision =
-            poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
-
-        assertEq(decision.settlementAmount, 0);
-        assertEq(decision.settleUpto, settlementStartEpoch);
-        assertEq(decision.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
-        assertEq(decision.result, SettlementResult.REJECTED);
-        assertEq(decision.note, "evidence refresh too old");
+        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
     }
 
     function testValidateDealSettlementAcceptsEvidenceAtRefreshMarginBoundary() public {
@@ -2302,6 +2294,61 @@ contract PoRepMarketTest is Test {
         PoRepTypes.Deal memory p = poRepMarket.getDeal(dealId);
         assertTrue(p.state == DealState.EARLY_TERMINATED);
         assertEq(validator.earlyRailTerminationCallCount(), 1);
+    }
+
+    function testTerminateDealAtServiceEndEpoch() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        setDealActive(dealId);
+
+        int64 serviceEndEpoch = int64(uint64(block.number + 1));
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+        service.serviceEndEpoch = CommonTypes.ChainEpoch.wrap(serviceEndEpoch);
+        PoRepMarketContractMock(address(poRepMarket)).setDealService(dealId, service);
+        vm.roll(block.number + 1);
+
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
+
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.EARLY_TERMINATED);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(poRepMarket.getDealService(dealId).earlyTerminationEpoch), serviceEndEpoch
+        );
+        assertEq(validator.earlyRailTerminationCallCount(), 1);
+    }
+
+    function testTerminateDealRevertsAfterServiceEndEpoch() public {
+        ValidatorMock validator = new ValidatorMock();
+        validatorFactory.setValidator(address(validator), true);
+
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+
+        vm.prank(address(validator));
+        poRepMarket.updateValidator(dealId);
+        setDealActive(dealId);
+
+        int64 serviceEndEpoch = int64(uint64(block.number + 1));
+        PoRepTypes.DealService memory service = poRepMarket.getDealService(dealId);
+        service.serviceEndEpoch = CommonTypes.ChainEpoch.wrap(serviceEndEpoch);
+        PoRepMarketContractMock(address(poRepMarket)).setDealService(dealId, service);
+        vm.roll(block.number + 2);
+        int64 earlyTerminationEpoch = int64(uint64(block.number));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.ServiceAlreadyEnded.selector, serviceEndEpoch, earlyTerminationEpoch)
+        );
+        vm.prank(adminAddress);
+        poRepMarket.terminateDeal(dealId, DealState.EARLY_TERMINATED);
+
+        assertEq(poRepMarket.getDeal(dealId).state, DealState.ACTIVE);
+        assertEq(validator.earlyRailTerminationCallCount(), 0);
     }
 
     function testTerminateDealReleasesCommittedCapacityWithManifestHash() public {
@@ -2589,15 +2636,15 @@ contract PoRepMarketTest is Test {
         uint256 newPadding = 15;
 
         vm.expectEmit(true, false, false, false);
-        emit PoRepMarket.DealActivationPaddingUpdated(0, newPadding);
+        emit PoRepMarket.DealActivationPaddingUpdated(1_000, newPadding);
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(newPadding);
     }
 
     function testSetDealActivationPaddingRevertsWhenPaddingTooHigh() public {
-        uint256 newPadding = 10_001;
+        uint256 newPadding = 2_001;
 
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealActivationPaddingTooHigh.selector, newPadding, 10_000));
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.DealActivationPaddingTooHigh.selector, newPadding, 2_000));
         vm.prank(adminAddress);
         poRepMarket.setDealActivationPadding(newPadding);
     }
@@ -2617,7 +2664,7 @@ contract PoRepMarketTest is Test {
     }
 
     function testGetDealActivationPaddingReturnsUpdatedValue() public {
-        assertEq(poRepMarket.getDealActivationPadding(), 0);
+        assertEq(poRepMarket.getDealActivationPadding(), 1_000);
 
         uint256 newPadding = 15;
         vm.prank(adminAddress);

@@ -67,8 +67,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice The maximum value allowed for deal activation padding, in basis points.
+     * @dev 2000 basis points equals 20%.
      */
-    uint256 private constant MAX_DEAL_ACTIVATION_PADDING = 10_000;
+    uint256 private constant MAX_DEAL_ACTIVATION_PADDING = 2_000;
 
     /**
      * @notice Minimum Filecoin deal duration equals 180 days (6 months)
@@ -343,6 +344,20 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error DealServiceNotStarted(uint256 dealId);
 
     /**
+     * @notice Error indicating that the requested settlement window is too short
+     * @param requestedToEpoch The requested settlement end epoch
+     * @param earliestSettlementEpoch The earliest epoch at which settlement may end
+     * @dev 0xf5342533
+     */
+    error SettlementTooEarly(uint256 requestedToEpoch, uint256 earliestSettlementEpoch);
+
+    /**
+     * @notice Error indicating that the deal evidence is too stale for settlement
+     * @dev 0x5e885a2d
+     */
+    error EvidenceTooStale();
+
+    /**
      * @notice Error indicating that the minimum time between settlements is invalid
      * @dev 0xf90f5b8f
      */
@@ -393,6 +408,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param currentEpoch The current block epoch
      */
     error ServiceNotEnded(uint256 serviceEndEpoch, uint256 currentEpoch);
+
+    /**
+     * @notice Error indicating that a deal can no longer be terminated early because its service has ended
+     * @param serviceEndEpoch The epoch at which the deal service ended
+     * @param currentEpoch The current block epoch
+     * @dev 0x284d2b90
+     */
+    error ServiceAlreadyEnded(int64 serviceEndEpoch, int64 currentEpoch);
 
     /**
      * @notice Error thrown when there are no billable 32 GiB units for a deal
@@ -468,6 +491,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         $._SPRegistryContract = ISPRegistry(_spRegistry);
         $._globalEvidenceAdapter = IStorageEvidenceAdapter(_globalEvidenceAdapter);
         $._SLIScorer = ISLIScorer(_SLIScorer);
+        $._dealActivationPadding = 1_000; // 10% default padding
 
         emit GlobalEvidenceAdapterUpdated(_globalEvidenceAdapter);
     }
@@ -916,6 +940,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         PoRepMarketStorage storage $ = s();
         uint256 dealId = deal.dealId;
         uint8 previousState = deal.state;
+        int64 blockNumber = int64(uint64(block.number));
+        int64 serviceEndEpoch = CommonTypes.ChainEpoch.unwrap($._dealService[dealId].serviceEndEpoch);
+        if (serviceEndEpoch != 0 && blockNumber > serviceEndEpoch) {
+            revert ServiceAlreadyEnded(serviceEndEpoch, blockNumber);
+        }
         _changeDealState(dealId, state);
         if (previousState == DealState.ACCEPTED) {
             $._SPRegistryContract
@@ -929,8 +958,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 );
         }
         IOperator(deal.validator).earlyRailTermination();
-        int64 earlyTerminationEpoch = int64(uint64(block.number));
-        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(earlyTerminationEpoch);
+        $._dealService[dealId].earlyTerminationEpoch = CommonTypes.ChainEpoch.wrap(blockNumber);
         emit DealTerminated(dealId, $._dealService[dealId].earlyTerminationEpoch);
     }
 
@@ -1251,8 +1279,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 settlementWasCapped = true;
             }
         } else {
-            if (effectiveToEpoch < fromEpoch + service.minTimeBetweenSettlementsInEpochs) {
-                return _rejectedSettlement(fromEpoch, SettlementReason.TOO_EARLY, "too early for settlement");
+            uint256 earliestSettlementEpoch = fromEpoch + service.minTimeBetweenSettlementsInEpochs;
+            if (effectiveToEpoch < earliestSettlementEpoch) {
+                revert SettlementTooEarly(effectiveToEpoch, earliestSettlementEpoch);
             }
 
             if (effectiveToEpoch > serviceEndEpoch) {
@@ -1262,7 +1291,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
             }
         }
 
-        // Stale evidence keeps the cursor at fromEpoch for retry; score and size failures advance it to effectiveToEpoch.
+        // Score and size failures advance the cursor to effectiveToEpoch; stale evidence reverts for a later retry.
         {
             SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
             if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
@@ -1279,7 +1308,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 evidenceStatus.result == EvidenceResult.INACTIVE
                     || lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch
             ) {
-                return _rejectedSettlement(fromEpoch, SettlementReason.EVIDENCE_TOO_STALE, "evidence refresh too old");
+                revert EvidenceTooStale();
             }
 
             if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
