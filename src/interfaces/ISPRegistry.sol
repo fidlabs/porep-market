@@ -276,7 +276,7 @@ interface ISPRegistry {
      * @param organization Organization address.
      * @return True when the organization already holds a deal for that client's manifest.
      */
-    function getClientManifestDealWithOrganization(address client, bytes32 manifestHash, address organization)
+    function isClientManifestDealWithOrganization(address client, bytes32 manifestHash, address organization)
         external
         view
         returns (bool);

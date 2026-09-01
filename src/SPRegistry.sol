@@ -680,7 +680,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function getClientManifestDealWithOrganization(address client, bytes32 manifestHash, address organization)
+    function isClientManifestDealWithOrganization(address client, bytes32 manifestHash, address organization)
         external
         view
         returns (bool)

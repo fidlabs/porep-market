@@ -254,35 +254,6 @@
   },
   {
     "type": "function",
-    "name": "getClientManifestDealWithOrganization",
-    "inputs": [
-      {
-        "name": "client",
-        "type": "address",
-        "internalType": "address"
-      },
-      {
-        "name": "manifestHash",
-        "type": "bytes32",
-        "internalType": "bytes32"
-      },
-      {
-        "name": "organization",
-        "type": "address",
-        "internalType": "address"
-      }
-    ],
-    "outputs": [
-      {
-        "name": "",
-        "type": "bool",
-        "internalType": "bool"
-      }
-    ],
-    "stateMutability": "view"
-  },
-  {
-    "type": "function",
     "name": "getOfferView",
     "inputs": [
       {
@@ -630,6 +601,35 @@
         "name": "provider",
         "type": "uint64",
         "internalType": "CommonTypes.FilActorId"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
+    "name": "isClientManifestDealWithOrganization",
+    "inputs": [
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "organization",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [
