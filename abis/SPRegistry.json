@@ -614,8 +614,13 @@
   },
   {
     "type": "function",
-    "name": "isManifestAssignedToOrganization",
+    "name": "isManifestAssignedToOrganizationAndClient",
     "inputs": [
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "manifestHash",
         "type": "bytes32",
@@ -676,6 +681,11 @@
         "name": "offerId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
       },
       {
         "name": "request",
@@ -824,6 +834,11 @@
     "type": "function",
     "name": "previewProviderForDeal",
     "inputs": [
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "request",
         "type": "tuple",
@@ -1018,6 +1033,11 @@
         "internalType": "uint256"
       },
       {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "manifestHash",
         "type": "bytes32",
         "internalType": "bytes32"
@@ -1039,6 +1059,11 @@
         "name": "sizeBytes",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
       },
       {
         "name": "manifestHash",
@@ -1075,6 +1100,11 @@
         "name": "offerId",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
       },
       {
         "name": "request",
@@ -1218,6 +1248,11 @@
     "type": "function",
     "name": "reserveProviderForDeal",
     "inputs": [
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
       {
         "name": "request",
         "type": "tuple",

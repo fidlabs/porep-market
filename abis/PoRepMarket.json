@@ -942,6 +942,11 @@
     "name": "previewProviderForDeal",
     "inputs": [
       {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
         "name": "request",
         "type": "tuple",
         "internalType": "struct SharedTypes.DealRequest",

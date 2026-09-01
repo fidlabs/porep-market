@@ -76,7 +76,8 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint256 => SharedTypes.OfferTerms) _offerTerms;
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
         mapping(uint256 => mapping(address => RegistryOfferPayment)) _offerPayments;
-        mapping(bytes32 manifestHash => mapping(address organization => bool)) _manifestAssignedToOrganization;
+        mapping(address client => mapping(bytes32 manifestHash => mapping(address organization => bool)))
+            _clientManifestDealWithOrganization;
         mapping(uint256 => EnumerableSet.AddressSet) _offerPaymentTokens;
     }
 
@@ -670,65 +671,71 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+    function previewProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
-        return _selectProviderForDeal(request);
+        return _selectProviderForDeal(client, request);
     }
 
     /// @inheritdoc ISPRegistry
-    function isManifestAssignedToOrganization(bytes32 manifestHash, address organization) external view returns (bool) {
-        return s()._manifestAssignedToOrganization[manifestHash][organization];
+    function isManifestAssignedToOrganizationAndClient(address client, bytes32 manifestHash, address organization)
+        external
+        view
+        returns (bool)
+    {
+        return s()._clientManifestDealWithOrganization[client][manifestHash][organization];
     }
 
     /// @inheritdoc ISPRegistry
-    function reserveProviderForDeal(SharedTypes.DealRequest calldata request)
+    function reserveProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
         onlyRole(MARKET_ROLE)
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
-        selection = _selectProviderForDeal(request);
+        selection = _selectProviderForDeal(client, request);
         if (_providerId(selection.provider) == 0) revert NoOfferMatched();
-        _reserveSelection(request.manifestHash, selection);
+        _reserveSelection(client, request.manifestHash, selection);
     }
 
     /// @inheritdoc ISPRegistry
-    function previewOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function previewOfferForDeal(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason)
     {
-        return _evaluateOffer(offerId, request);
+        return _evaluateOffer(offerId, client, request);
     }
 
     /// @inheritdoc ISPRegistry
-    function reserveOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function reserveOfferForDeal(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         external
         onlyRole(MARKET_ROLE)
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
         uint16 reason;
-        (selection, reason) = _evaluateOffer(offerId, request);
+        (selection, reason) = _evaluateOffer(offerId, client, request);
         if (reason != OfferMatch.OK) revert OfferNotEligible(offerId, reason);
-        _reserveSelection(request.manifestHash, selection);
+        _reserveSelection(client, request.manifestHash, selection);
     }
 
     /// @inheritdoc ISPRegistry
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, address client, bytes32 manifestHash)
         external
         onlyRole(MARKET_ROLE)
     {
-        _releaseCapacity(provider, sizeBytes, manifestHash);
+        _releaseCapacity(provider, sizeBytes, client, manifestHash);
     }
 
     /// @inheritdoc ISPRegistry
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
-        external
-        onlyRole(MARKET_ROLE)
-    {
-        _releasePendingCapacity(provider, sizeBytes, manifestHash);
+    function releasePendingCapacity(
+        CommonTypes.FilActorId provider,
+        uint256 sizeBytes,
+        address client,
+        bytes32 manifestHash
+    ) external onlyRole(MARKET_ROLE) {
+        _releasePendingCapacity(provider, sizeBytes, client, manifestHash);
     }
 
     /// @inheritdoc ISPRegistry
@@ -866,10 +873,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /**
      * @notice Selects the best matching active offer for a deal request.
+     * @param client Client the manifest assignment is scoped to.
      * @param request Deal request to evaluate.
      * @return best Selected provider offer snapshot, or zeroed fields when no offer matches.
      */
-    function _selectProviderForDeal(SharedTypes.DealRequest calldata request)
+    function _selectProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         internal
         view
         returns (SharedTypes.ProviderDealSelection memory best)
@@ -884,7 +892,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
         for (uint256 i = 0; i < length; i++) {
             (SharedTypes.ProviderDealSelection memory candidate, uint16 reason) =
-                _evaluateOffer($._activeOfferIds.at(i), request);
+                _evaluateOffer($._activeOfferIds.at(i), client, request);
             if (reason != OfferMatch.OK) continue;
             eligibleOfferIds[count] = candidate.offerId;
             eligibleProviders[count] = candidate.provider;
@@ -893,9 +901,19 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         }
         if (count == 0) return best;
 
+        uint256 bestOfferId = _pickBestOfferId(eligibleOfferIds, eligibleProviders, eligiblePrices, count, cheapest);
+        (best,) = _evaluateOffer(bestOfferId, client, request);
+    }
+
+    function _pickBestOfferId(
+        uint256[] memory eligibleOfferIds,
+        CommonTypes.FilActorId[] memory eligibleProviders,
+        uint256[] memory eligiblePrices,
+        uint256 count,
+        uint256 cheapest
+    ) internal view returns (uint256 bestOfferId) {
         uint256 maxBandPrice = (cheapest * (MAX_BPS + MATCH_PRICE_BAND_BPS)) / MAX_BPS;
         CommonTypes.FilActorId bestProvider;
-        uint256 bestOfferId;
         uint256 bestPrice;
         uint256 bestLoad = type(uint256).max;
         for (uint256 i = 0; i < count; i++) {
@@ -911,7 +929,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
                 bestOfferId = offerId;
             }
         }
-        (best,) = _evaluateOffer(bestOfferId, request);
     }
 
     /**
@@ -943,28 +960,61 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /**
      * @notice Evaluates a single offer against a deal request.
      * @param offerId Offer ID to evaluate.
+     * @param client Client the manifest assignment is scoped to.
      * @param request Deal request to evaluate against the offer.
      * @return selection Offer snapshot returned when the offer is eligible.
      * @return reason Match result code describing eligibility or the first rejection reason.
      */
-    // solhint-disable-next-line function-max-lines
-    function _evaluateOffer(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function _evaluateOffer(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         internal
         view
         returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason)
     {
+        CommonTypes.FilActorId provider;
+        address payee;
+        uint256 pricePer32GiBPerMonth;
+        (reason, provider, payee, pricePer32GiBPerMonth) = _checkOfferEligibility(offerId, client, request);
+        if (reason != OfferMatch.OK) return (selection, reason);
+
+        selection = SharedTypes.ProviderDealSelection({
+            provider: provider,
+            offerId: offerId,
+            paymentToken: request.paymentToken,
+            payee: payee,
+            pricePer32GiBPerMonth: pricePer32GiBPerMonth,
+            promisedSLIs: s()._offerSLIs[offerId],
+            reservedBytes: request.requestedSizeBytes
+        });
+    }
+
+    /**
+     * @notice Checks whether an offer is eligible for a deal request.
+     * @param offerId Offer ID to evaluate.
+     * @param client Client the manifest assignment is scoped to.
+     * @param request Deal request to evaluate against the offer.
+     * @return reason Match result code; OfferMatch.OK when the offer is eligible.
+     * @return provider Offer provider, set when reason is OfferMatch.OK.
+     * @return payee Provider payee, set when reason is OfferMatch.OK.
+     * @return pricePer32GiBPerMonth Offer price, set when reason is OfferMatch.OK.
+     */
+    // solhint-disable-next-line function-max-lines
+    function _checkOfferEligibility(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
+        internal
+        view
+        returns (uint16 reason, CommonTypes.FilActorId provider, address payee, uint256 pricePer32GiBPerMonth)
+    {
         SPRegistryStorage storage $ = s();
         Offer storage offer = $._offers[offerId];
         if (offerId == 0 || _providerId(offer.provider) == 0) {
-            return (selection, OfferMatch.OFFER_NOT_FOUND);
+            return (OfferMatch.OFFER_NOT_FOUND, provider, payee, pricePer32GiBPerMonth);
         }
-        if (!offer.active) return (selection, OfferMatch.OFFER_INACTIVE);
+        if (!offer.active) return (OfferMatch.OFFER_INACTIVE, provider, payee, pricePer32GiBPerMonth);
 
         Provider storage providerInfo = $._providers[_providerId(offer.provider)];
-        if (providerInfo.blocked) return (selection, OfferMatch.PROVIDER_BLOCKED);
-        if (providerInfo.paused) return (selection, OfferMatch.PROVIDER_PAUSED);
-        if ($._manifestAssignedToOrganization[request.manifestHash][providerInfo.organization]) {
-            return (selection, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
+        if (providerInfo.blocked) return (OfferMatch.PROVIDER_BLOCKED, provider, payee, pricePer32GiBPerMonth);
+        if (providerInfo.paused) return (OfferMatch.PROVIDER_PAUSED, provider, payee, pricePer32GiBPerMonth);
+        if ($._clientManifestDealWithOrganization[client][request.manifestHash][providerInfo.organization]) {
+            return (OfferMatch.MANIFEST_ALREADY_ASSIGNED, provider, payee, pricePer32GiBPerMonth);
         }
 
         SharedTypes.OfferTerms storage terms = $._offerTerms[offerId];
@@ -972,7 +1022,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             request.requestedSizeBytes < terms.minSizeBytes
                 || (terms.maxSizeBytes != 0 && request.requestedSizeBytes > terms.maxSizeBytes)
         ) {
-            return (selection, OfferMatch.SIZE_OUT_OF_BOUNDS);
+            return (OfferMatch.SIZE_OUT_OF_BOUNDS, provider, payee, pricePer32GiBPerMonth);
         }
 
         uint64 durationEpochs = uint64(uint256(request.durationDays) * SharedTypes.EPOCHS_IN_DAY);
@@ -980,38 +1030,34 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
             durationEpochs < terms.minDurationEpochs
                 || (terms.maxDurationEpochs != 0 && durationEpochs > terms.maxDurationEpochs)
         ) {
-            return (selection, OfferMatch.DURATION_OUT_OF_BOUNDS);
+            return (OfferMatch.DURATION_OUT_OF_BOUNDS, provider, payee, pricePer32GiBPerMonth);
         }
 
         if (!_meetsRequirements($._offerSLIs[offerId], request.requiredSLIs)) {
-            return (selection, OfferMatch.SLIS_NOT_MET);
+            return (OfferMatch.SLIS_NOT_MET, provider, payee, pricePer32GiBPerMonth);
         }
 
         ISPRegistry.TokenConfig storage config = $._tokenConfig[request.paymentToken];
         RegistryOfferPayment storage payment = $._offerPayments[offerId][request.paymentToken];
-        if (!config.allowed || !payment.active) return (selection, OfferMatch.TOKEN_NOT_ALLOWED);
+        if (!config.allowed || !payment.active) {
+            return (OfferMatch.TOKEN_NOT_ALLOWED, provider, payee, pricePer32GiBPerMonth);
+        }
         uint256 minimum = config.minPricePer32GiBPerMonth == 0 ? 1 : config.minPricePer32GiBPerMonth;
         if (payment.pricePer32GiBPerMonth < minimum) {
-            return (selection, OfferMatch.PRICE_BELOW_TOKEN_MIN);
+            return (OfferMatch.PRICE_BELOW_TOKEN_MIN, provider, payee, pricePer32GiBPerMonth);
         }
         if (payment.pricePer32GiBPerMonth > request.maxPricePer32GiBPerMonth) {
-            return (selection, OfferMatch.PRICE_ABOVE_CLIENT_MAX);
+            return (OfferMatch.PRICE_ABOVE_CLIENT_MAX, provider, payee, pricePer32GiBPerMonth);
         }
 
         if (_remainingCapacity(offer.provider) < request.requestedSizeBytes) {
-            return (selection, OfferMatch.INSUFFICIENT_CAPACITY);
+            return (OfferMatch.INSUFFICIENT_CAPACITY, provider, payee, pricePer32GiBPerMonth);
         }
 
-        selection = SharedTypes.ProviderDealSelection({
-            provider: offer.provider,
-            offerId: offerId,
-            paymentToken: request.paymentToken,
-            payee: providerInfo.payee,
-            pricePer32GiBPerMonth: payment.pricePer32GiBPerMonth,
-            promisedSLIs: $._offerSLIs[offerId],
-            reservedBytes: request.requestedSizeBytes
-        });
         reason = OfferMatch.OK;
+        provider = offer.provider;
+        payee = providerInfo.payee;
+        pricePer32GiBPerMonth = payment.pricePer32GiBPerMonth;
     }
 
     /**
@@ -1024,11 +1070,13 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         emit PendingCapacityReserved(provider, sizeBytes);
     }
 
-    function _reserveSelection(bytes32 manifestHash, SharedTypes.ProviderDealSelection memory selection) internal {
+    function _reserveSelection(address client, bytes32 manifestHash, SharedTypes.ProviderDealSelection memory selection)
+        internal
+    {
         _reservePending(selection.provider, selection.reservedBytes);
         SPRegistryStorage storage $ = s();
         uint64 providerId = _providerId(selection.provider);
-        $._manifestAssignedToOrganization[manifestHash][$._providers[providerId].organization] = true;
+        $._clientManifestDealWithOrganization[client][manifestHash][$._providers[providerId].organization] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -1038,20 +1086,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         );
     }
 
-    function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) internal {
-        _ensureProviderRegistered(provider);
-
-        SPRegistryStorage storage $ = s();
-        uint64 providerId = _providerId(provider);
-        ProviderCapacity storage c = $._providerCapacity[providerId];
-        if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
-        c.committedBytes -= sizeBytes;
-        $._manifestAssignedToOrganization[manifestHash][$._providers[providerId].organization] = false;
-
-        emit CapacityReleased(provider, sizeBytes);
-    }
-
-    function _releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash)
+    function _releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, address client, bytes32 manifestHash)
         internal
     {
         _ensureProviderRegistered(provider);
@@ -1059,9 +1094,27 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         SPRegistryStorage storage $ = s();
         uint64 providerId = _providerId(provider);
         ProviderCapacity storage c = $._providerCapacity[providerId];
+        if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
+        c.committedBytes -= sizeBytes;
+        $._clientManifestDealWithOrganization[client][manifestHash][$._providers[providerId].organization] = false;
+
+        emit CapacityReleased(provider, sizeBytes);
+    }
+
+    function _releasePendingCapacity(
+        CommonTypes.FilActorId provider,
+        uint256 sizeBytes,
+        address client,
+        bytes32 manifestHash
+    ) internal {
+        _ensureProviderRegistered(provider);
+
+        SPRegistryStorage storage $ = s();
+        uint64 providerId = _providerId(provider);
+        ProviderCapacity storage c = $._providerCapacity[providerId];
         if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
         c.pendingBytes -= sizeBytes;
-        $._manifestAssignedToOrganization[manifestHash][$._providers[providerId].organization] = false;
+        $._clientManifestDealWithOrganization[client][manifestHash][$._providers[providerId].organization] = false;
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }

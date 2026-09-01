@@ -226,31 +226,34 @@ interface ISPRegistry {
 
     /**
      * @notice Previews automatic offer matching without reserving capacity.
+     * @param client Client the manifest assignment is scoped to.
      * @param request Client deal request.
      * @return selection Selected offer snapshot, or zero provider when no offer matches.
      */
-    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+    function previewProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
      * @notice Selects an offer automatically and reserves pending provider capacity.
+     * @param client Client the manifest assignment is scoped to.
      * @param request Client deal request.
      * @return selection Selected offer snapshot.
      */
-    function reserveProviderForDeal(SharedTypes.DealRequest calldata request)
+    function reserveProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
      * @notice Previews a specific offer for a deal without reserving capacity.
      * @param offerId Offer ID to validate.
+     * @param client Client the manifest assignment is scoped to.
      * @param request Client deal request.
      * @return selection Selected offer snapshot, or zero provider when the offer does not match.
      * @return reason OfferMatch reason code; OfferMatch.OK when the offer is eligible.
      */
-    function previewOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function previewOfferForDeal(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory selection, uint16 reason);
@@ -258,36 +261,49 @@ interface ISPRegistry {
     /**
      * @notice Validates a specific offer and reserves pending provider capacity.
      * @param offerId Offer ID to validate.
+     * @param client Client the manifest assignment is scoped to.
      * @param request Client deal request.
      * @return selection Selected offer snapshot.
      */
-    function reserveOfferForDeal(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function reserveOfferForDeal(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         external
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
-     * @notice Checks whether an organization is already assigned to a manifest.
+     * @notice Checks whether an organization already holds a deal for the client's manifest.
+     * @param client Client the manifest deal is scoped to.
      * @param manifestHash Manifest hash used as data identity.
      * @param organization Organization address.
-     * @return True when organization is locked for the manifest.
+     * @return True when the organization already holds a deal for that client's manifest.
      */
-    function isManifestAssignedToOrganization(bytes32 manifestHash, address organization) external view returns (bool);
+    function isManifestAssignedToOrganizationAndClient(address client, bytes32 manifestHash, address organization)
+        external
+        view
+        returns (bool);
 
     /**
      * @notice Releases committed provider capacity and clears the manifest/organization assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Capacity to release.
+     * @param client Client the manifest assignment is scoped to.
      * @param manifestHash Manifest hash whose organization assignment should be cleared.
      */
-    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
+    function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, address client, bytes32 manifestHash)
+        external;
 
     /**
      * @notice Releases pending provider capacity and clears the manifest/organization assignment.
      * @param provider Provider actor ID.
      * @param sizeBytes Pending capacity to release.
+     * @param client Client the manifest assignment is scoped to.
      * @param manifestHash Manifest hash whose organization assignment should be cleared.
      */
-    function releasePendingCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, bytes32 manifestHash) external;
+    function releasePendingCapacity(
+        CommonTypes.FilActorId provider,
+        uint256 sizeBytes,
+        address client,
+        bytes32 manifestHash
+    ) external;
 
     /**
      * @notice Converts pending capacity into committed capacity.

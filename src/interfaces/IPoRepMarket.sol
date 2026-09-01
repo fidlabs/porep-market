@@ -32,10 +32,11 @@ interface IPoRepMarket {
 
     /**
      * @notice Previews the provider offer automatic matching would select for a deal request
+     * @param client The client the manifest assignment is scoped to
      * @param request The client deal request
      * @return selection The selected provider offer snapshot, or zeroed fields when no offer matches
      */
-    function previewProviderForDeal(SharedTypes.DealRequest calldata request)
+    function previewProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
         view
         returns (SharedTypes.ProviderDealSelection memory selection);
