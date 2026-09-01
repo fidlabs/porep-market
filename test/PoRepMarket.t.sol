@@ -2078,12 +2078,12 @@ contract PoRepMarketTest is Test {
             .setDealService(
                 dealId,
                 PoRepTypes.DealService({
-                    serviceStartEpoch: service.serviceStartEpoch,
-                    serviceEndEpoch: service.serviceEndEpoch,
-                    earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(earlyTerminationChainEpoch),
-                    minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
-                    lastSettledEpoch: service.lastSettledEpoch
-                })
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(earlyTerminationChainEpoch),
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: service.lastSettledEpoch
+            })
             );
 
         vm.prank(validatorAddress);
@@ -2107,12 +2107,12 @@ contract PoRepMarketTest is Test {
             .setDealService(
                 dealId,
                 PoRepTypes.DealService({
-                    serviceStartEpoch: service.serviceStartEpoch,
-                    serviceEndEpoch: service.serviceEndEpoch,
-                    earlyTerminationEpoch: earlyTerminationChainEpoch,
-                    minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
-                    lastSettledEpoch: earlyTerminationChainEpoch
-                })
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: earlyTerminationChainEpoch,
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: earlyTerminationChainEpoch
+            })
             );
 
         vm.prank(validatorAddress);
@@ -2138,12 +2138,12 @@ contract PoRepMarketTest is Test {
             .setDealService(
                 dealId,
                 PoRepTypes.DealService({
-                    serviceStartEpoch: service.serviceStartEpoch,
-                    serviceEndEpoch: service.serviceEndEpoch,
-                    earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(earlyTerminationChainEpoch),
-                    minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
-                    lastSettledEpoch: service.lastSettledEpoch
-                })
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: CommonTypes.ChainEpoch.wrap(earlyTerminationChainEpoch),
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: service.lastSettledEpoch
+            })
             );
 
         vm.prank(validatorAddress);
@@ -2170,12 +2170,12 @@ contract PoRepMarketTest is Test {
             .setDealService(
                 dealId,
                 PoRepTypes.DealService({
-                    serviceStartEpoch: service.serviceStartEpoch,
-                    serviceEndEpoch: service.serviceEndEpoch,
-                    earlyTerminationEpoch: service.earlyTerminationEpoch,
-                    minTimeBetweenSettlementsInEpochs: service.minTimeBetweenSettlementsInEpochs,
-                    lastSettledEpoch: CommonTypes.ChainEpoch.wrap(settlementStartChainEpoch)
-                })
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: service.earlyTerminationEpoch,
+                minTimeBetweenSettlementsInEpochs: service.minTimeBetweenSettlementsInEpochs,
+                lastSettledEpoch: CommonTypes.ChainEpoch.wrap(settlementStartChainEpoch)
+            })
             );
 
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(serviceEndEpoch));
