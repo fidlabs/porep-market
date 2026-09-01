@@ -77,7 +77,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         mapping(uint256 => SharedTypes.SLIThresholds) _offerSLIs;
         mapping(uint256 => mapping(address => RegistryOfferPayment)) _offerPayments;
         mapping(address client => mapping(bytes32 manifestHash => mapping(address organization => bool)))
-            _manifestAssignedToOrganization;
+            _clientManifestDealWithOrganization;
         mapping(uint256 => EnumerableSet.AddressSet) _offerPaymentTokens;
     }
 
@@ -680,12 +680,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function isManifestAssignedToOrganization(address client, bytes32 manifestHash, address organization)
+    function getClientManifestDealWithOrganization(address client, bytes32 manifestHash, address organization)
         external
         view
         returns (bool)
     {
-        return s()._manifestAssignedToOrganization[client][manifestHash][organization];
+        return s()._clientManifestDealWithOrganization[client][manifestHash][organization];
     }
 
     /// @inheritdoc ISPRegistry
@@ -1013,7 +1013,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         Provider storage providerInfo = $._providers[_providerId(offer.provider)];
         if (providerInfo.blocked) return (OfferMatch.PROVIDER_BLOCKED, provider, payee, pricePer32GiBPerMonth);
         if (providerInfo.paused) return (OfferMatch.PROVIDER_PAUSED, provider, payee, pricePer32GiBPerMonth);
-        if ($._manifestAssignedToOrganization[client][request.manifestHash][providerInfo.organization]) {
+        if ($._clientManifestDealWithOrganization[client][request.manifestHash][providerInfo.organization]) {
             return (OfferMatch.MANIFEST_ALREADY_ASSIGNED, provider, payee, pricePer32GiBPerMonth);
         }
 
@@ -1076,7 +1076,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         _reservePending(selection.provider, selection.reservedBytes);
         SPRegistryStorage storage $ = s();
         uint64 providerId = _providerId(selection.provider);
-        $._manifestAssignedToOrganization[client][manifestHash][$._providers[providerId].organization] = true;
+        $._clientManifestDealWithOrganization[client][manifestHash][$._providers[providerId].organization] = true;
         emit OfferSelected(
             selection.offerId,
             selection.provider,
@@ -1096,7 +1096,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         ProviderCapacity storage c = $._providerCapacity[providerId];
         if (sizeBytes > c.committedBytes) revert ReleaseExceedsCommitted(provider, sizeBytes, c.committedBytes);
         c.committedBytes -= sizeBytes;
-        $._manifestAssignedToOrganization[client][manifestHash][$._providers[providerId].organization] = false;
+        $._clientManifestDealWithOrganization[client][manifestHash][$._providers[providerId].organization] = false;
 
         emit CapacityReleased(provider, sizeBytes);
     }
@@ -1114,7 +1114,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         ProviderCapacity storage c = $._providerCapacity[providerId];
         if (sizeBytes > c.pendingBytes) revert ReleasePendingExceedsPending(provider, sizeBytes, c.pendingBytes);
         c.pendingBytes -= sizeBytes;
-        $._manifestAssignedToOrganization[client][manifestHash][$._providers[providerId].organization] = false;
+        $._clientManifestDealWithOrganization[client][manifestHash][$._providers[providerId].organization] = false;
 
         emit PendingCapacityReleased(provider, sizeBytes);
     }

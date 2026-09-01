@@ -270,13 +270,13 @@ interface ISPRegistry {
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
-     * @notice Checks whether an organization is already assigned to a manifest for a client.
-     * @param client Client the manifest assignment is scoped to.
+     * @notice Checks whether an organization already holds a deal for the client's manifest.
+     * @param client Client the manifest deal is scoped to.
      * @param manifestHash Manifest hash used as data identity.
      * @param organization Organization address.
-     * @return True when organization is locked for the manifest for that client.
+     * @return True when the organization already holds a deal for that client's manifest.
      */
-    function isManifestAssignedToOrganization(address client, bytes32 manifestHash, address organization)
+    function getClientManifestDealWithOrganization(address client, bytes32 manifestHash, address organization)
         external
         view
         returns (bool);
