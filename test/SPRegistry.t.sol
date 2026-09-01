@@ -323,7 +323,7 @@ contract SPRegistryTest is Test {
         vm.prank(market);
         SharedTypes.ProviderDealSelection memory first = spRegistry.reserveProviderForDeal(client1, request);
         assertEq(CommonTypes.FilActorId.unwrap(first.provider), CommonTypes.FilActorId.unwrap(provider1));
-        assertTrue(spRegistry.isClientManifestDealWithOrganization(client1, manifestHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, manifestHash, owner1));
 
         SharedTypes.ProviderDealSelection memory preview = spRegistry.previewProviderForDeal(client1, request);
         assertEq(preview.offerId, provider2Offer);
@@ -331,7 +331,7 @@ contract SPRegistryTest is Test {
         vm.prank(market);
         SharedTypes.ProviderDealSelection memory second = spRegistry.reserveProviderForDeal(client1, request);
         assertEq(CommonTypes.FilActorId.unwrap(second.provider), CommonTypes.FilActorId.unwrap(provider2));
-        assertTrue(spRegistry.isClientManifestDealWithOrganization(client1, manifestHash, owner2));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, manifestHash, owner2));
     }
 
     function testAutoMatchRevertsWhenAllEligibleOrganizationsAlreadyAssignedToManifest() public {
@@ -358,8 +358,8 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.reserveOfferForDeal(offerId, client2, request);
-        assertTrue(spRegistry.isClientManifestDealWithOrganization(client2, manifestHash, owner1));
-        assertFalse(spRegistry.isClientManifestDealWithOrganization(client1, manifestHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client2, manifestHash, owner1));
+        assertFalse(spRegistry.isManifestAssignedToOrganizationAndClient(client1, manifestHash, owner1));
 
         vm.prank(market);
         SharedTypes.ProviderDealSelection memory selection = spRegistry.reserveProviderForDeal(client1, request);
@@ -781,11 +781,11 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.reserveProviderForDeal(client1, request);
-        assertTrue(spRegistry.isClientManifestDealWithOrganization(client1, manifestHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, manifestHash, owner1));
 
         vm.prank(market);
         spRegistry.releasePendingCapacity(provider1, request.requestedSizeBytes, client1, manifestHash);
-        assertFalse(spRegistry.isClientManifestDealWithOrganization(client1, manifestHash, owner1));
+        assertFalse(spRegistry.isManifestAssignedToOrganizationAndClient(client1, manifestHash, owner1));
     }
 
     function testReleaseCapacityClearsManifestOrganizationLock() public {
@@ -802,7 +802,7 @@ contract SPRegistryTest is Test {
 
         vm.prank(market);
         spRegistry.releaseCapacity(provider1, request.requestedSizeBytes, client1, manifestHash);
-        assertFalse(spRegistry.isClientManifestDealWithOrganization(client1, manifestHash, owner1));
+        assertFalse(spRegistry.isManifestAssignedToOrganizationAndClient(client1, manifestHash, owner1));
     }
 
     function testReserveValidationFailures() public {

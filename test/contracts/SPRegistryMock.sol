@@ -214,7 +214,7 @@ contract SPRegistryMock is ISPRegistry {
         return new uint256[](0);
     }
 
-    function isClientManifestDealWithOrganization(address, bytes32, address) external pure returns (bool) {
+    function isManifestAssignedToOrganizationAndClient(address, bytes32, address) external pure returns (bool) {
         return false;
     }
 

@@ -614,7 +614,7 @@
   },
   {
     "type": "function",
-    "name": "isClientManifestDealWithOrganization",
+    "name": "isManifestAssignedToOrganizationAndClient",
     "inputs": [
       {
         "name": "client",
