@@ -171,19 +171,6 @@
   },
   {
     "type": "function",
-    "name": "activatePayment",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "beginDefaultAdminTransfer",
     "inputs": [
       {
