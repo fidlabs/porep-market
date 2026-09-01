@@ -7,6 +7,9 @@ import {stdJson} from "forge-std/StdJson.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
+import {
+    IAccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/IAccessControlDefaultAdminRules.sol";
 import {Deploy} from "../../script/Deploy.s.sol";
 import {Upgrade} from "../../script/Upgrade.s.sol";
 import {DeployUtils} from "../../script/utils/DeployUtils.sol";
@@ -101,6 +104,8 @@ contract DeploymentScriptsTest is Test {
             assertTrue(proxy.code.length > 0 && implementation.code.length > 0);
             assertEq(address(uint160(uint256(vm.load(proxy, SLOT)))), implementation);
             assertTrue(IAccessProbe(proxy).hasRole(0, admin));
+            assertEq(IAccessControlDefaultAdminRules(proxy).defaultAdmin(), admin);
+            assertEq(IAccessControlDefaultAdminRules(proxy).defaultAdminDelay(), 3 days);
         }
         address factory = json.readAddress(".result.contracts.ValidatorFactory.proxy");
         address beacon = json.readAddress(".result.contracts.ValidatorBeacon.address");

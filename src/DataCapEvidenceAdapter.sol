@@ -2,7 +2,9 @@
 pragma solidity =0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {DataCapAPI} from "filecoin-solidity/v0.8/DataCapAPI.sol";
@@ -34,7 +36,7 @@ import {DataCapAllocationStatus} from "./types/DataCapAllocationStatus.sol";
 contract DataCapEvidenceAdapter is
     IDataCapEvidenceAdapter,
     Initializable,
-    AccessControlUpgradeable,
+    AccessControlDefaultAdminRulesUpgradeable,
     UUPSUpgradeable,
     ReentrancyGuard
 {
@@ -385,8 +387,7 @@ contract DataCapEvidenceAdapter is
     ) public initializer {
         _validateInitializeAddresses(admin, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        __AccessControlDefaultAdminRules_init(3 days, admin);
         _grantRole(UPGRADER_ROLE, admin);
         _grantRole(TERMINATION_ORACLE, terminationOracle);
 

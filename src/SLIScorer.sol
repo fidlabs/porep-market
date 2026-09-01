@@ -2,7 +2,9 @@
 pragma solidity =0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLIOracle} from "./SLIOracle.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
@@ -12,7 +14,7 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
  * @title SLA Registry
  * @notice Upgradeable contract for managing SLA deals with role-based access control
  */
-contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract SLIScorer is ISLIScorer, Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable {
     /**
      * @notice Thrown when an invalid oracle address is provided
      * @dev 0x9589a27d
@@ -92,10 +94,9 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
      * @param oracle_ SLIOracle
      */
     function initialize(address admin, SLIOracle oracle_) external initializer {
-        __AccessControl_init();
         if (admin == address(0)) revert InvalidAdmin();
         if (address(oracle_) == address(0)) revert InvalidOracle();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        __AccessControlDefaultAdminRules_init(3 days, admin);
         _grantRole(UPGRADER_ROLE, admin);
         s().oracle = oracle_;
     }

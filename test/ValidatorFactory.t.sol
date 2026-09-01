@@ -12,6 +12,9 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {
+    IAccessControlDefaultAdminRules
+} from "@openzeppelin/contracts/access/extensions/IAccessControlDefaultAdminRules.sol";
 import {PoRepMarketMock} from "./contracts/PoRepMarketMock.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {DealState} from "../src/types/DealState.sol";
@@ -201,7 +204,104 @@ contract ValidatorFactoryTest is Test {
         vm.prank(validAdmin);
         f.setAdmin(newValidAdmin);
 
+        (address pendingAdmin, uint48 schedule) = f.pendingDefaultAdmin();
+        assertEq(pendingAdmin, newValidAdmin);
+        assertEq(schedule, block.timestamp + 3 days);
+        assertEq(f.defaultAdmin(), validAdmin);
+        assertFalse(f.hasRole(f.DEFAULT_ADMIN_ROLE(), newValidAdmin));
+
+        vm.warp(schedule);
+        vm.prank(newValidAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                IAccessControlDefaultAdminRules.AccessControlEnforcedDefaultAdminDelay.selector, schedule
+            )
+        );
+        f.acceptDefaultAdminTransfer();
+
+        vm.warp(uint256(schedule) + 1);
+        vm.prank(newValidAdmin);
+        f.acceptDefaultAdminTransfer();
+
+        assertEq(f.defaultAdmin(), newValidAdmin);
+        assertFalse(f.hasRole(f.DEFAULT_ADMIN_ROLE(), validAdmin));
         assertTrue(f.hasRole(f.DEFAULT_ADMIN_ROLE(), newValidAdmin));
+    }
+
+    function testAcceptDefaultAdminTransferUpdatesNewValidators() public {
+        address newAdmin = vm.addr(999);
+        vm.prank(admin);
+        factory.beginDefaultAdminTransfer(newAdmin);
+
+        vm.prank(client);
+        factory.create(dealId);
+        Validator existingValidator = Validator(factory.getInstance(dealId));
+        assertEq(address(existingValidator), computeProxyAddress(admin, dealId));
+        assertEq(existingValidator.defaultAdmin(), admin);
+        assertEq(existingValidator.defaultAdminDelay(), 3 days);
+
+        (, uint48 schedule) = factory.pendingDefaultAdmin();
+        vm.warp(uint256(schedule) + 1);
+        vm.prank(newAdmin);
+        factory.acceptDefaultAdminTransfer();
+
+        uint256 newDealId = dealId + 1;
+        PoRepTypes.Deal memory deal = poRepMarketMock.getDeal(dealId);
+        deal.dealId = newDealId;
+        poRepMarketMock.setDeal(newDealId, deal);
+        vm.prank(client);
+        factory.create(newDealId);
+
+        Validator newValidator = Validator(factory.getInstance(newDealId));
+        assertEq(address(newValidator), computeProxyAddress(newAdmin, newDealId));
+        assertEq(newValidator.defaultAdmin(), newAdmin);
+        assertEq(newValidator.defaultAdminDelay(), 3 days);
+        assertEq(existingValidator.defaultAdmin(), admin);
+        assertTrue(factory.hasRole(factory.UPGRADER_ROLE(), admin));
+        assertFalse(factory.hasRole(factory.UPGRADER_ROLE(), newAdmin));
+        assertEq(UpgradeableBeacon(factory.getBeacon()).owner(), admin);
+    }
+
+    function testSetAdminRevertsWhenCallerIsNotAdmin() public {
+        bytes32 adminRole = factory.DEFAULT_ADMIN_ROLE();
+        vm.prank(client);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, client, adminRole)
+        );
+        factory.setAdmin(client);
+    }
+
+    function testAcceptDefaultAdminTransferRejectsWrongCaller() public {
+        vm.prank(admin);
+        factory.setAdmin(client);
+        (, uint48 schedule) = factory.pendingDefaultAdmin();
+        vm.warp(uint256(schedule) + 1);
+
+        vm.prank(admin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControlDefaultAdminRules.AccessControlInvalidDefaultAdmin.selector, admin)
+        );
+        factory.acceptDefaultAdminTransfer();
+    }
+
+    function testCancelDefaultAdminTransferKeepsCurrentAdmin() public {
+        vm.prank(admin);
+        factory.setAdmin(client);
+        (, uint48 schedule) = factory.pendingDefaultAdmin();
+        vm.warp(uint256(schedule) + 1);
+        vm.prank(admin);
+        factory.cancelDefaultAdminTransfer();
+
+        vm.prank(client);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControlDefaultAdminRules.AccessControlInvalidDefaultAdmin.selector, client)
+        );
+        factory.acceptDefaultAdminTransfer();
+
+        assertEq(factory.defaultAdmin(), admin);
+        vm.prank(client);
+        factory.create(dealId);
+        assertEq(factory.getInstance(dealId), computeProxyAddress(admin, dealId));
     }
 
     function testGrantRoleReverts() public {
@@ -255,7 +355,7 @@ contract ValidatorFactoryTest is Test {
         assertTrue(f.hasRole(f.UPGRADER_ROLE(), newUpgrader));
     }
 
-    function testSetAdminEmitsAdminChangedEvent() public {
+    function testAcceptDefaultAdminTransferEmitsAdminChangedEvent() public {
         Validator validatorImplementation = new Validator();
         ValidatorFactory impl = new ValidatorFactory();
         address validAdmin = address(0xABCD);
@@ -265,10 +365,15 @@ contract ValidatorFactoryTest is Test {
             abi.encodeCall(ValidatorFactory.initialize, (validAdmin, address(validatorImplementation)));
         ValidatorFactory f = ValidatorFactory(address(new ERC1967Proxy(address(impl), initData)));
 
-        vm.expectEmit(true, false, false, false);
-        emit ValidatorFactory.AdminChanged(newValidAdmin);
         vm.prank(validAdmin);
         f.setAdmin(newValidAdmin);
+        (, uint48 schedule) = f.pendingDefaultAdmin();
+        vm.warp(uint256(schedule) + 1);
+
+        vm.expectEmit(true, false, false, false);
+        emit ValidatorFactory.AdminChanged(newValidAdmin);
+        vm.prank(newValidAdmin);
+        f.acceptDefaultAdminTransfer();
     }
 
     function testSetUpgraderRoleEmitsUpgraderRoleChangedEvent() public {

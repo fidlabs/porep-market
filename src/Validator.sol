@@ -4,7 +4,9 @@
 pragma solidity =0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
@@ -23,7 +25,13 @@ import {RailStatus} from "./types/RailStatus.sol";
  * @dev Implements validator and operator logic for managing Filecoin Pay rails
  * @notice Validator contract for Filecoin Pay
  */
-contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValidator, IValidator, Operator {
+contract Validator is
+    Initializable,
+    AccessControlDefaultAdminRulesUpgradeable,
+    IFilecoinPayValidator,
+    IValidator,
+    Operator
+{
     /**
      * @notice Error indicating that the caller is not the FilecoinPay contract
      * @dev 0x46a5d52f
@@ -213,8 +221,7 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
     {
         _validateInitializeAddresses(_admin, _filecoinPay, _poRepMarket);
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        __AccessControlDefaultAdminRules_init(3 days, _admin);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 

@@ -4,7 +4,9 @@
 pragma solidity =0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
@@ -17,7 +19,7 @@ import {MinerUtils} from "./lib/MinerUtils.sol";
  * @title SPRegistry
  * @notice Storage provider registry for provider offers, matching, and capacity management
  */
-contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ISPRegistry {
+contract SPRegistry is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable, ISPRegistry {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
 
@@ -396,8 +398,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function initialize(address _admin) public initializer {
         if (_admin == address(0)) revert InvalidAdminAddress();
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        __AccessControlDefaultAdminRules_init(3 days, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
     }
 

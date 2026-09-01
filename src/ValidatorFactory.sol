@@ -3,7 +3,9 @@
 
 pragma solidity =0.8.30;
 
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {BeaconProxy} from "@openzeppelin/contracts/proxy/beacon/BeaconProxy.sol";
 import {Validator} from "./Validator.sol";
@@ -17,7 +19,7 @@ import {PoRepTypes} from "./types/PoRepTypes.sol";
  * @title ValidatorFactory
  * @notice Beacon factory contract for creating Validator instances
  */
-contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUpgradeable {
+contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlDefaultAdminRulesUpgradeable {
     /**
      * @notice Upgradable role which allows for contract upgrades
      */
@@ -151,8 +153,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
             revert InvalidImplementationAddress();
         }
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
+        __AccessControlDefaultAdminRules_init(3 days, admin);
         _grantRole(UPGRADER_ROLE, admin);
 
         ValidatorFactoryStorage storage $ = s();
@@ -209,20 +210,26 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
     }
 
     /**
-     * @notice Sets a new admin for the contract and revoke the role from the old admin
-     * @dev Only callable by the current admin. Reverts if the new admin address is the zero address.
+     * @notice Schedules a transfer of the default admin role
+     * @dev Only callable by the current admin. The new admin must accept after the default admin delay.
+     * @dev Reverts if the new admin address is the zero address.
      * @param newAdmin The new admin address
      */
     function setAdmin(address newAdmin) external onlyRole(DEFAULT_ADMIN_ROLE) {
         if (newAdmin == address(0)) {
             revert InvalidNewAdminAddress();
         }
-        ValidatorFactoryStorage storage $ = s();
+        _beginDefaultAdminTransfer(newAdmin);
+    }
 
-        _revokeRole(DEFAULT_ADMIN_ROLE, $._admin);
-        _grantRole(DEFAULT_ADMIN_ROLE, newAdmin);
-        $._admin = newAdmin;
-
+    /**
+     * @notice Completes the default admin transfer and updates the admin used for new validators
+     * @dev Called after the public acceptance function verifies the caller is the pending admin
+     */
+    function _acceptDefaultAdminTransfer() internal override {
+        super._acceptDefaultAdminTransfer();
+        address newAdmin = defaultAdmin();
+        s()._admin = newAdmin;
         emit AdminChanged(newAdmin);
     }
 
@@ -264,7 +271,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlUp
 
     /**
      * @notice Disabled role management functions
-     * @dev This contract has a fixed admin and does not allow for dynamic role management
+     * @dev Role renunciation remains disabled for the factory
      */
     function renounceRole(bytes32, address) public pure override {
         revert RoleManagementDisabled();

@@ -5,7 +5,9 @@ pragma solidity =0.8.30;
 
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {
+    AccessControlDefaultAdminRulesUpgradeable
+} from "@openzeppelin/contracts-upgradeable/access/extensions/AccessControlDefaultAdminRulesUpgradeable.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
@@ -30,7 +32,7 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
  * @dev PoRepMarket contract is a contract that allows users to create and manage PoRep deals
  * @notice PoRepMarket contract
  */
-contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable, IPoRepMarket {
+contract PoRepMarket is Initializable, AccessControlDefaultAdminRulesUpgradeable, UUPSUpgradeable, IPoRepMarket {
     using EnumerableSet for EnumerableSet.UintSet;
     /**
      * @notice role to manage contract upgrades
@@ -481,8 +483,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
         if (_SLIScorer == address(0)) revert InvalidSLIScorerAddress();
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        __AccessControlDefaultAdminRules_init(3 days, _admin);
         _grantRole(UPGRADER_ROLE, _admin);
         _grantRole(POREP_SERVICE_ROLE, _admin);
 
@@ -852,20 +853,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         $._SPRegistryContract
             .releaseCapacity(deal.provider, $._dealCapacity[dealId].committedBytes, $._dealData[dealId].manifestHash);
         emit DealFinalized(dealId, deal.validator);
-    }
-
-    /**
-     * @notice Activates an accepted deal and starts payment
-     * @dev Verifies evidence, commits capacity, initializes the service window, and asks the validator to update the rail.
-     * @param dealId The id of the deal
-     */
-    function activatePayment(uint256 dealId) external override onlyRole(POREP_SERVICE_ROLE) {
-        PoRepMarketStorage storage $ = s();
-        PoRepTypes.Deal storage deal = $._deals[dealId];
-
-        _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.ACTIVE);
-        _startPreparedPayment($, dealId, deal);
     }
 
     /**

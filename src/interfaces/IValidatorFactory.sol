@@ -17,8 +17,9 @@ interface IValidatorFactory {
     function create(uint256 dealId) external;
 
     /**
-     * @notice Sets a new admin for the contract and revoke the role from the old admin
-     * @dev Only callable by the current admin. Reverts if the new admin address is the zero address.
+     * @notice Schedules a transfer of the default admin role
+     * @dev Only callable by the current admin. The new admin must accept after the default admin delay.
+     * @dev Reverts if the new admin address is the zero address.
      * @param newAdmin The new admin address
      */
     function setAdmin(address newAdmin) external;
