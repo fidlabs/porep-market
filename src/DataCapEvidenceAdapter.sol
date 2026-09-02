@@ -766,7 +766,8 @@ contract DataCapEvidenceAdapter is
 
     function _ensureAllocationCoverage(uint256 allocatedBytes, uint256 requestedSizeBytes) internal view virtual {
         uint256 activationToleranceBps = s()._poRepMarketContract.getDealActivationPadding();
-        if (allocatedBytes < _applyActivationToleranceFloor(requestedSizeBytes, activationToleranceBps)) {
+        uint256 requiredBytes = _applyActivationToleranceFloor(requestedSizeBytes, activationToleranceBps);
+        if (allocatedBytes < requiredBytes) {
             revert InvalidAllocatedBytes();
         }
     }
