@@ -825,25 +825,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @notice Accepts a deal
-     * @param dealId The id of the deal
-     */
-    function acceptDeal(uint256 dealId) external override {
-        PoRepMarketStorage storage $ = s();
-        PoRepTypes.Deal storage deal = $._deals[dealId];
-
-        _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.PROPOSED);
-
-        if (!$._SPRegistryContract.isAuthorizedForProvider(msg.sender, deal.provider)) {
-            revert NotTheControllingAddress(dealId, msg.sender, deal.provider);
-        }
-
-        _changeDealState(dealId, DealState.ACCEPTED);
-        emit DealAccepted(dealId, msg.sender, deal.provider);
-    }
-
-    /**
      * @notice Finalizes an active deal after service has finished
      * @param dealId The id of the deal
      */
@@ -873,20 +854,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 deal.provider, $._dealCapacity[dealId].committedBytes, deal.client, $._dealData[dealId].manifestHash
             );
         emit DealFinalized(dealId, deal.validator);
-    }
-
-    /**
-     * @notice Activates an accepted deal and starts payment
-     * @dev Verifies evidence, commits capacity, initializes the service window, and asks the validator to update the rail.
-     * @param dealId The id of the deal
-     */
-    function activatePayment(uint256 dealId) external override onlyRole(POREP_SERVICE_ROLE) {
-        PoRepMarketStorage storage $ = s();
-        PoRepTypes.Deal storage deal = $._deals[dealId];
-
-        _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.ACTIVE);
-        _startPreparedPayment($, dealId, deal);
     }
 
     /**
@@ -957,7 +924,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param deal The deal to terminate
      * @param state The terminal state to assign to the deal
      */
-    function _terminateDeal(PoRepTypes.Deal memory deal, uint8 state) internal {
+    function _terminateDeal(PoRepTypes.Deal storage deal, uint8 state) internal {
         PoRepMarketStorage storage $ = s();
         uint256 dealId = deal.dealId;
         uint8 previousState = deal.state;
