@@ -207,6 +207,7 @@ contract Deploy is DeployUtils {
         return json.serialize("buildInfoSha256", buildInfoSha256);
     }
 
+    // solhint-disable-next-line function-max-lines
     function _serializeContracts() private returns (string memory) {
         string memory json = "pendingContracts";
         json.serialize("AccessManager", _serializeAccessManager());

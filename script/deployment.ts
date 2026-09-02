@@ -161,6 +161,7 @@ const upgradeTargets: Record<
     manifestKind: "uups",
     operationKind: "uups",
   },
+  SectorEvidenceAdapter: { artifact: "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter", manifestKind: "uups", operationKind: "uups" },
   SPRegistry: { artifact: "src/SPRegistry.sol:SPRegistry", manifestKind: "uups", operationKind: "uups" },
   SLIOracle: { artifact: "src/SLIOracle.sol:SLIOracle", manifestKind: "uups", operationKind: "uups" },
   SLIScorer: { artifact: "src/SLIScorer.sol:SLIScorer", manifestKind: "uups", operationKind: "uups" },

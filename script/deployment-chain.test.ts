@@ -13,8 +13,10 @@ import type { DeploymentManifest, DeploymentTransaction, ManifestContract } from
 const hashA = `0x${"a".repeat(64)}`;
 const hashB = `0x${"b".repeat(64)}`;
 const codeHash = `0x${"c".repeat(64)}`;
-const addresses = Array.from({ length: 9 }, (_, index) => `0x${String(index + 1).repeat(40)}`);
-const [a1, a2, a3, a4, a5, a6, a7, a8, a9] = addresses as [
+const addresses = Array.from({ length: 11 }, (_, index) => `0x${(index + 1).toString(16).repeat(40)}`);
+const [a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11] = addresses as [
+  string,
+  string,
   string,
   string,
   string,
@@ -182,6 +184,13 @@ test("verifies the complete deployment topology", async () => {
   assert.ok(selectors.has("UPGRADER_ROLE()(bytes32)"));
   assert.ok(selectors.has("POREPMARKET_CONTRACT()(address)"));
   assert.ok(selectors.has("getPaymentTokenConfig(address)(bool,uint256)"));
+  assert.ok(selectors.has(`${a10}:getPoRepMarketAddress()(address)`));
+});
+
+test("continues to verify deployments that predate the sector adapter", async () => {
+  const manifest = completeManifest();
+  delete manifest.contracts.SectorEvidenceAdapter;
+  await verifyLiveDeployment(fullRunner(manifest), "rpc", manifest);
 });
 
 test("rejects unexpected initial manager admin and upgrader independently", async () => {
@@ -279,6 +288,7 @@ function completeManifest(): DeploymentManifest {
     PoRepMarket: uups(a1, a2),
     ValidatorFactory: uups(a3, a4),
     DataCapEvidenceAdapter: uups(a5, a6),
+    SectorEvidenceAdapter: uups(a10, a11),
     SPRegistry: uups(a7, a8),
     SLIOracle: uups(a9, a2),
     SLIScorer: uups(a4, a6),
@@ -330,6 +340,7 @@ function fullRunner(manifest: DeploymentManifest, selectors = new Set<string>())
       const target = args[1]!;
       const signature = args[2]!;
       selectors.add(signature);
+      selectors.add(`${target}:${signature}`);
       if (signature.endsWith("_ROLE()(bytes32)") || signature === "TERMINATION_ORACLE()(bytes32)") return hashA;
       if (signature === "hasRole(bytes32,address)(bool)") return "true\n";
       if (signature === "getPaymentTokenConfig(address)(bool,uint256)") return "true\n1\n";

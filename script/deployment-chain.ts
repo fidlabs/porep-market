@@ -191,6 +191,9 @@ export async function verifyLiveDeployment(
   const market = requireUupsContract(manifest, "PoRepMarket");
   const validatorFactory = requireUupsContract(manifest, "ValidatorFactory");
   const adapter = requireUupsContract(manifest, "DataCapEvidenceAdapter");
+  const sectorAdapter = manifest.contracts.SectorEvidenceAdapter === undefined
+    ? undefined
+    : requireUupsContract(manifest, "SectorEvidenceAdapter");
   const registry = requireUupsContract(manifest, "SPRegistry");
   const sliOracle = requireUupsContract(manifest, "SLIOracle");
   const sliScorer = requireUupsContract(manifest, "SLIScorer");
@@ -210,6 +213,10 @@ export async function verifyLiveDeployment(
     throw new Error(
       `ValidatorBeacon factoryProxy does not match ValidatorFactory proxy: expected ${validatorFactoryProxy}, got ${recordedBeaconFactory}`,
     );
+  }
+
+  if (sectorAdapter !== undefined) {
+    await verifyRole(run, rpcUrl, sectorAdapter.proxy, "DEFAULT_ADMIN_ROLE()(bytes32)", manifest.deployer, "SectorEvidenceAdapter admin");
   }
 
   const roleContract = manager ?? market.proxy;
@@ -331,6 +338,16 @@ export async function verifyLiveDeployment(
     market.proxy,
     "adapter market",
   );
+  if (sectorAdapter !== undefined) {
+    await verifyAddressCall(
+      run,
+      rpcUrl,
+      sectorAdapter.proxy,
+      "getPoRepMarketAddress()(address)",
+      market.proxy,
+      "sector adapter market",
+    );
+  }
   await verifyAddressCall(
     run,
     rpcUrl,
