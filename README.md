@@ -76,6 +76,10 @@ changing `PoRepMarket`, `Validator`, or the existing deal ABI.
 
 Each deal keeps the adapter selected when it was created. New deals can move to
 the replacement while older deals remain tied to the path they started with.
+Fresh deployments include `SectorEvidenceAdapter`, but keep
+`DataCapEvidenceAdapter` as the global default. An administrator can select the
+sector adapter for new deals when running this PoC. No existing Calibnet or
+mainnet deployment is changed by this branch.
 
 The code calls these storage facts **evidence**. Evidence here means the
 on-chain information used to check storage coverage; it does not mean that
@@ -84,16 +88,21 @@ the adapter.
 
 ### Sector piece-set commitment v1
 
-Before proposing a Sector evidence deal, tooling rejects duplicate rows and
-sorts every data and DAG row by `(PieceCID digest bytes32, paddedSize uint64)`.
+Before proposing a Sector evidence deal, the manifest builder rejects duplicate
+rows and sorts every data and DAG row by
+`(PieceCID digest bytes32, paddedSize uint64)`.
 The zero-based index after sorting is part of the leaf. The tree is padded to
 the next power of two with a fixed empty leaf and uses ordered, not commutative,
 left/right hashes:
 
-Duplicate rejection is required because one physical sector piece may carry
+The adapter verifies membership in the client-committed rows, but it does not
+enforce uniqueness between different indexes. The manifest builder rejects
+duplicates because one physical sector piece may carry
 multiple notifications. If the commitment contained the same `(PieceCID,
 paddedSize)` row more than once, those notifications could satisfy several
-bitmap indexes without several stored copies.
+bitmap indexes without several stored copies. A provider cannot add a row that
+the client did not commit, but the contract does not protect a client that
+deliberately commits duplicate rows.
 
 ```text
 leaf = keccak256(abi.encode(keccak256("PoRepMarket.PieceSet.Leaf"), uint8(1), index, digest, size))
@@ -151,12 +160,12 @@ piece, sector, or batch cap. Repeat until `EvidenceRefreshCompleted` reports
 operator reconstruct the placement inventory from chain state without the
 original manifest host or a private database.
 
-Stale or `INACTIVE` evidence makes settlement return `EVIDENCE_TOO_STALE` without
-advancing its stored settlement cursor. A later completed `ACTIVE` sweep lets the
-same interval be retried. This adapter relies on the current pre-Re-Snap rule that
-sector content cannot change while the sector number stays Active. It must be
-replaced or upgraded with authenticated current-content membership before
-Re-Snap is enabled for these deals.
+Stale or `INACTIVE` evidence makes settlement revert with `EvidenceTooStale()`
+without advancing its stored settlement cursor. A later completed `ACTIVE`
+sweep lets the same interval be retried. This adapter relies on the current
+pre-Re-Snap rule that sector content cannot change while the sector number stays
+Active. It must be replaced or upgraded with authenticated current-content
+membership before Re-Snap is enabled for these deals.
 
 ## Deal lifecycle
 

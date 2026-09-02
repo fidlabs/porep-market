@@ -153,6 +153,7 @@ const upgradeTargets: Record<string, {
   PoRepMarket: { artifact: "src/PoRepMarket.sol:PoRepMarket", manifestKind: "uups", operationKind: "uups" },
   ValidatorFactory: { artifact: "src/ValidatorFactory.sol:ValidatorFactory", manifestKind: "uups", operationKind: "uups" },
   DataCapEvidenceAdapter: { artifact: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter", manifestKind: "uups", operationKind: "uups" },
+  SectorEvidenceAdapter: { artifact: "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter", manifestKind: "uups", operationKind: "uups" },
   SPRegistry: { artifact: "src/SPRegistry.sol:SPRegistry", manifestKind: "uups", operationKind: "uups" },
   SLIOracle: { artifact: "src/SLIOracle.sol:SLIOracle", manifestKind: "uups", operationKind: "uups" },
   SLIScorer: { artifact: "src/SLIScorer.sol:SLIScorer", manifestKind: "uups", operationKind: "uups" },

@@ -174,12 +174,8 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         vm.roll(settlementEndEpoch);
 
         vm.prank(validatorAddress);
-        SharedTypes.SettlementDecision memory settlement =
-            market.validateDealSettlement(DEAL_ID, settlementStartEpoch, settlementEndEpoch);
-        assertEq(settlement.result, SettlementResult.REJECTED);
-        assertEq(settlement.reasonCode, SettlementReason.EVIDENCE_TOO_STALE);
-        assertEq(settlement.settlementAmount, 0);
-        assertEq(settlement.settleUpto, settlementStartEpoch);
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
+        market.validateDealSettlement(DEAL_ID, settlementStartEpoch, settlementEndEpoch);
         assertEq(CommonTypes.ChainEpoch.unwrap(market.getDealService(DEAL_ID).lastSettledEpoch), settlementCursorBefore);
 
         int64 deadline = 4;
