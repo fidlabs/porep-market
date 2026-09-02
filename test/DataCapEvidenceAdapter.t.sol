@@ -46,7 +46,7 @@ contract DataCapEvidenceAdapterTest is Test {
     address public datacapContract = address(0xfF00000000000000000000000000000000000007);
     address public clientAddress;
     address public terminationOracle;
-    bytes public transferTo = abi.encodePacked(vm.addr(2));
+    bytes public transferTo = hex"0006";
     uint256 public dealId;
     uint256 public totalDealSize;
     uint256 public pricePerSectorPerMonth;
@@ -1719,5 +1719,39 @@ contract DataCapEvidenceAdapterTest is Test {
     function testCurrentEvidenceStatusRevertsWhenCallerIsNotPoRepMarket() public {
         vm.expectRevert(DataCapEvidenceAdapter.CallerIsNotPoRepMarket.selector);
         dataCapEvidenceAdapter.currentEvidenceStatus(_activationContext());
+    }
+
+    function testShouldRevertWhenTransferDestinationIsNotVerifReg() public {
+        transferParams.to = CommonTypes.FilAddress(abi.encodePacked(vm.addr(2)));
+        vm.prank(clientAddress);
+        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidTransferDestination.selector));
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+    }
+
+    function testPartialEvidenceRefreshEpochIsSetOnlyAtSweepStart() public {
+        DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+
+        uint256 sweepStartBlock = block.number + 10;
+        vm.roll(sweepStartBlock);
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory first =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(first.result, EvidenceResult.PARTIAL);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(mock.getPartialEvidenceRefreshEpoch(dealId)),
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int64(uint64(sweepStartBlock))
+        );
+
+        vm.roll(sweepStartBlock + 10);
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory second =
+            mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
+        assertEq(second.result, EvidenceResult.ACTIVE);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(mock.getPartialEvidenceRefreshEpoch(dealId)),
+            // forge-lint: disable-next-line(unsafe-typecast)
+            int64(uint64(sweepStartBlock))
+        );
     }
 }
