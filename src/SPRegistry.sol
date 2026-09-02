@@ -489,8 +489,19 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function getProviders() external view returns (CommonTypes.FilActorId[] memory) {
-        return _toFilActorIdArray(s()._providerIds);
+    function getProviders(uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory providers, uint256 total)
+    {
+        EnumerableSet.UintSet storage providerIds = s()._providerIds;
+        total = providerIds.length();
+        uint256 length = _pageLength(total, offset, limit);
+        providers = new CommonTypes.FilActorId[](length);
+
+        for (uint256 i = 0; i < length; i++) {
+            providers[i] = CommonTypes.FilActorId.wrap(uint64(providerIds.at(offset + i)));
+        }
     }
 
     /// @inheritdoc ISPRegistry
@@ -1143,17 +1154,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         return true;
     }
 
-    function _toFilActorIdArray(EnumerableSet.UintSet storage set)
-        internal
-        view
-        returns (CommonTypes.FilActorId[] memory)
-    {
-        uint256 length = set.length();
-        CommonTypes.FilActorId[] memory result = new CommonTypes.FilActorId[](length);
-        for (uint256 i = 0; i < length; i++) {
-            result[i] = CommonTypes.FilActorId.wrap(uint64(set.at(i)));
+    function _pageLength(uint256 total, uint256 offset, uint256 limit) internal pure returns (uint256 length) {
+        // solhint-disable-next-line gas-strict-inequalities
+        if (offset >= total || limit == 0) {
+            return 0;
         }
-        return result;
+
+        uint256 remaining = total - offset;
+        return limit < remaining ? limit : remaining;
     }
 
     // solhint-disable no-empty-blocks

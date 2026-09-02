@@ -35,44 +35,70 @@ contract PoRepMarketViewHelper {
      * @return dealView Complete generic deal snapshot.
      */
     function getDealView(uint256 dealId) public returns (PoRepTypes.DealView memory dealView) {
-        IPoRepMarket market = POREPMARKET_CONTRACT;
-        PoRepTypes.Deal memory deal = market.getDeal(dealId);
-        SharedTypes.EvidenceStatus memory evidenceStatus;
-
-        if (deal.evidenceAdapter != address(0)) {
-            evidenceStatus = market.currentEvidenceStatus(dealId);
-        }
-
-        dealView = PoRepTypes.DealView({
-            deal: deal,
-            data: market.getDealData(dealId),
-            requiredSLIs: market.getDealSLIs(dealId),
-            terms: market.getDealTerms(dealId),
-            service: market.getDealService(dealId),
-            capacity: market.getDealCapacity(dealId),
-            payment: market.getDealPayment(dealId),
-            providerOrganization: market.getDealOrganization(dealId),
-            evidenceStatus: evidenceStatus
-        });
+        dealView = _getDealView(POREPMARKET_CONTRACT.getDeal(dealId));
     }
 
     /**
      * @notice Gets a caller-sized page of complete generic deal views.
-     * @param offset Zero-based index in the creation-order deal ID list.
+     * @param offset Zero-based index in the creation-order deal list.
      * @param limit Maximum number of deal views to return.
      * @return dealViews Page of complete generic deal snapshots.
-     * @return total Total number of created deal IDs at call time.
+     * @return total Total number of created deals at call time.
      */
     function getDealViews(uint256 offset, uint256 limit)
         external
         returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
     {
-        (uint256[] memory dealIds, uint256 dealCount) = POREPMARKET_CONTRACT.getDealIds(offset, limit);
+        (PoRepTypes.Deal[] memory deals, uint256 dealCount) = POREPMARKET_CONTRACT.getDeals(offset, limit);
         total = dealCount;
-        dealViews = new PoRepTypes.DealView[](dealIds.length);
+        dealViews = _getDealViews(deals);
+    }
 
-        for (uint256 i = 0; i < dealIds.length; i++) {
-            dealViews[i] = getDealView(dealIds[i]);
+    /**
+     * @notice Gets a caller-sized page of complete deal views for an organization and state.
+     * @param organization The address of the organization.
+     * @param state The state of the deals to retrieve.
+     * @param offset Zero-based index in the organization's state-specific deal list.
+     * @param limit Maximum number of deal views to return.
+     * @return dealViews Page of complete generic deal snapshots.
+     * @return total Total number of matching deals at call time.
+     */
+    function getDealViewsForOrganizationByState(address organization, uint8 state, uint256 offset, uint256 limit)
+        external
+        returns (PoRepTypes.DealView[] memory dealViews, uint256 total)
+    {
+        (PoRepTypes.Deal[] memory deals, uint256 dealCount) =
+            POREPMARKET_CONTRACT.getDealsForOrganizationByState(organization, state, offset, limit);
+        total = dealCount;
+        dealViews = _getDealViews(deals);
+    }
+
+    function _getDealView(PoRepTypes.Deal memory deal) internal returns (PoRepTypes.DealView memory dealView) {
+        IPoRepMarket market = POREPMARKET_CONTRACT;
+        SharedTypes.EvidenceStatus memory evidenceStatus;
+
+        if (deal.evidenceAdapter != address(0)) {
+            evidenceStatus = market.currentEvidenceStatus(deal.dealId);
+        }
+
+        dealView = PoRepTypes.DealView({
+            deal: deal,
+            data: market.getDealData(deal.dealId),
+            requiredSLIs: market.getDealSLIs(deal.dealId),
+            terms: market.getDealTerms(deal.dealId),
+            service: market.getDealService(deal.dealId),
+            capacity: market.getDealCapacity(deal.dealId),
+            payment: market.getDealPayment(deal.dealId),
+            providerOrganization: market.getDealOrganization(deal.dealId),
+            evidenceStatus: evidenceStatus
+        });
+    }
+
+    function _getDealViews(PoRepTypes.Deal[] memory deals) internal returns (PoRepTypes.DealView[] memory dealViews) {
+        dealViews = new PoRepTypes.DealView[](deals.length);
+
+        for (uint256 i = 0; i < deals.length; i++) {
+            dealViews[i] = _getDealView(deals[i]);
         }
     }
 }

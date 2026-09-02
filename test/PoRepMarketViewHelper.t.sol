@@ -16,6 +16,7 @@ import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
 import {DealType} from "../src/types/DealType.sol";
+import {DealState} from "../src/types/DealState.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketViewHelperTest is Test {
@@ -111,6 +112,11 @@ contract PoRepMarketViewHelperTest is Test {
     function testDealViewInterfaceSelectorsAreAvailable() public pure {
         assertEq(PoRepMarketViewHelper.getDealView.selector, bytes4(keccak256("getDealView(uint256)")));
         assertEq(PoRepMarketViewHelper.getDealViews.selector, bytes4(keccak256("getDealViews(uint256,uint256)")));
+        assertEq(
+            PoRepMarketViewHelper.getDealViewsForOrganizationByState.selector,
+            // solhint-disable-next-line gas-small-strings
+            bytes4(keccak256("getDealViewsForOrganizationByState(address,uint8,uint256,uint256)"))
+        );
     }
 
     function testConstructorRevertsWhenPoRepMarketAddressIsZero() public {
@@ -201,6 +207,109 @@ contract PoRepMarketViewHelperTest is Test {
 
         assertEq(total, 1);
         assertEq(views.length, 0);
+    }
+
+    function testGetDealViewsForOrganizationByStateReturnsMiddleAndLastPartialPages() public {
+        _proposeDealForOrganization(providerOwnerAddress);
+        _proposeDealForOrganization(vm.addr(0x222));
+        _proposeDealForOrganization(providerOwnerAddress);
+        _proposeDealForOrganization(providerOwnerAddress);
+        dataCapEvidenceAdapter.setDeal(_createClientDealWithAllocationSize(3, totalDealSize));
+
+        (PoRepTypes.DealView[] memory views, uint256 total) =
+            poRepMarketViewHelper.getDealViewsForOrganizationByState(providerOwnerAddress, DealState.ACCEPTED, 1, 1);
+
+        assertEq(total, 3);
+        assertEq(views.length, 1);
+        assertEq(abi.encode(views[0]), abi.encode(poRepMarketViewHelper.getDealView(3)));
+        assertEq(views[0].providerOrganization, providerOwnerAddress);
+        assertEq(views[0].evidenceStatus.activeCoveredBytes, totalDealSize);
+
+        (views, total) = poRepMarketViewHelper.getDealViewsForOrganizationByState(
+            providerOwnerAddress, DealState.ACCEPTED, 2, type(uint256).max
+        );
+
+        assertEq(total, 3);
+        assertEq(views.length, 1);
+        assertEq(abi.encode(views[0]), abi.encode(poRepMarketViewHelper.getDealView(4)));
+    }
+
+    function testGetDealViewsForOrganizationByStateTracksStateChanges() public {
+        address otherOrganization = vm.addr(0x222);
+        _proposeDealForOrganization(providerOwnerAddress);
+        _proposeDealForOrganization(otherOrganization);
+        _proposeDealForOrganization(providerOwnerAddress);
+
+        vm.prank(adminAddress);
+        poRepMarket.rejectAcceptedDeal(1);
+
+        (PoRepTypes.DealView[] memory views, uint256 total) = poRepMarketViewHelper.getDealViewsForOrganizationByState(
+            providerOwnerAddress, DealState.ACCEPTED, 0, type(uint256).max
+        );
+        assertEq(total, 1);
+        assertEq(views.length, 1);
+        assertEq(views[0].deal.dealId, 3);
+        assertEq(views[0].deal.state, DealState.ACCEPTED);
+
+        (views, total) = poRepMarketViewHelper.getDealViewsForOrganizationByState(
+            providerOwnerAddress, DealState.REJECTED, 0, type(uint256).max
+        );
+        assertEq(total, 1);
+        assertEq(views.length, 1);
+        assertEq(views[0].deal.dealId, 1);
+        assertEq(views[0].deal.state, DealState.REJECTED);
+
+        (views, total) = poRepMarketViewHelper.getDealViewsForOrganizationByState(
+            otherOrganization, DealState.ACCEPTED, 0, type(uint256).max
+        );
+        assertEq(total, 1);
+        assertEq(views.length, 1);
+        assertEq(views[0].deal.dealId, 2);
+        assertEq(views[0].providerOrganization, otherOrganization);
+    }
+
+    function testGetDealViewsForOrganizationByStateReturnsEmptyWhenNoMatchingDeals() public {
+        (PoRepTypes.DealView[] memory views, uint256 total) =
+            poRepMarketViewHelper.getDealViewsForOrganizationByState(providerOwnerAddress, DealState.ACCEPTED, 0, 10);
+        assertEq(total, 0);
+        assertEq(views.length, 0);
+
+        _proposeDealForOrganization(providerOwnerAddress);
+
+        (views, total) =
+            poRepMarketViewHelper.getDealViewsForOrganizationByState(providerOwnerAddress, DealState.REJECTED, 0, 10);
+        assertEq(total, 0);
+        assertEq(views.length, 0);
+
+        (views, total) =
+            poRepMarketViewHelper.getDealViewsForOrganizationByState(vm.addr(0x222), DealState.ACCEPTED, 0, 10);
+        assertEq(total, 0);
+        assertEq(views.length, 0);
+    }
+
+    function testGetDealViewsForOrganizationByStateReturnsEmptyWhenLimitIsZero() public {
+        _proposeDealForOrganization(providerOwnerAddress);
+
+        (PoRepTypes.DealView[] memory views, uint256 total) =
+            poRepMarketViewHelper.getDealViewsForOrganizationByState(providerOwnerAddress, DealState.ACCEPTED, 0, 0);
+
+        assertEq(total, 1);
+        assertEq(views.length, 0);
+    }
+
+    function testGetDealViewsForOrganizationByStateRevertsWhenOrganizationIsZero() public {
+        vm.expectRevert(PoRepMarket.InvalidOrganizationAddress.selector);
+        poRepMarketViewHelper.getDealViewsForOrganizationByState(address(0), DealState.ACCEPTED, 0, 10);
+    }
+
+    function _proposeDealForOrganization(address organization) internal {
+        spRegistry.setProviderState(
+            providerFilActorId,
+            SPRegistryMock.MockProviderState({
+                organization: organization, payee: address(0), paused: false, blocked: false
+            })
+        );
+        _proposeDefaultDeal();
     }
 
     function _proposeDefaultDeal() internal {

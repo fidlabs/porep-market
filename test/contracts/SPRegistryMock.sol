@@ -82,8 +82,22 @@ contract SPRegistryMock is ISPRegistry {
         owners[owner][provider] = isOwner;
     }
 
-    function getProviders() external view returns (CommonTypes.FilActorId[] memory) {
-        return _providers;
+    function getProviders(uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory providers, uint256 total)
+    {
+        total = _providers.length;
+        if (offset >= total || limit == 0) {
+            return (new CommonTypes.FilActorId[](0), total);
+        }
+
+        uint256 remaining = total - offset;
+        uint256 length = limit < remaining ? limit : remaining;
+        providers = new CommonTypes.FilActorId[](length);
+        for (uint256 i = 0; i < length; i++) {
+            providers[i] = _providers[offset + i];
+        }
     }
 
     function getProviderView(CommonTypes.FilActorId provider) external view returns (ProviderView memory) {

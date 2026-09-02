@@ -208,15 +208,18 @@ interface IPoRepMarket {
     function getDealActivationPadding() external view returns (uint256);
 
     /**
-     * @notice Gets deals for a specific organization by state
-     * @param organization The address of the organization
-     * @param state The state of the deals to retrieve
-     * @return deals Array of deals for the organization in the specified state (from all providers associated with the organization)
+     * @notice Gets a page of deals for a specific organization by state.
+     * @param organization The address of the organization.
+     * @param state The state of the deals to retrieve.
+     * @param offset Zero-based index in the organization's state-specific deal list.
+     * @param limit Maximum number of deals to return.
+     * @return deals Page of deals in the existing index order.
+     * @return total Total number of deals for the organization in the specified state at call time.
      */
-    function getDealsForOrganizationByState(address organization, uint8 state)
+    function getDealsForOrganizationByState(address organization, uint8 state, uint256 offset, uint256 limit)
         external
         view
-        returns (PoRepTypes.Deal[] memory deals);
+        returns (PoRepTypes.Deal[] memory deals, uint256 total);
 
     /**
      * @notice Gets the SPRegistry contract address from storage
@@ -281,10 +284,16 @@ interface IPoRepMarket {
     function getValidatorFactoryContract() external view returns (address);
 
     /**
-     * @notice Gets all deals
-     * @return deals Array of all deals
+     * @notice Gets a creation-order page of deals.
+     * @param offset Zero-based index in the creation-order deal list.
+     * @param limit Maximum number of deals to return.
+     * @return deals Page of deals in creation order.
+     * @return total Total number of created deals at call time.
      */
-    function getDeals() external view returns (PoRepTypes.Deal[] memory deals);
+    function getDeals(uint256 offset, uint256 limit)
+        external
+        view
+        returns (PoRepTypes.Deal[] memory deals, uint256 total);
 
     /**
      * @notice Validates deal settlement for a deal

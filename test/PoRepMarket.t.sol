@@ -2506,7 +2506,7 @@ contract PoRepMarketTest is Test {
 
     function testGetDealsForOrganizationByStateZeroAddressOfOrganizationReverts() public {
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidOrganizationAddress.selector, address(0)));
-        poRepMarket.getDealsForOrganizationByState(address(0), DealState.PROPOSED);
+        poRepMarket.getDealsForOrganizationByState(address(0), DealState.PROPOSED, 0, 10);
     }
 
     function testGetDealsForOrganizationByStateAccepted() public {
@@ -2523,22 +2523,23 @@ contract PoRepMarketTest is Test {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
 
-        PoRepTypes.Deal[] memory dealsOrg1 =
-            poRepMarket.getDealsForOrganizationByState(organization1, DealState.ACCEPTED);
+        (PoRepTypes.Deal[] memory dealsOrg1,) =
+            poRepMarket.getDealsForOrganizationByState(organization1, DealState.ACCEPTED, 0, type(uint256).max);
         assertEq(dealsOrg1.length, 1);
         assertEq(dealsOrg1[0].dealId, dealId);
 
-        PoRepTypes.Deal[] memory proposedOrg1 =
-            poRepMarket.getDealsForOrganizationByState(organization1, DealState.PROPOSED);
+        (PoRepTypes.Deal[] memory proposedOrg1,) =
+            poRepMarket.getDealsForOrganizationByState(organization1, DealState.PROPOSED, 0, type(uint256).max);
         assertEq(proposedOrg1.length, 0);
 
-        PoRepTypes.Deal[] memory dealsOrg2 =
-            poRepMarket.getDealsForOrganizationByState(organization2, DealState.ACCEPTED);
+        (PoRepTypes.Deal[] memory dealsOrg2,) =
+            poRepMarket.getDealsForOrganizationByState(organization2, DealState.ACCEPTED, 0, type(uint256).max);
         assertEq(dealsOrg2.length, 0);
     }
 
     function testGetDealsReturnsEmptyArrayWhenNoDeals() public view {
-        PoRepTypes.Deal[] memory deals = poRepMarket.getDeals();
+        (PoRepTypes.Deal[] memory deals, uint256 total) = poRepMarket.getDeals(0, type(uint256).max);
+        assertEq(total, 0);
         assertEq(deals.length, 0);
     }
 
@@ -2549,12 +2550,40 @@ contract PoRepMarketTest is Test {
             poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
         }
 
-        PoRepTypes.Deal[] memory deals = poRepMarket.getDeals();
+        (PoRepTypes.Deal[] memory deals, uint256 total) = poRepMarket.getDeals(0, type(uint256).max);
+        assertEq(total, count);
         assertEq(deals.length, count);
         for (uint256 i = 0; i < count; i++) {
             assertEq(deals[i].dealId, i + 1);
             assertEq(deals[i].client, vm.addr(i + 1));
         }
+    }
+
+    function testGetDealsReturnsEmptyWhenLimitIsZero() public {
+        proposeDefaultDeal();
+
+        (PoRepTypes.Deal[] memory deals, uint256 total) = poRepMarket.getDeals(0, 0);
+
+        assertEq(total, 1);
+        assertEq(deals.length, 0);
+    }
+
+    function testGetDealsReturnsMiddleAndLastPartialPages() public {
+        for (uint256 i = 0; i < 3; i++) {
+            proposeDefaultDeal();
+        }
+
+        (PoRepTypes.Deal[] memory deals, uint256 total) = poRepMarket.getDeals(1, 1);
+
+        assertEq(total, 3);
+        assertEq(deals.length, 1);
+        assertEq(abi.encode(deals[0]), abi.encode(poRepMarket.getDeal(2)));
+
+        (deals, total) = poRepMarket.getDeals(2, type(uint256).max);
+
+        assertEq(total, 3);
+        assertEq(deals.length, 1);
+        assertEq(abi.encode(deals[0]), abi.encode(poRepMarket.getDeal(3)));
     }
 
     function testProposeDealRevertsWhenDealSizeIsZero() public {
