@@ -59,6 +59,9 @@ deploy-missing network:
 configure-payment-tokens network:
     node script/deployment.ts configure-payment-tokens {{ network }}
 
+deploy-calibnet-adapter:
+    node script/deployment.ts deploy-calibnet-adapter calibnet
+
 upgrade network target *targets:
     node script/deployment.ts upgrade {{ network }} {{ target }} {{ targets }}
 

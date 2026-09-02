@@ -44,6 +44,7 @@ const commands = [
   "finalize-deploy",
   "deploy-missing",
   "configure-payment-tokens",
+  "deploy-calibnet-adapter",
   "upgrade",
   "finalize-upgrade",
   "check-live",
@@ -123,6 +124,7 @@ type DeployOptions = {
   fresh: boolean;
   confirmMainnetReplacement: boolean;
 };
+type UpgradeVariant = "standard" | "calibnet-adapter";
 
 type DeploymentDependencies = Record<string, string> & {
   FilecoinPay: string;
@@ -139,6 +141,8 @@ export type SignalHandling = { signal: AbortSignal; dispose: () => void };
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const zeroAddress = `0x${"0".repeat(40)}`;
+const unsafeCalibnetAdapterProxy = "0xfEBd13e0DecCD8B96c2781da32b30BbEB12884Db";
+const calibnetAdapterArtifact = "src/CalibnetDataCapAdapter.sol:CalibnetDataCapAdapter";
 const networks = Object.keys(networkConfigs) as Network[];
 const usage = `Usage: deployment.ts <command> <network> [args...]\nCommands: ${commands.join(", ")}\nNetworks: ${networks.join(", ")}`;
 const upgradeTargets: Record<string, {
@@ -359,7 +363,10 @@ async function configurePaymentTokens(context: Context): Promise<void> {
   console.error(needsBroadcast ? "Payment tokens configured" : "Payment tokens already configured");
 }
 
-async function upgrade(context: Context, targets: readonly string[]): Promise<void> {
+async function upgrade(context: Context, targets: readonly string[], variant: UpgradeVariant = "standard"): Promise<void> {
+  if (variant === "calibnet-adapter" && context.network !== "calibnet") {
+    throw new Error("CalibnetDataCapAdapter can only be deployed on calibnet");
+  }
   const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
   phase("Upgrade preflight");
   await broadcastPreflight(context);
@@ -372,6 +379,7 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
   const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
   const sourceHash = hashRawBytes(sourceBytes);
   validateTargets(source, targets);
+  if (variant === "calibnet-adapter") validateCalibnetAdapterTarget(source, targets);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-upgrade-ts-"));
   const forgeIoDirectory = join(context.root, ".deployment", `.typescript-upgrade-${randomUUID()}`);
@@ -399,12 +407,16 @@ async function upgrade(context: Context, targets: readonly string[]): Promise<vo
     let forgeError: unknown;
     try {
       phase("Broadcast upgrade");
-      await runUpgradeScript(context, workspace, sourcePath, output, build, privateKey, targets);
+      if (variant === "calibnet-adapter") {
+        await runCalibnetAdapterScript(context, workspace, sourcePath, output, build, privateKey);
+      } else {
+        await runUpgradeScript(context, workspace, sourcePath, output, build, privateKey, targets);
+      }
     } catch (error) {
       forgeError = error;
     }
 
-    const recorded = recordUpgrade(context, workspace, output, build, pending);
+    const recorded = recordUpgrade(context, workspace, output, build, pending, variant);
     if (forgeError !== undefined) throw forgeError;
     if (!recorded) throw new Error("Forge did not produce complete upgrade evidence");
   } finally {
@@ -541,6 +553,10 @@ async function runCli(args: readonly string[], signal?: AbortSignal): Promise<vo
     case "configure-payment-tokens":
       noArguments(command, rest);
       await configurePaymentTokens(context);
+      return;
+    case "deploy-calibnet-adapter":
+      noArguments(command, rest);
+      await upgrade(context, ["DataCapEvidenceAdapter"], "calibnet-adapter");
       return;
     case "upgrade":
       if (rest.length === 0) throw new Error("upgrade requires at least one target");
@@ -801,6 +817,29 @@ async function runUpgradeScript(
   await runForgeScript(context, "script/Upgrade.s.sol:Upgrade", build, privateKey, environment);
 }
 
+async function runCalibnetAdapterScript(
+  context: Context,
+  workspace: string,
+  source: string,
+  output: string,
+  build: Build,
+  privateKey: string,
+): Promise<void> {
+  await runForgeScript(
+    context,
+    "script/DeployCalibnetDataCapAdapter.s.sol:DeployCalibnetDataCapAdapter",
+    build,
+    privateKey,
+    {
+      ...context.environment,
+      PRIVATE_KEY: privateKey,
+      DEPLOYMENT_MANIFEST: source,
+      UPGRADE_OUTPUT: output,
+      FOUNDRY_BROADCAST: join(workspace, "broadcast"),
+    },
+  );
+}
+
 async function runDeployMissingScript(
   context: Context,
   workspace: string,
@@ -950,11 +989,13 @@ function recordUpgrade(
   output: string,
   build: Build,
   expected: PendingUpgrade,
+  variant: UpgradeVariant,
 ): boolean {
-  const broadcast = findBroadcast(context, workspace, "Upgrade.s.sol");
+  const script = variant === "calibnet-adapter" ? "DeployCalibnetDataCapAdapter.s.sol" : "Upgrade.s.sol";
+  const broadcast = findBroadcast(context, workspace, script);
   if (!broadcast || !existsSync(output)) return false;
   const operations = parseUpgradeOperations(JSON.stringify((JSON.parse(readFileSync(output, "utf8")) as { operations: unknown }).operations));
-  validateOperations(expected.targets, operations);
+  validateOperations(expected.targets, operations, variant);
   const broadcastBytes = readFileSync(broadcast);
   const pending: PendingUpgrade = {
     ...expected,
@@ -998,6 +1039,19 @@ function validateTargets(source: DeploymentManifest, targets: readonly string[])
   }
 }
 
+function validateCalibnetAdapterTarget(
+  source: DeploymentManifest,
+  targets: readonly string[],
+): void {
+  if (targets.length !== 1 || targets[0] !== "DataCapEvidenceAdapter") {
+    throw new Error("CalibnetDataCapAdapter upgrade target is invalid");
+  }
+  const adapter = source.contracts.DataCapEvidenceAdapter;
+  if (adapter?.kind !== "uups" || adapter.proxy.toLowerCase() !== unsafeCalibnetAdapterProxy.toLowerCase()) {
+    throw new Error(`unsafe Calibnet adapter proxy must be ${unsafeCalibnetAdapterProxy}`);
+  }
+}
+
 async function validateStorage(context: Context, source: DeploymentManifest, build: Build, workspace: string): Promise<void> {
   const previous = retainedBuildInfoPath(context, source.release.buildInfoSha256);
   authenticateBuildInfo(previous, source.release.buildInfoSha256);
@@ -1018,7 +1072,11 @@ async function validateStorage(context: Context, source: DeploymentManifest, bui
   await runProcess(validator, args, { environment: context.environment, signal: context.signal, terminal: true });
 }
 
-function validateOperations(targets: readonly string[], operations: PendingUpgrade["operations"]): void {
+function validateOperations(
+  targets: readonly string[],
+  operations: PendingUpgrade["operations"],
+  variant: UpgradeVariant,
+): void {
   if (operations.length !== targets.length) throw new Error("Forge upgrade operations do not match requested targets");
   operations.forEach((operation, index) => {
     const target = targets[index];
@@ -1026,7 +1084,9 @@ function validateOperations(targets: readonly string[], operations: PendingUpgra
     if (
       operation.target !== target ||
       operation.kind !== definition.operationKind ||
-      operation.artifact !== definition.artifact
+      operation.artifact !== definition.artifact ||
+      (variant === "standard" && operation.newArtifact !== undefined) ||
+      (variant === "calibnet-adapter" && operation.newArtifact !== calibnetAdapterArtifact)
     ) {
       throw new Error(`Forge upgrade operation ${index} does not match ${target}`);
     }

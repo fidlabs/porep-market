@@ -726,14 +726,18 @@ contract DataCapEvidenceAdapter is
         }
 
         PoRepTypes.DealTerms memory dealTerms = $._poRepMarketContract.getDealTerms(dealId);
-        if (deal.allocatedBytes < dealTerms.requestedSizeBytes) {
-            revert InvalidAllocatedBytes();
-        }
+        _ensureAllocationCoverage(deal.allocatedBytes, dealTerms.requestedSizeBytes);
 
         deal.postingFinished = true;
         $._allocationStatusPerDeal[dealId] = DataCapAllocationStatus.ALLOCATED;
 
         emit DataCapPostingFinished(dealId, deal.allocatedBytes);
+    }
+
+    function _ensureAllocationCoverage(uint256 allocatedBytes, uint256 requestedSizeBytes) internal view virtual {
+        if (allocatedBytes < requestedSizeBytes) {
+            revert InvalidAllocatedBytes();
+        }
     }
 
     // solhint-disable func-name-mixedcase

@@ -207,6 +207,8 @@ contract DeploymentScriptsTest is Test {
         outputPath = string.concat(vm.projectRoot(), "/.deployment/upgrade-test-output-", suffix, ".json");
         vm.setEnv("DEPLOYMENT_MANIFEST", manifestPath);
         vm.setEnv("UPGRADE_OUTPUT", outputPath);
+        if (vm.exists(manifestPath)) vm.removeFile(manifestPath);
+        if (vm.exists(outputPath)) vm.removeFile(outputPath);
         vm.writeFile(manifestPath, manifest);
         vm.writeFile(outputPath, "{\"operations\":[]}");
         string memory csv;
