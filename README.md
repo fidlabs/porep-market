@@ -13,7 +13,7 @@ only the system ownership and deal lifecycle needed to navigate them.
 ### V2
 
 - [Latest Calibnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/calibnet/latest.json)
-- Mainnet: not released yet.
+- [Mainnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/mainnet/latest.json) — V2 alpha technical release.
 
 ### V1
 
@@ -140,6 +140,6 @@ accepted deal that does not yet have a rail.
 
 The [`justfile`](justfile) is the command reference. Run `just --list` to see
 the commands supported by the current checkout. Deployment behavior is
-implemented in [`script/deployment.sh`](script/deployment.sh).
+implemented in [`script/deployment.ts`](script/deployment.ts).
 
 Run `just pre-push` before pushing changes.

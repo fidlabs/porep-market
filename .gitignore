@@ -6,6 +6,7 @@ node_modules/
 # Ignores development broadcast logs
 /broadcast
 /.deployment/
+/.deployment-ts/
 
 # Docs
 docs/*

@@ -38,25 +38,38 @@ check-coverage:
     ./ci/check-full-coverage.sh
 
 deployment-tests:
-    bash test/scripts/deployment-commands.sh
-    bash test/scripts/deployment-finality.sh
-    bash test/scripts/deployment-live.sh
-    bash test/scripts/deployment-flow.sh
+    just typecheck-deployment
+    just test-deployment-ts
+
+typecheck-deployment:
+    npx tsc --noEmit
+
+test-deployment-ts:
+    node --test script/*.test.ts
 
 deploy network *args:
-    ./script/deployment.sh deploy {{ network }} {{ args }}
+    node script/deployment.ts deploy {{ network }} {{ args }}
 
 finalize-deploy network:
-    ./script/deployment.sh finalize-deploy {{ network }}
+    node script/deployment.ts finalize-deploy {{ network }}
+
+deploy-missing network:
+    node script/deployment.ts deploy-missing {{ network }}
+
+configure-payment-tokens network:
+    node script/deployment.ts configure-payment-tokens {{ network }}
 
 upgrade network target *targets:
-    ./script/deployment.sh upgrade {{ network }} {{ target }} {{ targets }}
+    node script/deployment.ts upgrade {{ network }} {{ target }} {{ targets }}
 
 finalize-upgrade network:
-    ./script/deployment.sh finalize-upgrade {{ network }}
+    node script/deployment.ts finalize-upgrade {{ network }}
 
 verify network:
-    ./script/deployment.sh verify {{ network }}
+    node script/deployment.ts verify-sources {{ network }}
+
+check-live network:
+    node script/deployment.ts check-live {{ network }}
 
 # CI equivalent check
 check: fmt-check lint test deployment-tests check-coverage build check-abis
