@@ -39,7 +39,7 @@ import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
 // solhint-disable max-states-count
 contract DataCapEvidenceAdapterTest is Test {
     error MissingAllocationId();
-    error ClaimAlreadyRegistered();
+    error AllocationOrClaimIdAssignedToAnotherDeal();
 
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
     address public datacapContract = address(0xfF00000000000000000000000000000000000007);
@@ -699,7 +699,7 @@ contract DataCapEvidenceAdapterTest is Test {
         uint256 otherDealId = 2;
         _setAcceptedDeal(otherDealId, SP1);
         vm.prank(clientAddress);
-        vm.expectRevert(ClaimAlreadyRegistered.selector);
+        vm.expectRevert(AllocationOrClaimIdAssignedToAnotherDeal.selector);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, otherDealId);
     }
 

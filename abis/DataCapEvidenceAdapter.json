@@ -1140,12 +1140,12 @@
   },
   {
     "type": "error",
-    "name": "CallerIsNotPoRepMarket",
+    "name": "AllocationOrClaimIdAssignedToAnotherDeal",
     "inputs": []
   },
   {
     "type": "error",
-    "name": "ClaimAlreadyRegistered",
+    "name": "CallerIsNotPoRepMarket",
     "inputs": []
   },
   {

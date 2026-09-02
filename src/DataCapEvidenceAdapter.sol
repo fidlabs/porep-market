@@ -52,7 +52,7 @@ contract DataCapEvidenceAdapter is
         mapping(uint256 dealId => CommonTypes.ChainEpoch expiration) _maxAllocationExpirationPerDeal;
         mapping(uint64 claimId => uint256 dealId) _claimDealIds;
         mapping(uint256 dealId => uint256 revision) _terminationRevisions;
-        mapping(uint64 id => uint256 dealId) _dealByEvidenceId;
+        mapping(uint64 allocationOrClaimId => uint256 dealId) _dealByAllocationOrClaimId;
     }
 
     /**
@@ -330,10 +330,10 @@ contract DataCapEvidenceAdapter is
     error InvalidAllocationState();
 
     /**
-     * @notice Error thrown when a claim has already been registered
-     * @dev 0xc33e5e92
+     * @notice Error thrown when an allocation or claim ID is assigned to another deal
+     * @dev 0xfaf9d8cd
      */
-    error ClaimAlreadyRegistered();
+    error AllocationOrClaimIdAssignedToAnotherDeal();
 
     struct DataCapDealEvidence {
         bool postingFinished;
@@ -1062,7 +1062,7 @@ contract DataCapEvidenceAdapter is
             CommonTypes.FilActorId[] memory allocationIds = transferReturn.decodeAllocationResponse();
             for (uint256 i = 0; i < allocationIds.length; i++) {
                 CommonTypes.FilActorId allocId = allocationIds[i];
-                _registerEvidenceId(dealId, allocId);
+                _registerAllocationOrClaimId(dealId, allocId);
                 dealEvidence.allocationIds.push(allocId);
             }
         }
@@ -1122,7 +1122,7 @@ contract DataCapEvidenceAdapter is
             for (uint256 i = 0; i < claimsDetails.claims.length; i++) {
                 VerifRegTypes.Claim memory claim = claimsDetails.claims[i];
                 claimBytes += claim.size;
-                if (_registerEvidenceId(dealId, claimIds[i])) {
+                if (_registerAllocationOrClaimId(dealId, claimIds[i])) {
                     dealEvidence.allocationIds.push(claimIds[i]);
                     newEvidenceBytes += claim.size;
                 }
@@ -1211,15 +1211,18 @@ contract DataCapEvidenceAdapter is
     }
 
     // solhint-disable-next-line use-natspec
-    function _registerEvidenceId(uint256 dealId, CommonTypes.FilActorId id) internal returns (bool) {
+    function _registerAllocationOrClaimId(uint256 dealId, CommonTypes.FilActorId allocationOrClaimId)
+        internal
+        returns (bool)
+    {
         DataCapEvidenceAdapterStorage storage $ = s();
-        uint64 actorId = CommonTypes.FilActorId.unwrap(id);
-        uint256 assignedDealId = $._dealByEvidenceId[actorId];
+        uint64 allocationOrClaimIdValue = CommonTypes.FilActorId.unwrap(allocationOrClaimId);
+        uint256 assignedDealId = $._dealByAllocationOrClaimId[allocationOrClaimIdValue];
         if (assignedDealId == 0) {
-            $._dealByEvidenceId[actorId] = dealId;
+            $._dealByAllocationOrClaimId[allocationOrClaimIdValue] = dealId;
             return true;
         }
-        if (assignedDealId != dealId) revert ClaimAlreadyRegistered();
+        if (assignedDealId != dealId) revert AllocationOrClaimIdAssignedToAnotherDeal();
         return false;
     }
 
