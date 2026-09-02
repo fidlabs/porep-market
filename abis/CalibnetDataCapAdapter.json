@@ -1140,6 +1140,11 @@
   },
   {
     "type": "error",
+    "name": "AllocatedBytesExceededRequestedSize",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AllocationOrClaimIdAssignedToAnotherDeal",
     "inputs": []
   },

@@ -341,6 +341,12 @@ contract DataCapEvidenceAdapter is
      */
     error AllocationOrClaimIdAssignedToAnotherDeal();
 
+    /**
+     * @notice Error thrown when the allocated bytes exceed the requested size
+     * @dev 0x0d8466b6
+     */
+    error AllocatedBytesExceededRequestedSize();
+
     struct DataCapDealEvidence {
         bool postingFinished;
         address client;
@@ -464,6 +470,11 @@ contract DataCapEvidenceAdapter is
 
         $._metaAllocatorContract.addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, datacapSpendBytes);
 
+        PoRepTypes.DealTerms memory dealTerms = $._poRepMarketContract.getDealTerms(dealId);
+        if (_getStorageDeal(dealId).allocatedBytes + newEvidenceBytes > dealTerms.requestedSizeBytes) {
+            revert AllocatedBytesExceededRequestedSize();
+        }
+
         emit DatacapSpent(msg.sender, datacapSpendBytes);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
         (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
@@ -563,8 +574,7 @@ contract DataCapEvidenceAdapter is
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
-        uint256 threshold =
-            context.requestedSizeBytes * (BPS_DENOMINATOR - context.activationToleranceBps) / BPS_DENOMINATOR;
+        uint256 threshold = _applyActivationTolerance(context.requestedSizeBytes, context.activationToleranceBps);
 
         if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
             // TODO: add custom reasonCode
@@ -752,7 +762,8 @@ contract DataCapEvidenceAdapter is
     }
 
     function _ensureAllocationCoverage(uint256 allocatedBytes, uint256 requestedSizeBytes) internal view virtual {
-        if (allocatedBytes < requestedSizeBytes) {
+        uint256 activationToleranceBps = s()._poRepMarketContract.getDealActivationPadding();
+        if (allocatedBytes < _applyActivationTolerance(requestedSizeBytes, activationToleranceBps)) {
             revert InvalidAllocatedBytes();
         }
     }
@@ -1204,6 +1215,16 @@ contract DataCapEvidenceAdapter is
      */
     function _getStorageDeal(uint256 dealId) internal view returns (DataCapDealEvidence storage) {
         return s()._deals[dealId];
+    }
+
+    /**
+     * @notice Applies an activation tolerance to a requested size
+     * @param sizeBytes The requested size in bytes
+     * @param toleranceBps The activation tolerance in basis points
+     * @return The minimum number of bytes required after applying the tolerance
+     */
+    function _applyActivationTolerance(uint256 sizeBytes, uint256 toleranceBps) internal pure returns (uint256) {
+        return sizeBytes * (BPS_DENOMINATOR - toleranceBps) / BPS_DENOMINATOR;
     }
 
     // solhint-disable no-empty-blocks
