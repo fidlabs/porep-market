@@ -44,7 +44,6 @@ library SharedTypes {
     struct SLIThresholds {
         /// @dev Valid range: 0-10000 (basis points, e.g. 7550 = 75.50%). 0 means "don't care".
         uint16 retrievabilityBps;
-        /// @dev Capped at ~64 Gbps
         uint64 bandwidthBytesPerSecond;
         /// @dev In requirements/capabilities 0 means "don't care". In attestations a measurement is
         ///      mandatory: 0 (unset) and {LATENCY_UNMEASURED} are invalid and never satisfy an SLA.

@@ -186,7 +186,7 @@ interface ISPRegistry {
     function getPaymentTokenConfig(address token) external view returns (TokenConfig memory config);
 
     /**
-     * @notice Creates an active provider offer.
+     * @notice Creates an active provider offer when the provider is not paused or blocked.
      * @param provider Provider actor ID.
      * @param terms Immutable offer size and duration bounds.
      * @param slis Immutable promised SLIs.
@@ -201,7 +201,7 @@ interface ISPRegistry {
     ) external returns (uint256 offerId);
 
     /**
-     * @notice Enables or disables an offer for matching.
+     * @notice Enables or disables an offer for matching. Paused providers may only disable offers.
      * @param offerId Offer ID.
      * @param active True to enable the offer, false to disable it.
      */

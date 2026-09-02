@@ -250,6 +250,12 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error ProviderIsBlocked(CommonTypes.FilActorId provider);
 
     /**
+     * @notice Error thrown when a paused provider attempts to create or activate an offer
+     * @dev 0x02ffe7e3
+     */
+    error ProviderIsPaused(CommonTypes.FilActorId provider);
+
+    /**
      * @notice Error thrown when caller is neither provider controller nor admin
      * @dev 0xf3da36ec
      */
@@ -587,6 +593,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     ) external returns (uint256 offerId) {
         _ensureProviderRegistered(provider);
         _ensureProviderNotBlocked(provider);
+        _ensureProviderNotPaused(provider);
         _onlyProviderControllerOrAdmin(provider);
         _ensureOfferTermsValid(terms);
         _ensureSLIsValid(slis);
@@ -619,6 +626,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         Offer storage offer = $._offers[offerId];
         _ensureOfferExists(offerId);
         _ensureProviderNotBlocked(offer.provider);
+        if (active) _ensureProviderNotPaused(offer.provider);
         _onlyProviderControllerOrAdmin(offer.provider);
 
         if (offer.active == active) return;
@@ -829,6 +837,16 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     function _ensureProviderNotBlocked(CommonTypes.FilActorId provider) internal view {
         if (s()._providers[_providerId(provider)].blocked) {
             revert ProviderIsBlocked(provider);
+        }
+    }
+
+    /**
+     * @notice Ensures the provider is not paused.
+     * @param provider Provider actor ID to check.
+     */
+    function _ensureProviderNotPaused(CommonTypes.FilActorId provider) internal view {
+        if (s()._providers[_providerId(provider)].paused) {
+            revert ProviderIsPaused(provider);
         }
     }
 
