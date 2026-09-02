@@ -12,6 +12,8 @@ import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {PoRepMarketClaimInspector} from "../src/helpers/PoRepMarketClaimInspector.sol";
+import {PoRepMarketSectorStatusInspector} from "../src/helpers/PoRepMarketSectorStatusInspector.sol";
+import {PoRepMarketViewHelper} from "../src/helpers/PoRepMarketViewHelper.sol";
 import {console} from "forge-std/console.sol";
 
 contract Deploy is DeployUtils {
@@ -23,6 +25,8 @@ contract Deploy is DeployUtils {
     address internal sliOracle;
     address internal sliScorer;
     address internal claimInspector;
+    address internal sectorStatusInspector;
+    address internal viewHelper;
 
     address internal poRepMarketImpl;
     address internal validatorFactoryImpl;
@@ -42,6 +46,8 @@ contract Deploy is DeployUtils {
     address internal poRepService;
     address internal operatorAddress;
     address internal metaAllocator;
+    address internal usdfc;
+    address internal axlUsdc;
 
     function run() external {
         string memory outputPath = vm.envString("DEPLOYMENT_OUTPUT");
@@ -54,6 +60,8 @@ contract Deploy is DeployUtils {
         poRepService = vm.envAddress("POREP_SERVICE");
         operatorAddress = vm.envOr("OPERATOR_ADDR", address(0));
         metaAllocator = vm.envAddress("META_ALLOCATOR");
+        usdfc = vm.envOr("USDFC", address(0));
+        axlUsdc = vm.envOr("AXL_USDC", address(0));
 
         vm.startBroadcast(admin);
 
@@ -65,12 +73,16 @@ contract Deploy is DeployUtils {
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
         claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
+        sectorStatusInspector = address(new PoRepMarketSectorStatusInspector(poRepMarket));
+        viewHelper = address(new PoRepMarketViewHelper(poRepMarket));
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
         PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
         ValidatorFactory(validatorFactory).initialize2(filecoinPay, poRepMarket);
         SPRegistry(spRegistry).initialize2(poRepMarket);
+        _configurePaymentToken(usdfc);
+        _configurePaymentToken(axlUsdc);
 
         if (operatorAddress != address(0)) {
             SPRegistry(spRegistry).grantRole(SPRegistry(spRegistry).OPERATOR_ROLE(), operatorAddress);
@@ -82,6 +94,10 @@ contract Deploy is DeployUtils {
         vm.stopBroadcast();
 
         vm.writeJson(_serializePendingManifest(buildInfoSha256), outputPath, ".result");
+    }
+
+    function _configurePaymentToken(address token) private {
+        if (token != address(0)) SPRegistry(spRegistry).setPaymentToken(token, true, 1);
     }
 
     function _deployValidatorFactory(address _admin)
@@ -189,7 +205,9 @@ contract Deploy is DeployUtils {
         );
         json.serialize("Validator", _serializeValidator());
         json.serialize("ValidatorBeacon", _serializeValidatorBeacon());
-        return json.serialize("PoRepMarketClaimInspector", _serializeClaimInspector());
+        json.serialize("PoRepMarketClaimInspector", _serializeClaimInspector());
+        json.serialize("PoRepMarketSectorStatusInspector", _serializeSectorStatusInspector());
+        return json.serialize("PoRepMarketViewHelper", _serializeViewHelper());
     }
 
     function _serializeUupsContract(
@@ -222,6 +240,24 @@ contract Deploy is DeployUtils {
         return json.serialize("implementationCodeHash", claimInspector.codehash);
     }
 
+    function _serializeViewHelper() private returns (string memory) {
+        string memory json = "pendingViewHelper";
+        json.serialize("kind", string("standalone"));
+        json.serialize("artifact", string("src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper"));
+        json.serialize("implementation", viewHelper);
+        return json.serialize("implementationCodeHash", viewHelper.codehash);
+    }
+
+    function _serializeSectorStatusInspector() private returns (string memory) {
+        string memory json = "pendingSectorStatusInspector";
+        json.serialize("kind", string("standalone"));
+        json.serialize(
+            "artifact", string("src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector")
+        );
+        json.serialize("implementation", sectorStatusInspector);
+        return json.serialize("implementationCodeHash", sectorStatusInspector.codehash);
+    }
+
     function _serializeValidatorBeacon() private returns (string memory) {
         string memory json = "pendingValidatorBeacon";
         json.serialize("kind", string("beacon"));
@@ -241,6 +277,8 @@ contract Deploy is DeployUtils {
         json.serialize("MetaAllocator", metaAllocator);
         json.serialize("TerminationOracle", terminationOracle);
         json.serialize("Oracle", oracleAddress);
+        if (usdfc != address(0)) json.serialize("USDFC", usdfc);
+        if (axlUsdc != address(0)) json.serialize("AxlUSDC", axlUsdc);
         return json.serialize("Operator", operatorAddress);
     }
 }

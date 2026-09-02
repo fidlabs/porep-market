@@ -1,8 +1,9 @@
 {
   "status": "finalized",
+  "finalizedAt": "2026-08-07T09:22:36.102Z",
   "deployer": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
   "release": {
-    "buildInfoSha256": "0x5699f19f21c71c0d0ee5c58e52ef7fef9a60922765a60ab40ca4592387acb2d4"
+    "buildInfoSha256": "0x0314b25a424a6ce18e519d3fb4ec84195913deeda99883ddc6c8655543fc613f"
   },
   "contracts": {
     "DataCapEvidenceAdapter": {
@@ -71,6 +72,18 @@
       "implementation": "0x53Ae0e3FC5B8Dee5e48c8eC05a3a3b983b724b70",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
       "implementationCodeHash": "0xe3309484f24946d453dd804682b8bd2881ec5060f596c475568123a9d147c334"
+    },
+    "PoRepMarketSectorStatusInspector": {
+      "kind": "standalone",
+      "artifact": "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
+      "implementation": "0x195E37338Bfcf373Ea3a717Ca562e2FF3157D396",
+      "implementationCodeHash": "0xc5b001c2d680c4d523e9a09e82e06ef8f609519790d4fed4efa96fd0b02d926e"
+    },
+    "PoRepMarketViewHelper": {
+      "kind": "standalone",
+      "artifact": "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
+      "implementation": "0x8a38982B26c21a852ec4D904AA0b187BefE0e8b7",
+      "implementationCodeHash": "0x55513c30b8368eaaeb8f8d3d02954d20a01717fce291aca573ce03a96621b959"
     }
   },
   "externalDependencies": {
@@ -79,9 +92,9 @@
     "Operator": "0x99A1b7CE10b02b490F14B1921feCc53625c1952D",
     "Oracle": "0x25d4D2EC6814f9FD405a9c3e32E9b7c38358b9ED",
     "PoRepService": "0x1efBbe336C7763fB63f57d2490269A577fAbD841",
-    "TerminationOracle": "0x087Ea8b72CBf4B435023356776834eB10dd07f2a"
+    "TerminationOracle": "0x087Ea8b72CBf4B435023356776834eB10dd07f2a",
+    "USDFC": "0xb3042734b608a1B16e9e86B374A3f3e389B4cDf0"
   },
-  "finalizedAt": "2026-08-06T07:48:34.421Z",
   "transactions": [
     {
       "hash": "0xfc2b239ea06f5e6e4463e4d6fccabd0f401d177aca31798eebf52204b0350bb7",
@@ -214,6 +227,27 @@
       "status": 1,
       "blockNumber": 3955865,
       "blockHash": "0x64d2b70e10d5e6840fdd19d23b04a0cc85a430191035c5e9a090ee5b8663efe9",
+      "contractAddress": null
+    },
+    {
+      "hash": "0x9cf540d1403bb0d91fa042b7e635725c59e4b84494bdd65cddb202371c654b19",
+      "status": 1,
+      "blockNumber": 3958932,
+      "blockHash": "0x2e33f7943a1dfa4f12f44c16ea4130032a213b190299a784a84fb6bb08f3d52e",
+      "contractAddress": "0x195e37338bfcf373ea3a717ca562e2ff3157d396"
+    },
+    {
+      "hash": "0x559cf6eedd74d7653d80204b52334995f5f362ff5ba5846710f65e16714179b9",
+      "status": 1,
+      "blockNumber": 3958934,
+      "blockHash": "0x81a972e0f28b48ce3c33fed0c7bd1fc9fe8db11c8cb1aa0431808a759d5fa924",
+      "contractAddress": "0x8a38982b26c21a852ec4d904aa0b187befe0e8b7"
+    },
+    {
+      "hash": "0x2946017fb1bf931f0fc177871c70b7d1472d18059240ce28e6119b1b8ed1b904",
+      "status": 1,
+      "blockNumber": 3970579,
+      "blockHash": "0x1fa6c807c2e01d3117e60393b21bf2d62925ee6784e7a07526fc82992abce698",
       "contractAddress": null
     }
   ]

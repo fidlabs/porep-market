@@ -202,6 +202,8 @@ export async function verifyLiveDeployment(
   const sliScorer = requireUupsContract(manifest, "SLIScorer");
   const beacon = requireBeaconContract(manifest, "ValidatorBeacon");
   const claimInspector = requireStandaloneContract(manifest, "PoRepMarketClaimInspector");
+  const sectorStatusInspector = requireStandaloneContract(manifest, "PoRepMarketSectorStatusInspector");
+  const viewHelper = requireStandaloneContract(manifest, "PoRepMarketViewHelper");
   const recordedBeaconFactory = readManifestAddress(
     beacon.factoryProxy,
     "manifest ValidatorBeacon factoryProxy",
@@ -302,6 +304,14 @@ export async function verifyLiveDeployment(
   await loadRuntimeCode(run, rpcUrl, requireDependency(manifest, "FilecoinPay"), "FilecoinPay");
   await loadRuntimeCode(run, rpcUrl, requireDependency(manifest, "MetaAllocator"), "MetaAllocator");
 
+  for (const name of ["USDFC", "AxlUSDC"]) {
+    const token = manifest.externalDependencies[name];
+    if (token === undefined) continue;
+    const address = readManifestAddress(token, `manifest external dependency ${name}`);
+    await loadRuntimeCode(run, rpcUrl, address, name);
+    await verifyPaymentTokenConfiguration(run, rpcUrl, registry.proxy, address, name);
+  }
+
   await verifyAddressCall(
     run,
     rpcUrl,
@@ -318,6 +328,45 @@ export async function verifyLiveDeployment(
     adapter.proxy,
     "ClaimInspector adapter",
   );
+  await verifyAddressCall(
+    run,
+    rpcUrl,
+    sectorStatusInspector.implementation,
+    "POREPMARKET_CONTRACT()(address)",
+    market.proxy,
+    "SectorStatusInspector market",
+  );
+  await verifyAddressCall(
+    run,
+    rpcUrl,
+    viewHelper.implementation,
+    "POREPMARKET_CONTRACT()(address)",
+    market.proxy,
+    "ViewHelper market",
+  );
+}
+
+async function verifyPaymentTokenConfiguration(
+  run: CommandRunner,
+  rpcUrl: string,
+  registry: string,
+  token: string,
+  name: string,
+): Promise<void> {
+  let output: string;
+  try {
+    output = await run(
+      "cast",
+      ["call", registry, "getPaymentTokenConfig(address)(bool,uint256)", token, "--rpc-url", rpcUrl],
+      {},
+    );
+  } catch (error) {
+    throw new Error(`could not read ${name} payment-token configuration`, { cause: error });
+  }
+  const values = output.trim().split(/\s+/);
+  if (values.length !== 2 || values[0] !== "true" || values[1] !== "1") {
+    throw new Error(`${name} payment token must be allowed with minimum 1`);
+  }
 }
 
 function collectUpgradeReplacements(

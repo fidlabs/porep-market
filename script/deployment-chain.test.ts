@@ -128,6 +128,7 @@ test("verifies the complete deployment topology", async () => {
   assert.ok(selectors.has("getGlobalEvidenceAdapter()(address)"));
   assert.ok(selectors.has("hasRole(bytes32,address)(bool)"));
   assert.ok(selectors.has("POREPMARKET_CONTRACT()(address)"));
+  assert.ok(selectors.has("getPaymentTokenConfig(address)(bool,uint256)"));
 });
 
 test("rejects a stale Validator beacon-to-factory binding", async () => {
@@ -151,6 +152,7 @@ function manifestWith(contracts: Record<string, ManifestContract>): DeploymentMa
       Oracle: a6,
       TerminationOracle: a7,
       Operator: a4,
+      USDFC: a2,
     },
   };
 }
@@ -186,6 +188,8 @@ function completeManifest(): DeploymentManifest {
     Validator: { kind: "implementation", artifact: "src/Validator.sol:Validator", implementation: a8, implementationCodeHash: codeHash },
     ValidatorBeacon: { kind: "beacon", artifact: "UpgradeableBeacon", address: a9, implementation: a8, factoryProxy: a3 },
     PoRepMarketClaimInspector: { kind: "standalone", artifact: "ClaimInspector", implementation: a7, implementationCodeHash: codeHash },
+    PoRepMarketSectorStatusInspector: { kind: "standalone", artifact: "SectorStatusInspector", implementation: a5, implementationCodeHash: codeHash },
+    PoRepMarketViewHelper: { kind: "standalone", artifact: "ViewHelper", implementation: a6, implementationCodeHash: codeHash },
   });
 }
 
@@ -205,6 +209,7 @@ function fullRunner(manifest: DeploymentManifest, selectors = new Set<string>())
       selectors.add(signature);
       if (signature.endsWith("_ROLE()(bytes32)") || signature === "TERMINATION_ORACLE()(bytes32)") return hashA;
       if (signature === "hasRole(bytes32,address)(bool)") return "true\n";
+      if (signature === "getPaymentTokenConfig(address)(bool,uint256)") return "true\n1\n";
       return padded(addressResult(manifest, target, signature));
     }
     throw new Error(`unexpected cast arguments: ${args.join(" ")}`);

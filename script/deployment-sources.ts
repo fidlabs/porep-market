@@ -46,7 +46,7 @@ export function sourceVerificationTargets(manifest: DeploymentManifest): SourceV
       address: contract.kind === "beacon" ? contract.address : contract.implementation,
       artifact: contract.artifact,
       verifier: contract.kind === "beacon" ? "sourcify" : "blockscout",
-      guessConstructorArguments: false,
+      guessConstructorArguments: contract.kind === "standalone",
     });
   }
   return targets;

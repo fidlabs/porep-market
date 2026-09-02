@@ -53,6 +53,12 @@ deploy network *args:
 finalize-deploy network:
     node script/deployment.ts finalize-deploy {{ network }}
 
+deploy-missing network:
+    node script/deployment.ts deploy-missing {{ network }}
+
+configure-payment-tokens network:
+    node script/deployment.ts configure-payment-tokens {{ network }}
+
 upgrade network target *targets:
     node script/deployment.ts upgrade {{ network }} {{ target }} {{ targets }}
 
