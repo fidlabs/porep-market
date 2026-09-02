@@ -40,6 +40,7 @@ import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
 // solhint-disable max-states-count
 contract DataCapEvidenceAdapterTest is Test {
     error MissingAllocationId();
+    error AllocationOrClaimIdAssignedToAnotherDeal();
 
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
     address public datacapContract = address(0xfF00000000000000000000000000000000000007);
@@ -117,7 +118,7 @@ contract DataCapEvidenceAdapterTest is Test {
             amount: CommonTypes.BigInt({val: hex"DE0B6B3A7640000000", neg: false}),
             // [[[1000, 42(h'000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA22'),
             //    2048, 518400, 5256000, 305], [...]], []]
-            operator_data: hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC"
+            operator_data: hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC"
         });
         resolveAddress.setId(address(this), uint64(10000));
         resolveAddress.setAddress(hex"00C2A101", uint64(10000));
@@ -148,6 +149,13 @@ contract DataCapEvidenceAdapterTest is Test {
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return address(proxy);
+    }
+
+    function _setAcceptedDeal(uint256 id, CommonTypes.FilActorId provider) internal {
+        PoRepTypes.Deal memory deal = poRepMarketMock.getDeal(dealId);
+        deal.dealId = id;
+        deal.provider = provider;
+        poRepMarketMock.setDeal(id, deal);
     }
 
     function _registerDealWithOneAllocation(DataCapEvidenceAdapterContractMock dataCapEvidenceAdapterMock) internal {
@@ -626,19 +634,74 @@ contract DataCapEvidenceAdapterTest is Test {
 
     function testClaimExtensionGetClaimsFail() public {
         vm.etch(CALL_ACTOR_ID, address(builtInActorForTransferFunctionMock).code);
-        transferParams.operator_data = hex"82808283192710011A005034AC83192710011A005034AC";
+        transferParams.operator_data = hex"82808283192710011A005034AC83192710021A005034AC";
         vm.prank(clientAddress);
         vm.expectRevert(DataCapEvidenceAdapter.GetClaimsCallFailed.selector);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
     }
 
-    function testTransferDoubleClaimExtension() public {
+    function testSubmitDataCapBatchCountsDuplicateClaimOnce() public {
+        // No new allocations; claim 1 for provider 10000 is submitted twice.
         transferParams.operator_data = hex"82808283192710011A005034AC83192710011A005034AC";
+        // GetClaims returns the same 2 KiB claim twice. Before the fix this stored [1, 1]
+        // and increased allocatedBytes by 4 KiB despite only one unique claim existing.
         actorIdMock.setGetClaimsResult(
             hex"8282028082881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
         );
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 2048);
+        (, uint256 allocationCount) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        assertEq(allocationCount, 1);
+        assertEq(metaAllocatorMock.allowance(address(dataCapEvidenceAdapter)), 5904);
+    }
+
+    function testSubmitDataCapBatchAllowsRepeatedClaimExtensionForSameDeal() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 2048);
+        (, uint256 allocationCount) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        assertEq(allocationCount, 1);
+        assertEq(metaAllocatorMock.allowance(address(dataCapEvidenceAdapter)), 5904);
+    }
+
+    function testSubmitDataCapBatchAllowsRegisteredAllocationExtensionForSameDeal() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        transferParams.operator_data =
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A000816001A0050334080";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        actorIdMock.setGetClaimsResult(
+            hex"8282018081881903E81866D82A5828000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C76381908001A003815911A005034D60000"
+        );
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        assertEq(dataCapEvidenceAdapter.getAllocatedBytes(dealId), 2048);
+        (, uint256 allocationCount) = dataCapEvidenceAdapter.getAllocationIdsPerDeal(dealId, 0, type(uint256).max);
+        assertEq(allocationCount, 1);
+        assertEq(metaAllocatorMock.allowance(address(dataCapEvidenceAdapter)), 5904);
+    }
+
+    function testSubmitDataCapBatchRejectsClaimAssignedToAnotherDeal() public {
+        transferParams.operator_data = hex"82808183192710011A005034AC";
+        vm.prank(clientAddress);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+
+        uint256 otherDealId = 2;
+        _setAcceptedDeal(otherDealId, SP1);
+        vm.prank(clientAddress);
+        vm.expectRevert(AllocationOrClaimIdAssignedToAnotherDeal.selector);
+        dataCapEvidenceAdapter.submitDataCapBatch(transferParams, otherDealId);
     }
 
     function testDecodeAllocationResponseRevertInvalidTopLevelArray() public {
@@ -704,7 +767,7 @@ contract DataCapEvidenceAdapterTest is Test {
         metaAllocatorMock.setAllowance(address(dataCapEvidenceAdapterMock), uint256(1000000));
 
         transferParams.operator_data =
-            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710011A005034AC";
+            hex"828186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710031A005034AC";
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
@@ -724,10 +787,11 @@ contract DataCapEvidenceAdapterTest is Test {
                 dealType: DealType.PUBLIC
             })
         );
-        vm.prank(clientAddress);
         // solhint-disable-next-line reentrancy
         transferParams.operator_data =
-            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710011A005034AC";
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221950001A0007E9001A009C7E801901318183192710041A005034AC";
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808102");
+        vm.prank(clientAddress);
         vm.expectEmit(true, true, true, true);
         emit DataCapEvidenceAdapter.DatacapSpent(clientAddress, 24576);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
@@ -1030,11 +1094,17 @@ contract DataCapEvidenceAdapterTest is Test {
         allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
         assertEq(allocatedBytes, sizeOfTransfer);
 
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808102");
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710041A005034AC";
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
         allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
         assertEq(allocatedBytes, sizeOfTransfer * 2);
 
+        actorIdMock.setDataCapTransferResult(hex"834100410049838201808200808105");
+        transferParams.operator_data =
+            hex"828286192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A0050334019013186192710D82A5828000181E203922020F2B9A58BBC9D9856E52EAB85155C1BA298F7E8DF458BD20A3AD767E11572CA221908001A0007E9001A005033401901318183192710061A005034AC";
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
         allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
