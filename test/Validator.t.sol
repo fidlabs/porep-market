@@ -6,6 +6,7 @@ import {Test} from "lib/forge-std/src/Test.sol";
 import {Validator} from "../src/Validator.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
+import {IFilecoinServiceMetadata} from "../src/interfaces/IFilecoinServiceMetadata.sol";
 import {IFilecoinPayValidator} from "../src/interfaces/IFilecoinPayValidator.sol";
 import {PoRepTypes} from "../src/types/PoRepTypes.sol";
 import {SLITypes} from "../src/types/SLITypes.sol";
@@ -133,11 +134,18 @@ contract ValidatorTest is Test {
     }
 
     function testNameReturnsFCSS() public view {
-        assertEq(validator.name(), "FCSS");
+        IFilecoinServiceMetadata metadata = IFilecoinServiceMetadata(address(validator));
+        assertEq(metadata.name(), "FCSS");
     }
 
     function testDescriptionReturnsFullServiceName() public view {
-        assertEq(validator.description(), "Filecoin Cold Storage Service");
+        IFilecoinServiceMetadata metadata = IFilecoinServiceMetadata(address(validator));
+        assertEq(metadata.description(), "Filecoin Cold Storage Service");
+    }
+
+    function testHomepageReturnsRepositoryURL() public view {
+        IFilecoinServiceMetadata metadata = IFilecoinServiceMetadata(address(validator));
+        assertEq(metadata.homepage(), "https://github.com/fidlabs/porep-market");
     }
 
     function testEIP7201StorageSlotIsCorrect() public pure {
