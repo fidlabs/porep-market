@@ -2408,8 +2408,6 @@
   },
   {
     "type": "error",
-<<<<<<< HEAD
-<<<<<<< HEAD
     "name": "ServiceAlreadyEnded",
     "inputs": [
       {
@@ -2423,15 +2421,9 @@
         "internalType": "int64"
       }
     ]
-=======
-    "name": "RequestedSizeBelowAllocatedBytes",
-    "inputs": []
->>>>>>> 4fcb754 (refactor: updateManifestLocation now takes newRequestedSizeBytes parameter)
   },
   {
     "type": "error",
-=======
->>>>>>> 0ec7b06 (refactor: cannot update manifest while DataCap has been already allocated)
     "name": "ServiceNotEnded",
     "inputs": [
       {
