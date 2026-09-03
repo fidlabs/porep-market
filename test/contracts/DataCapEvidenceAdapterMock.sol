@@ -63,6 +63,10 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         return deals[dealId].allocatedBytes;
     }
 
+    function hasSubmittedEvidence(uint256 dealId) external view returns (bool) {
+        return deals[dealId].allocatedBytes != 0;
+    }
+
     function setActivationResult(uint256 dealId, uint8 result) external {
         activationResult[dealId] = result;
     }

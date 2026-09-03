@@ -32,6 +32,15 @@ interface IStorageEvidenceAdapter {
     function isOperational() external view returns (bool);
 
     /**
+     * @notice Returns whether evidence has been submitted for a deal, locking its manifest
+     * @dev Includes unclaimed allocations or accepted piece placements, not only active coverage.
+     * Once true, must remain true even if the evidence later expires or becomes inactive.
+     * @param dealId The id of the deal
+     * @return True when the deal's manifest must no longer be replaced
+     */
+    function hasSubmittedEvidence(uint256 dealId) external view returns (bool);
+
+    /**
      * @notice Retrieves the expiration epoch for a deal's submitted evidence
      * @param dealId The id of the deal
      * @return expiration The evidence expiration epoch

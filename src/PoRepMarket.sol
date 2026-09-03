@@ -12,7 +12,6 @@ import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
 import {IOperator} from "./interfaces/IOperator.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {IStorageEvidenceAdapter} from "./interfaces/IStorageEvidenceAdapter.sol";
-import {IDataCapEvidenceAdapter} from "./interfaces/IDataCapEvidenceAdapter.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {DealState} from "./types/DealState.sol";
@@ -189,19 +188,23 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     // solhint-disable gas-indexed-events
     /**
      * @notice ManifestUpdated event
-     * @dev ManifestUpdated event is emitted when a manifest location and requested size are updated
+     * @dev Emitted when the manifest, piece-set commitment, and reserved size are replaced
      * @param dealId The id of the deal
      * @param oldManifestLocation The old manifest location
      * @param newManifestLocation The new manifest location
      * @param oldRequestedSizeBytes The old requested size in bytes
      * @param newRequestedSizeBytes The new requested size in bytes
+     * @param oldManifestHash The old piece-set commitment
+     * @param newManifestHash The new piece-set commitment
      */
     event ManifestUpdated(
         uint256 indexed dealId,
         string oldManifestLocation,
         string newManifestLocation,
         uint256 oldRequestedSizeBytes,
-        uint256 newRequestedSizeBytes
+        uint256 newRequestedSizeBytes,
+        bytes32 oldManifestHash,
+        bytes32 newManifestHash
     );
 
     // solhint-enable gas-indexed-events
@@ -400,10 +403,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     error InvalidDealSize();
 
     /**
-     * @notice Error thrown when the manifest is updated after DataCap has already been allocated for the deal
-     * @dev 0x5fe775b3
+     * @notice Error thrown when the manifest is updated after evidence has been submitted
+     * @dev 0x6976a1e6
      */
-    error ManifestUpdateNotAllowedAfterAllocation();
+    error ManifestUpdateNotAllowedAfterEvidence();
 
     /**
      * @notice Error thrown when a deal is not in a state that allows it to be rejected
@@ -1157,48 +1160,63 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         return address($._validatorFactoryContract);
     }
 
-    /**
-     * @notice Updates the manifest location and requested size for a specific deal
-     * @dev Only callable by the admin
-     * @param dealId The unique identifier of the deal
-     * @param newManifestLocation The new manifest location URL to be updated for the deal
-     * @param newRequestedSizeBytes The new requested size in bytes read from the updated manifest
-     */
-    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation, uint256 newRequestedSizeBytes)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
-    {
+    /// @inheritdoc IPoRepMarket
+    function updateManifestLocation(
+        uint256 dealId,
+        string calldata newManifestLocation,
+        uint256 newRequestedSizeBytes,
+        bytes32 newManifestHash
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
         _ensureDealExists(deal);
-
-        if (bytes(newManifestLocation).length == 0) {
-            revert EmptyManifestLocation();
+        _ensureDealCorrectState(deal, DealState.ACCEPTED);
+        _ensureCorrectManifestLocation(newManifestLocation);
+        if (newRequestedSizeBytes == 0) revert InvalidDealSize();
+        if (newManifestHash == bytes32(0)) revert InvalidManifestHash();
+        if (IStorageEvidenceAdapter(deal.evidenceAdapter).hasSubmittedEvidence(dealId)) {
+            revert ManifestUpdateNotAllowedAfterEvidence();
         }
 
-        if (bytes(newManifestLocation).length > 2048) {
-            revert TooLongManifestLocation();
-        }
-
-        if (newRequestedSizeBytes == 0) {
-            revert InvalidDealSize();
-        }
-
-        uint256 allocatedBytes = IDataCapEvidenceAdapter(deal.evidenceAdapter).getAllocatedBytes(dealId);
-        if (allocatedBytes != 0) {
-            revert ManifestUpdateNotAllowedAfterAllocation();
-        }
-
-        string memory oldManifestLocation = $._dealData[dealId].manifestLocation;
-        $._dealData[dealId].manifestLocation = newManifestLocation;
-
+        _updateManifestReservation(dealId, newRequestedSizeBytes, newManifestHash);
+        SharedTypes.DealData memory oldData = $._dealData[dealId];
         uint256 oldRequestedSizeBytes = $._dealTerms[dealId].requestedSizeBytes;
+        $._dealData[dealId] =
+            SharedTypes.DealData({manifestHash: newManifestHash, manifestLocation: newManifestLocation});
         $._dealTerms[dealId].requestedSizeBytes = newRequestedSizeBytes;
+        $._dealCapacity[dealId].reservedBytes = newRequestedSizeBytes;
 
         emit ManifestUpdated(
-            dealId, oldManifestLocation, newManifestLocation, oldRequestedSizeBytes, newRequestedSizeBytes
+            dealId,
+            oldData.manifestLocation,
+            newManifestLocation,
+            oldRequestedSizeBytes,
+            newRequestedSizeBytes,
+            oldData.manifestHash,
+            newManifestHash
         );
+    }
+
+    /**
+     * @notice Updates the selected offer's reservation before replacing the stored manifest
+     * @param dealId The deal whose pending reservation changes
+     * @param newRequestedSizeBytes The replacement manifest size
+     * @param newManifestHash The replacement manifest hash
+     */
+    function _updateManifestReservation(uint256 dealId, uint256 newRequestedSizeBytes, bytes32 newManifestHash)
+        internal
+    {
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+        $._SPRegistryContract
+            .updatePendingReservation(
+                deal.offerId,
+                deal.client,
+                $._dealData[dealId].manifestHash,
+                newManifestHash,
+                $._dealCapacity[dealId].reservedBytes,
+                newRequestedSizeBytes
+            );
     }
 
     /**
