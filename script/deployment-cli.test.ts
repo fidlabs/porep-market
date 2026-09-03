@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 import {
   applyPaymentTokenPolicy,
   installSignalHandling,
@@ -14,7 +15,7 @@ import {
   runProcess,
   writeAtomicFile,
 } from "./deployment.ts";
-import { parseDeploymentManifest } from "./deployment-state.ts";
+import { hashRawBytes, parseDeploymentManifest } from "./deployment-state.ts";
 import { confirmBlockscoutSource, verifyContractSources } from "./deployment-sources.ts";
 
 const script = fileURLToPath(new URL("./deployment.ts", import.meta.url));
@@ -76,6 +77,55 @@ test("maps the three Filecoin networks explicitly", () => {
     { name: "USDFC", address: "0x80B98d3aa09ffff255c3ba4A241111Ff1262F045" },
     { name: "AxlUSDC", address: "0xEB466342C4d449BC9f53A865D5Cb90586f405215" },
   ]);
+});
+
+test("allows the Calibnet adapter switch within the deployed build while rejecting unchanged standard upgrades", () => {
+  const directory = temporaryDirectory();
+  try {
+    const build = Buffer.from("{}");
+    const source = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
+    source.contracts.DataCapEvidenceAdapter.artifact = "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter";
+    source.release.buildInfoSha256 = hashRawBytes(build);
+    const deploymentDirectory = join(directory, "deployments", "calibnet");
+    mkdirSync(join(deploymentDirectory, "build-info"), { recursive: true });
+    writeFileSync(join(deploymentDirectory, "latest.json"), JSON.stringify(source));
+    writeFileSync(
+      join(deploymentDirectory, "build-info", `${source.release.buildInfoSha256.slice(2)}.json.gz`),
+      gzipSync(build),
+    );
+    const marker = join(directory, "storage-checked");
+    const env: NodeJS.ProcessEnv = {
+      ...environment(directory),
+      RPC_CALIBNET: "http://calibnet.example",
+      PRIVATE_KEY_CALIBNET: "calibnet-key",
+      CAST_BIN: executable(directory, "cast", "process.stdout.write('314159')"),
+      GIT_BIN: executable(directory, "git", ""),
+      FORGE_BIN: executable(directory, "forge", `
+        const fs = require('node:fs');
+        const path = require('node:path');
+        const args = process.argv.slice(2);
+        if (args[0] !== 'build') throw new Error('unexpected broadcast');
+        const output = args[args.indexOf('--out') + 1];
+        fs.mkdirSync(path.join(output, 'build-info'), { recursive: true });
+        fs.writeFileSync(path.join(output, 'build-info', 'build.json'), '{}');
+      `),
+      STORAGE_VALIDATOR: executable(directory, "storage-validator", `
+        require('node:fs').writeFileSync(${JSON.stringify(marker)}, '');
+        process.exitCode = 77;
+      `),
+    };
+
+    const standard = run(["upgrade", "calibnet", "DataCapEvidenceAdapter"], env);
+    assert.match(standard.stderr, /current build matches the deployed release/);
+    assert.equal(existsSync(marker), false);
+
+    const relaxed = run(["deploy-calibnet-adapter", "calibnet"], env);
+    assert.equal(existsSync(marker), true);
+    assert.match(relaxed.stderr, /storage-validator exited with code 77/);
+    assert.equal(existsSync(join(env.PENDING_ROOT_TS!, "calibnet", "pending-upgrade.json")), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("adds the configured payment tokens without replacing deployment state", () => {
@@ -276,7 +326,9 @@ test("rejects standard upgrades from manager-less legacy manifests before Forge 
     const forge = executable(directory, "forge", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, '')`);
     const deploymentDirectory = join(directory, "deployments", "devnet");
     mkdirSync(deploymentDirectory, { recursive: true });
-    writeFileSync(join(deploymentDirectory, "latest.json"), readFileSync("deployments/mainnet/latest.json"));
+    const source = parseDeploymentManifest(readFileSync("deployments/mainnet/latest.json", "utf8"));
+    delete source.contracts.AccessManager;
+    writeFileSync(join(deploymentDirectory, "latest.json"), JSON.stringify(source));
 
     const result = run(["upgrade", "devnet", "PoRepMarket"], {
       ...environment(directory),
@@ -306,12 +358,12 @@ test("verifies every deployed Calibnet address idempotently", async () => {
     progress: () => {},
   });
 
-  assert.equal(calls.length, 17);
-  assert.equal(confirmed.length, 17);
-  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 9);
+  assert.equal(calls.length, 18);
+  assert.equal(confirmed.length, 18);
+  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 10);
   assert.equal(calls.filter((args) => args.includes("--constructor-args")).length, 0);
-  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 16);
-  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 16);
+  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 17);
+  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 17);
   assert.equal(calls.filter((args) => args.includes("sourcify")).length, 1);
   assert.ok(calls.every((args) => args.includes("--verifier") && args.includes("--watch")));
 });

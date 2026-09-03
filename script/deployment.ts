@@ -404,7 +404,10 @@ async function upgrade(
     mkdirSync(forgeIoDirectory, { recursive: true });
     phase("Build contracts");
     const build = await buildContracts(context, workspace);
-    if (build.hash === source.release.buildInfoSha256) {
+    if (
+      build.hash === source.release.buildInfoSha256 &&
+      !(variant === "calibnet-adapter" && source.contracts.DataCapEvidenceAdapter?.artifact !== calibnetAdapterArtifact)
+    ) {
       throw new Error("current build matches the deployed release; nothing to upgrade");
     }
     phase("Validate storage layouts");
