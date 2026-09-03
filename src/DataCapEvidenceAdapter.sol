@@ -922,6 +922,11 @@ contract DataCapEvidenceAdapter is
         return _getStorageDeal(dealId).allocatedBytes;
     }
 
+    /// @inheritdoc IStorageEvidenceAdapter
+    function hasSubmittedEvidence(uint256 dealId) external view returns (bool) {
+        return _getStorageDeal(dealId).allocatedBytes != 0;
+    }
+
     /**
      * @notice Getter to retrieve the lifecycle status of a deal's DataCap allocations
      * @param dealId The id of the deal

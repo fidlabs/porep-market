@@ -669,8 +669,10 @@ contract DataCapEvidenceAdapterTest is Test {
     function testSubmitDataCapBatchAllowsRepeatedClaimExtensionForSameDeal() public {
         transferParams.operator_data = hex"82808183192710011A005034AC";
 
+        assertFalse(dataCapEvidenceAdapter.hasSubmittedEvidence(dealId));
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
+        assertTrue(dataCapEvidenceAdapter.hasSubmittedEvidence(dealId));
 
         vm.prank(clientAddress);
         dataCapEvidenceAdapter.submitDataCapBatch(transferParams, dealId);
@@ -1098,8 +1100,10 @@ contract DataCapEvidenceAdapterTest is Test {
         // 2 * 2048 from allocations and 2048 from claims
         uint256 allocatedBytes;
 
+        assertFalse(dataCapEvidenceAdapterMock.hasSubmittedEvidence(dealId));
         vm.prank(clientAddress);
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
+        assertTrue(dataCapEvidenceAdapterMock.hasSubmittedEvidence(dealId));
         allocatedBytes = dataCapEvidenceAdapterMock.getAllocatedBytes(dealId);
         assertEq(allocatedBytes, sizeOfTransfer);
 
