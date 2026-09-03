@@ -530,7 +530,7 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
         SharedTypes.ProviderDealSelection memory selection =
             $._SPRegistryContract.reserveProviderForDeal(msg.sender, request);
 
-        _createDeal(request, selection, $);
+        _createDeal(request, selection, $, msg.sender);
     }
 
     /**
@@ -538,8 +538,9 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
      * @dev Only admins can bypass automatic matching and reserve a specific offer
      * @param offerId The provider offer to reserve for the deal
      * @param request The client deal request
+     * @param client The address of the client for which the deal is proposed
      */
-    function proposeDealWithSpecificOffer(uint256 offerId, SharedTypes.DealRequest calldata request)
+    function proposeDealWithSpecificOffer(uint256 offerId, SharedTypes.DealRequest calldata request, address client)
         external
         override
         onlyRole(Roles.DEFAULT_ADMIN_ROLE)
@@ -547,9 +548,9 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
         PoRepMarketStorage storage $ = s();
         _ensureValidProposalRequest(request);
         SharedTypes.ProviderDealSelection memory reservedProvider =
-            $._SPRegistryContract.reserveOfferForDeal(offerId, msg.sender, request);
+            $._SPRegistryContract.reserveOfferForDeal(offerId, client, request);
 
-        _createDeal(request, reservedProvider, $);
+        _createDeal(request, reservedProvider, $, client);
     }
 
     /**
@@ -570,34 +571,39 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
      * @param request The client deal request
      * @param selection The reserved provider offer selection
      * @param marketStorage PoRepMarket storage pointer
+     * @param client The address of the client for which the deal is proposed
      */
     // solhint-disable-next-line function-max-lines
     function _createDeal(
         SharedTypes.DealRequest calldata request,
         SharedTypes.ProviderDealSelection memory selection,
-        PoRepMarketStorage storage marketStorage
+        PoRepMarketStorage storage marketStorage,
+        address client
     ) internal {
         CommonTypes.FilActorId provider = selection.provider;
 
         uint256 dealId = ++marketStorage._dealIdCounter;
         uint8 initialState = DealState.ACCEPTED;
-        IStorageEvidenceAdapter evidenceAdapter = marketStorage._globalEvidenceAdapter;
-        if (address(evidenceAdapter) == address(0)) {
-            revert InvalidEvidenceAdapterAddress();
+        {
+            IStorageEvidenceAdapter evidenceAdapter = marketStorage._globalEvidenceAdapter;
+            if (address(evidenceAdapter) == address(0)) {
+                revert InvalidEvidenceAdapterAddress();
+            }
+            int64 proposedAtEpoch = int64(uint64(block.number));
+
+            marketStorage._deals[dealId] = PoRepTypes.Deal({
+                dealId: dealId,
+                client: client,
+                provider: provider,
+                offerId: selection.offerId,
+                state: initialState,
+                evidenceAdapter: address(evidenceAdapter),
+                validator: address(0),
+                railId: 0,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch),
+                dealType: request.dealType
+            });
         }
-        int64 proposedAtEpoch = int64(uint64(block.number));
-        marketStorage._deals[dealId] = PoRepTypes.Deal({
-            dealId: dealId,
-            client: msg.sender,
-            provider: provider,
-            offerId: selection.offerId,
-            state: initialState,
-            evidenceAdapter: address(evidenceAdapter),
-            validator: address(0),
-            railId: 0,
-            proposedAtEpoch: CommonTypes.ChainEpoch.wrap(proposedAtEpoch),
-            dealType: request.dealType
-        });
         marketStorage._dealSLIs[dealId] = selection.promisedSLIs;
         {
             uint64 durationEpochs = uint64(uint256(request.durationDays) * (EPOCHS_IN_MONTH / 30));
@@ -622,25 +628,23 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
         });
         marketStorage._dealData[dealId] =
             SharedTypes.DealData({manifestHash: request.manifestHash, manifestLocation: request.manifestLocation});
-        {
-            emit DealCreated(
-                dealId,
-                msg.sender,
-                provider,
-                request.requiredSLIs,
-                request.manifestHash,
-                request.manifestLocation,
-                request.requestedSizeBytes,
-                block.number
-            );
-        }
+        emit DealCreated(
+            dealId,
+            client,
+            provider,
+            request.requiredSLIs,
+            request.manifestHash,
+            request.manifestLocation,
+            request.requestedSizeBytes,
+            block.number
+        );
         address organization = marketStorage._SPRegistryContract.getProviderView(provider).organization;
         marketStorage._dealOrganization[dealId] = organization;
         marketStorage._dealIdsByStateByOrganization[initialState][organization].add(dealId);
-        marketStorage._dealIdsByClient[msg.sender].add(dealId);
+        marketStorage._dealIdsByClient[client].add(dealId);
         marketStorage._dealIdsByProvider[provider].add(dealId);
         marketStorage._dealIdsByState[initialState].add(dealId);
-        emit DealAccepted(dealId, msg.sender, provider);
+        emit DealAccepted(dealId, client, provider);
     }
 
     // solhint-enable function-max-lines

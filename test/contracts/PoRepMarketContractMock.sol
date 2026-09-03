@@ -7,8 +7,11 @@ import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {PoRepTypes} from "../../src/types/PoRepTypes.sol";
 import {SharedTypes} from "../../src/types/SharedTypes.sol";
 import {IStorageEvidenceAdapter} from "../../src/interfaces/IStorageEvidenceAdapter.sol";
+import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 
 contract PoRepMarketContractMock is PoRepMarket {
+    using EnumerableSet for EnumerableSet.UintSet;
+
     function _getStorage() private pure returns (PoRepMarket.PoRepMarketStorage storage $) {
         // solhint-disable-next-line no-inline-assembly
         assembly ("memory-safe") {
@@ -42,6 +45,10 @@ contract PoRepMarketContractMock is PoRepMarket {
 
     function setGlobalEvidenceAdapterForTest(address evidenceAdapter) external {
         _getStorage()._globalEvidenceAdapter = IStorageEvidenceAdapter(evidenceAdapter);
+    }
+
+    function isDealIndexedForClient(address client, uint256 dealId) external view returns (bool) {
+        return _getStorage()._dealIdsByClient[client].contains(dealId);
     }
 
     function getActiveDealIdsReadyForPayment() public pure returns (uint256[] memory) {

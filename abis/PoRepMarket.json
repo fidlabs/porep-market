@@ -1156,6 +1156,11 @@
             ]
           }
         ]
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
