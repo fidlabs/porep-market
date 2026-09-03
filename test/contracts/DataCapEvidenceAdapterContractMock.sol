@@ -18,4 +18,8 @@ contract DataCapEvidenceAdapterContractMock is DataCapEvidenceAdapter {
         DataCapDealEvidence storage dealEvidence = s()._deals[dealId];
         _deleteIdByIndex(dealEvidence.allocationIds, index);
     }
+
+    function getPartialEvidenceRefreshEpoch(uint256 dealId) external view returns (CommonTypes.ChainEpoch) {
+        return s()._refreshStatus[dealId].partialEvidenceRefreshEpoch;
+    }
 }
