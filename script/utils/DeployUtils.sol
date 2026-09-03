@@ -38,6 +38,9 @@ contract DeployUtils is Script {
         if (target == keccak256("DataCapEvidenceAdapter")) {
             return "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter";
         }
+        if (target == keccak256("SectorEvidenceAdapter")) {
+            return "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter";
+        }
         if (target == keccak256("SPRegistry")) return "src/SPRegistry.sol:SPRegistry";
         if (target == keccak256("SLIOracle")) return "src/SLIOracle.sol:SLIOracle";
         if (target == keccak256("SLIScorer")) return "src/SLIScorer.sol:SLIScorer";

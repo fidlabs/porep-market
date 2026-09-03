@@ -197,6 +197,9 @@ export async function verifyLiveDeployment(
   const market = requireUupsContract(manifest, "PoRepMarket");
   const validatorFactory = requireUupsContract(manifest, "ValidatorFactory");
   const adapter = requireUupsContract(manifest, "DataCapEvidenceAdapter");
+  const sectorAdapter = manifest.contracts.SectorEvidenceAdapter === undefined
+    ? undefined
+    : requireUupsContract(manifest, "SectorEvidenceAdapter");
   const registry = requireUupsContract(manifest, "SPRegistry");
   const sliOracle = requireUupsContract(manifest, "SLIOracle");
   const sliScorer = requireUupsContract(manifest, "SLIScorer");
@@ -222,6 +225,7 @@ export async function verifyLiveDeployment(
     ["PoRepMarket", market],
     ["ValidatorFactory", validatorFactory],
     ["DataCapEvidenceAdapter", adapter],
+    ...(sectorAdapter === undefined ? [] : [["SectorEvidenceAdapter", sectorAdapter] as const]),
     ["SPRegistry", registry],
     ["SLIOracle", sliOracle],
     ["SLIScorer", sliScorer],
@@ -292,6 +296,16 @@ export async function verifyLiveDeployment(
     market.proxy,
     "adapter market",
   );
+  if (sectorAdapter !== undefined) {
+    await verifyAddressCall(
+      run,
+      rpcUrl,
+      sectorAdapter.proxy,
+      "getPoRepMarketAddress()(address)",
+      market.proxy,
+      "sector adapter market",
+    );
+  }
   await verifyAddressCall(
     run,
     rpcUrl,

@@ -6,6 +6,7 @@ import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {Validator} from "../src/Validator.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
+import {SectorEvidenceAdapter} from "../src/SectorEvidenceAdapter.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
@@ -22,6 +23,7 @@ contract Deploy is DeployUtils {
     address internal poRepMarket;
     address internal validatorFactory;
     address internal dataCapEvidenceAdapter;
+    address internal sectorEvidenceAdapter;
     address internal sliOracle;
     address internal sliScorer;
     address internal claimInspector;
@@ -32,6 +34,7 @@ contract Deploy is DeployUtils {
     address internal validatorFactoryImpl;
     address internal validatorImpl;
     address internal dataCapEvidenceAdapterImpl;
+    address internal sectorEvidenceAdapterImpl;
     address internal sliOracleImpl;
     address internal sliScorerImpl;
     address internal validator;
@@ -72,6 +75,7 @@ contract Deploy is DeployUtils {
         (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
+        (sectorEvidenceAdapter, sectorEvidenceAdapterImpl) = _deploySectorEvidenceAdapter(admin, poRepMarket);
         claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
         sectorStatusInspector = address(new PoRepMarketSectorStatusInspector(poRepMarket));
         viewHelper = address(new PoRepMarketViewHelper(poRepMarket));
@@ -130,6 +134,16 @@ contract Deploy is DeployUtils {
         impl = address(_impl);
     }
 
+    function _deploySectorEvidenceAdapter(address _admin, address _poRepMarket)
+        internal
+        returns (address proxy, address impl)
+    {
+        SectorEvidenceAdapter _impl = new SectorEvidenceAdapter();
+        bytes memory init = abi.encodeCall(SectorEvidenceAdapter.initialize, (_admin, _poRepMarket));
+        proxy = createProxy(init, address(_impl));
+        impl = address(_impl);
+    }
+
     function _deploySLIOracle(address _admin, address _oracleAddress) internal returns (address proxy, address impl) {
         SLIOracle _impl = new SLIOracle();
         bytes memory init = abi.encodeCall(SLIOracle.initialize, (_admin, _oracleAddress));
@@ -165,6 +179,7 @@ contract Deploy is DeployUtils {
         return json.serialize("buildInfoSha256", buildInfoSha256);
     }
 
+    // solhint-disable-next-line function-max-lines
     function _serializeContracts() private returns (string memory) {
         string memory json = "pendingContracts";
         json.serialize(
@@ -189,6 +204,15 @@ contract Deploy is DeployUtils {
                 "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
                 dataCapEvidenceAdapter,
                 dataCapEvidenceAdapterImpl
+            )
+        );
+        json.serialize(
+            "SectorEvidenceAdapter",
+            _serializeUupsContract(
+                "pendingSectorEvidenceAdapter",
+                "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter",
+                sectorEvidenceAdapter,
+                sectorEvidenceAdapterImpl
             )
         );
         json.serialize(
