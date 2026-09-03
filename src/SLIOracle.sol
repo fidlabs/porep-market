@@ -1,30 +1,18 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {MulticallUpgradeable} from "@openzeppelin/contracts-upgradeable/utils/MulticallUpgradeable.sol";
 import {ISLIOracle} from "./interfaces/ISLIOracle.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 
 /**
  * @title SLI Oracle
  * @notice Contract for managing and retrieving SLI values for deals
  */
-contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSUpgradeable, MulticallUpgradeable {
-    /**
-     * @notice Thrown when an invalid oracle address is provided
-     * @dev 0x9589a27d
-     */
-    error InvalidOracle();
-
-    /**
-     * @notice Thrown when an invalid admin address is provided
-     * @dev 0xb5eba9f0
-     */
-    error InvalidAdmin();
-
+contract SLIOracle is ISLIOracle, AccessControlledUpgradeable, UUPSUpgradeable, MulticallUpgradeable {
     /**
      * @notice Error thrown when retrievabilityBps in requirements is greater than 10_000
      * @dev 0x26f456b9
@@ -48,16 +36,6 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
      * @dev 0xb06db32a
      */
     error InvalidDealId();
-
-    /**
-     * @notice Upgradable role which allows for contract upgrades
-     */
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-
-    /**
-     * @notice Oracle role which allows to update SLI values
-     */
-    bytes32 public constant ORACLE_ROLE = keccak256("ORACLE_ROLE");
 
     /// @custom:storage-location erc7201:slioracle.storage.SLIOracleStorage
     struct SLIOracleStorage {
@@ -99,17 +77,11 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
 
     /**
      * @notice Contract initializator. Should be called during deployment
-     * @param admin Contract owner
-     * @param oracle Address that will get ORACLE_ROLE
+     * @param _accessManager Protocol AccessManager address
      */
-    function initialize(address admin, address oracle) external initializer {
-        if (admin == address(0)) revert InvalidAdmin();
-        if (oracle == address(0)) revert InvalidOracle();
-        __AccessControl_init();
+    function initialize(address _accessManager) external initializer {
+        __AccessControlled_init(_accessManager);
         __Multicall_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
-        _grantRole(ORACLE_ROLE, oracle);
     }
 
     /**
@@ -117,7 +89,7 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
      * @param dealId The id of the deal
      * @param slis New slis values for a deal
      */
-    function setSLI(uint256 dealId, SharedTypes.SLIThresholds calldata slis) external onlyRole(ORACLE_ROLE) {
+    function setSLI(uint256 dealId, SharedTypes.SLIThresholds calldata slis) external onlyRole(Roles.ORACLE_ROLE) {
         if (dealId == 0) revert InvalidDealId();
         if (slis.retrievabilityBps > 10_000) revert InvalidRetrievabilityBps(slis.retrievabilityBps);
         if (slis.indexingPct > 100) revert InvalidIndexingPct(slis.indexingPct);
@@ -147,6 +119,6 @@ contract SLIOracle is ISLIOracle, Initializable, AccessControlUpgradeable, UUPSU
      * @dev Will revert (reject upgrade) if upgrade isn't called by UPGRADER_ROLE
      * @param newImplementation Address of new implementation
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
     // solhint-enable no-empty-blocks
 }

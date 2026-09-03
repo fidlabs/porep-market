@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {DataCapAPI} from "filecoin-solidity/v0.8/DataCapAPI.sol";
@@ -24,6 +22,8 @@ import {EvidenceTypes} from "./types/EvidenceTypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {EvidenceResult} from "./types/EvidenceResult.sol";
 import {DataCapAllocationStatus} from "./types/DataCapAllocationStatus.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 
 /**
  * @title DataCapEvidenceAdapter
@@ -33,8 +33,7 @@ import {DataCapAllocationStatus} from "./types/DataCapAllocationStatus.sol";
  */
 contract DataCapEvidenceAdapter is
     IDataCapEvidenceAdapter,
-    Initializable,
-    AccessControlUpgradeable,
+    AccessControlledUpgradeable,
     UUPSUpgradeable,
     ReentrancyGuard
 {
@@ -93,16 +92,6 @@ contract DataCapEvidenceAdapter is
 
     uint32 private constant _FRC46_TOKEN_TYPE = 2233613279; // method_hash!("FRC46") as u32;
     address private constant _DATACAP_ADDRESS = address(0xfF00000000000000000000000000000000000007);
-
-    /**
-     * @notice Upgradable role which allows for contract upgrades
-     */
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-
-    /**
-     * @notice The role to set terminated claims.
-     */
-    bytes32 public constant TERMINATION_ORACLE = keccak256("TERMINATION_ORACLE");
 
     /**
      * @notice Size of 32GiB sector in bytes
@@ -232,18 +221,6 @@ contract DataCapEvidenceAdapter is
      * @dev 0x804fe482
      */
     error InvalidDealStateForTransfer();
-
-    /**
-     * @notice Error thrown when invalid admin address is provided
-     * @dev 0x05bb467c
-     */
-    error InvalidAdminAddress();
-
-    /**
-     * @notice Error thrown when invalid termination oracle address is provided
-     * @dev 0x2673f088
-     */
-    error InvalidTerminationOracleAddress();
 
     /**
      * @notice Error thrown when invalid PoRepMarket contract address is provided
@@ -391,23 +368,16 @@ contract DataCapEvidenceAdapter is
 
     /**
      * @notice Contract initializator. Should be called during deployment
-     * @param admin Contract owner
-     * @param terminationOracle Address of the Termination Oracle
+     * @param _accessManager Protocol AccessManager address
      * @param _poRepMarketContract Address of the PoRepMarket contract
      * @param _metaAllocatorContract Address of the MetaAllocator contract
      */
-    function initialize(
-        address admin,
-        address terminationOracle,
-        address _poRepMarketContract,
-        address _metaAllocatorContract
-    ) public initializer {
-        _validateInitializeAddresses(admin, terminationOracle, _poRepMarketContract, _metaAllocatorContract);
-
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
-        _grantRole(TERMINATION_ORACLE, terminationOracle);
+    function initialize(address _accessManager, address _poRepMarketContract, address _metaAllocatorContract)
+        public
+        initializer
+    {
+        _validateInitializeAddresses(_poRepMarketContract, _metaAllocatorContract);
+        __AccessControlled_init(_accessManager);
 
         DataCapEvidenceAdapterStorage storage $ = s();
         $._poRepMarketContract = IPoRepMarket(_poRepMarketContract);
@@ -808,7 +778,7 @@ contract DataCapEvidenceAdapter is
     }
 
     /// @inheritdoc IDataCapEvidenceAdapter
-    function disableAdapter() external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function disableAdapter() external onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         DataCapEvidenceAdapterStorage storage $ = s();
         if (!$._operational) {
             revert AdapterAlreadyNonOperational();
@@ -822,7 +792,7 @@ contract DataCapEvidenceAdapter is
      * @dev Only callable by TERMINATION_ORACLE role.
      * @param claims An array of claim IDs to mark as terminated.
      */
-    function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(TERMINATION_ORACLE) {
+    function claimsTerminatedEarly(uint64[] calldata claims) external onlyRole(Roles.TERMINATION_ORACLE) {
         DataCapEvidenceAdapterStorage storage $ = s();
         for (uint256 i = 0; i < claims.length; ++i) {
             uint64 claimId = claims[i];
@@ -1254,7 +1224,7 @@ contract DataCapEvidenceAdapter is
      * @dev Will revert (reject upgrade) if upgrade isn't called by UPGRADER_ROLE
      * @param newImplementation Address of new implementation
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 
     // solhint-enable no-empty-blocks
 
@@ -1287,23 +1257,10 @@ contract DataCapEvidenceAdapter is
 
     /**
      * @notice Validates the addresses passed to the initialize function
-     * @param admin Contract owner
-     * @param terminationOracle Address of the Termination Oracle
      * @param poRepMarketContract Address of the PoRepMarket contract
      * @param metaAllocatorContract Address of the MetaAllocator contract
      */
-    function _validateInitializeAddresses(
-        address admin,
-        address terminationOracle,
-        address poRepMarketContract,
-        address metaAllocatorContract
-    ) internal pure {
-        if (admin == address(0)) {
-            revert InvalidAdminAddress();
-        }
-        if (terminationOracle == address(0)) {
-            revert InvalidTerminationOracleAddress();
-        }
+    function _validateInitializeAddresses(address poRepMarketContract, address metaAllocatorContract) internal pure {
         if (poRepMarketContract == address(0)) {
             revert InvalidPoRepMarketContractAddress();
         }

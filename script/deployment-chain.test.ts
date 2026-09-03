@@ -14,7 +14,17 @@ const hashA = `0x${"a".repeat(64)}`;
 const hashB = `0x${"b".repeat(64)}`;
 const codeHash = `0x${"c".repeat(64)}`;
 const addresses = Array.from({ length: 9 }, (_, index) => `0x${String(index + 1).repeat(40)}`);
-const [a1, a2, a3, a4, a5, a6, a7, a8, a9] = addresses as [string, string, string, string, string, string, string, string, string];
+const [a1, a2, a3, a4, a5, a6, a7, a8, a9] = addresses as [
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+  string,
+];
 
 test("accepts every unique Foundry transaction and rejects malformed entries", () => {
   assert.deepEqual(
@@ -22,7 +32,12 @@ test("accepts every unique Foundry transaction and rejects malformed entries", (
     [hashA, hashB],
   );
   assert.throws(
-    () => extractBroadcastTransactionHashes(JSON.stringify({ transactions: [{ hash: hashA }, { transactionHash: hashB }] })),
+    () =>
+      extractBroadcastTransactionHashes(
+        JSON.stringify({
+          transactions: [{ hash: hashA }, { transactionHash: hashB }],
+        }),
+      ),
     /transactions\[1\]\.hash/,
   );
   assert.throws(
@@ -42,8 +57,24 @@ test("loads successful receipts including Filecoin transaction-hash aliases", as
   const run = async (output: string): Promise<DeploymentTransaction[]> =>
     loadTransactionReceipts(async () => output, "rpc", [hashA]);
 
-  assert.deepEqual(await run(valid), [{ hash: hashA, status: 1, blockNumber: 10, blockHash: hashB, contractAddress: null }]);
-  assert.deepEqual(await run(valid.replace(hashA, hashB)), [{ hash: hashB, status: 1, blockNumber: 10, blockHash: hashB, contractAddress: null }]);
+  assert.deepEqual(await run(valid), [
+    {
+      hash: hashA,
+      status: 1,
+      blockNumber: 10,
+      blockHash: hashB,
+      contractAddress: null,
+    },
+  ]);
+  assert.deepEqual(await run(valid.replace(hashA, hashB)), [
+    {
+      hash: hashB,
+      status: 1,
+      blockNumber: 10,
+      blockHash: hashB,
+      contractAddress: null,
+    },
+  ]);
   await assert.rejects(run("null"), /receipt is missing/);
   await assert.rejects(run(valid.replace('"0x1"', '"0x0"')), /failed with status/);
   await assert.rejects(
@@ -53,7 +84,13 @@ test("loads successful receipts including Filecoin transaction-hash aliases", as
 });
 
 function receipt(blockNumber = 10, blockHash = hashB): DeploymentTransaction {
-  return { hash: hashA, status: 1, blockNumber, blockHash, contractAddress: null };
+  return {
+    hash: hashA,
+    status: 1,
+    blockNumber,
+    blockHash,
+    contractAddress: null,
+  };
 }
 
 test("waits for Filecoin finality and then verifies the canonical receipt block", async () => {
@@ -65,7 +102,10 @@ test("waits for Filecoin finality and then verifies the canonical receipt block"
       ? JSON.stringify({ Height: heights.shift() })
       : JSON.stringify({ number: "0xa", hash: hashB });
   };
-  await waitForFilecoinFinality(run, "rpc", [receipt()], { sleep: async () => {}, progress: () => {} });
+  await waitForFilecoinFinality(run, "rpc", [receipt()], {
+    sleep: async () => {},
+    progress: () => {},
+  });
   assert.equal(calls.filter((args) => args.includes("eth_getBlockByNumber")).length, 1);
 });
 
@@ -74,7 +114,12 @@ test("rejects a non-canonical receipt block and supports cancellation", async ()
     args.includes("Filecoin.ChainGetFinalizedTipSet")
       ? JSON.stringify({ Height: 10 })
       : JSON.stringify({ number: "0xa", hash: hashA });
-  await assert.rejects(waitForFilecoinFinality(nonCanonical, "rpc", [receipt()], { progress: () => {} }), /not canonical/);
+  await assert.rejects(
+    waitForFilecoinFinality(nonCanonical, "rpc", [receipt()], {
+      progress: () => {},
+    }),
+    /not canonical/,
+  );
 
   const controller = new AbortController();
   const waiting: CommandRunner = async () => JSON.stringify({ Height: 9 });
@@ -91,7 +136,10 @@ test("rejects a non-canonical receipt block and supports cancellation", async ()
 test("verifies runtime hashes and UUPS implementation slots", async () => {
   const manifest = manifestWith({ Example: uups(a1, a2) });
   await verifyManifestContracts(basicRunner(), "rpc", manifest);
-  await assert.rejects(verifyManifestContracts(basicRunner({ implementation: a3 }), "rpc", manifest), /implementation slot/);
+  await assert.rejects(
+    verifyManifestContracts(basicRunner({ implementation: a3 }), "rpc", manifest),
+    /implementation slot/,
+  );
   await assert.rejects(verifyManifestContracts(basicRunner({ runtimeHash: hashA }), "rpc", manifest), /code hash/);
 });
 
@@ -126,6 +174,7 @@ test("verifies the complete deployment topology", async () => {
   assert.ok(selectors.has("getBeacon()(address)"));
   assert.ok(selectors.has("getValidatorFactoryContract()(address)"));
   assert.ok(selectors.has("getGlobalEvidenceAdapter()(address)"));
+  assert.ok(selectors.has("accessManager()(address)"));
   assert.ok(selectors.has("hasRole(bytes32,address)(bool)"));
   assert.ok(selectors.has("POREPMARKET_CONTRACT()(address)"));
   assert.ok(selectors.has("getPaymentTokenConfig(address)(bool,uint256)"));
@@ -137,6 +186,26 @@ test("rejects a stale Validator beacon-to-factory binding", async () => {
   assert.equal(beacon.kind, "beacon");
   manifest.contracts.ValidatorBeacon = { ...beacon, factoryProxy: a2 };
   await assert.rejects(verifyLiveDeployment(fullRunner(manifest), "rpc", manifest), /factoryProxy/);
+});
+
+test("keeps legacy deployment verification available without an AccessManager", async () => {
+  const manifest = completeManifest();
+  delete manifest.contracts.AccessManager;
+  const selectors = new Set<string>();
+
+  await verifyLiveDeployment(fullRunner(manifest, selectors), "rpc", manifest);
+
+  assert.ok(selectors.has("DEFAULT_ADMIN_ROLE()(bytes32)"));
+  assert.ok(selectors.has("hasRole(bytes32,address)(bool)"));
+  assert.ok(!selectors.has("accessManager()(address)"));
+  assert.ok(!selectors.has("defaultAdmin()(address)"));
+});
+
+test("rejects zero-valued required deployment dependencies", async () => {
+  const manifest = completeManifest();
+  manifest.externalDependencies.Oracle = `0x${"0".repeat(40)}`;
+
+  await assert.rejects(verifyLiveDeployment(fullRunner(manifest), "rpc", manifest), /Oracle must be non-zero/);
 });
 
 function manifestWith(contracts: Record<string, ManifestContract>): DeploymentManifest {
@@ -179,17 +248,49 @@ function basicRunner(overrides: { implementation?: string; runtimeHash?: string 
 
 function completeManifest(): DeploymentManifest {
   return manifestWith({
+    AccessManager: {
+      kind: "standalone",
+      artifact: "src/AccessManager.sol:AccessManager",
+      implementation: a2,
+      implementationCodeHash: codeHash,
+    },
     PoRepMarket: uups(a1, a2),
     ValidatorFactory: uups(a3, a4),
     DataCapEvidenceAdapter: uups(a5, a6),
     SPRegistry: uups(a7, a8),
     SLIOracle: uups(a9, a2),
     SLIScorer: uups(a4, a6),
-    Validator: { kind: "implementation", artifact: "src/Validator.sol:Validator", implementation: a8, implementationCodeHash: codeHash },
-    ValidatorBeacon: { kind: "beacon", artifact: "UpgradeableBeacon", address: a9, implementation: a8, factoryProxy: a3 },
-    PoRepMarketClaimInspector: { kind: "standalone", artifact: "ClaimInspector", implementation: a7, implementationCodeHash: codeHash },
-    PoRepMarketSectorStatusInspector: { kind: "standalone", artifact: "SectorStatusInspector", implementation: a5, implementationCodeHash: codeHash },
-    PoRepMarketViewHelper: { kind: "standalone", artifact: "ViewHelper", implementation: a6, implementationCodeHash: codeHash },
+    Validator: {
+      kind: "implementation",
+      artifact: "src/Validator.sol:Validator",
+      implementation: a8,
+      implementationCodeHash: codeHash,
+    },
+    ValidatorBeacon: {
+      kind: "beacon",
+      artifact: "UpgradeableBeacon",
+      address: a9,
+      implementation: a8,
+      factoryProxy: a3,
+    },
+    PoRepMarketClaimInspector: {
+      kind: "standalone",
+      artifact: "ClaimInspector",
+      implementation: a7,
+      implementationCodeHash: codeHash,
+    },
+    PoRepMarketSectorStatusInspector: {
+      kind: "standalone",
+      artifact: "SectorStatusInspector",
+      implementation: a5,
+      implementationCodeHash: codeHash,
+    },
+    PoRepMarketViewHelper: {
+      kind: "standalone",
+      artifact: "ViewHelper",
+      implementation: a6,
+      implementationCodeHash: codeHash,
+    },
   });
 }
 
@@ -219,7 +320,10 @@ function fullRunner(manifest: DeploymentManifest, selectors = new Set<string>())
 function addressResult(manifest: DeploymentManifest, target: string, signature: string): string {
   const c = manifest.contracts;
   if (signature === "implementation()(address)") return implementation(c.Validator!);
-  if (signature === "owner()(address)") return manifest.deployer;
+  if (signature === "owner()(address)")
+    return c.AccessManager === undefined ? manifest.deployer : implementation(c.AccessManager);
+  if (signature === "defaultAdmin()(address)") return a4;
+  if (signature === "accessManager()(address)") return implementation(c.AccessManager!);
   if (signature === "getBeacon()(address)") return beaconAddress(c.ValidatorBeacon!);
   if (signature === "getValidatorFactoryContract()(address)") return proxy(c.ValidatorFactory!);
   if (signature === "getSPRegistryContract()(address)") return proxy(c.SPRegistry!);

@@ -75,9 +75,7 @@ export const networkConfigs = {
     privateKeyVariable: "PRIVATE_KEY_CALIBNET",
     environmentSuffix: "CALIBNET",
     verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
-    paymentTokens: [
-      { name: "USDFC", address: "0xb3042734b608a1B16e9e86B374A3f3e389B4cDf0" },
-    ],
+    paymentTokens: [{ name: "USDFC", address: "0xb3042734b608a1B16e9e86B374A3f3e389B4cDf0" }],
   },
   mainnet: {
     chainId: 314,
@@ -141,26 +139,35 @@ export type SignalHandling = { signal: AbortSignal; dispose: () => void };
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const zeroAddress = `0x${"0".repeat(40)}`;
-const unsafeCalibnetAdapterProxy = "0xfEBd13e0DecCD8B96c2781da32b30BbEB12884Db";
 const calibnetAdapterArtifact = "src/CalibnetDataCapAdapter.sol:CalibnetDataCapAdapter";
 const networks = Object.keys(networkConfigs) as Network[];
 const usage = `Usage: deployment.ts <command> <network> [args...]\nCommands: ${commands.join(", ")}\nNetworks: ${networks.join(", ")}`;
-const upgradeTargets: Record<string, {
-  artifact: string;
-  manifestKind: "uups" | "implementation";
-  operationKind: "uups" | "beacon";
-}> = {
+const upgradeTargets: Record<
+  string,
+  {
+    artifact: string;
+    manifestKind: "uups" | "implementation";
+    operationKind: "uups" | "beacon";
+  }
+> = {
   PoRepMarket: { artifact: "src/PoRepMarket.sol:PoRepMarket", manifestKind: "uups", operationKind: "uups" },
-  ValidatorFactory: { artifact: "src/ValidatorFactory.sol:ValidatorFactory", manifestKind: "uups", operationKind: "uups" },
-  DataCapEvidenceAdapter: { artifact: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter", manifestKind: "uups", operationKind: "uups" },
+  ValidatorFactory: {
+    artifact: "src/ValidatorFactory.sol:ValidatorFactory",
+    manifestKind: "uups",
+    operationKind: "uups",
+  },
+  DataCapEvidenceAdapter: {
+    artifact: "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
+    manifestKind: "uups",
+    operationKind: "uups",
+  },
   SPRegistry: { artifact: "src/SPRegistry.sol:SPRegistry", manifestKind: "uups", operationKind: "uups" },
   SLIOracle: { artifact: "src/SLIOracle.sol:SLIOracle", manifestKind: "uups", operationKind: "uups" },
   SLIScorer: { artifact: "src/SLIScorer.sol:SLIScorer", manifestKind: "uups", operationKind: "uups" },
   Validator: { artifact: "src/Validator.sol:Validator", manifestKind: "implementation", operationKind: "beacon" },
 };
 const missingHelperArtifacts = {
-  PoRepMarketSectorStatusInspector:
-    "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
+  PoRepMarketSectorStatusInspector: "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
   PoRepMarketViewHelper: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
 } as const;
 async function deploy(context: Context, options: DeployOptions): Promise<void> {
@@ -326,9 +333,9 @@ async function configurePaymentTokens(context: Context): Promise<void> {
   const registry = spRegistryProxy(source);
 
   for (const token of policy) await ensureTokenHasCode(context, token);
-  const needsBroadcast = (await Promise.all(
-    policy.map((token) => paymentTokenIsConfigured(context, registry, token.address)),
-  )).some((configured) => !configured);
+  const needsBroadcast = (
+    await Promise.all(policy.map((token) => paymentTokenIsConfigured(context, registry, token.address)))
+  ).some((configured) => !configured);
 
   let receipts: DeploymentTransaction[] = [];
   if (needsBroadcast) {
@@ -363,7 +370,11 @@ async function configurePaymentTokens(context: Context): Promise<void> {
   console.error(needsBroadcast ? "Payment tokens configured" : "Payment tokens already configured");
 }
 
-async function upgrade(context: Context, targets: readonly string[], variant: UpgradeVariant = "standard"): Promise<void> {
+async function upgrade(
+  context: Context,
+  targets: readonly string[],
+  variant: UpgradeVariant = "standard",
+): Promise<void> {
   if (variant === "calibnet-adapter" && context.network !== "calibnet") {
     throw new Error("CalibnetDataCapAdapter can only be deployed on calibnet");
   }
@@ -488,9 +499,10 @@ async function verifySources(context: Context): Promise<void> {
     root: context.root,
     rpcUrl: rpc(context),
     verifierUrl: config.verifierUrl,
-    confirmVerified: (target) => target.verifier === "blockscout"
-      ? confirmBlockscoutSource(config.verifierUrl, target)
-      : confirmSourcifySource(config.chainId, target),
+    confirmVerified: (target) =>
+      target.verifier === "blockscout"
+        ? confirmBlockscoutSource(config.verifierUrl, target)
+        : confirmSourcifySource(config.chainId, target),
     runForge: async (args) => {
       await runProcess(context.forge, args, {
         environment: context.environment,
@@ -509,7 +521,7 @@ async function verifyPublishedSources(context: Context): Promise<void> {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
       `deployment is finalized and published, but source verification failed: ${message}\n` +
-      `Retry with: just verify ${context.network}`,
+        `Retry with: just verify ${context.network}`,
       { cause: error },
     );
   }
@@ -641,9 +653,12 @@ async function finalizePreflight(context: Context): Promise<void> {
 }
 
 async function ensureChainId(context: Context): Promise<void> {
-  const actual = (await runProcess(context.cast, ["chain-id", "--rpc-url", rpc(context)], { signal: context.signal })).trim();
+  const actual = (
+    await runProcess(context.cast, ["chain-id", "--rpc-url", rpc(context)], { signal: context.signal })
+  ).trim();
   const expected = networkConfigs[context.network].chainId;
-  if (actual !== String(expected)) throw new Error(`${context.network} RPC chain ID must be ${expected}, got ${actual}`);
+  if (actual !== String(expected))
+    throw new Error(`${context.network} RPC chain ID must be ${expected}, got ${actual}`);
 }
 
 function confirmMainnet(context: Context): void {
@@ -692,7 +707,18 @@ async function buildContracts(context: Context, workspace: string): Promise<Buil
   const cacheDirectory = join(workspace, "cache");
   await runProcess(
     context.forge,
-    ["build", "--root", context.root, "--out", outputDirectory, "--cache-path", cacheDirectory, "--build-info", "--extra-output", "storageLayout"],
+    [
+      "build",
+      "--root",
+      context.root,
+      "--out",
+      outputDirectory,
+      "--cache-path",
+      cacheDirectory,
+      "--build-info",
+      "--extra-output",
+      "storageLayout",
+    ],
     { signal: context.signal, terminal: true },
   );
   const directory = join(outputDirectory, "build-info");
@@ -722,7 +748,12 @@ function newPendingDeploy(context: Context, previousHash: string | null, buildHa
   };
 }
 
-function newPendingUpgrade(context: Context, targets: readonly string[], sourceHash: string, buildHash: string): PendingUpgrade {
+function newPendingUpgrade(
+  context: Context,
+  targets: readonly string[],
+  sourceHash: string,
+  buildHash: string,
+): PendingUpgrade {
   return {
     status: "pending",
     operation: "upgrade",
@@ -776,9 +807,18 @@ async function runConfigurePaymentTokensScript(
   await runProcess(
     context.forge,
     [
-      "script", "script/ConfigurePaymentTokens.s.sol:ConfigurePaymentTokens", "--root", context.root,
-      "--broadcast", "--rpc-url", rpc(context), "--private-key", privateKey,
-      "--gas-estimate-multiplier", "100000", "--slow",
+      "script",
+      "script/ConfigurePaymentTokens.s.sol:ConfigurePaymentTokens",
+      "--root",
+      context.root,
+      "--broadcast",
+      "--rpc-url",
+      rpc(context),
+      "--private-key",
+      privateKey,
+      "--gas-estimate-multiplier",
+      "100000",
+      "--slow",
     ],
     {
       environment: {
@@ -868,10 +908,22 @@ async function runForgeScript(
   await runProcess(
     context.forge,
     [
-      "script", script, "--root", context.root,
-      "--out", build.outputDirectory, "--cache-path", build.cacheDirectory,
-      "--broadcast", "--rpc-url", rpc(context), "--private-key", privateKey,
-      "--gas-estimate-multiplier", "100000", "--slow",
+      "script",
+      script,
+      "--root",
+      context.root,
+      "--out",
+      build.outputDirectory,
+      "--cache-path",
+      build.cacheDirectory,
+      "--broadcast",
+      "--rpc-url",
+      rpc(context),
+      "--private-key",
+      privateKey,
+      "--gas-estimate-multiplier",
+      "100000",
+      "--slow",
     ],
     { environment, signal: context.signal, terminal: true },
   );
@@ -889,7 +941,8 @@ function recordDeploy(
   if (!broadcast || !existsSync(output)) return false;
   const parsed = parsePendingOperation(readFileSync(output, "utf8"));
   if (parsed.operation !== "deploy" || parsed.result === null) throw new Error("Forge deployment output is incomplete");
-  if (parsed.result.release.buildInfoSha256 !== build.hash) throw new Error("Forge deployment used unexpected build-info");
+  if (parsed.result.release.buildInfoSha256 !== build.hash)
+    throw new Error("Forge deployment used unexpected build-info");
   for (const [name, value] of Object.entries(dependencies)) {
     if (parsed.result.externalDependencies[name]?.toLowerCase() !== value.toLowerCase()) {
       throw new Error(`Forge deployment dependency ${name} is unexpected`);
@@ -994,7 +1047,9 @@ function recordUpgrade(
   const script = variant === "calibnet-adapter" ? "DeployCalibnetDataCapAdapter.s.sol" : "Upgrade.s.sol";
   const broadcast = findBroadcast(context, workspace, script);
   if (!broadcast || !existsSync(output)) return false;
-  const operations = parseUpgradeOperations(JSON.stringify((JSON.parse(readFileSync(output, "utf8")) as { operations: unknown }).operations));
+  const operations = parseUpgradeOperations(
+    JSON.stringify((JSON.parse(readFileSync(output, "utf8")) as { operations: unknown }).operations),
+  );
   validateOperations(expected.targets, operations, variant);
   const broadcastBytes = readFileSync(broadcast);
   const pending: PendingUpgrade = {
@@ -1006,7 +1061,12 @@ function recordUpgrade(
   return true;
 }
 
-function retainPendingEvidence(paths: Paths, buildInfo: Buffer, broadcast: Buffer, pending: PendingDeploy | PendingUpgrade): void {
+function retainPendingEvidence(
+  paths: Paths,
+  buildInfo: Buffer,
+  broadcast: Buffer,
+  pending: PendingDeploy | PendingUpgrade,
+): void {
   mkdirSync(paths.directory, { recursive: true });
   writeAtomicFile(paths.buildInfo, buildInfo);
   writeAtomicFile(paths.broadcast, broadcast);
@@ -1039,34 +1099,43 @@ function validateTargets(source: DeploymentManifest, targets: readonly string[])
   }
 }
 
-function validateCalibnetAdapterTarget(
-  source: DeploymentManifest,
-  targets: readonly string[],
-): void {
+function validateCalibnetAdapterTarget(source: DeploymentManifest, targets: readonly string[]): void {
   if (targets.length !== 1 || targets[0] !== "DataCapEvidenceAdapter") {
     throw new Error("CalibnetDataCapAdapter upgrade target is invalid");
   }
   const adapter = source.contracts.DataCapEvidenceAdapter;
-  if (adapter?.kind !== "uups" || adapter.proxy.toLowerCase() !== unsafeCalibnetAdapterProxy.toLowerCase()) {
-    throw new Error(`unsafe Calibnet adapter proxy must be ${unsafeCalibnetAdapterProxy}`);
+  const manager = source.contracts.AccessManager;
+  if (adapter?.kind !== "uups" || manager?.kind !== "standalone") {
+    throw new Error("CalibnetDataCapAdapter requires a fresh AccessManager deployment");
   }
 }
 
-async function validateStorage(context: Context, source: DeploymentManifest, build: Build, workspace: string): Promise<void> {
+async function validateStorage(
+  context: Context,
+  source: DeploymentManifest,
+  build: Build,
+  workspace: string,
+): Promise<void> {
   const previous = retainedBuildInfoPath(context, source.release.buildInfoSha256);
   authenticateBuildInfo(previous, source.release.buildInfoSha256);
   const current = join(workspace, "current-build-info.json.gz");
   writeAtomicFile(current, build.gzip);
   const targets = Object.entries(source.contracts)
-    .filter(([name, contract]) => contract.kind === "uups" || (name === "Validator" && contract.kind === "implementation"))
+    .filter(
+      ([name, contract]) => contract.kind === "uups" || (name === "Validator" && contract.kind === "implementation"),
+    )
     .map(([name]) => name);
   const args = ["--manifest", canonicalManifestPath(context)];
   for (const target of targets) args.push("--target", target);
   args.push(
-    "--reference-build-info", previous,
-    "--reference-sha256", source.release.buildInfoSha256,
-    "--current-build-info", current,
-    "--current-sha256", build.hash,
+    "--reference-build-info",
+    previous,
+    "--reference-sha256",
+    source.release.buildInfoSha256,
+    "--current-build-info",
+    current,
+    "--current-sha256",
+    build.hash,
   );
   const validator = context.environment.STORAGE_VALIDATOR ?? join(context.root, "script", "validate-storage-layout.sh");
   await runProcess(validator, args, { environment: context.environment, signal: context.signal, terminal: true });
@@ -1095,14 +1164,16 @@ function validateOperations(
 
 function readDeployPending(context: Context, paths: Paths): PendingDeploy {
   const pending = readPending(paths.pending);
-  if (pending.operation !== "deploy" || pending.network !== context.network) throw new Error("pending deployment does not match command");
+  if (pending.operation !== "deploy" || pending.network !== context.network)
+    throw new Error("pending deployment does not match command");
   if (!pending.result || !pending.broadcastSha256) throw new Error("pending deployment evidence is incomplete");
   return pending;
 }
 
 function readUpgradePending(context: Context, paths: Paths): PendingUpgrade {
   const pending = readPending(paths.pending);
-  if (pending.operation !== "upgrade" || pending.network !== context.network) throw new Error("pending upgrade does not match command");
+  if (pending.operation !== "upgrade" || pending.network !== context.network)
+    throw new Error("pending upgrade does not match command");
   if (pending.operations.length === 0 || !pending.broadcastSha256) {
     throw new Error("pending upgrade evidence is incomplete");
   }
@@ -1116,7 +1187,8 @@ function readPending(path: string): ReturnType<typeof parsePendingOperation> {
 
 function authenticateEvidence(paths: Paths, buildHash: string, broadcastHash: string | null): void {
   authenticateBuildInfo(paths.buildInfo, buildHash);
-  if (!broadcastHash || hashFile(paths.broadcast) !== broadcastHash) throw new Error("pending broadcast hash does not match");
+  if (!broadcastHash || hashFile(paths.broadcast) !== broadcastHash)
+    throw new Error("pending broadcast hash does not match");
 }
 
 function authenticateBuildInfo(path: string, expectedHash: string): Buffer {
@@ -1168,11 +1240,11 @@ function pruneBuildInfo(context: Context, retainedHash: string): void {
 function deploymentDependencies(context: Context): DeploymentDependencies {
   const suffix = networkConfigs[context.network].environmentSuffix;
   const dependencies: DeploymentDependencies = {
-    FilecoinPay: required(context, `FILECOIN_PAY_${suffix}`),
-    TerminationOracle: required(context, `TERMINATION_ORACLE_${suffix}`),
-    Oracle: required(context, `ORACLE_${suffix}`),
-    PoRepService: required(context, `POREP_SERVICE_${suffix}`),
-    MetaAllocator: required(context, `META_ALLOCATOR_${suffix}`),
+    FilecoinPay: requiredNonZeroAddress(context, `FILECOIN_PAY_${suffix}`),
+    TerminationOracle: requiredNonZeroAddress(context, `TERMINATION_ORACLE_${suffix}`),
+    Oracle: requiredNonZeroAddress(context, `ORACLE_${suffix}`),
+    PoRepService: requiredNonZeroAddress(context, `POREP_SERVICE_${suffix}`),
+    MetaAllocator: requiredNonZeroAddress(context, `META_ALLOCATOR_${suffix}`),
     Operator: required(context, `OPERATOR_ADDR_${suffix}`),
   };
   for (const token of paymentTokenPolicy(context)) dependencies[token.name] = token.address;
@@ -1192,22 +1264,24 @@ function spRegistryProxy(manifest: DeploymentManifest): string {
 }
 
 async function ensureTokenHasCode(context: Context, token: PaymentToken): Promise<void> {
-  const code = (await runProcess(
-    context.cast,
-    ["code", token.address, "--rpc-url", rpc(context)],
-    { signal: context.signal },
-  )).trim();
+  const code = (
+    await runProcess(context.cast, ["code", token.address, "--rpc-url", rpc(context)], { signal: context.signal })
+  ).trim();
   if (!/^0x(?:[0-9a-fA-F]{2})+$/.test(code)) {
     throw new Error(`${token.name} has no runtime bytecode at ${token.address}`);
   }
 }
 
 async function paymentTokenIsConfigured(context: Context, registry: string, token: string): Promise<boolean> {
-  const output = (await runProcess(
-    context.cast,
-    ["call", registry, "getPaymentTokenConfig(address)(bool,uint256)", token, "--rpc-url", rpc(context)],
-    { signal: context.signal },
-  )).trim().split(/\s+/);
+  const output = (
+    await runProcess(
+      context.cast,
+      ["call", registry, "getPaymentTokenConfig(address)(bool,uint256)", token, "--rpc-url", rpc(context)],
+      { signal: context.signal },
+    )
+  )
+    .trim()
+    .split(/\s+/);
   if (output.length !== 2 || !["true", "false"].includes(output[0]!) || !/^\d+$/.test(output[1]!)) {
     throw new Error(`SPRegistry returned an invalid payment-token configuration for ${token}`);
   }
@@ -1217,6 +1291,14 @@ async function paymentTokenIsConfigured(context: Context, registry: string, toke
 function required(context: Context, name: string): string {
   const value = context.environment[name];
   if (!value) throw new Error(`required environment variable is unset for ${context.network}: ${name}`);
+  return value;
+}
+
+function requiredNonZeroAddress(context: Context, name: string): string {
+  const value = required(context, name);
+  if (!/^0x[0-9a-fA-F]{40}$/.test(value) || value.toLowerCase() === zeroAddress) {
+    throw new Error(`required environment variable must be a non-zero address for ${context.network}: ${name}`);
+  }
   return value;
 }
 
@@ -1279,7 +1361,11 @@ export async function runProcess(
       }
       if (code !== 0) {
         const details = Buffer.concat(stderr).toString("utf8").trim();
-        reject(new Error(`${command} exited with code ${code ?? "unknown"}${signal ? ` (${signal})` : ""}${details ? `: ${details}` : ""}`));
+        reject(
+          new Error(
+            `${command} exited with code ${code ?? "unknown"}${signal ? ` (${signal})` : ""}${details ? `: ${details}` : ""}`,
+          ),
+        );
         return;
       }
       resolve(Buffer.concat(stdout).toString("utf8"));

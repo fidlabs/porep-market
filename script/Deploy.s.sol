@@ -15,9 +15,16 @@ import {PoRepMarketClaimInspector} from "../src/helpers/PoRepMarketClaimInspecto
 import {PoRepMarketSectorStatusInspector} from "../src/helpers/PoRepMarketSectorStatusInspector.sol";
 import {PoRepMarketViewHelper} from "../src/helpers/PoRepMarketViewHelper.sol";
 import {console} from "forge-std/console.sol";
+import {AccessManager} from "../src/AccessManager.sol";
+import {Roles} from "../src/lib/Roles.sol";
 
 contract Deploy is DeployUtils {
     using stdJson for string;
+
+    /**
+     * @dev 0x1da2bad3
+     */
+    error InvalidDeploymentAddress(string name);
 
     address internal poRepMarket;
     address internal validatorFactory;
@@ -27,6 +34,7 @@ contract Deploy is DeployUtils {
     address internal claimInspector;
     address internal sectorStatusInspector;
     address internal viewHelper;
+    address internal accessManager;
 
     address internal poRepMarketImpl;
     address internal validatorFactoryImpl;
@@ -62,30 +70,33 @@ contract Deploy is DeployUtils {
         metaAllocator = vm.envAddress("META_ALLOCATOR");
         usdfc = vm.envOr("USDFC", address(0));
         axlUsdc = vm.envOr("AXL_USDC", address(0));
+        _ensureDeploymentAddress(terminationOracle, "TERMINATION_ORACLE");
+        _ensureDeploymentAddress(oracleAddress, "ORACLE");
+        _ensureDeploymentAddress(poRepService, "POREP_SERVICE");
 
         vm.startBroadcast(admin);
 
-        (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(admin);
-        (spRegistry, spRegistryImpl) = _deploySPRegistry(admin);
+        accessManager = address(new AccessManager(admin, admin));
+        (validatorFactory, validatorFactoryImpl, validatorImpl) = _deployValidatorFactory(accessManager);
+        (spRegistry, spRegistryImpl) = _deploySPRegistry(accessManager);
         (dataCapEvidenceAdapter, dataCapEvidenceAdapterImpl) = _deployDataCapEvidenceAdapter();
-        (sliOracle, sliOracleImpl) = _deploySLIOracle(admin, oracleAddress);
-        (sliScorer, sliScorerImpl) = _deploySliScorer(admin, sliOracle);
-        (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(admin, validatorFactory, spRegistry, sliScorer);
-        DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(admin, terminationOracle, poRepMarket, metaAllocator);
+        (sliOracle, sliOracleImpl) = _deploySLIOracle(accessManager);
+        (sliScorer, sliScorerImpl) = _deploySliScorer(accessManager, sliOracle);
+        (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(accessManager, validatorFactory, spRegistry, sliScorer);
+        DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(accessManager, poRepMarket, metaAllocator);
         claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
         sectorStatusInspector = address(new PoRepMarketSectorStatusInspector(poRepMarket));
         viewHelper = address(new PoRepMarketViewHelper(poRepMarket));
 
         validatorBeacon = ValidatorFactory(validatorFactory).getBeacon();
 
-        PoRepMarket(poRepMarket).grantRole(PoRepMarket(poRepMarket).POREP_SERVICE_ROLE(), poRepService);
+        _configureRoles();
         ValidatorFactory(validatorFactory).initialize2(filecoinPay, poRepMarket);
-        SPRegistry(spRegistry).initialize2(poRepMarket);
         _configurePaymentToken(usdfc);
         _configurePaymentToken(axlUsdc);
 
         if (operatorAddress != address(0)) {
-            SPRegistry(spRegistry).grantRole(SPRegistry(spRegistry).OPERATOR_ROLE(), operatorAddress);
+            AccessManager(accessManager).grantRole(Roles.OPERATOR_ROLE, operatorAddress);
         } else {
             // solhint-disable-next-line gas-small-strings
             console.log("WARNING: OPERATOR_ADDR not set, skipping operator role grant");
@@ -100,25 +111,39 @@ contract Deploy is DeployUtils {
         if (token != address(0)) SPRegistry(spRegistry).setPaymentToken(token, true, 1);
     }
 
-    function _deployValidatorFactory(address _admin)
+    function _configureRoles() private {
+        AccessManager manager = AccessManager(accessManager);
+        manager.grantRole(Roles.POREP_SERVICE_ROLE, poRepService);
+        manager.grantRole(Roles.ORACLE_ROLE, oracleAddress);
+        manager.grantRole(Roles.TERMINATION_ORACLE, terminationOracle);
+        manager.grantRole(Roles.MARKET_ROLE, poRepMarket);
+    }
+
+    function _ensureDeploymentAddress(address account, string memory name) private pure {
+        if (account == address(0)) revert InvalidDeploymentAddress(name);
+    }
+
+    function _deployValidatorFactory(address _accessManager)
         internal
         returns (address proxy, address factoryImpl, address valImpl)
     {
         Validator _validatorImpl = new Validator();
         ValidatorFactory _impl = new ValidatorFactory();
-        bytes memory init = abi.encodeCall(ValidatorFactory.initialize, (_admin, address(_validatorImpl)));
+        bytes memory init = abi.encodeCall(ValidatorFactory.initialize, (_accessManager, address(_validatorImpl)));
         proxy = createProxy(init, address(_impl));
         factoryImpl = address(_impl);
         valImpl = address(_validatorImpl);
     }
 
-    function _deployPoRepMarket(address _admin, address _validatorFactory, address _spRegistry, address _sliScorer)
-        internal
-        returns (address proxy, address impl)
-    {
+    function _deployPoRepMarket(
+        address _accessManager,
+        address _validatorFactory,
+        address _spRegistry,
+        address _sliScorer
+    ) internal returns (address proxy, address impl) {
         PoRepMarket _impl = new PoRepMarket();
         bytes memory init = abi.encodeCall(
-            PoRepMarket.initialize, (_admin, _validatorFactory, _spRegistry, dataCapEvidenceAdapter, _sliScorer)
+            PoRepMarket.initialize, (_accessManager, _validatorFactory, _spRegistry, dataCapEvidenceAdapter, _sliScorer)
         );
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
@@ -130,23 +155,26 @@ contract Deploy is DeployUtils {
         impl = address(_impl);
     }
 
-    function _deploySLIOracle(address _admin, address _oracleAddress) internal returns (address proxy, address impl) {
+    function _deploySLIOracle(address _accessManager) internal returns (address proxy, address impl) {
         SLIOracle _impl = new SLIOracle();
-        bytes memory init = abi.encodeCall(SLIOracle.initialize, (_admin, _oracleAddress));
+        bytes memory init = abi.encodeCall(SLIOracle.initialize, (_accessManager));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
 
-    function _deploySliScorer(address _admin, address _sliOracle) internal returns (address proxy, address impl) {
+    function _deploySliScorer(address _accessManager, address _sliOracle)
+        internal
+        returns (address proxy, address impl)
+    {
         SLIScorer _impl = new SLIScorer();
-        bytes memory init = abi.encodeCall(SLIScorer.initialize, (_admin, SLIOracle(_sliOracle)));
+        bytes memory init = abi.encodeCall(SLIScorer.initialize, (_accessManager, SLIOracle(_sliOracle)));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
 
-    function _deploySPRegistry(address _admin) internal returns (address proxy, address impl) {
+    function _deploySPRegistry(address _accessManager) internal returns (address proxy, address impl) {
         SPRegistry _impl = new SPRegistry();
-        bytes memory init = abi.encodeCall(SPRegistry.initialize, (_admin));
+        bytes memory init = abi.encodeCall(SPRegistry.initialize, (_accessManager));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }
@@ -167,6 +195,7 @@ contract Deploy is DeployUtils {
 
     function _serializeContracts() private returns (string memory) {
         string memory json = "pendingContracts";
+        json.serialize("AccessManager", _serializeAccessManager());
         json.serialize(
             "PoRepMarket",
             _serializeUupsContract(
@@ -230,6 +259,14 @@ contract Deploy is DeployUtils {
         json.serialize("artifact", string("src/Validator.sol:Validator"));
         json.serialize("implementation", validatorImpl);
         return json.serialize("implementationCodeHash", validatorImpl.codehash);
+    }
+
+    function _serializeAccessManager() private returns (string memory) {
+        string memory json = "pendingAccessManager";
+        json.serialize("kind", string("standalone"));
+        json.serialize("artifact", string("src/AccessManager.sol:AccessManager"));
+        json.serialize("implementation", accessManager);
+        return json.serialize("implementationCodeHash", accessManager.codehash);
     }
 
     function _serializeClaimInspector() private returns (string memory) {

@@ -3,9 +3,8 @@
 
 pragma solidity =0.8.30;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IValidatorFactory} from "./interfaces/IValidatorFactory.sol";
@@ -24,23 +23,16 @@ import {SettlementResult} from "./types/SettlementResult.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {Math} from "@openzeppelin/contracts/utils/math/Math.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 
 /**
  * @title PoRepMarket contract
  * @dev PoRepMarket contract is a contract that allows users to create and manage PoRep deals
  * @notice PoRepMarket contract
  */
-contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable, IPoRepMarket {
+contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMarket {
     using EnumerableSet for EnumerableSet.UintSet;
-    /**
-     * @notice role to manage contract upgrades
-     */
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-
-    /**
-     * @notice role to manage PoRep service operations
-     */
-    bytes32 public constant POREP_SERVICE_ROLE = keccak256("POREP_SERVICE_ROLE");
 
     /**
      * @notice Number of epochs in one month
@@ -484,14 +476,14 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
 
     /**
      * @notice Initializes the contract
-     * @param _admin The address of the admin
+     * @param _accessManager The protocol AccessManager address
      * @param _validatorFactory The address of the validator registry
      * @param _spRegistry The address of the SP registry
      * @param _globalEvidenceAdapter The address of the default evidence adapter
      * @param _SLIScorer The address of the SLI scorer
      */
     function initialize(
-        address _admin,
+        address _accessManager,
         address _validatorFactory,
         address _spRegistry,
         address _globalEvidenceAdapter,
@@ -502,10 +494,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         }
         if (_SLIScorer == address(0)) revert InvalidSLIScorerAddress();
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(UPGRADER_ROLE, _admin);
-        _grantRole(POREP_SERVICE_ROLE, _admin);
+        __AccessControlled_init(_accessManager);
 
         PoRepMarketStorage storage $ = s();
         $._validatorFactoryContract = IValidatorFactory(_validatorFactory);
@@ -518,7 +507,11 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /// @inheritdoc IPoRepMarket
-    function setGlobalEvidenceAdapter(address _globalEvidenceAdapter) public override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setGlobalEvidenceAdapter(address _globalEvidenceAdapter)
+        public
+        override
+        onlyRole(Roles.DEFAULT_ADMIN_ROLE)
+    {
         if (_globalEvidenceAdapter == address(0)) {
             revert InvalidEvidenceAdapterAddress();
         }
@@ -549,7 +542,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     function proposeDealWithSpecificOffer(uint256 offerId, SharedTypes.DealRequest calldata request)
         external
         override
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyRole(Roles.DEFAULT_ADMIN_ROLE)
     {
         PoRepMarketStorage storage $ = s();
         _ensureValidProposalRequest(request);
@@ -958,7 +951,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev Only callable by the admin
      * @param dealId The id of the deal
      */
-    function rejectAcceptedDeal(uint256 dealId) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function rejectAcceptedDeal(uint256 dealId) external override onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
 
@@ -1166,7 +1159,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         string calldata newManifestLocation,
         uint256 newRequestedSizeBytes,
         bytes32 newManifestHash
-    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+    ) external override onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         PoRepMarketStorage storage $ = s();
         PoRepTypes.Deal storage deal = $._deals[dealId];
         _ensureDealExists(deal);
@@ -1223,7 +1216,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Updates the deal activation padding
      * @param padding The new padding value
      */
-    function setDealActivationPadding(uint256 padding) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setDealActivationPadding(uint256 padding) external onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         if (padding > MAX_DEAL_ACTIVATION_PADDING) {
             revert DealActivationPaddingTooHigh(padding, MAX_DEAL_ACTIVATION_PADDING);
         }
@@ -1250,7 +1243,10 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param dealId The deal being configured
      * @param minEpochs Minimum time between settlements in epochs
      */
-    function setMinEpochsBetweenSettlements(uint256 dealId, uint256 minEpochs) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function setMinEpochsBetweenSettlements(uint256 dealId, uint256 minEpochs)
+        external
+        onlyRole(Roles.DEFAULT_ADMIN_ROLE)
+    {
         if (minEpochs == 0) {
             revert InvalidMinEpochsBetweenSettlements();
         }
@@ -1426,9 +1422,9 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Ensures caller has admin or PoRep service role
      */
     function _ensurePoRepServiceOrAdmin() internal view {
-        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(POREP_SERVICE_ROLE, msg.sender)) {
-            revert AccessControlUnauthorizedAccount(msg.sender, POREP_SERVICE_ROLE);
-        }
+        if (_hasRole(Roles.POREP_SERVICE_ROLE, msg.sender)) return;
+        if (_hasRole(Roles.DEFAULT_ADMIN_ROLE, msg.sender)) return;
+        revert IAccessControl.AccessControlUnauthorizedAccount(msg.sender, Roles.POREP_SERVICE_ROLE);
     }
 
     /**
@@ -1571,5 +1567,5 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @notice Authorizes an upgrade
      * @param newImplementation The address of the new implementation
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 }
