@@ -26,8 +26,6 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlle
         address _filecoinPay;
         address _poRepMarket;
         address _beacon;
-        address _admin;
-        address _upgraderRole;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.ValidatorFactoryStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -98,7 +96,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlle
 
     /**
      * @notice Initializes the contract
-     * @dev Initializes the contract by setting a default admin role and a UUPS upgradeable role
+     * @dev Sets the shared AccessManager and creates a Validator beacon owned by it
      * @param _accessManager Protocol AccessManager address
      * @param implementation The address of the implementation contract
      */
@@ -115,7 +113,7 @@ contract ValidatorFactory is IValidatorFactory, UUPSUpgradeable, AccessControlle
 
     /**
      * @notice Initializes the contract with the PoRepMarket, and FilecoinPay addresses
-     * @dev This function is called after the contract is initialized with the admin and implementation addresses
+     * @dev Called after initialization with the AccessManager and implementation addresses
      * @param _filecoinPay The address of the FilecoinPay contract
      * @param _poRepMarket The address of the PoRepMarket contract
      */
