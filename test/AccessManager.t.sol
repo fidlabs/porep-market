@@ -47,6 +47,28 @@ contract MalformedManager {
     }
 }
 
+contract RawReturnManager {
+    uint256 private immutable RETURN_SIZE;
+    uint256 private immutable RETURN_VALUE;
+
+    constructor(uint256 size, uint256 value) {
+        RETURN_SIZE = size;
+        RETURN_VALUE = value;
+    }
+
+    // solhint-disable-next-line no-complex-fallback
+    fallback() external {
+        uint256 size = RETURN_SIZE;
+        uint256 value = RETURN_VALUE;
+        assembly ("memory-safe") {
+            let pointer := mload(0x40)
+            mstore(pointer, value)
+            mstore(add(pointer, 0x20), 0)
+            return(pointer, size)
+        }
+    }
+}
+
 contract BeaconImplementationV1 {}
 
 contract BeaconImplementationV2 {}
@@ -204,6 +226,27 @@ contract AccessManagerTest is Test {
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), adminRole)
         );
         malformedTarget.adminOnly();
+    }
+
+    function testManagerReturnDataMustBeExactlyOneAbiBoolean() public {
+        uint256[8] memory sizes = [uint256(0), 1, 31, 32, 33, 64, 32, 32];
+        uint256[8] memory values = [uint256(1), 1, 1, 2, 1, 1, 0, type(uint256).max];
+        for (uint256 i; i < sizes.length; ++i) {
+            AccessControlledHarness malformedTarget = new AccessControlledHarness();
+            malformedTarget.initialize(address(new RawReturnManager(sizes[i], values[i])));
+            assertFalse(malformedTarget.hasManagedRole(bytes32(0), admin));
+            vm.prank(admin);
+            vm.expectRevert(
+                abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, admin, bytes32(0))
+            );
+            malformedTarget.adminOnly();
+        }
+
+        AccessControlledHarness validTarget = new AccessControlledHarness();
+        validTarget.initialize(address(new RawReturnManager(32, 1)));
+        assertTrue(validTarget.hasManagedRole(bytes32(0), admin));
+        vm.prank(admin);
+        validTarget.adminOnly();
     }
 
     function testTargetsDoNotExposeLocalRoleAdministration() public {
