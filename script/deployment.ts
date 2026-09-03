@@ -1104,6 +1104,9 @@ function findBroadcast(context: Context, workspace: string, script: string): str
 
 function validateTargets(source: DeploymentManifest, targets: readonly string[]): void {
   if (source.status !== "finalized") throw new Error("canonical manifest must be finalized before upgrade");
+  if (source.contracts.AccessManager?.kind !== "standalone") {
+    throw new Error("V2 upgrades require a fresh AccessManager deployment");
+  }
   if (new Set(targets).size !== targets.length) throw new Error("upgrade targets contain duplicates");
   for (const target of targets) {
     const definition = upgradeTargets[target];

@@ -267,6 +267,31 @@ test("checks live mainnet state without write confirmation or a clean manifest",
   }
 });
 
+test("rejects standard upgrades from manager-less legacy manifests before Forge runs", () => {
+  const directory = temporaryDirectory();
+  try {
+    const cast = executable(directory, "cast", "process.stdout.write('31415926')");
+    const git = executable(directory, "git", "");
+    const marker = join(directory, "forge-ran");
+    const forge = executable(directory, "forge", `require('node:fs').writeFileSync(${JSON.stringify(marker)}, '')`);
+    const deploymentDirectory = join(directory, "deployments", "devnet");
+    mkdirSync(deploymentDirectory, { recursive: true });
+    writeFileSync(join(deploymentDirectory, "latest.json"), readFileSync("deployments/mainnet/latest.json"));
+
+    const result = run(["upgrade", "devnet", "PoRepMarket"], {
+      ...environment(directory),
+      CAST_BIN: cast,
+      GIT_BIN: git,
+      FORGE_BIN: forge,
+    });
+
+    assert.match(result.stderr, /V2 upgrades require a fresh AccessManager deployment/);
+    assert.equal(existsSync(marker), false);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("verifies every deployed Calibnet address idempotently", async () => {
   const manifest = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
   const calls: string[][] = [];
