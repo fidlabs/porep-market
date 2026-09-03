@@ -1506,6 +1506,11 @@
         "name": "newRequestedSizeBytes",
         "type": "uint256",
         "internalType": "uint256"
+      },
+      {
+        "name": "newManifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -1853,6 +1858,18 @@
         "type": "uint256",
         "indexed": false,
         "internalType": "uint256"
+      },
+      {
+        "name": "oldManifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newManifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -2309,7 +2326,7 @@
   },
   {
     "type": "error",
-    "name": "ManifestUpdateNotAllowedAfterAllocation",
+    "name": "ManifestUpdateNotAllowedAfterEvidence",
     "inputs": []
   },
   {

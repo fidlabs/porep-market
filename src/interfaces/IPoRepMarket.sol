@@ -176,14 +176,21 @@ interface IPoRepMarket {
     function rejectAcceptedDeal(uint256 dealId) external;
 
     /**
-     * @notice Updates the manifest location and requested size for a specific deal
-     * @dev Only callable by the admin
+     * @notice Replaces an accepted deal's manifest and resizes its provider reservation
+     * @dev Only callable by the admin before any evidence has been submitted.
+     * Keeps the selected provider and payment terms; rejects an ineligible size or assigned manifest.
+     * Provider tooling must stop queued work for the old manifest before replacement.
      * @param dealId The unique identifier of the deal
      * @param newManifestLocation The new manifest location URL to be updated for the deal
      * @param newRequestedSizeBytes The new requested size in bytes read from the updated manifest
+     * @param newManifestHash The replacement piece-set commitment, including the new piece list and total size
      */
-    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation, uint256 newRequestedSizeBytes)
-        external;
+    function updateManifestLocation(
+        uint256 dealId,
+        string calldata newManifestLocation,
+        uint256 newRequestedSizeBytes,
+        bytes32 newManifestHash
+    ) external;
 
     /**
      * @notice Updates the deal activation padding

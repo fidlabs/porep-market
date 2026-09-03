@@ -5,6 +5,9 @@ pragma solidity =0.8.30;
 import {Test} from "lib/forge-std/src/Test.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {SPRegistryMock} from "./contracts/SPRegistryMock.sol";
+import {SPRegistry} from "../src/SPRegistry.sol";
+import {StorageEvidenceAdapterMock} from "./contracts/StorageEvidenceAdapterMock.sol";
+import {OfferMatch} from "../src/types/OfferMatch.sol";
 import {ValidatorFactoryMock} from "./contracts/ValidatorFactoryMock.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
@@ -1371,7 +1374,7 @@ contract PoRepMarketTest is Test {
 
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.EmptyManifestLocation.selector, ""));
-        poRepMarket.updateManifestLocation(dealId, "", totalDealSize);
+        poRepMarket.updateManifestLocation(dealId, "", totalDealSize, defaultManifestHash);
     }
 
     function testProposeDealRevertsWhenDealDurationIsBelowMinimum() public {
@@ -1416,10 +1419,20 @@ contract PoRepMarketTest is Test {
         string memory updatedManifestLocation = "updatedManifestLocation";
         uint256 updatedRequestedSizeBytes = totalDealSize * 2;
         vm.prank(adminAddress);
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, updatedRequestedSizeBytes);
+        poRepMarket.updateManifestLocation(
+            dealId, updatedManifestLocation, updatedRequestedSizeBytes, keccak256("replacement-manifest")
+        );
         data = poRepMarket.getDealData(dealId);
         assertEq(data.manifestLocation, updatedManifestLocation);
         assertEq(poRepMarket.getDealTerms(dealId).requestedSizeBytes, updatedRequestedSizeBytes);
+        assertEq(data.manifestHash, keccak256("replacement-manifest"));
+        assertEq(poRepMarket.getDealCapacity(dealId).reservedBytes, updatedRequestedSizeBytes);
+        assertEq(spRegistry.lastUpdatedOfferId(), selectedOfferId);
+        assertEq(spRegistry.lastUpdatedClient(), clientAddress);
+        assertEq(spRegistry.lastUpdatedOldManifestHash(), defaultManifestHash);
+        assertEq(spRegistry.lastUpdatedNewManifestHash(), keccak256("replacement-manifest"));
+        assertEq(spRegistry.lastUpdatedOldSizeBytes(), totalDealSize);
+        assertEq(spRegistry.lastUpdatedNewSizeBytes(), updatedRequestedSizeBytes);
     }
 
     function testManifestLocationUpdateEmitsEvent() public {
@@ -1430,9 +1443,195 @@ contract PoRepMarketTest is Test {
         vm.prank(adminAddress);
         vm.expectEmit(true, true, true, true);
         emit PoRepMarket.ManifestUpdated(
-            dealId, expectedManifestLocation, updatedManifestLocation, totalDealSize, updatedRequestedSizeBytes
+            dealId,
+            expectedManifestLocation,
+            updatedManifestLocation,
+            totalDealSize,
+            updatedRequestedSizeBytes,
+            defaultManifestHash,
+            defaultManifestHash
         );
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, updatedRequestedSizeBytes);
+        poRepMarket.updateManifestLocation(
+            dealId, updatedManifestLocation, updatedRequestedSizeBytes, defaultManifestHash
+        );
+    }
+
+    function testManifestReplacementUsesGenericAdapterAndRejectsSubmittedEvidence() public {
+        StorageEvidenceAdapterMock adapter = new StorageEvidenceAdapterMock();
+        vm.prank(adminAddress);
+        poRepMarket.setGlobalEvidenceAdapter(address(adapter));
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        // The generic adapter intentionally has no DataCap getter.
+        vm.prank(adminAddress);
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize, keccak256("new-pieces"));
+        assertEq(poRepMarket.getDealData(dealId).manifestHash, keccak256("new-pieces"));
+
+        vm.prank(adminAddress);
+        poRepMarket.setGlobalEvidenceAdapter(address(dataCapEvidenceAdapterAddress));
+        adapter.markEvidenceSubmitted(dealId);
+        vm.prank(adminAddress);
+        vm.expectRevert(PoRepMarket.ManifestUpdateNotAllowedAfterEvidence.selector);
+        poRepMarket.updateManifestLocation(dealId, "another", totalDealSize, defaultManifestHash);
+        assertEq(poRepMarket.getDealData(dealId).manifestHash, keccak256("new-pieces"));
+    }
+
+    function testManifestReplacementRejectsZeroHashAndUnknownDeal() public {
+        vm.prank(adminAddress);
+        vm.expectRevert(PoRepMarket.DealDoesNotExist.selector);
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize, defaultManifestHash);
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        vm.prank(adminAddress);
+        vm.expectRevert(PoRepMarket.InvalidManifestHash.selector);
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize, bytes32(0));
+    }
+
+    function testManifestReplacementRejectsEveryNonAcceptedStateWithoutEvidence() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        uint8[6] memory states = [
+            DealState.PROPOSED,
+            DealState.ACTIVE,
+            DealState.FINALIZED,
+            DealState.REJECTED,
+            DealState.EXPIRED,
+            DealState.EARLY_TERMINATED
+        ];
+        for (uint256 i; i < states.length; ++i) {
+            PoRepMarketContractMock(address(poRepMarket)).setDealState(dealId, states[i]);
+            vm.prank(adminAddress);
+            vm.expectRevert(
+                abi.encodeWithSelector(
+                    PoRepMarket.DealNotInExpectedState.selector, dealId, states[i], DealState.ACCEPTED
+                )
+            );
+            poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize, defaultManifestHash);
+        }
+    }
+
+    function _useRealRegistryForManifestReplacement() internal returns (SPRegistry registry) {
+        registry = SPRegistry(
+            address(new ERC1967Proxy(address(new SPRegistry()), abi.encodeCall(SPRegistry.initialize, (adminAddress))))
+        );
+        poRepMarket = PoRepMarket(
+            address(
+                new ERC1967Proxy(
+                    address(new PoRepMarketContractMock()),
+                    abi.encodeCall(
+                        PoRepMarket.initialize,
+                        (
+                            adminAddress,
+                            address(validatorFactory),
+                            address(registry),
+                            address(dataCapEvidenceAdapterAddress),
+                            address(sliScorer)
+                        )
+                    )
+                )
+            )
+        );
+        vm.startPrank(adminAddress);
+        registry.initialize2(address(poRepMarket));
+        registry.registerProviderFor(providerFilActorId, providerOwnerAddress, totalDealSize * 3, paymentPayee);
+        registry.setPaymentToken(paymentToken, true, MIN_PRICE_PER_SECTOR_PER_MONTH);
+        SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](1);
+        rows[0] = SharedTypes.OfferPaymentInput({
+            token: paymentToken, active: true, pricePer32GiBPerMonth: MIN_PRICE_PER_SECTOR_PER_MONTH
+        });
+        selectedOfferId = registry.createOffer(
+            providerFilActorId,
+            SharedTypes.OfferTerms({
+                minSizeBytes: totalDealSize / 2,
+                maxSizeBytes: totalDealSize * 2,
+                minDurationEpochs: 0,
+                maxDurationEpochs: 0
+            }),
+            defaultRequirements,
+            rows
+        );
+        vm.stopPrank();
+    }
+
+    function testManifestReplacementResizesRealReservationAndMovesAssignment() public {
+        SPRegistry registry = _useRealRegistryForManifestReplacement();
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.startPrank(clientAddress);
+        poRepMarket.proposeDeal(request);
+        request.manifestHash = keccak256("other-deal");
+        poRepMarket.proposeDeal(request);
+        vm.stopPrank();
+        PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
+        bytes32 replacement = keccak256("replacement-pieces");
+        vm.prank(adminAddress);
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize * 2, replacement);
+        assertEq(registry.getProviderView(providerFilActorId).pendingBytes, totalDealSize * 3);
+        assertEq(poRepMarket.getDealCapacity(dealId).reservedBytes, totalDealSize * 2);
+        assertEq(poRepMarket.getDealTerms(dealId).requestedSizeBytes, totalDealSize * 2);
+        assertEq(abi.encode(poRepMarket.getDealPayment(dealId)), abi.encode(payment));
+
+        request.manifestHash = replacement;
+        (, uint16 reason) = registry.previewOfferForDeal(selectedOfferId, clientAddress, request);
+        assertEq(reason, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
+        vm.prank(adminAddress);
+        poRepMarket.updateManifestLocation(dealId, "smaller", totalDealSize / 2, replacement);
+        assertEq(registry.getProviderView(providerFilActorId).pendingBytes, totalDealSize * 3 / 2);
+        assertEq(poRepMarket.getDealCapacity(dealId).reservedBytes, totalDealSize / 2);
+        request.manifestHash = defaultManifestHash;
+        (, reason) = registry.previewOfferForDeal(selectedOfferId, clientAddress, request);
+        assertEq(reason, OfferMatch.OK);
+
+        vm.prank(adminAddress);
+        poRepMarket.rejectAcceptedDeal(dealId);
+        assertEq(registry.getProviderView(providerFilActorId).pendingBytes, totalDealSize);
+        request.manifestHash = replacement;
+        (, reason) = registry.previewOfferForDeal(selectedOfferId, clientAddress, request);
+        assertEq(reason, OfferMatch.OK);
+    }
+
+    function testManifestReplacementRollsBackForCapacityBoundsAndAssignedHash() public {
+        SPRegistry registry = _useRealRegistryForManifestReplacement();
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+        vm.startPrank(clientAddress);
+        poRepMarket.proposeDeal(request);
+        request.manifestHash = keccak256("other-deal");
+        request.requestedSizeBytes = totalDealSize * 2;
+        poRepMarket.proposeDeal(request);
+        vm.stopPrank();
+
+        vm.startPrank(adminAddress);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.OfferNotEligible.selector, selectedOfferId, OfferMatch.INSUFFICIENT_CAPACITY
+            )
+        );
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize * 2, keccak256("new"));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, selectedOfferId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize / 4, keccak256("new"));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, selectedOfferId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize * 3, keccak256("new"));
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.OfferNotEligible.selector, selectedOfferId, OfferMatch.MANIFEST_ALREADY_ASSIGNED
+            )
+        );
+        poRepMarket.updateManifestLocation(dealId, "replacement", totalDealSize, request.manifestHash);
+        vm.stopPrank();
+
+        assertEq(poRepMarket.getDealData(dealId).manifestLocation, expectedManifestLocation);
+        assertEq(poRepMarket.getDealData(dealId).manifestHash, defaultManifestHash);
+        assertEq(poRepMarket.getDealTerms(dealId).requestedSizeBytes, totalDealSize);
+        assertEq(poRepMarket.getDealCapacity(dealId).reservedBytes, totalDealSize);
+        assertEq(registry.getProviderView(providerFilActorId).pendingBytes, totalDealSize * 3);
+        request.manifestHash = defaultManifestHash;
+        (, uint16 reason) = registry.previewOfferForDeal(selectedOfferId, clientAddress, request);
+        assertEq(reason, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
     }
 
     function testManifestLocationUpdateRevertsTooLongManifestLocation() public {
@@ -1441,7 +1640,7 @@ contract PoRepMarketTest is Test {
         string memory updatedManifestLocation = TestUtils.generateLongString(2049);
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.TooLongManifestLocation.selector, updatedManifestLocation));
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize, defaultManifestHash);
     }
 
     function testProposeDealRevertsTooLongManifestLocation() public {
@@ -2452,7 +2651,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(clientAddress);
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize, defaultManifestHash);
     }
 
     function testManifestLocationUpdateRevertsInvalidDealSize() public {
@@ -2461,7 +2660,7 @@ contract PoRepMarketTest is Test {
         string memory updatedManifestLocation = "updatedManifestLocation";
         vm.prank(adminAddress);
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidDealSize.selector));
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, 0);
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, 0, defaultManifestHash);
     }
 
     function testManifestLocationUpdateRevertsWhenDataCapAlreadyAllocated() public {
@@ -2471,8 +2670,8 @@ contract PoRepMarketTest is Test {
         dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, allocatedBytes));
         string memory updatedManifestLocation = "updatedManifestLocation";
         vm.prank(adminAddress);
-        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ManifestUpdateNotAllowedAfterAllocation.selector));
-        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize * 2);
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarket.ManifestUpdateNotAllowedAfterEvidence.selector));
+        poRepMarket.updateManifestLocation(dealId, updatedManifestLocation, totalDealSize * 2, defaultManifestHash);
     }
 
     function testActivateEvidenceRevertsWhenRailStatusNotPrepared() public {
