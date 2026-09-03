@@ -249,6 +249,17 @@ contract AccessManagerTest is Test {
         validTarget.adminOnly();
     }
 
+    function testShortManagerResponseCannotReuseCalldataAsTrue() public {
+        // A 31-byte return leaves the final byte of the output buffer unchanged from the role calldata.
+        bytes32 role = bytes32(uint256(1) << 32);
+        AccessControlledHarness shortTarget = new AccessControlledHarness();
+        shortTarget.initialize(address(new RawReturnManager(31, 0)));
+        assertFalse(shortTarget.hasManagedRole(role, admin));
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, admin, role));
+        shortTarget.checkRole(role);
+    }
+
     function testTargetsDoNotExposeLocalRoleAdministration() public {
         (bool grantSuccess,) =
             address(target).call(abi.encodeWithSignature("grantRole(bytes32,address)", manager.ORACLE_ROLE(), newAdmin));
