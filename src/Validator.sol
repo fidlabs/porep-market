@@ -11,6 +11,7 @@ import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 
 import {IFilecoinPayV1} from "./interfaces/IFilecoinPayV1.sol";
 import {IFilecoinPayValidator} from "./interfaces/IFilecoinPayValidator.sol";
+import {IFilecoinServiceMetadata} from "./interfaces/IFilecoinServiceMetadata.sol";
 import {IPoRepMarket} from "./interfaces/IPoRepMarket.sol";
 import {IValidator} from "./interfaces/IValidator.sol";
 import {Operator} from "./abstracts/Operator.sol";
@@ -23,7 +24,14 @@ import {RailStatus} from "./types/RailStatus.sol";
  * @dev Implements validator and operator logic for managing Filecoin Pay rails
  * @notice Validator contract for Filecoin Pay
  */
-contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValidator, IValidator, Operator {
+contract Validator is
+    Initializable,
+    AccessControlUpgradeable,
+    IFilecoinPayValidator,
+    IFilecoinServiceMetadata,
+    IValidator,
+    Operator
+{
     /**
      * @notice Error indicating that the caller is not the FilecoinPay contract
      * @dev 0x46a5d52f
@@ -167,6 +175,8 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     string private constant SERVICE_NAME = "FCSS";
     string private constant SERVICE_DESCRIPTION = "Filecoin Cold Storage Service";
+    // solhint-disable-next-line gas-small-strings
+    string private constant SERVICE_HOMEPAGE = "https://github.com/fidlabs/porep-market";
 
     /**
      * @notice Number of epochs in one month
@@ -230,20 +240,19 @@ contract Validator is Initializable, AccessControlUpgradeable, IFilecoinPayValid
 
     // solhint-enable func-param-name-mixedcase
 
-    /**
-     * @notice Returns the service name displayed for this validator
-     * @return serviceName The validator service name
-     */
-    function name() external pure returns (string memory serviceName) {
+    /// @inheritdoc IFilecoinServiceMetadata
+    function name() external pure override returns (string memory serviceName) {
         return SERVICE_NAME;
     }
 
-    /**
-     * @notice Returns the service description displayed for this validator
-     * @return serviceDescription The validator service description
-     */
-    function description() external pure returns (string memory serviceDescription) {
+    /// @inheritdoc IFilecoinServiceMetadata
+    function description() external pure override returns (string memory serviceDescription) {
         return SERVICE_DESCRIPTION;
+    }
+
+    /// @inheritdoc IFilecoinServiceMetadata
+    function homepage() external pure override returns (string memory serviceHomepage) {
+        return SERVICE_HOMEPAGE;
     }
 
     // solhint-disable function-max-lines, gas-strict-inequalities, use-natspec
