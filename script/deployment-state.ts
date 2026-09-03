@@ -53,6 +53,10 @@ export type UpgradeOperation = {
   newImplementation: string;
   newImplementationCodeHash: string;
 };
+export type ManagerRoleExpectations = {
+  defaultAdmin: string;
+  upgrader: string;
+};
 export type PendingDeploy = {
   status: "pending" | "finalized";
   operation: "deploy";
@@ -62,6 +66,7 @@ export type PendingDeploy = {
   release: { buildInfoSha256: string };
   broadcastSha256: string | null;
   result: DeploymentManifest | null;
+  expectedManagerRoles: ManagerRoleExpectations | null;
   finalizedAt: string | null;
   resultManifestSha256: string | null;
 };
@@ -104,6 +109,10 @@ export function parsePendingOperation(text: string): PendingOperation {
       operation: "deploy",
       previousManifestSha256: nullableHash(value.previousManifestSha256, "pending.previousManifestSha256"),
       result: value.result === null ? null : manifest(value.result, "pending.result"),
+      expectedManagerRoles:
+        value.expectedManagerRoles === undefined || value.expectedManagerRoles === null
+          ? null
+          : managerRoleExpectations(value.expectedManagerRoles, "pending.expectedManagerRoles"),
       finalizedAt: nullableString(value.finalizedAt, "pending.finalizedAt"),
       resultManifestSha256: nullableHash(value.resultManifestSha256, "pending.resultManifestSha256"),
     };
@@ -232,6 +241,14 @@ function operation(input: unknown, path: string): UpgradeOperation {
     ...(value.newArtifact === undefined ? {} : { newArtifact: string(value.newArtifact, `${path}.newArtifact`) }),
     newImplementation: address(value.newImplementation, `${path}.newImplementation`),
     newImplementationCodeHash: hash(value.newImplementationCodeHash, `${path}.newImplementationCodeHash`),
+  };
+}
+
+function managerRoleExpectations(input: unknown, path: string): ManagerRoleExpectations {
+  const value = object(input, path);
+  return {
+    defaultAdmin: address(value.defaultAdmin, `${path}.defaultAdmin`),
+    upgrader: address(value.upgrader, `${path}.upgrader`),
   };
 }
 

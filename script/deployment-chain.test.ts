@@ -170,14 +170,36 @@ test("uses recorded replacement implementations during upgrade verification", as
 test("verifies the complete deployment topology", async () => {
   const manifest = completeManifest();
   const selectors = new Set<string>();
-  await verifyLiveDeployment(fullRunner(manifest, selectors), "rpc", manifest);
+  await verifyLiveDeployment(fullRunner(manifest, selectors), "rpc", manifest, [], {
+    defaultAdmin: a4,
+    upgrader: a1,
+  });
   assert.ok(selectors.has("getBeacon()(address)"));
   assert.ok(selectors.has("getValidatorFactoryContract()(address)"));
   assert.ok(selectors.has("getGlobalEvidenceAdapter()(address)"));
   assert.ok(selectors.has("accessManager()(address)"));
   assert.ok(selectors.has("hasRole(bytes32,address)(bool)"));
+  assert.ok(selectors.has("UPGRADER_ROLE()(bytes32)"));
   assert.ok(selectors.has("POREPMARKET_CONTRACT()(address)"));
   assert.ok(selectors.has("getPaymentTokenConfig(address)(bool,uint256)"));
+});
+
+test("rejects unexpected initial manager admin and upgrader independently", async () => {
+  const manifest = completeManifest();
+  await assert.rejects(
+    verifyLiveDeployment(fullRunner(manifest), "rpc", manifest, [], { defaultAdmin: a5, upgrader: a1 }),
+    /protocol admin does not match expected initial admin/,
+  );
+
+  const run = fullRunner(manifest);
+  const missingUpgrader: CommandRunner = async (command, args, options) => {
+    if (args[0] === "call" && args[2] === "hasRole(bytes32,address)(bool)" && args[4] === a1) return "false\n";
+    return run(command, args, options);
+  };
+  await assert.rejects(
+    verifyLiveDeployment(missingUpgrader, "rpc", manifest, [], { defaultAdmin: a4, upgrader: a1 }),
+    /protocol upgrader role is missing/,
+  );
 });
 
 test("rejects a stale Validator beacon-to-factory binding", async () => {

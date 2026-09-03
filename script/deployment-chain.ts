@@ -1,6 +1,7 @@
 import type {
   DeploymentManifest,
   DeploymentTransaction,
+  ManagerRoleExpectations,
   ManifestContract,
   UpgradeOperation,
 } from "./deployment-state.ts";
@@ -183,6 +184,7 @@ export async function verifyLiveDeployment(
   rpcUrl: string,
   manifest: DeploymentManifest,
   operations: readonly UpgradeOperation[] = [],
+  expectedManagerRoles?: ManagerRoleExpectations,
 ): Promise<void> {
   await verifyManifestContracts(run, rpcUrl, manifest, operations);
 
@@ -248,7 +250,22 @@ export async function verifyLiveDeployment(
       );
     }
     const currentAdmin = await readAddressCall(run, rpcUrl, manager, "defaultAdmin()(address)", "protocol admin");
+    if (expectedManagerRoles !== undefined && currentAdmin !== expectedManagerRoles.defaultAdmin.toLowerCase()) {
+      throw new Error(
+        `protocol admin does not match expected initial admin: expected ${expectedManagerRoles.defaultAdmin.toLowerCase()}, got ${currentAdmin}`,
+      );
+    }
     await verifyRole(run, rpcUrl, manager, "DEFAULT_ADMIN_ROLE()(bytes32)", currentAdmin, "protocol admin");
+    if (expectedManagerRoles !== undefined) {
+      await verifyRole(
+        run,
+        rpcUrl,
+        manager,
+        "UPGRADER_ROLE()(bytes32)",
+        expectedManagerRoles.upgrader,
+        "protocol upgrader",
+      );
+    }
   }
 
   await verifyRole(

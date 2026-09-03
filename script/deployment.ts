@@ -244,7 +244,13 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
     transactions: mergeTransactions(pending.result!.transactions, receipts),
   };
   phase("Check live deployment");
-  await verifyLiveDeployment(commandRunner(context), rpcUrl, manifest);
+  await verifyLiveDeployment(
+    commandRunner(context),
+    rpcUrl,
+    manifest,
+    [],
+    pending.expectedManagerRoles ?? undefined,
+  );
 
   const manifestBytes = json(manifest);
   pending = {
@@ -743,6 +749,7 @@ function newPendingDeploy(context: Context, previousHash: string | null, buildHa
     release: { buildInfoSha256: buildHash },
     broadcastSha256: null,
     result: null,
+    expectedManagerRoles: null,
     finalizedAt: null,
     resultManifestSha256: null,
   };
@@ -950,7 +957,16 @@ function recordDeploy(
   }
   const paths = operationPaths(context, "deploy");
   const broadcastBytes = readFileSync(broadcast);
-  const pending: PendingDeploy = { ...expected, result: parsed.result, broadcastSha256: hashRawBytes(broadcastBytes) };
+  const expectedManagerRoles =
+    parsed.result.contracts.AccessManager === undefined
+      ? null
+      : { defaultAdmin: parsed.result.deployer, upgrader: parsed.result.deployer };
+  const pending: PendingDeploy = {
+    ...expected,
+    result: parsed.result,
+    expectedManagerRoles,
+    broadcastSha256: hashRawBytes(broadcastBytes),
+  };
   retainPendingEvidence(paths, build.gzip, broadcastBytes, pending);
   return true;
 }
