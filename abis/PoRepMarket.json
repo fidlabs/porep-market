@@ -110,19 +110,6 @@
   },
   {
     "type": "function",
-    "name": "acceptDeal",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
     "name": "activateEvidence",
     "inputs": [
       {
@@ -160,19 +147,6 @@
         ]
       }
     ],
-    "stateMutability": "nonpayable"
-  },
-  {
-    "type": "function",
-    "name": "activatePayment",
-    "inputs": [
-      {
-        "name": "dealId",
-        "type": "uint256",
-        "internalType": "uint256"
-      }
-    ],
-    "outputs": [],
     "stateMutability": "nonpayable"
   },
   {
@@ -1527,6 +1501,16 @@
         "name": "newManifestLocation",
         "type": "string",
         "internalType": "string"
+      },
+      {
+        "name": "newRequestedSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newManifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
       }
     ],
     "outputs": [],
@@ -1843,7 +1827,7 @@
   },
   {
     "type": "event",
-    "name": "ManifestLocationUpdated",
+    "name": "ManifestUpdated",
     "inputs": [
       {
         "name": "dealId",
@@ -1862,6 +1846,30 @@
         "type": "string",
         "indexed": false,
         "internalType": "string"
+      },
+      {
+        "name": "oldRequestedSizeBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "newRequestedSizeBytes",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      },
+      {
+        "name": "oldManifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newManifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -2314,6 +2322,11 @@
   {
     "type": "error",
     "name": "InvalidZeroAmount",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "ManifestUpdateNotAllowedAfterEvidence",
     "inputs": []
   },
   {

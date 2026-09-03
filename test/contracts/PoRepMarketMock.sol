@@ -14,9 +14,18 @@ contract PoRepMarketMock {
     mapping(uint256 dealId => PoRepTypes.DealService service) public dealServices;
     SharedTypes.SettlementDecision public settlementDecision;
     uint256 public finalizeDealCallCount;
+    uint256 public dealActivationPadding;
 
     function setDeal(uint256 dealId, PoRepTypes.Deal calldata deal) external {
         deals[dealId] = deal;
+    }
+
+    function setDealActivationPadding(uint256 padding) external {
+        dealActivationPadding = padding;
+    }
+
+    function getDealActivationPadding() external view returns (uint256) {
+        return dealActivationPadding;
     }
 
     function setDealTerms(uint256 dealId, PoRepTypes.DealTerms calldata terms) external {

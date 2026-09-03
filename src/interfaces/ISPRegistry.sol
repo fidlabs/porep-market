@@ -276,6 +276,26 @@ interface ISPRegistry {
         returns (SharedTypes.ProviderDealSelection memory selection);
 
     /**
+     * @notice Resizes a pending reservation and replaces its client/manifest/organization assignment.
+     * @dev Only MARKET_ROLE may call. The market supplies the deal's current offer, hash, and reserved bytes.
+     *      Checks the selected offer's size bounds and free provider capacity without repeating matching.
+     * @param offerId Offer already selected for the deal.
+     * @param client Client the manifest assignment is scoped to.
+     * @param oldManifestHash Currently assigned manifest hash.
+     * @param newManifestHash Nonzero replacement manifest hash.
+     * @param oldSizeBytes Current nonzero pending reservation for the deal.
+     * @param newSizeBytes Nonzero replacement pending reservation for the deal.
+     */
+    function updatePendingReservation(
+        uint256 offerId,
+        address client,
+        bytes32 oldManifestHash,
+        bytes32 newManifestHash,
+        uint256 oldSizeBytes,
+        uint256 newSizeBytes
+    ) external;
+
+    /**
      * @notice Checks whether an organization already holds a deal for the client's manifest.
      * @param client Client the manifest deal is scoped to.
      * @param manifestHash Manifest hash used as data identity.

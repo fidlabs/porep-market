@@ -341,6 +341,12 @@ contract DataCapEvidenceAdapter is
      */
     error AllocationOrClaimIdAssignedToAnotherDeal();
 
+    /**
+     * @notice Error thrown when the allocated bytes exceed the requested size
+     * @dev 0x0d8466b6
+     */
+    error AllocatedBytesExceededRequestedSize();
+
     struct DataCapDealEvidence {
         bool postingFinished;
         address client;
@@ -464,6 +470,14 @@ contract DataCapEvidenceAdapter is
 
         $._metaAllocatorContract.addVerifiedClient(FilAddresses.fromEthAddress(address(this)).data, datacapSpendBytes);
 
+        PoRepTypes.DealTerms memory dealTerms = $._poRepMarketContract.getDealTerms(dealId);
+        uint256 activationToleranceBps = $._poRepMarketContract.getDealActivationPadding();
+        uint256 maxAllocatedBytes =
+            _applyActivationToleranceCeiling(dealTerms.requestedSizeBytes, activationToleranceBps);
+        if (_getStorageDeal(dealId).allocatedBytes + newEvidenceBytes > maxAllocatedBytes) {
+            revert AllocatedBytesExceededRequestedSize();
+        }
+
         emit DatacapSpent(msg.sender, datacapSpendBytes);
         /// @custom:oz-upgrades-unsafe-allow-reachable delegatecall
         (int256 exitCode, DataCapTypes.TransferReturn memory transferReturn) = DataCapAPI.transfer(params);
@@ -563,8 +577,7 @@ contract DataCapEvidenceAdapter is
 
         DataCapDealEvidence storage deal = _getStorageDeal(context.dealId);
 
-        uint256 threshold =
-            context.requestedSizeBytes * (BPS_DENOMINATOR - context.activationToleranceBps) / BPS_DENOMINATOR;
+        uint256 threshold = _applyActivationToleranceFloor(context.requestedSizeBytes, context.activationToleranceBps);
 
         if (deal.allocationIds.length != 0 || deal.claimedBytes < threshold) {
             // TODO: add custom reasonCode
@@ -752,7 +765,9 @@ contract DataCapEvidenceAdapter is
     }
 
     function _ensureAllocationCoverage(uint256 allocatedBytes, uint256 requestedSizeBytes) internal view virtual {
-        if (allocatedBytes < requestedSizeBytes) {
+        uint256 activationToleranceBps = s()._poRepMarketContract.getDealActivationPadding();
+        uint256 requiredBytes = _applyActivationToleranceFloor(requestedSizeBytes, activationToleranceBps);
+        if (allocatedBytes < requiredBytes) {
             revert InvalidAllocatedBytes();
         }
     }
@@ -905,6 +920,11 @@ contract DataCapEvidenceAdapter is
      */
     function getAllocatedBytes(uint256 dealId) external view returns (uint256) {
         return _getStorageDeal(dealId).allocatedBytes;
+    }
+
+    /// @inheritdoc IStorageEvidenceAdapter
+    function hasSubmittedEvidence(uint256 dealId) external view returns (bool) {
+        return _getStorageDeal(dealId).allocatedBytes != 0;
     }
 
     /**
@@ -1204,6 +1224,28 @@ contract DataCapEvidenceAdapter is
      */
     function _getStorageDeal(uint256 dealId) internal view returns (DataCapDealEvidence storage) {
         return s()._deals[dealId];
+    }
+
+    /**
+     * @notice Applies an activation tolerance to a requested size, returning the lower bound
+     * @dev Used where a deal must be allowed to fall slightly short of the requested size
+     * @param sizeBytes The requested size in bytes
+     * @param toleranceBps The activation tolerance in basis points
+     * @return The minimum number of bytes required after applying the tolerance
+     */
+    function _applyActivationToleranceFloor(uint256 sizeBytes, uint256 toleranceBps) internal pure returns (uint256) {
+        return sizeBytes * (BPS_DENOMINATOR - toleranceBps) / BPS_DENOMINATOR;
+    }
+
+    /**
+     * @notice Applies an activation tolerance to a requested size, returning the upper bound
+     * @dev Used where allocations may exceed the requested size, as allocation sizes are padded piece sizes
+     * @param sizeBytes The requested size in bytes
+     * @param toleranceBps The activation tolerance in basis points
+     * @return The maximum number of bytes allowed after applying the tolerance
+     */
+    function _applyActivationToleranceCeiling(uint256 sizeBytes, uint256 toleranceBps) internal pure returns (uint256) {
+        return sizeBytes * (BPS_DENOMINATOR + toleranceBps) / BPS_DENOMINATOR;
     }
 
     // solhint-disable no-empty-blocks

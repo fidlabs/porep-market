@@ -517,6 +517,25 @@
   },
   {
     "type": "function",
+    "name": "hasSubmittedEvidence",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "",
+        "type": "bool",
+        "internalType": "bool"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -1137,6 +1156,11 @@
         "internalType": "address"
       }
     ]
+  },
+  {
+    "type": "error",
+    "name": "AllocatedBytesExceededRequestedSize",
+    "inputs": []
   },
   {
     "type": "error",

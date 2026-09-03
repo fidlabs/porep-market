@@ -185,14 +185,29 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      */
     event DealRejected(uint256 indexed dealId, address indexed rejector);
 
+    // solhint-disable gas-indexed-events
     /**
-     * @notice ManifestLocationUpdated event
-     * @dev ManifestLocationUpdated event is emitted when a manifest location is updated
+     * @notice ManifestUpdated event
+     * @dev Emitted when the manifest, piece-set commitment, and reserved size are replaced
      * @param dealId The id of the deal
      * @param oldManifestLocation The old manifest location
      * @param newManifestLocation The new manifest location
+     * @param oldRequestedSizeBytes The old requested size in bytes
+     * @param newRequestedSizeBytes The new requested size in bytes
+     * @param oldManifestHash The old piece-set commitment
+     * @param newManifestHash The new piece-set commitment
      */
-    event ManifestLocationUpdated(uint256 indexed dealId, string oldManifestLocation, string newManifestLocation);
+    event ManifestUpdated(
+        uint256 indexed dealId,
+        string oldManifestLocation,
+        string newManifestLocation,
+        uint256 oldRequestedSizeBytes,
+        uint256 newRequestedSizeBytes,
+        bytes32 oldManifestHash,
+        bytes32 newManifestHash
+    );
+
+    // solhint-enable gas-indexed-events
 
     /**
      * @notice GlobalEvidenceAdapterUpdated event
@@ -386,6 +401,12 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @dev 0xdbe015a7
      */
     error InvalidDealSize();
+
+    /**
+     * @notice Error thrown when the manifest is updated after evidence has been submitted
+     * @dev 0x6976a1e6
+     */
+    error ManifestUpdateNotAllowedAfterEvidence();
 
     /**
      * @notice Error thrown when a deal is not in a state that allows it to be rejected
@@ -807,25 +828,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
     }
 
     /**
-     * @notice Accepts a deal
-     * @param dealId The id of the deal
-     */
-    function acceptDeal(uint256 dealId) external override {
-        PoRepMarketStorage storage $ = s();
-        PoRepTypes.Deal storage deal = $._deals[dealId];
-
-        _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.PROPOSED);
-
-        if (!$._SPRegistryContract.isAuthorizedForProvider(msg.sender, deal.provider)) {
-            revert NotTheControllingAddress(dealId, msg.sender, deal.provider);
-        }
-
-        _changeDealState(dealId, DealState.ACCEPTED);
-        emit DealAccepted(dealId, msg.sender, deal.provider);
-    }
-
-    /**
      * @notice Finalizes an active deal after service has finished
      * @param dealId The id of the deal
      */
@@ -855,20 +857,6 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
                 deal.provider, $._dealCapacity[dealId].committedBytes, deal.client, $._dealData[dealId].manifestHash
             );
         emit DealFinalized(dealId, deal.validator);
-    }
-
-    /**
-     * @notice Activates an accepted deal and starts payment
-     * @dev Verifies evidence, commits capacity, initializes the service window, and asks the validator to update the rail.
-     * @param dealId The id of the deal
-     */
-    function activatePayment(uint256 dealId) external override onlyRole(POREP_SERVICE_ROLE) {
-        PoRepMarketStorage storage $ = s();
-        PoRepTypes.Deal storage deal = $._deals[dealId];
-
-        _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.ACTIVE);
-        _startPreparedPayment($, dealId, deal);
     }
 
     /**
@@ -939,7 +927,7 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
      * @param deal The deal to terminate
      * @param state The terminal state to assign to the deal
      */
-    function _terminateDeal(PoRepTypes.Deal memory deal, uint8 state) internal {
+    function _terminateDeal(PoRepTypes.Deal storage deal, uint8 state) internal {
         PoRepMarketStorage storage $ = s();
         uint256 dealId = deal.dealId;
         uint8 previousState = deal.state;
@@ -1172,31 +1160,63 @@ contract PoRepMarket is Initializable, AccessControlUpgradeable, UUPSUpgradeable
         return address($._validatorFactoryContract);
     }
 
+    /// @inheritdoc IPoRepMarket
+    function updateManifestLocation(
+        uint256 dealId,
+        string calldata newManifestLocation,
+        uint256 newRequestedSizeBytes,
+        bytes32 newManifestHash
+    ) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+        PoRepMarketStorage storage $ = s();
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+        _ensureDealExists(deal);
+        _ensureDealCorrectState(deal, DealState.ACCEPTED);
+        _ensureCorrectManifestLocation(newManifestLocation);
+        if (newRequestedSizeBytes == 0) revert InvalidDealSize();
+        if (newManifestHash == bytes32(0)) revert InvalidManifestHash();
+        if (IStorageEvidenceAdapter(deal.evidenceAdapter).hasSubmittedEvidence(dealId)) {
+            revert ManifestUpdateNotAllowedAfterEvidence();
+        }
+
+        _updateManifestReservation(dealId, newRequestedSizeBytes, newManifestHash);
+        SharedTypes.DealData memory oldData = $._dealData[dealId];
+        uint256 oldRequestedSizeBytes = $._dealTerms[dealId].requestedSizeBytes;
+        $._dealData[dealId] =
+            SharedTypes.DealData({manifestHash: newManifestHash, manifestLocation: newManifestLocation});
+        $._dealTerms[dealId].requestedSizeBytes = newRequestedSizeBytes;
+        $._dealCapacity[dealId].reservedBytes = newRequestedSizeBytes;
+
+        emit ManifestUpdated(
+            dealId,
+            oldData.manifestLocation,
+            newManifestLocation,
+            oldRequestedSizeBytes,
+            newRequestedSizeBytes,
+            oldData.manifestHash,
+            newManifestHash
+        );
+    }
+
     /**
-     * @notice Updates the manifest location for a specific deal
-     * @dev Only callable by the admin
-     * @param dealId The unique identifier of the deal
-     * @param newManifestLocation The new manifest location URL to be updated for the deal
+     * @notice Updates the selected offer's reservation before replacing the stored manifest
+     * @param dealId The deal whose pending reservation changes
+     * @param newRequestedSizeBytes The replacement manifest size
+     * @param newManifestHash The replacement manifest hash
      */
-    function updateManifestLocation(uint256 dealId, string calldata newManifestLocation)
-        external
-        override
-        onlyRole(DEFAULT_ADMIN_ROLE)
+    function _updateManifestReservation(uint256 dealId, uint256 newRequestedSizeBytes, bytes32 newManifestHash)
+        internal
     {
         PoRepMarketStorage storage $ = s();
-        _ensureDealExists($._deals[dealId]);
-
-        if (bytes(newManifestLocation).length == 0) {
-            revert EmptyManifestLocation();
-        }
-
-        if (bytes(newManifestLocation).length > 2048) {
-            revert TooLongManifestLocation();
-        }
-
-        string memory oldManifestLocation = $._dealData[dealId].manifestLocation;
-        $._dealData[dealId].manifestLocation = newManifestLocation;
-        emit ManifestLocationUpdated(dealId, oldManifestLocation, newManifestLocation);
+        PoRepTypes.Deal storage deal = $._deals[dealId];
+        $._SPRegistryContract
+            .updatePendingReservation(
+                deal.offerId,
+                deal.client,
+                $._dealData[dealId].manifestHash,
+                newManifestHash,
+                $._dealCapacity[dealId].reservedBytes,
+                newRequestedSizeBytes
+            );
     }
 
     /**
