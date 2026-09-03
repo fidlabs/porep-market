@@ -9,6 +9,7 @@ import {
   parsePendingOperation,
   parseUpgradeOperations,
   renderUpgradedManifest,
+  type PendingDeploy,
 } from "./deployment-state.ts";
 
 const address = `0x${"1".repeat(40)}`;
@@ -49,7 +50,7 @@ function manifest() {
   };
 }
 
-function deployPending() {
+function deployPending(): PendingDeploy {
   return {
     status: "pending",
     operation: "deploy",
@@ -58,7 +59,8 @@ function deployPending() {
     previousManifestSha256: null,
     release: { buildInfoSha256: hash },
     broadcastSha256: nextHash,
-    result: manifest(),
+    result: manifest() as PendingDeploy["result"],
+    expectedManagerRoles: null,
     finalizedAt: null,
     resultManifestSha256: null,
   };
@@ -90,6 +92,19 @@ test("parses manifests and pending deploy or upgrade journals", () => {
   assert.equal(parseDeploymentManifest(JSON.stringify(manifest())).contracts.Market.kind, "uups");
   assert.equal(parsePendingOperation(JSON.stringify(deployPending())).operation, "deploy");
   assert.equal(parsePendingOperation(JSON.stringify(upgradePending())).operation, "upgrade");
+});
+
+test("parses independent initial manager role expectations and accepts old deployment journals", () => {
+  const pending = deployPending();
+  pending.expectedManagerRoles = { defaultAdmin: address, upgrader: nextAddress };
+  const parsed = parsePendingOperation(JSON.stringify(pending));
+  assert.equal(parsed.operation, "deploy");
+  assert.deepEqual(parsed.expectedManagerRoles, { defaultAdmin: address, upgrader: nextAddress });
+
+  const { expectedManagerRoles: _omitted, ...legacyPending } = deployPending();
+  const legacy = parsePendingOperation(JSON.stringify(legacyPending));
+  assert.equal(legacy.operation, "deploy");
+  assert.equal(legacy.expectedManagerRoles, null);
 });
 
 test("rejects malformed JSON, unsupported contract kinds, and invalid hashes", () => {

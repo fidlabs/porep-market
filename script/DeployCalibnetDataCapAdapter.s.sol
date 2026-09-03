@@ -5,12 +5,12 @@ pragma solidity =0.8.30;
 import {stdJson} from "forge-std/StdJson.sol";
 import {CalibnetDataCapAdapter} from "../src/CalibnetDataCapAdapter.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
+import {AccessManager} from "../src/AccessManager.sol";
 
 contract DeployCalibnetDataCapAdapter is DeployUtils {
     using stdJson for string;
 
     uint256 internal constant CALIBNET_CHAIN_ID = 314159;
-    address internal constant CALIBNET_ADAPTER_PROXY = 0xfEBd13e0DecCD8B96c2781da32b30BbEB12884Db;
     string internal constant DATA_CAP_ADAPTER_ARTIFACT = "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter";
     string internal constant CALIBNET_ADAPTER_ARTIFACT = "src/CalibnetDataCapAdapter.sol:CalibnetDataCapAdapter";
 
@@ -20,9 +20,14 @@ contract DeployCalibnetDataCapAdapter is DeployUtils {
     error UnsupportedChainId(uint256 chainId);
 
     /**
-     * @dev 0x3acefc45
+     * @dev 0xc6ede9b4
      */
-    error UnexpectedAdapterProxy(address expected, address actual);
+    error MissingAccessManagerManifest();
+
+    /**
+     * @dev 0x80f1a802
+     */
+    error UnexpectedAccessManager(address expected, address actual);
 
     /**
      * @dev 0xfcf16e0e
@@ -39,11 +44,16 @@ contract DeployCalibnetDataCapAdapter is DeployUtils {
         if (block.chainid != CALIBNET_CHAIN_ID) revert UnsupportedChainId(block.chainid);
 
         address proxy = _manifestUupsTarget(manifest, "DataCapEvidenceAdapter");
-        if (proxy != CALIBNET_ADAPTER_PROXY) revert UnexpectedAdapterProxy(CALIBNET_ADAPTER_PROXY, proxy);
+        if (!manifest.keyExists(".contracts.AccessManager.implementation")) revert MissingAccessManagerManifest();
+        address managerAddress = manifest.readAddress(".contracts.AccessManager.implementation");
+        _ensureCode(managerAddress);
 
         address deployer = vm.addr(privateKey);
         CalibnetDataCapAdapter adapter = CalibnetDataCapAdapter(proxy);
-        if (!adapter.hasRole(adapter.UPGRADER_ROLE(), deployer)) revert MissingUpgraderRole(deployer);
+        address actualManager = adapter.accessManager();
+        if (actualManager != managerAddress) revert UnexpectedAccessManager(managerAddress, actualManager);
+        AccessManager manager = AccessManager(managerAddress);
+        if (!manager.hasRole(manager.UPGRADER_ROLE(), deployer)) revert MissingUpgraderRole(deployer);
 
         vm.startBroadcast(deployer);
         address implementation = address(new CalibnetDataCapAdapter());

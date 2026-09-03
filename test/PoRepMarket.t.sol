@@ -29,6 +29,7 @@ import {TestUtils} from "./utils/TestUtils.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
+import {AccessManager} from "../src/AccessManager.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -39,6 +40,7 @@ contract PoRepMarketTest is Test {
     }
 
     PoRepMarket public poRepMarket;
+    AccessManager public accessManager;
     SPRegistryMock public spRegistry;
     ValidatorFactoryMock public validatorFactory;
     address public validatorAddress;
@@ -77,6 +79,10 @@ contract PoRepMarketTest is Test {
         providerOwnerAddress = vm.addr(0x004);
         operatorAddress = vm.addr(0x005);
         adminAddress = vm.addr(0x006);
+        accessManager = new AccessManager(adminAddress, adminAddress);
+        vm.startPrank(adminAddress);
+        accessManager.grantRole(accessManager.POREP_SERVICE_ROLE(), adminAddress);
+        vm.stopPrank();
         dealId = 1;
         railId = 1;
         totalDealSize = 103_079_215_104; // 96 GiB
@@ -97,7 +103,7 @@ contract PoRepMarketTest is Test {
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
             (
-                adminAddress,
+                address(accessManager),
                 address(validatorFactory),
                 address(spRegistry),
                 address(dataCapEvidenceAdapterAddress),
@@ -234,7 +240,7 @@ contract PoRepMarketTest is Test {
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
             (
-                adminAddress,
+                address(accessManager),
                 address(validatorFactory),
                 address(spRegistry),
                 address(dataCapEvidenceAdapterAddress),
@@ -672,7 +678,7 @@ contract PoRepMarketTest is Test {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 clientAddress,
-                poRepMarket.DEFAULT_ADMIN_ROLE()
+                accessManager.DEFAULT_ADMIN_ROLE()
             )
         );
         vm.prank(clientAddress);
@@ -1158,7 +1164,7 @@ contract PoRepMarketTest is Test {
         // solhint-disable-next-line gas-small-strings
         bytes memory initData = abi.encodeWithSignature(
             "initialize(address,address,address,address,address)",
-            adminAddress,
+            address(accessManager),
             address(validatorFactory),
             address(spRegistry),
             address(dataCapEvidenceAdapterAddress),
@@ -1237,7 +1243,7 @@ contract PoRepMarketTest is Test {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 notTheClientAddress,
-                poRepMarket.POREP_SERVICE_ROLE()
+                accessManager.POREP_SERVICE_ROLE()
             )
         );
         vm.prank(notTheClientAddress);
@@ -1310,7 +1316,7 @@ contract PoRepMarketTest is Test {
     function testAuthorizeUpgradeRevert() public {
         address unauthorized = vm.addr(0x999);
         address newImpl = address(new PoRepMarket());
-        bytes32 upgraderRole = poRepMarket.UPGRADER_ROLE();
+        bytes32 upgraderRole = accessManager.UPGRADER_ROLE();
         vm.prank(unauthorized);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, upgraderRole)
@@ -1512,7 +1518,11 @@ contract PoRepMarketTest is Test {
 
     function _useRealRegistryForManifestReplacement() internal returns (SPRegistry registry) {
         registry = SPRegistry(
-            address(new ERC1967Proxy(address(new SPRegistry()), abi.encodeCall(SPRegistry.initialize, (adminAddress))))
+            address(
+                new ERC1967Proxy(
+                    address(new SPRegistry()), abi.encodeCall(SPRegistry.initialize, (address(accessManager)))
+                )
+            )
         );
         poRepMarket = PoRepMarket(
             address(
@@ -1521,7 +1531,7 @@ contract PoRepMarketTest is Test {
                     abi.encodeCall(
                         PoRepMarket.initialize,
                         (
-                            adminAddress,
+                            address(accessManager),
                             address(validatorFactory),
                             address(registry),
                             address(dataCapEvidenceAdapterAddress),
@@ -1532,7 +1542,7 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.startPrank(adminAddress);
-        registry.initialize2(address(poRepMarket));
+        accessManager.grantRole(accessManager.MARKET_ROLE(), address(poRepMarket));
         registry.registerProviderFor(providerFilActorId, providerOwnerAddress, totalDealSize * 3, paymentPayee);
         registry.setPaymentToken(paymentToken, true, MIN_PRICE_PER_SECTOR_PER_MONTH);
         SharedTypes.OfferPaymentInput[] memory rows = new SharedTypes.OfferPaymentInput[](1);
@@ -1654,7 +1664,7 @@ contract PoRepMarketTest is Test {
         PoRepMarket impl = new PoRepMarket();
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
-            (adminAddress, address(validatorFactory), address(spRegistry), address(0), address(sliScorer))
+            (address(accessManager), address(validatorFactory), address(spRegistry), address(0), address(sliScorer))
         );
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarket.InvalidEvidenceAdapterAddress.selector));
@@ -1666,7 +1676,7 @@ contract PoRepMarketTest is Test {
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
             (
-                adminAddress,
+                address(accessManager),
                 address(validatorFactory),
                 address(spRegistry),
                 address(dataCapEvidenceAdapterAddress),
@@ -1710,7 +1720,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.DEFAULT_ADMIN_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, accessManager.DEFAULT_ADMIN_ROLE()
             )
         );
         vm.prank(caller);
@@ -1725,7 +1735,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, accessManager.POREP_SERVICE_ROLE()
             )
         );
         vm.prank(caller);
@@ -2146,7 +2156,7 @@ contract PoRepMarketTest is Test {
 
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.DEFAULT_ADMIN_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, accessManager.DEFAULT_ADMIN_ROLE()
             )
         );
         vm.prank(caller);
@@ -2420,7 +2430,7 @@ contract PoRepMarketTest is Test {
         address caller = vm.addr(0x999);
         vm.expectRevert(
             abi.encodeWithSelector(
-                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, poRepMarket.POREP_SERVICE_ROLE()
+                IAccessControl.AccessControlUnauthorizedAccount.selector, caller, accessManager.POREP_SERVICE_ROLE()
             )
         );
         vm.prank(caller);
@@ -2607,7 +2617,7 @@ contract PoRepMarketTest is Test {
     function testSetDealActivationPaddingRevertsWhenCallerIsNotAdmin() public {
         uint256 newPadding = 15;
         address notTheAdmin = vm.addr(0x999);
-        bytes32 defaultAdminRole = poRepMarket.DEFAULT_ADMIN_ROLE();
+        bytes32 defaultAdminRole = accessManager.DEFAULT_ADMIN_ROLE();
 
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -2647,7 +2657,7 @@ contract PoRepMarketTest is Test {
             abi.encodeWithSelector(
                 IAccessControl.AccessControlUnauthorizedAccount.selector,
                 clientAddress,
-                poRepMarket.DEFAULT_ADMIN_ROLE()
+                accessManager.DEFAULT_ADMIN_ROLE()
             )
         );
         vm.prank(clientAddress);

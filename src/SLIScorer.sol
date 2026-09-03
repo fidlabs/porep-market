@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {SLIOracle} from "./SLIOracle.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
 
@@ -12,18 +12,12 @@ import {ISLIScorer} from "./interfaces/ISLIScorer.sol";
  * @title SLA Registry
  * @notice Upgradeable contract for managing SLA deals with role-based access control
  */
-contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract SLIScorer is ISLIScorer, AccessControlledUpgradeable, UUPSUpgradeable {
     /**
      * @notice Thrown when an invalid oracle address is provided
      * @dev 0x9589a27d
      */
     error InvalidOracle();
-
-    /**
-     * @notice Thrown when an invalid admin address is provided
-     * @dev 0xb5eba9f0
-     */
-    error InvalidAdmin();
 
     /**
      * @notice Thrown when no attestation exists for the given provider
@@ -44,11 +38,6 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
      * @dev 0xb06db32a
      */
     error InvalidDealId();
-
-    /**
-     * @notice Upgradable role which allows for contract upgrades
-     */
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
 
     /**
      * @notice Number of epochs in one month
@@ -88,15 +77,12 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
 
     /**
      * @notice Contract initializator. Should be called during deployment
-     * @param admin Contract owner
+     * @param _accessManager Protocol AccessManager address
      * @param oracle_ SLIOracle
      */
-    function initialize(address admin, SLIOracle oracle_) external initializer {
-        __AccessControl_init();
-        if (admin == address(0)) revert InvalidAdmin();
+    function initialize(address _accessManager, SLIOracle oracle_) external initializer {
+        __AccessControlled_init(_accessManager);
         if (address(oracle_) == address(0)) revert InvalidOracle();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
         s().oracle = oracle_;
     }
 
@@ -106,7 +92,7 @@ contract SLIScorer is ISLIScorer, Initializable, AccessControlUpgradeable, UUPSU
      * @dev Will revert (reject upgrade) if upgrade isn't called by UPGRADER_ROLE
      * @param newImplementation Address of new implementation
      */
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 
     // solhint-enable no-empty-blocks
 

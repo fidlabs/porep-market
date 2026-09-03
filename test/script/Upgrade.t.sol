@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec, one-contract-per-file, no-empty-blocks, gas-small-strings, gas-calldata-parameters
+// solhint-disable use-natspec, one-contract-per-file, no-empty-blocks, gas-small-strings, gas-calldata-parameters, function-max-lines
 pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {Deploy} from "../../script/Deploy.s.sol";
@@ -16,6 +17,7 @@ import {PoRepMarket} from "../../src/PoRepMarket.sol";
 import {DataCapEvidenceAdapter} from "../../src/DataCapEvidenceAdapter.sol";
 import {SPRegistry} from "../../src/SPRegistry.sol";
 import {ISPRegistry} from "../../src/interfaces/ISPRegistry.sol";
+import {AccessManager} from "../../src/AccessManager.sol";
 
 interface IAccessProbe {
     function hasRole(bytes32 role, address account) external view returns (bool);
@@ -97,6 +99,7 @@ contract DeploymentScriptsTest is Test {
 
         new Deploy().run();
         string memory json = vm.readFile("./.deployment/deploy-run.json");
+        address managerAddress = json.readAddress(".result.contracts.AccessManager.implementation");
         string[6] memory names =
             ["PoRepMarket", "ValidatorFactory", "DataCapEvidenceAdapter", "SPRegistry", "SLIOracle", "SLIScorer"];
         for (uint256 i; i < names.length; ++i) {
@@ -104,7 +107,7 @@ contract DeploymentScriptsTest is Test {
             address implementation = json.readAddress(string.concat(".result.contracts.", names[i], ".implementation"));
             assertTrue(proxy.code.length > 0 && implementation.code.length > 0);
             assertEq(address(uint160(uint256(vm.load(proxy, SLOT)))), implementation);
-            assertTrue(IAccessProbe(proxy).hasRole(0, admin));
+            assertEq(PoRepMarket(proxy).accessManager(), managerAddress);
         }
         address factory = json.readAddress(".result.contracts.ValidatorFactory.proxy");
         address beacon = json.readAddress(".result.contracts.ValidatorBeacon.address");
@@ -113,20 +116,32 @@ contract DeploymentScriptsTest is Test {
         address registry = json.readAddress(".result.contracts.SPRegistry.proxy");
         address adapter = json.readAddress(".result.contracts.DataCapEvidenceAdapter.proxy");
         assertEq(UpgradeableBeacon(beacon).implementation(), validator);
-        assertEq(UpgradeableBeacon(beacon).owner(), admin);
+        assertEq(UpgradeableBeacon(beacon).owner(), managerAddress);
         assertEq(ValidatorFactory(factory).getBeacon(), beacon);
         assertEq(PoRepMarket(market).getValidatorFactoryContract(), factory);
         assertEq(PoRepMarket(market).getSPRegistryContract(), registry);
         assertEq(DataCapEvidenceAdapter(adapter).getPoRepMarketAddress(), market);
         assertTrue(DataCapEvidenceAdapter(adapter).isOperational());
-        assertTrue(IAccessProbe(market).hasRole(PoRepMarket(market).POREP_SERVICE_ROLE(), service));
-        assertTrue(IAccessProbe(registry).hasRole(SPRegistry(registry).MARKET_ROLE(), market));
+        _assertManagerTopology(managerAddress, admin, service, oracle, termination, market);
         _assertPaymentTokens(registry, admin, json);
-        assertTrue(
-            IAccessProbe(json.readAddress(".result.contracts.SLIOracle.proxy"))
-                .hasRole(keccak256("ORACLE_ROLE"), oracle)
-        );
-        assertTrue(IAccessProbe(adapter).hasRole(keccak256("TERMINATION_ORACLE"), termination));
+        _assertAdminTransferAcrossTargets(managerAddress, admin, market, registry, adapter);
+    }
+
+    function _assertManagerTopology(
+        address managerAddress,
+        address admin,
+        address service,
+        address oracle,
+        address termination,
+        address market
+    ) private view {
+        AccessManager manager = AccessManager(managerAddress);
+        assertTrue(manager.hasRole(manager.DEFAULT_ADMIN_ROLE(), admin));
+        assertTrue(manager.hasRole(manager.UPGRADER_ROLE(), admin));
+        assertTrue(manager.hasRole(manager.POREP_SERVICE_ROLE(), service));
+        assertTrue(manager.hasRole(manager.MARKET_ROLE(), market));
+        assertTrue(manager.hasRole(manager.ORACLE_ROLE(), oracle));
+        assertTrue(manager.hasRole(manager.TERMINATION_ORACLE(), termination));
     }
 
     function _assertPaymentTokens(address registry, address admin, string memory json) private {
@@ -151,6 +166,58 @@ contract DeploymentScriptsTest is Test {
         config = SPRegistry(registry).getPaymentTokenConfig(axlUsdc);
         assertTrue(config.allowed);
         assertEq(config.minPricePer32GiBPerMonth, 1);
+    }
+
+    function _assertAdminTransferAcrossTargets(
+        address managerAddress,
+        address oldAdmin,
+        address market,
+        address registry,
+        address adapter
+    ) private {
+        AccessManager manager = AccessManager(managerAddress);
+        address newAdmin = vm.addr(11);
+        bytes32 adminRole = manager.DEFAULT_ADMIN_ROLE();
+
+        vm.prank(oldAdmin);
+        manager.beginDefaultAdminTransfer(newAdmin);
+        (, uint48 schedule) = manager.pendingDefaultAdmin();
+        vm.warp(uint256(schedule) + 1);
+        vm.prank(newAdmin);
+        manager.acceptDefaultAdminTransfer();
+
+        assertFalse(manager.hasRole(adminRole, oldAdmin));
+        assertTrue(manager.hasRole(adminRole, newAdmin));
+        assertTrue(manager.hasRole(manager.UPGRADER_ROLE(), oldAdmin));
+        assertFalse(manager.hasRole(manager.UPGRADER_ROLE(), newAdmin));
+
+        vm.prank(oldAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, oldAdmin, adminRole)
+        );
+        PoRepMarket(market).setDealActivationPadding(200);
+        vm.prank(newAdmin);
+        PoRepMarket(market).setDealActivationPadding(200);
+        assertEq(PoRepMarket(market).getDealActivationPadding(), 200);
+
+        address paymentToken = address(0x107);
+        vm.prank(oldAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, oldAdmin, adminRole)
+        );
+        SPRegistry(registry).setPaymentToken(paymentToken, true, 2);
+        vm.prank(newAdmin);
+        SPRegistry(registry).setPaymentToken(paymentToken, true, 2);
+        assertTrue(SPRegistry(registry).getPaymentTokenConfig(paymentToken).allowed);
+
+        vm.prank(oldAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, oldAdmin, adminRole)
+        );
+        DataCapEvidenceAdapter(adapter).disableAdapter();
+        vm.prank(newAdmin);
+        DataCapEvidenceAdapter(adapter).disableAdapter();
+        assertFalse(DataCapEvidenceAdapter(adapter).isOperational());
     }
 
     function _assertUnsupportedTargetRejected() private {
@@ -235,8 +302,9 @@ contract DeploymentScriptsTest is Test {
         returns (string memory manifest, address[] memory destinations)
     {
         destinations = new address[](names.length);
+        AccessManager manager = new AccessManager(vm.addr(1), vm.addr(1));
         address validator = address(new LegacyValidator());
-        UpgradeableBeacon beacon = new UpgradeableBeacon(validator, vm.addr(1));
+        UpgradeableBeacon beacon = new UpgradeableBeacon(validator, address(manager));
         string memory contractsJson = "{";
         for (uint256 i; i < names.length - 1; ++i) {
             address previous = i == 1 ? address(new LegacyValidatorFactory(address(beacon))) : address(new LegacyUups());
@@ -248,7 +316,9 @@ contract DeploymentScriptsTest is Test {
         destinations[names.length - 1] = address(beacon);
         contractsJson = string.concat(
             contractsJson,
-            ",\"ValidatorBeacon\":{\"address\":\"",
+            ",\"AccessManager\":{\"implementation\":\"",
+            vm.toString(address(manager)),
+            "\"},\"ValidatorBeacon\":{\"address\":\"",
             vm.toString(address(beacon)),
             "\"},\"Validator\":{\"implementation\":\"",
             vm.toString(validator),

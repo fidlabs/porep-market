@@ -13,11 +13,14 @@ import {DealType} from "../src/types/DealType.sol";
 import {ActorIdFailingMock} from "./contracts/ActorIdFailingMock.sol";
 import {MockProxy} from "./contracts/MockProxy.sol";
 import {ResolveAddressPrecompileMock} from "./contracts/ResolveAddressPrecompileMock.sol";
+import {AccessManager} from "../src/AccessManager.sol";
+import {AccessControlledUpgradeable} from "../src/abstracts/AccessControlledUpgradeable.sol";
 
 contract SPRegistryTest is Test {
     address internal constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
 
     SPRegistry internal spRegistry;
+    AccessManager internal accessManager;
 
     address internal admin = vm.addr(0x001);
     address internal market = vm.addr(0x002);
@@ -44,16 +47,14 @@ contract SPRegistryTest is Test {
 
     function setUp() public {
         SPRegistry impl = new SPRegistry();
-        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (admin));
+        accessManager = new AccessManager(admin, admin);
+        vm.startPrank(admin);
+        accessManager.grantRole(accessManager.MARKET_ROLE(), market);
+        accessManager.grantRole(accessManager.OPERATOR_ROLE(), operator);
+        vm.stopPrank();
+        bytes memory initData = abi.encodeCall(SPRegistry.initialize, (address(accessManager)));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         spRegistry = SPRegistry(address(proxy));
-
-        vm.prank(admin);
-        spRegistry.initialize2(market);
-
-        vm.startPrank(admin);
-        spRegistry.grantRole(spRegistry.OPERATOR_ROLE(), operator);
-        vm.stopPrank();
     }
 
     function _terms() internal pure returns (SharedTypes.OfferTerms memory) {
@@ -153,21 +154,11 @@ contract SPRegistryTest is Test {
         resolveAddress.setId(unauthorized, 1000);
     }
 
-    function testInitializeRevertsWhenAdminIsZero() public {
+    function testInitializeRevertsWhenManagerIsZero() public {
         SPRegistry impl = new SPRegistry();
 
-        vm.expectRevert(SPRegistry.InvalidAdminAddress.selector);
+        vm.expectRevert(abi.encodeWithSelector(AccessControlledUpgradeable.InvalidAccessManager.selector, address(0)));
         new ERC1967Proxy(address(impl), abi.encodeCall(SPRegistry.initialize, (address(0))));
-    }
-
-    function testInitialize2RevertsWhenMarketIsZero() public {
-        SPRegistry impl = new SPRegistry();
-        SPRegistry freshRegistry =
-            SPRegistry(address(new ERC1967Proxy(address(impl), abi.encodeCall(SPRegistry.initialize, (admin)))));
-
-        vm.prank(admin);
-        vm.expectRevert(SPRegistry.InvalidPoRepMarketAddress.selector);
-        freshRegistry.initialize2(address(0));
     }
 
     function testGetProviderViewReturnsRegistrationAndCapacityData() public {
@@ -1076,7 +1067,7 @@ contract SPRegistryTest is Test {
 
     function testUpdatePendingReservationRejectsNonMarketCaller() public {
         uint256 offerId = _setupPendingReservation();
-        bytes32 marketRole = spRegistry.MARKET_ROLE();
+        bytes32 marketRole = accessManager.MARKET_ROLE();
         vm.prank(admin);
         vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", admin, marketRole));
         spRegistry.updatePendingReservation(

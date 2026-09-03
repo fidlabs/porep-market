@@ -6,6 +6,7 @@ import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/Upgradeabl
 import {stdJson} from "forge-std/StdJson.sol";
 import {IValidatorFactory} from "../src/interfaces/IValidatorFactory.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
+import {AccessManager} from "../src/AccessManager.sol";
 
 interface IUpgradeable {
     function upgradeToAndCall(address newImplementation, bytes calldata data) external;
@@ -55,13 +56,21 @@ contract Upgrade is DeployUtils {
                 operations[i] = Operation(names[i], artifact, proxy, address(0), false);
             }
         }
+        address accessManager;
+        for (uint256 i; i < operations.length; ++i) {
+            if (operations[i].beacon) {
+                accessManager = manifest.readAddress(".contracts.AccessManager.implementation");
+                _ensureCode(accessManager);
+                break;
+            }
+        }
         vm.startBroadcast(vm.addr(vm.envUint("PRIVATE_KEY")));
         for (uint256 i; i < operations.length; ++i) {
             operations[i].newImplementation = vm.deployCode(operations[i].artifact);
         }
         for (uint256 i; i < operations.length; ++i) {
             if (operations[i].beacon) {
-                UpgradeableBeacon(operations[i].destination).upgradeTo(operations[i].newImplementation);
+                AccessManager(accessManager).upgradeBeacon(operations[i].destination, operations[i].newImplementation);
             } else {
                 IUpgradeable(operations[i].destination).upgradeToAndCall(operations[i].newImplementation, "");
             }

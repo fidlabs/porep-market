@@ -17,6 +17,7 @@ import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock
 import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
 import {DealType} from "../src/types/DealType.sol";
 import {DealState} from "../src/types/DealState.sol";
+import {AccessManager} from "../src/AccessManager.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketViewHelperTest is Test {
@@ -32,6 +33,7 @@ contract PoRepMarketViewHelperTest is Test {
     ValidatorFactoryMock public validatorFactory;
     DataCapEvidenceAdapterMock public dataCapEvidenceAdapter;
     SLIScorerMock public sliScorer;
+    AccessManager public accessManager;
 
     address public clientAddress;
     address public providerOwnerAddress;
@@ -64,6 +66,7 @@ contract PoRepMarketViewHelperTest is Test {
         clientAddress = vm.addr(0x003);
         providerOwnerAddress = vm.addr(0x004);
         adminAddress = vm.addr(0x006);
+        accessManager = new AccessManager(adminAddress, adminAddress);
         paymentToken = vm.addr(0x777);
         paymentPayee = vm.addr(0x778);
         providerFilActorId = CommonTypes.FilActorId.wrap(1000);
@@ -83,7 +86,7 @@ contract PoRepMarketViewHelperTest is Test {
         bytes memory initData = abi.encodeCall(
             PoRepMarket.initialize,
             (
-                adminAddress,
+                address(accessManager),
                 address(validatorFactory),
                 address(spRegistry),
                 address(dataCapEvidenceAdapter),

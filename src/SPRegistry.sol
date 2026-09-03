@@ -3,8 +3,6 @@
 
 pragma solidity =0.8.30;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {EnumerableSet} from "@openzeppelin/contracts/utils/structs/EnumerableSet.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
@@ -12,21 +10,16 @@ import {ISPRegistry} from "./interfaces/ISPRegistry.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {OfferMatch} from "./types/OfferMatch.sol";
 import {MinerUtils} from "./lib/MinerUtils.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 
 /**
  * @title SPRegistry
  * @notice Storage provider registry for provider offers, matching, and capacity management
  */
-contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable, ISPRegistry {
+contract SPRegistry is AccessControlledUpgradeable, UUPSUpgradeable, ISPRegistry {
     using EnumerableSet for EnumerableSet.UintSet;
     using EnumerableSet for EnumerableSet.AddressSet;
-
-    /// @notice Role allowed to authorize contract upgrades.
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-    /// @notice Role allowed to reserve, release, and commit provider capacity.
-    bytes32 public constant MARKET_ROLE = keccak256("MARKET_ROLE");
-    /// @notice Role allowed to register providers and manage provider offers.
-    bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
     /// @notice Maximum number of registered providers.
     uint256 public constant MAX_PROVIDERS = 100;
@@ -291,18 +284,6 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     error InvalidIndexingPct(uint8 value);
 
     /**
-     * @notice Error thrown when admin address is invalid
-     * @dev 0x05bb467c
-     */
-    error InvalidAdminAddress();
-
-    /**
-     * @notice Error thrown when PoRepMarket address is invalid
-     * @dev 0xc9cc4a06
-     */
-    error InvalidPoRepMarketAddress();
-
-    /**
      * @notice Error thrown when provider actor ID is invalid
      * @dev 0x7599e239
      */
@@ -420,25 +401,11 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /**
-     * @notice Initializes SPRegistry roles and default offer-matching configuration.
-     * @param _admin Address receiving admin and upgrader roles.
+     * @notice Initializes the protocol AccessManager.
+     * @param _accessManager Protocol AccessManager address.
      */
-    function initialize(address _admin) public initializer {
-        if (_admin == address(0)) revert InvalidAdminAddress();
-
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
-        _grantRole(UPGRADER_ROLE, _admin);
-    }
-
-    /**
-     * @notice Grants market-only capacity and matching access to PoRepMarket.
-     * @param _poRepMarket PoRepMarket contract address.
-     */
-    function initialize2(address _poRepMarket) public reinitializer(2) onlyRole(DEFAULT_ADMIN_ROLE) {
-        if (_poRepMarket == address(0)) revert InvalidPoRepMarketAddress();
-
-        _grantRole(MARKET_ROLE, _poRepMarket);
+    function initialize(address _accessManager) public initializer {
+        __AccessControlled_init(_accessManager);
     }
 
     /// @inheritdoc ISPRegistry
@@ -482,7 +449,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function blockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function blockProvider(CommonTypes.FilActorId provider) external onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         _ensureProviderRegistered(provider);
 
         s()._providers[_providerId(provider)].blocked = true;
@@ -491,7 +458,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     /// @inheritdoc ISPRegistry
-    function unblockProvider(CommonTypes.FilActorId provider) external onlyRole(DEFAULT_ADMIN_ROLE) {
+    function unblockProvider(CommonTypes.FilActorId provider) external onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         _ensureProviderRegistered(provider);
 
         s()._providers[_providerId(provider)].blocked = false;
@@ -559,7 +526,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
 
     /// @inheritdoc ISPRegistry
     function isAuthorizedForProvider(address caller, CommonTypes.FilActorId provider) external view returns (bool) {
-        if (hasRole(DEFAULT_ADMIN_ROLE, caller) || hasRole(OPERATOR_ROLE, caller)) return true;
+        if (_hasRole(Roles.OPERATOR_ROLE, caller) || _hasRole(Roles.DEFAULT_ADMIN_ROLE, caller)) return true;
         return MinerUtils.isControllingAddress(provider, caller);
     }
 
@@ -581,7 +548,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function setPaymentToken(address token, bool allowed, uint256 minPricePer32GiBPerMonth)
         external
-        onlyRole(DEFAULT_ADMIN_ROLE)
+        onlyRole(Roles.DEFAULT_ADMIN_ROLE)
     {
         if (token == address(0)) revert InvalidPaymentToken();
 
@@ -733,7 +700,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function reserveProviderForDeal(address client, SharedTypes.DealRequest calldata request)
         external
-        onlyRole(MARKET_ROLE)
+        onlyRole(Roles.MARKET_ROLE)
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
         selection = _selectProviderForDeal(client, request);
@@ -753,7 +720,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function reserveOfferForDeal(uint256 offerId, address client, SharedTypes.DealRequest calldata request)
         external
-        onlyRole(MARKET_ROLE)
+        onlyRole(Roles.MARKET_ROLE)
         returns (SharedTypes.ProviderDealSelection memory selection)
     {
         uint16 reason;
@@ -770,7 +737,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         bytes32 newManifestHash,
         uint256 oldSizeBytes,
         uint256 newSizeBytes
-    ) external onlyRole(MARKET_ROLE) {
+    ) external onlyRole(Roles.MARKET_ROLE) {
         _ensureOfferExists(offerId);
         if (newManifestHash == bytes32(0)) revert InvalidManifestHash();
 
@@ -815,7 +782,7 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     /// @inheritdoc ISPRegistry
     function releaseCapacity(CommonTypes.FilActorId provider, uint256 sizeBytes, address client, bytes32 manifestHash)
         external
-        onlyRole(MARKET_ROLE)
+        onlyRole(Roles.MARKET_ROLE)
     {
         _releaseCapacity(provider, sizeBytes, client, manifestHash);
     }
@@ -826,14 +793,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         uint256 sizeBytes,
         address client,
         bytes32 manifestHash
-    ) external onlyRole(MARKET_ROLE) {
+    ) external onlyRole(Roles.MARKET_ROLE) {
         _releasePendingCapacity(provider, sizeBytes, client, manifestHash);
     }
 
     /// @inheritdoc ISPRegistry
     function commitCapacity(CommonTypes.FilActorId provider, uint256 estimatedSizeBytes, uint256 actualSizeBytes)
         external
-        onlyRole(MARKET_ROLE)
+        onlyRole(Roles.MARKET_ROLE)
     {
         _ensureProviderRegistered(provider);
 
@@ -881,14 +848,14 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     function _onlyProviderControllerOrAdmin(CommonTypes.FilActorId provider) internal view {
-        if (hasRole(DEFAULT_ADMIN_ROLE, msg.sender) || hasRole(OPERATOR_ROLE, msg.sender)) return;
+        if (_hasRole(Roles.OPERATOR_ROLE, msg.sender) || _hasRole(Roles.DEFAULT_ADMIN_ROLE, msg.sender)) return;
         if (!MinerUtils.isControllingAddress(provider, msg.sender)) {
             revert NotProviderControllerOrAdmin(msg.sender, provider);
         }
     }
 
     function _onlyAdminOrOperator() internal view {
-        if (!hasRole(DEFAULT_ADMIN_ROLE, msg.sender) && !hasRole(OPERATOR_ROLE, msg.sender)) {
+        if (!_hasRole(Roles.OPERATOR_ROLE, msg.sender) && !_hasRole(Roles.DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert NotAdminOrOperator(msg.sender);
         }
     }
@@ -1256,5 +1223,5 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     }
 
     // solhint-disable no-empty-blocks
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
 }

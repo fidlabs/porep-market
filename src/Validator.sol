@@ -3,8 +3,6 @@
 
 pragma solidity =0.8.30;
 
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
@@ -18,6 +16,8 @@ import {Operator} from "./abstracts/Operator.sol";
 import {PoRepTypes} from "./types/PoRepTypes.sol";
 import {SharedTypes} from "./types/SharedTypes.sol";
 import {RailStatus} from "./types/RailStatus.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 
 /**
  * @title Validator
@@ -25,8 +25,7 @@ import {RailStatus} from "./types/RailStatus.sol";
  * @notice Validator contract for Filecoin Pay
  */
 contract Validator is
-    Initializable,
-    AccessControlUpgradeable,
+    AccessControlledUpgradeable,
     IFilecoinPayValidator,
     IFilecoinServiceMetadata,
     IValidator,
@@ -43,12 +42,6 @@ contract Validator is
      * @dev 0x9dd45c94
      */
     error CallerIsNotPoRepMarket();
-
-    /**
-     * @notice Error indicating that the admin address provided during initialization is the zero address
-     * @dev 0x05bb467c
-     */
-    error InvalidAdminAddress();
 
     /**
      * @notice Error indicating that the FilecoinPay address provided during initialization is the zero address
@@ -212,19 +205,17 @@ contract Validator is
     // solhint-disable func-param-name-mixedcase
     /**
      * @notice Initializes the contract
-     * @param _admin Address to be granted the default admin role
+     * @param _accessManager Protocol AccessManager address
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _poRepMarket Address of the PoRepMarket contract
      * @param _dealId The ID of the deal for which this validator is being initialized
      */
-    function initialize(address _admin, address _filecoinPay, address _poRepMarket, uint256 _dealId)
+    function initialize(address _accessManager, address _filecoinPay, address _poRepMarket, uint256 _dealId)
         external
         initializer
     {
-        _validateInitializeAddresses(_admin, _filecoinPay, _poRepMarket);
-
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, _admin);
+        _validateInitializeAddresses(_filecoinPay, _poRepMarket);
+        __AccessControlled_init(_accessManager);
 
         ValidatorStorage storage $ = _getValidatorStorage();
 
@@ -385,7 +376,7 @@ contract Validator is
      * @dev Only callable by the admin
      * @param newLockupPeriod New lockup period to set
      */
-    function updateLockupPeriod(uint256 newLockupPeriod) external override onlyRole(DEFAULT_ADMIN_ROLE) {
+    function updateLockupPeriod(uint256 newLockupPeriod) external override onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
         ValidatorStorage storage $ = _getValidatorStorage();
         _updateLockupPeriod(IFilecoinPayV1($.filecoinPay), $.railId, newLockupPeriod, 0);
         emit LockupPeriodUpdated($.railId, newLockupPeriod);
@@ -466,14 +457,10 @@ contract Validator is
 
     /**
      * @notice Validates that the provided addresses for initialization are not zero addresses
-     * @param _admin Address to be granted the default admin role
      * @param _filecoinPay Address of the FilecoinPay contract
      * @param _poRepMarket Address of the PoRepMarket contract
      */
-    function _validateInitializeAddresses(address _admin, address _filecoinPay, address _poRepMarket) internal pure {
-        if (_admin == address(0)) {
-            revert InvalidAdminAddress();
-        }
+    function _validateInitializeAddresses(address _filecoinPay, address _poRepMarket) internal pure {
         if (_filecoinPay == address(0)) {
             revert InvalidFilecoinPayAddress();
         }

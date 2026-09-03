@@ -9,9 +9,12 @@ import {SharedTypes} from "../src/types/SharedTypes.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {MockSLIOracle} from "./contracts/MockSLIOracle.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
+import {AccessManager} from "../src/AccessManager.sol";
+import {AccessControlledUpgradeable} from "../src/abstracts/AccessControlledUpgradeable.sol";
 
 contract SLIScorerTest is Test {
     SLIScorer public sliScorer;
+    AccessManager public accessManager;
     address public client = vm.addr(1);
     uint256 public dealId;
     SharedTypes.SLIThresholds public sliParams;
@@ -20,7 +23,9 @@ contract SLIScorerTest is Test {
     function setUp() public {
         SLIScorer impl = new SLIScorer();
         oracle = new MockSLIOracle();
-        bytes memory initData = abi.encodeCall(SLIScorer.initialize, (address(this), SLIOracle(address(oracle))));
+        accessManager = new AccessManager(address(this), address(this));
+        bytes memory initData =
+            abi.encodeCall(SLIScorer.initialize, (address(accessManager), SLIOracle(address(oracle))));
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         sliScorer = SLIScorer(address(proxy));
         dealId = 1;
@@ -30,14 +35,14 @@ contract SLIScorerTest is Test {
     }
 
     function testIsAdminSet() public view {
-        bytes32 adminRole = sliScorer.DEFAULT_ADMIN_ROLE();
-        assertTrue(sliScorer.hasRole(adminRole, address(this)));
+        bytes32 adminRole = accessManager.DEFAULT_ADMIN_ROLE();
+        assertTrue(accessManager.hasRole(adminRole, address(this)));
     }
 
     function testAuthorizeUpgradeRevert() public {
         address newImpl = address(new SLIScorer());
         address unauthorized = vm.addr(2);
-        bytes32 upgraderRole = sliScorer.UPGRADER_ROLE();
+        bytes32 upgraderRole = accessManager.UPGRADER_ROLE();
 
         vm.prank(unauthorized);
         vm.expectRevert(
@@ -93,16 +98,16 @@ contract SLIScorerTest is Test {
         sliScorer.calculateScore(dealId, sliParams);
     }
 
-    function testInitializeRevertInvalidAdmin() public {
+    function testInitializeRevertInvalidManager() public {
         SLIScorer impl = new SLIScorer();
         bytes memory initData = abi.encodeCall(SLIScorer.initialize, (address(0), SLIOracle(address(oracle))));
-        vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidAdmin.selector));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlledUpgradeable.InvalidAccessManager.selector, address(0)));
         new ERC1967Proxy(address(impl), initData);
     }
 
     function testInitializeRevertInvalidOracle() public {
         SLIScorer impl = new SLIScorer();
-        bytes memory initData = abi.encodeCall(SLIScorer.initialize, (address(this), SLIOracle(address(0))));
+        bytes memory initData = abi.encodeCall(SLIScorer.initialize, (address(accessManager), SLIOracle(address(0))));
         vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidOracle.selector));
         new ERC1967Proxy(address(impl), initData);
     }

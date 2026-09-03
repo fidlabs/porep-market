@@ -1,6 +1,7 @@
 import type {
   DeploymentManifest,
   DeploymentTransaction,
+  ManagerRoleExpectations,
   ManifestContract,
   UpgradeOperation,
 } from "./deployment-state.ts";
@@ -16,11 +17,7 @@ export type CommandOptions = {
   signal?: AbortSignal;
 };
 
-export type CommandRunner = (
-  command: string,
-  args: readonly string[],
-  options: CommandOptions,
-) => Promise<string>;
+export type CommandRunner = (command: string, args: readonly string[], options: CommandOptions) => Promise<string>;
 
 export type FinalityOptions = {
   signal?: AbortSignal;
@@ -73,11 +70,7 @@ export async function loadTransactionReceipts(
   for (const requestedHash of requestedHashes) {
     let output: string;
     try {
-      output = await run(
-        "cast",
-        ["rpc", "--rpc-url", rpcUrl, "eth_getTransactionReceipt", requestedHash],
-        {},
-      );
+      output = await run("cast", ["rpc", "--rpc-url", rpcUrl, "eth_getTransactionReceipt", requestedHash], {});
     } catch (error) {
       throw new Error(`could not read receipt for transaction ${requestedHash}`, { cause: error });
     }
@@ -191,6 +184,7 @@ export async function verifyLiveDeployment(
   rpcUrl: string,
   manifest: DeploymentManifest,
   operations: readonly UpgradeOperation[] = [],
+  expectedManagerRoles?: ManagerRoleExpectations,
 ): Promise<void> {
   await verifyManifestContracts(run, rpcUrl, manifest, operations);
 
@@ -200,64 +194,109 @@ export async function verifyLiveDeployment(
   const registry = requireUupsContract(manifest, "SPRegistry");
   const sliOracle = requireUupsContract(manifest, "SLIOracle");
   const sliScorer = requireUupsContract(manifest, "SLIScorer");
+  const managerContract =
+    manifest.contracts.AccessManager === undefined ? undefined : requireStandaloneContract(manifest, "AccessManager");
+  const manager =
+    managerContract === undefined
+      ? undefined
+      : readManifestAddress(managerContract.implementation, "manifest AccessManager implementation");
   const beacon = requireBeaconContract(manifest, "ValidatorBeacon");
   const claimInspector = requireStandaloneContract(manifest, "PoRepMarketClaimInspector");
   const sectorStatusInspector = requireStandaloneContract(manifest, "PoRepMarketSectorStatusInspector");
   const viewHelper = requireStandaloneContract(manifest, "PoRepMarketViewHelper");
-  const recordedBeaconFactory = readManifestAddress(
-    beacon.factoryProxy,
-    "manifest ValidatorBeacon factoryProxy",
-  );
-  const validatorFactoryProxy = readManifestAddress(
-    validatorFactory.proxy,
-    "manifest ValidatorFactory proxy",
-  );
+  const recordedBeaconFactory = readManifestAddress(beacon.factoryProxy, "manifest ValidatorBeacon factoryProxy");
+  const validatorFactoryProxy = readManifestAddress(validatorFactory.proxy, "manifest ValidatorFactory proxy");
   if (recordedBeaconFactory !== validatorFactoryProxy) {
     throw new Error(
       `ValidatorBeacon factoryProxy does not match ValidatorFactory proxy: expected ${validatorFactoryProxy}, got ${recordedBeaconFactory}`,
     );
   }
 
-  for (const [name, contract] of [
-    ["PoRepMarket", market],
-    ["ValidatorFactory", validatorFactory],
-    ["DataCapEvidenceAdapter", adapter],
-    ["SPRegistry", registry],
-    ["SLIOracle", sliOracle],
-    ["SLIScorer", sliScorer],
-  ] as const) {
-    await verifyRole(run, rpcUrl, contract.proxy, "DEFAULT_ADMIN_ROLE()(bytes32)", manifest.deployer, `${name} admin`);
+  const roleContract = manager ?? market.proxy;
+  if (manager === undefined) {
+    for (const [name, contract] of [
+      ["PoRepMarket", market],
+      ["ValidatorFactory", validatorFactory],
+      ["DataCapEvidenceAdapter", adapter],
+      ["SPRegistry", registry],
+      ["SLIOracle", sliOracle],
+      ["SLIScorer", sliScorer],
+    ] as const) {
+      await verifyRole(
+        run,
+        rpcUrl,
+        contract.proxy,
+        "DEFAULT_ADMIN_ROLE()(bytes32)",
+        manifest.deployer,
+        `${name} admin`,
+      );
+    }
+  } else {
+    for (const [name, contract] of [
+      ["PoRepMarket", market],
+      ["ValidatorFactory", validatorFactory],
+      ["DataCapEvidenceAdapter", adapter],
+      ["SPRegistry", registry],
+      ["SLIOracle", sliOracle],
+      ["SLIScorer", sliScorer],
+    ] as const) {
+      await verifyAddressCall(
+        run,
+        rpcUrl,
+        contract.proxy,
+        "accessManager()(address)",
+        manager,
+        `${name} AccessManager`,
+      );
+    }
+    const currentAdmin = await readAddressCall(run, rpcUrl, manager, "defaultAdmin()(address)", "protocol admin");
+    if (expectedManagerRoles !== undefined && currentAdmin !== expectedManagerRoles.defaultAdmin.toLowerCase()) {
+      throw new Error(
+        `protocol admin does not match expected initial admin: expected ${expectedManagerRoles.defaultAdmin.toLowerCase()}, got ${currentAdmin}`,
+      );
+    }
+    await verifyRole(run, rpcUrl, manager, "DEFAULT_ADMIN_ROLE()(bytes32)", currentAdmin, "protocol admin");
+    if (expectedManagerRoles !== undefined) {
+      await verifyRole(
+        run,
+        rpcUrl,
+        manager,
+        "UPGRADER_ROLE()(bytes32)",
+        expectedManagerRoles.upgrader,
+        "protocol upgrader",
+      );
+    }
   }
 
   await verifyRole(
     run,
     rpcUrl,
-    market.proxy,
+    roleContract,
     "POREP_SERVICE_ROLE()(bytes32)",
-    requireDependency(manifest, "PoRepService"),
+    requireNonZeroDependency(manifest, "PoRepService"),
     "PoRep service",
   );
   await verifyRole(
     run,
     rpcUrl,
-    sliOracle.proxy,
+    manager ?? sliOracle.proxy,
     "ORACLE_ROLE()(bytes32)",
-    requireDependency(manifest, "Oracle"),
+    requireNonZeroDependency(manifest, "Oracle"),
     "SLI oracle",
   );
   await verifyRole(
     run,
     rpcUrl,
-    adapter.proxy,
+    manager ?? adapter.proxy,
     "TERMINATION_ORACLE()(bytes32)",
-    requireDependency(manifest, "TerminationOracle"),
+    requireNonZeroDependency(manifest, "TerminationOracle"),
     "termination oracle",
   );
-  await verifyRole(run, rpcUrl, registry.proxy, "MARKET_ROLE()(bytes32)", market.proxy, "registry market");
+  await verifyRole(run, rpcUrl, manager ?? registry.proxy, "MARKET_ROLE()(bytes32)", market.proxy, "registry market");
 
   const operator = requireDependency(manifest, "Operator");
   if (operator !== zeroAddress) {
-    await verifyRole(run, rpcUrl, registry.proxy, "OPERATOR_ROLE()(bytes32)", operator, "SP operator");
+    await verifyRole(run, rpcUrl, manager ?? registry.proxy, "OPERATOR_ROLE()(bytes32)", operator, "SP operator");
   }
 
   await verifyAddressCall(
@@ -301,8 +340,8 @@ export async function verifyLiveDeployment(
     "ValidatorFactory beacon",
   );
 
-  await loadRuntimeCode(run, rpcUrl, requireDependency(manifest, "FilecoinPay"), "FilecoinPay");
-  await loadRuntimeCode(run, rpcUrl, requireDependency(manifest, "MetaAllocator"), "MetaAllocator");
+  await loadRuntimeCode(run, rpcUrl, requireNonZeroDependency(manifest, "FilecoinPay"), "FilecoinPay");
+  await loadRuntimeCode(run, rpcUrl, requireNonZeroDependency(manifest, "MetaAllocator"), "MetaAllocator");
 
   for (const name of ["USDFC", "AxlUSDC"]) {
     const token = manifest.externalDependencies[name];
@@ -361,7 +400,9 @@ async function verifyPaymentTokenConfiguration(
       {},
     );
   } catch (error) {
-    throw new Error(`could not read ${name} payment-token configuration`, { cause: error });
+    throw new Error(`could not read ${name} payment-token configuration`, {
+      cause: error,
+    });
   }
   const values = output.trim().split(/\s+/);
   if (values.length !== 2 || values[0] !== "true" || values[1] !== "1") {
@@ -406,7 +447,9 @@ async function verifyRuntimeHash(
   try {
     output = await run("cast", ["keccak", code], {});
   } catch (error) {
-    throw new Error(`could not hash ${label} runtime bytecode`, { cause: error });
+    throw new Error(`could not hash ${label} runtime bytecode`, {
+      cause: error,
+    });
   }
   const actualHash = readHash(output.trim(), `${label} runtime code hash`);
   const expectedHash = readHash(expectedHashValue, `${label} manifest code hash`);
@@ -415,17 +458,14 @@ async function verifyRuntimeHash(
   }
 }
 
-async function loadRuntimeCode(
-  run: CommandRunner,
-  rpcUrl: string,
-  address: string,
-  label: string,
-): Promise<string> {
+async function loadRuntimeCode(run: CommandRunner, rpcUrl: string, address: string, label: string): Promise<string> {
   let output: string;
   try {
     output = await run("cast", ["rpc", "--rpc-url", rpcUrl, "eth_getCode", address, "latest"], {});
   } catch (error) {
-    throw new Error(`could not read ${label} runtime bytecode at ${address}`, { cause: error });
+    throw new Error(`could not read ${label} runtime bytecode at ${address}`, {
+      cause: error,
+    });
   }
   let value: unknown;
   try {
@@ -499,7 +539,10 @@ async function verifyBeacon(
     expectedImplementation,
     `${name} implementation`,
   );
-  await verifyAddressCall(run, rpcUrl, beacon.address, "owner()(address)", manifest.deployer, `${name} owner`);
+  const manager = manifest.contracts.AccessManager;
+  const expectedOwner =
+    manager === undefined ? manifest.deployer : requireStandaloneContract(manifest, "AccessManager").implementation;
+  await verifyAddressCall(run, rpcUrl, beacon.address, "owner()(address)", expectedOwner, `${name} owner`);
 }
 
 async function verifyAddressCall(
@@ -510,16 +553,28 @@ async function verifyAddressCall(
   expectedAddress: string,
   label: string,
 ): Promise<void> {
+  const actualAddress = await readAddressCall(run, rpcUrl, target, signature, label);
+  if (actualAddress !== expectedAddress.toLowerCase()) {
+    throw new Error(`${label} does not match: expected ${expectedAddress.toLowerCase()}, got ${actualAddress}`);
+  }
+}
+
+async function readAddressCall(
+  run: CommandRunner,
+  rpcUrl: string,
+  target: string,
+  signature: string,
+  label: string,
+): Promise<string> {
   let output: string;
   try {
     output = await run("cast", ["call", target, signature, "--rpc-url", rpcUrl], {});
   } catch (error) {
-    throw new Error(`could not read ${label} from contract ${target}`, { cause: error });
+    throw new Error(`could not read ${label} from contract ${target}`, {
+      cause: error,
+    });
   }
-  const actualAddress = readAddressResult(output.trim(), label);
-  if (actualAddress !== expectedAddress.toLowerCase()) {
-    throw new Error(`${label} does not match: expected ${expectedAddress.toLowerCase()}, got ${actualAddress}`);
-  }
+  return readAddressResult(output.trim(), label);
 }
 
 async function verifyRole(
@@ -546,7 +601,9 @@ async function verifyRole(
       {},
     );
   } catch (error) {
-    throw new Error(`could not check ${label} role on contract ${contract}`, { cause: error });
+    throw new Error(`could not check ${label} role on contract ${contract}`, {
+      cause: error,
+    });
   }
   if (grantedOutput.trim() !== "true") {
     throw new Error(`${label} role is missing for ${account} on contract ${contract}`);
@@ -605,6 +662,12 @@ function requireDependency(manifest: DeploymentManifest, name: string): string {
   return address.toLowerCase();
 }
 
+function requireNonZeroDependency(manifest: DeploymentManifest, name: string): string {
+  const address = requireDependency(manifest, name);
+  if (address === zeroAddress) throw new Error(`manifest external dependency ${name} must be non-zero`);
+  return address;
+}
+
 function collectReceiptBlocks(receipts: readonly DeploymentTransaction[]): Map<number, string> {
   if (receipts.length === 0) {
     throw new Error("at least one transaction receipt is required for Filecoin finality");
@@ -627,14 +690,12 @@ function collectReceiptBlocks(receipts: readonly DeploymentTransaction[]): Map<n
 async function loadFinalizedHeight(run: CommandRunner, rpcUrl: string, signal?: AbortSignal): Promise<number> {
   let output: string;
   try {
-    output = await run(
-      "cast",
-      ["rpc", "--rpc-url", rpcUrl, "Filecoin.ChainGetFinalizedTipSet"],
-      { signal },
-    );
+    output = await run("cast", ["rpc", "--rpc-url", rpcUrl, "Filecoin.ChainGetFinalizedTipSet"], { signal });
   } catch (error) {
     throwIfCancelled(signal);
-    throw new Error("could not read Filecoin finalized height", { cause: error });
+    throw new Error("could not read Filecoin finalized height", {
+      cause: error,
+    });
   }
 
   const tipSet = parseJsonObject(output, "Filecoin finalized tipset");
@@ -654,14 +715,12 @@ async function verifyCanonicalBlock(
   const quantity = `0x${height.toString(16)}`;
   let output: string;
   try {
-    output = await run(
-      "cast",
-      ["rpc", "--rpc-url", rpcUrl, "eth_getBlockByNumber", quantity, "false"],
-      { signal },
-    );
+    output = await run("cast", ["rpc", "--rpc-url", rpcUrl, "eth_getBlockByNumber", quantity, "false"], { signal });
   } catch (error) {
     throwIfCancelled(signal);
-    throw new Error(`could not read canonical block ${height}`, { cause: error });
+    throw new Error(`could not read canonical block ${height}`, {
+      cause: error,
+    });
   }
   throwIfCancelled(signal);
 

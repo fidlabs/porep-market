@@ -36,6 +36,8 @@ import {MetaAllocatorMock} from "./contracts/MetaAllocatorMock.sol";
 import {IMetaAllocator} from "../src/interfaces/IMetaAllocator.sol";
 import {FilAddresses} from "filecoin-solidity/v0.8/utils/FilAddresses.sol";
 import {EvidenceTypes} from "../src/types/EvidenceTypes.sol";
+import {AccessManager} from "../src/AccessManager.sol";
+import {AccessControlledUpgradeable} from "../src/abstracts/AccessControlledUpgradeable.sol";
 
 // solhint-disable max-states-count
 contract DataCapEvidenceAdapterTest is Test {
@@ -58,6 +60,7 @@ contract DataCapEvidenceAdapterTest is Test {
     // solhint-enable var-name-mixedcase
 
     DataCapEvidenceAdapter public dataCapEvidenceAdapter;
+    AccessManager public accessManager;
 
     DataCapTypes.TransferParams public transferParams;
 
@@ -90,6 +93,8 @@ contract DataCapEvidenceAdapterTest is Test {
         validatorMock = new ValidatorMock();
         metaAllocatorMock = new MetaAllocatorMock();
         terminationOracle = vm.addr(3);
+        accessManager = new AccessManager(address(this), address(this));
+        accessManager.grantRole(accessManager.TERMINATION_ORACLE(), terminationOracle);
         totalDealSize = 103_079_215_104; // 96 GiB
         pricePerSectorPerMonth = 86_400;
         dataCapEvidenceAdapter = DataCapEvidenceAdapter(setupProxy(address(impl)));
@@ -148,7 +153,7 @@ contract DataCapEvidenceAdapterTest is Test {
     function setupProxy(address impl) public returns (address) {
         bytes memory initData = abi.encodeCall(
             DataCapEvidenceAdapter.initialize,
-            (address(this), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock))
+            (address(accessManager), address(poRepMarketMock), address(metaAllocatorMock))
         );
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), initData);
         return address(proxy);
@@ -235,13 +240,13 @@ contract DataCapEvidenceAdapterTest is Test {
     }
 
     function testIsAdminSet() public view {
-        bytes32 adminRole = dataCapEvidenceAdapter.DEFAULT_ADMIN_ROLE();
-        assertTrue(dataCapEvidenceAdapter.hasRole(adminRole, address(this)));
+        bytes32 adminRole = accessManager.DEFAULT_ADMIN_ROLE();
+        assertTrue(accessManager.hasRole(adminRole, address(this)));
     }
 
     function testIsTerminationOracleSet() public view {
-        bytes32 terminationOracleRole = dataCapEvidenceAdapter.TERMINATION_ORACLE();
-        assertTrue(dataCapEvidenceAdapter.hasRole(terminationOracleRole, terminationOracle));
+        bytes32 terminationOracleRole = accessManager.TERMINATION_ORACLE();
+        assertTrue(accessManager.hasRole(terminationOracleRole, terminationOracle));
     }
 
     function testDataCapEvidenceAdapterEvidenceType() public view {
@@ -412,7 +417,7 @@ contract DataCapEvidenceAdapterTest is Test {
     function testAuthorizeUpgradeRevert() public {
         address newImpl = address(new DataCapEvidenceAdapter());
         address unauthorized = vm.addr(1);
-        bytes32 upgraderRole = dataCapEvidenceAdapter.UPGRADER_ROLE();
+        bytes32 upgraderRole = accessManager.UPGRADER_ROLE();
         vm.prank(unauthorized);
         vm.expectRevert(
             abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, upgraderRole)
@@ -820,7 +825,7 @@ contract DataCapEvidenceAdapterTest is Test {
         address impl = address(new DataCapEvidenceAdapter());
         bytes memory initData = abi.encodeCall(
             DataCapEvidenceAdapter.initialize,
-            (address(this), terminationOracle, address(poRepMarketMock), address(reentrantMetaAllocatorMock))
+            (address(accessManager), address(poRepMarketMock), address(reentrantMetaAllocatorMock))
         );
         DataCapEvidenceAdapter dataCapEvidenceAdapterWithReentrancy =
             DataCapEvidenceAdapter(address(new ERC1967Proxy(address(impl), initData)));
@@ -904,7 +909,7 @@ contract DataCapEvidenceAdapterTest is Test {
 
     function testClaimsTerminatedEarlyRevertsWhenNotTerminationOracle() public {
         address notTerminationOracle = vm.addr(4);
-        bytes32 expectedRole = dataCapEvidenceAdapter.TERMINATION_ORACLE();
+        bytes32 expectedRole = accessManager.TERMINATION_ORACLE();
         vm.prank(notTerminationOracle);
         vm.expectRevert(
             abi.encodeWithSelector(
@@ -995,22 +1000,13 @@ contract DataCapEvidenceAdapterTest is Test {
         dataCapEvidenceAdapterMock.submitDataCapBatch(transferParams, dealId);
     }
 
-    function testInitializeRevertsWhenAdminAddressIsZero() public {
+    function testInitializeRevertsWhenManagerAddressIsZero() public {
         DataCapEvidenceAdapter impl = new DataCapEvidenceAdapter();
         ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
         DataCapEvidenceAdapter c = DataCapEvidenceAdapter(address(proxy));
 
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidAdminAddress.selector));
-        c.initialize(address(0), terminationOracle, address(poRepMarketMock), address(metaAllocatorMock));
-    }
-
-    function testInitializeRevertsWhenTerminationOracleIsZero() public {
-        DataCapEvidenceAdapter impl = new DataCapEvidenceAdapter();
-        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
-        DataCapEvidenceAdapter c = DataCapEvidenceAdapter(address(proxy));
-
-        vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidTerminationOracleAddress.selector));
-        c.initialize(address(clientAddress), address(0), address(poRepMarketMock), address(metaAllocatorMock));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlledUpgradeable.InvalidAccessManager.selector, address(0)));
+        c.initialize(address(0), address(poRepMarketMock), address(metaAllocatorMock));
     }
 
     function testInitializeRevertsWhenPoRepMarketIsZero() public {
@@ -1019,7 +1015,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapter c = DataCapEvidenceAdapter(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidPoRepMarketContractAddress.selector));
-        c.initialize(address(clientAddress), terminationOracle, address(0), address(metaAllocatorMock));
+        c.initialize(address(accessManager), address(0), address(metaAllocatorMock));
     }
 
     function testInitializeRevertsWhenMetaAllocatorIsZero() public {
@@ -1028,7 +1024,7 @@ contract DataCapEvidenceAdapterTest is Test {
         DataCapEvidenceAdapter c = DataCapEvidenceAdapter(address(proxy));
 
         vm.expectRevert(abi.encodeWithSelector(DataCapEvidenceAdapter.InvalidMetaAllocatorContractAddress.selector));
-        c.initialize(address(clientAddress), terminationOracle, address(poRepMarketMock), address(0));
+        c.initialize(address(accessManager), address(poRepMarketMock), address(0));
     }
 
     function testGetPoRepMarketAddress() public view {
@@ -1225,7 +1221,7 @@ contract DataCapEvidenceAdapterTest is Test {
 
     function testDisableAdapterRevertsWhenCallerIsNotAdmin() public {
         address unauthorized = vm.addr(0x524);
-        bytes32 adminRole = dataCapEvidenceAdapter.DEFAULT_ADMIN_ROLE();
+        bytes32 adminRole = accessManager.DEFAULT_ADMIN_ROLE();
 
         vm.prank(unauthorized);
         vm.expectRevert(

@@ -17,20 +17,6 @@ interface IValidatorFactory {
     function create(uint256 dealId) external;
 
     /**
-     * @notice Sets a new admin for the contract and revoke the role from the old admin
-     * @dev Only callable by the current admin. Reverts if the new admin address is the zero address.
-     * @param newAdmin The new admin address
-     */
-    function setAdmin(address newAdmin) external;
-
-    /**
-     * @notice Sets a new upgrader role for the contract
-     * @dev Only callable by the current admin. Reverts if the new upgrader role address is the zero address.
-     * @param newUpgraderRole The new upgrader role address
-     */
-    function setUpgraderRole(address newUpgraderRole) external;
-
-    /**
      * @notice Checks if an address is a validator contract
      * @param contractAddress The address to check
      * @return True if the address is a validator contract, false otherwise
