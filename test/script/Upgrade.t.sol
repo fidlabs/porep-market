@@ -5,6 +5,7 @@ pragma solidity =0.8.30;
 import {Test} from "forge-std/Test.sol";
 import {stdJson} from "forge-std/StdJson.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {UpgradeableBeacon} from "@openzeppelin/contracts/proxy/beacon/UpgradeableBeacon.sol";
 import {Deploy} from "../../script/Deploy.s.sol";
@@ -123,6 +124,7 @@ contract DeploymentScriptsTest is Test {
         assertTrue(DataCapEvidenceAdapter(adapter).isOperational());
         _assertManagerTopology(managerAddress, admin, service, oracle, termination, market);
         _assertPaymentTokens(registry, admin, json);
+        _assertAdminTransferAcrossTargets(managerAddress, admin, market, registry, adapter);
     }
 
     function _assertManagerTopology(
@@ -164,6 +166,58 @@ contract DeploymentScriptsTest is Test {
         config = SPRegistry(registry).getPaymentTokenConfig(axlUsdc);
         assertTrue(config.allowed);
         assertEq(config.minPricePer32GiBPerMonth, 1);
+    }
+
+    function _assertAdminTransferAcrossTargets(
+        address managerAddress,
+        address oldAdmin,
+        address market,
+        address registry,
+        address adapter
+    ) private {
+        AccessManager manager = AccessManager(managerAddress);
+        address newAdmin = vm.addr(11);
+        bytes32 adminRole = manager.DEFAULT_ADMIN_ROLE();
+
+        vm.prank(oldAdmin);
+        manager.beginDefaultAdminTransfer(newAdmin);
+        (, uint48 schedule) = manager.pendingDefaultAdmin();
+        vm.warp(uint256(schedule) + 1);
+        vm.prank(newAdmin);
+        manager.acceptDefaultAdminTransfer();
+
+        assertFalse(manager.hasRole(adminRole, oldAdmin));
+        assertTrue(manager.hasRole(adminRole, newAdmin));
+        assertTrue(manager.hasRole(manager.UPGRADER_ROLE(), oldAdmin));
+        assertFalse(manager.hasRole(manager.UPGRADER_ROLE(), newAdmin));
+
+        vm.prank(oldAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, oldAdmin, adminRole)
+        );
+        PoRepMarket(market).setDealActivationPadding(200);
+        vm.prank(newAdmin);
+        PoRepMarket(market).setDealActivationPadding(200);
+        assertEq(PoRepMarket(market).getDealActivationPadding(), 200);
+
+        address paymentToken = address(0x107);
+        vm.prank(oldAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, oldAdmin, adminRole)
+        );
+        SPRegistry(registry).setPaymentToken(paymentToken, true, 2);
+        vm.prank(newAdmin);
+        SPRegistry(registry).setPaymentToken(paymentToken, true, 2);
+        assertTrue(SPRegistry(registry).getPaymentTokenConfig(paymentToken).allowed);
+
+        vm.prank(oldAdmin);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, oldAdmin, adminRole)
+        );
+        DataCapEvidenceAdapter(adapter).disableAdapter();
+        vm.prank(newAdmin);
+        DataCapEvidenceAdapter(adapter).disableAdapter();
+        assertFalse(DataCapEvidenceAdapter(adapter).isOperational());
     }
 
     function _assertUnsupportedTargetRejected() private {
