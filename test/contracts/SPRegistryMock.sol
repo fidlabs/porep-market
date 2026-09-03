@@ -40,6 +40,28 @@ contract SPRegistryMock is ISPRegistry {
     uint256 public lastCommittedEstimatedBytes;
     uint256 public lastCommittedActualBytes;
     uint256 public lastReserveOfferId;
+    uint256 public lastUpdatedOfferId;
+    address public lastUpdatedClient;
+    bytes32 public lastUpdatedOldManifestHash;
+    bytes32 public lastUpdatedNewManifestHash;
+    uint256 public lastUpdatedOldSizeBytes;
+    uint256 public lastUpdatedNewSizeBytes;
+
+    function updatePendingReservation(
+        uint256 offerId,
+        address client,
+        bytes32 oldManifestHash,
+        bytes32 newManifestHash,
+        uint256 oldSizeBytes,
+        uint256 newSizeBytes
+    ) external {
+        lastUpdatedOfferId = offerId;
+        lastUpdatedClient = client;
+        lastUpdatedOldManifestHash = oldManifestHash;
+        lastUpdatedNewManifestHash = newManifestHash;
+        lastUpdatedOldSizeBytes = oldSizeBytes;
+        lastUpdatedNewSizeBytes = newSizeBytes;
+    }
 
     function setNextSelection(SharedTypes.ProviderDealSelection calldata selection) external {
         nextSelection = selection;

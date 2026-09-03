@@ -232,6 +232,17 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
     );
 
     /**
+     * @notice Emitted when a pending deal replaces its manifest assignment.
+     * @param client Client whose assignment changes.
+     * @param organization Organization holding the assignment.
+     * @param oldManifestHash Released manifest hash.
+     * @param newManifestHash Assigned manifest hash.
+     */
+    event ManifestAssignmentUpdated(
+        address indexed client, address indexed organization, bytes32 oldManifestHash, bytes32 indexed newManifestHash
+    );
+
+    /**
      * @notice Error thrown when a provider is already registered
      * @dev 0xf91794e7
      */
@@ -390,6 +401,18 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
      * @param reason OfferMatch reason code identifying the first failing check.
      */
     error OfferNotEligible(uint256 offerId, uint16 reason);
+
+    /**
+     * @notice Error thrown when a replacement manifest hash is zero.
+     * @dev 0x03d0cf2a
+     */
+    error InvalidManifestHash();
+
+    /**
+     * @notice Error thrown when the client's previous manifest is not assigned to the selected organization.
+     * @dev 0xb0e04a53
+     */
+    error ManifestNotAssignedToOrganizationAndClient(address client, bytes32 manifestHash, address organization);
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor() {
@@ -737,6 +760,56 @@ contract SPRegistry is Initializable, AccessControlUpgradeable, UUPSUpgradeable,
         (selection, reason) = _evaluateOffer(offerId, client, request);
         if (reason != OfferMatch.OK) revert OfferNotEligible(offerId, reason);
         _reserveSelection(client, request.manifestHash, selection);
+    }
+
+    /// @inheritdoc ISPRegistry
+    function updatePendingReservation(
+        uint256 offerId,
+        address client,
+        bytes32 oldManifestHash,
+        bytes32 newManifestHash,
+        uint256 oldSizeBytes,
+        uint256 newSizeBytes
+    ) external onlyRole(MARKET_ROLE) {
+        _ensureOfferExists(offerId);
+        if (newManifestHash == bytes32(0)) revert InvalidManifestHash();
+
+        SPRegistryStorage storage $ = s();
+        CommonTypes.FilActorId provider = $._offers[offerId].provider;
+        address organization = $._providers[_providerId(provider)].organization;
+        if (!$._clientManifestDealWithOrganization[client][oldManifestHash][organization]) {
+            revert ManifestNotAssignedToOrganizationAndClient(client, oldManifestHash, organization);
+        }
+        ProviderCapacity storage c = $._providerCapacity[_providerId(provider)];
+        if (oldSizeBytes > c.pendingBytes) {
+            revert ReleasePendingExceedsPending(provider, oldSizeBytes, c.pendingBytes);
+        }
+        SharedTypes.OfferTerms storage terms = $._offerTerms[offerId];
+        if (
+            oldSizeBytes == 0 || newSizeBytes == 0 || newSizeBytes < terms.minSizeBytes
+                || (terms.maxSizeBytes != 0 && newSizeBytes > terms.maxSizeBytes)
+        ) revert OfferNotEligible(offerId, OfferMatch.SIZE_OUT_OF_BOUNDS);
+        if (
+            newManifestHash != oldManifestHash
+                && $._clientManifestDealWithOrganization[client][newManifestHash][organization]
+        ) revert OfferNotEligible(offerId, OfferMatch.MANIFEST_ALREADY_ASSIGNED);
+
+        if (newSizeBytes > oldSizeBytes) {
+            uint256 increase = newSizeBytes - oldSizeBytes;
+            if (increase > _remainingCapacity(provider)) {
+                revert OfferNotEligible(offerId, OfferMatch.INSUFFICIENT_CAPACITY);
+            }
+            _reservePending(provider, increase);
+        } else if (newSizeBytes < oldSizeBytes) {
+            uint256 decrease = oldSizeBytes - newSizeBytes;
+            c.pendingBytes -= decrease;
+            emit PendingCapacityReleased(provider, decrease);
+        }
+        if (newManifestHash != oldManifestHash) {
+            $._clientManifestDealWithOrganization[client][oldManifestHash][organization] = false;
+            $._clientManifestDealWithOrganization[client][newManifestHash][organization] = true;
+            emit ManifestAssignmentUpdated(client, organization, oldManifestHash, newManifestHash);
+        }
     }
 
     /// @inheritdoc ISPRegistry

@@ -1577,6 +1577,44 @@
   },
   {
     "type": "function",
+    "name": "updatePendingReservation",
+    "inputs": [
+      {
+        "name": "offerId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "oldManifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newManifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "oldSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "newSizeBytes",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "upgradeToAndCall",
     "inputs": [
       {
@@ -1659,6 +1697,37 @@
         "type": "uint64",
         "indexed": false,
         "internalType": "uint64"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
+    "name": "ManifestAssignmentUpdated",
+    "inputs": [
+      {
+        "name": "client",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "organization",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "oldManifestHash",
+        "type": "bytes32",
+        "indexed": false,
+        "internalType": "bytes32"
+      },
+      {
+        "name": "newManifestHash",
+        "type": "bytes32",
+        "indexed": true,
+        "internalType": "bytes32"
       }
     ],
     "anonymous": false
@@ -2176,6 +2245,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidManifestHash",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidOfferDurationBounds",
     "inputs": [
       {
@@ -2244,6 +2318,27 @@
         "name": "value",
         "type": "uint16",
         "internalType": "uint16"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ManifestNotAssignedToOrganizationAndClient",
+    "inputs": [
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
+      },
+      {
+        "name": "manifestHash",
+        "type": "bytes32",
+        "internalType": "bytes32"
+      },
+      {
+        "name": "organization",
+        "type": "address",
+        "internalType": "address"
       }
     ]
   },

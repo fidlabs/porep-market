@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-// solhint-disable use-natspec, function-max-lines, gas-strict-inequalities, max-states-count
+// solhint-disable use-natspec, function-max-lines, gas-strict-inequalities, max-states-count, gas-small-strings
 pragma solidity =0.8.30;
 
 import {Test, Vm} from "lib/forge-std/src/Test.sol";
@@ -832,6 +832,299 @@ contract SPRegistryTest is Test {
             abi.encodeWithSelector(SPRegistry.CommitExceedsAvailable.selector, provider1, 10_400_000, 10_000_000)
         );
         spRegistry.commitCapacity(provider1, 0, 10_000_000);
+    }
+
+    function _setupPendingReservation() internal returns (uint256 offerId) {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        offerId = _createOffer(provider1, 90_000);
+        vm.prank(market);
+        spRegistry.reserveOfferForDeal(offerId, client1, _request(100_000));
+    }
+
+    function _assertPendingReservationUpdate(uint256 newSizeBytes, bool changeHash) internal {
+        uint256 offerId = _setupPendingReservation();
+        bytes32 oldHash = keccak256("manifest");
+        bytes32 newHash = changeHash ? keccak256("replacement") : oldHash;
+        bytes memory offerBefore = abi.encode(spRegistry.getOfferView(offerId));
+
+        vm.recordLogs();
+        vm.prank(market);
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, newSizeBytes);
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+
+        ISPRegistry.ProviderView memory capacity = spRegistry.getProviderView(provider1);
+        assertEq(capacity.pendingBytes, newSizeBytes);
+        assertEq(capacity.committedBytes, 0);
+        assertEq(capacity.availableBytes, defaultAvailableBytes);
+        assertEq(abi.encode(spRegistry.getOfferView(offerId)), offerBefore);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
+        assertEq(spRegistry.isManifestAssignedToOrganizationAndClient(client1, oldHash, owner1), !changeHash);
+
+        uint256 capacityEvents = newSizeBytes == 1_000_000 ? 0 : 1;
+        assertEq(logs.length, capacityEvents + (changeHash ? 1 : 0));
+        if (capacityEvents != 0) {
+            bool growth = newSizeBytes > 1_000_000;
+            assertEq(
+                logs[0].topics[0],
+                growth
+                    ? keccak256("PendingCapacityReserved(uint64,uint256)")
+                    : keccak256("PendingCapacityReleased(uint64,uint256)")
+            );
+            assertEq(abi.decode(logs[0].data, (uint256)), growth ? newSizeBytes - 1_000_000 : 1_000_000 - newSizeBytes);
+        }
+        if (changeHash) {
+            Vm.Log memory assignmentLog = logs[capacityEvents];
+            assertEq(assignmentLog.topics[0], keccak256("ManifestAssignmentUpdated(address,address,bytes32,bytes32)"));
+            assertEq(assignmentLog.topics[1], bytes32(uint256(uint160(client1))));
+            assertEq(assignmentLog.topics[2], bytes32(uint256(uint160(owner1))));
+            assertEq(assignmentLog.topics[3], newHash);
+            assertEq(abi.decode(assignmentLog.data, (bytes32)), oldHash);
+        }
+    }
+
+    function testUpdatePendingReservationGrowsWithSameHash() public {
+        _assertPendingReservationUpdate(2_000_000, false);
+    }
+
+    function testUpdatePendingReservationShrinksWithSameHash() public {
+        _assertPendingReservationUpdate(500_000, false);
+    }
+
+    function testUpdatePendingReservationSameSizeAndHash() public {
+        _assertPendingReservationUpdate(1_000_000, false);
+    }
+
+    function testUpdatePendingReservationGrowsWithChangedHash() public {
+        _assertPendingReservationUpdate(2_000_000, true);
+    }
+
+    function testUpdatePendingReservationShrinksWithChangedHash() public {
+        _assertPendingReservationUpdate(500_000, true);
+    }
+
+    function testUpdatePendingReservationSameSizeWithChangedHash() public {
+        _assertPendingReservationUpdate(1_000_000, true);
+    }
+
+    function testFuzzUpdatePendingReservationPreservesOtherPendingAndCommitted(uint256 newSizeBytes, bool changeHash)
+        public
+    {
+        uint256 offerId = _setupPendingReservation();
+        newSizeBytes = bound(newSizeBytes, 1, 8_000_000);
+        bytes32 oldHash = keccak256("manifest");
+        bytes32 newHash = changeHash ? keccak256("replacement") : oldHash;
+        bytes32 committedHash = keccak256("committed");
+        bytes32 pendingHash = keccak256("pending");
+        vm.startPrank(market);
+        spRegistry.reserveOfferForDeal(offerId, client1, _requestWithManifest(committedHash, 100_000));
+        spRegistry.commitCapacity(provider1, 1_000_000, 1_000_000);
+        spRegistry.reserveOfferForDeal(offerId, client1, _requestWithManifest(pendingHash, 100_000));
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, newSizeBytes);
+        vm.stopPrank();
+
+        ISPRegistry.ProviderView memory capacity = spRegistry.getProviderView(provider1);
+        assertEq(capacity.pendingBytes, newSizeBytes + 1_000_000);
+        assertEq(capacity.committedBytes, 1_000_000);
+        assertLe(capacity.pendingBytes + capacity.committedBytes, capacity.availableBytes);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, committedHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, pendingHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
+    }
+
+    function testUpdatePendingReservationGrowthChecksOtherPendingAndCommittedCapacity() public {
+        uint256 offerId = _setupPendingReservation();
+        bytes32 oldHash = keccak256("manifest");
+        bytes32 newHash = keccak256("replacement");
+        vm.startPrank(market);
+        spRegistry.reserveOfferForDeal(offerId, client1, _requestWithManifest(keccak256("committed"), 100_000));
+        spRegistry.commitCapacity(provider1, 1_000_000, 1_000_000);
+        spRegistry.reserveOfferForDeal(offerId, client1, _requestWithManifest(keccak256("pending"), 100_000));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.INSUFFICIENT_CAPACITY)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, 8_000_001);
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 2_000_000);
+        assertEq(spRegistry.getProviderView(provider1).committedBytes, 1_000_000);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, oldHash, owner1));
+        assertFalse(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
+
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, 8_000_000);
+        vm.stopPrank();
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 9_000_000);
+    }
+
+    function testUpdatePendingReservationChecksSelectedOfferSizeBounds() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        SharedTypes.OfferTerms memory terms = _terms();
+        terms.minSizeBytes = 500_000;
+        terms.maxSizeBytes = 2_000_000;
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, terms, defaultSLIs, _paymentRows(90_000));
+        bytes32 manifestHash = keccak256("manifest");
+        vm.startPrank(market);
+        spRegistry.reserveOfferForDeal(offerId, client1, _request(100_000));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, manifestHash, manifestHash, 1_000_000, 499_999);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, manifestHash, manifestHash, 1_000_000, 2_000_001);
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 1_000_000);
+        spRegistry.updatePendingReservation(offerId, client1, manifestHash, manifestHash, 1_000_000, 500_000);
+        spRegistry.updatePendingReservation(offerId, client1, manifestHash, manifestHash, 500_000, 2_000_000);
+        vm.stopPrank();
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 2_000_000);
+    }
+
+    function testUpdatePendingReservationSupportsUnboundedOfferSize() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        SharedTypes.OfferTerms memory terms = _terms();
+        terms.maxSizeBytes = 0;
+        vm.prank(operator);
+        uint256 offerId = spRegistry.createOffer(provider1, terms, defaultSLIs, _paymentRows(90_000));
+        vm.startPrank(market);
+        spRegistry.reserveOfferForDeal(offerId, client1, _request(100_000));
+        spRegistry.updatePendingReservation(
+            offerId, client1, keccak256("manifest"), keccak256("replacement"), 1_000_000, defaultAvailableBytes
+        );
+        vm.stopPrank();
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, defaultAvailableBytes);
+    }
+
+    function testUpdatePendingReservationRejectsDuplicateWithinClientAndOrganization() public {
+        uint256 offerId = _setupPendingReservation();
+        _registerProvider(provider2, owner1);
+        uint256 secondOfferId = _createOffer(provider2, 90_000);
+        bytes32 oldHash = keccak256("manifest");
+        bytes32 newHash = keccak256("replacement");
+        vm.startPrank(market);
+        spRegistry.reserveOfferForDeal(secondOfferId, client1, _requestWithManifest(newHash, 100_000));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.MANIFEST_ALREADY_ASSIGNED)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, 2_000_000);
+        vm.stopPrank();
+
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 1_000_000);
+        assertEq(spRegistry.getProviderView(provider2).pendingBytes, 1_000_000);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, oldHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
+    }
+
+    function testUpdatePendingReservationAllowsHashAssignedToOtherClientOrOrganization() public {
+        uint256 offerId = _setupPendingReservation();
+        _registerProvider(provider2, owner2);
+        uint256 secondOfferId = _createOffer(provider2, 90_000);
+        bytes32 newHash = keccak256("replacement");
+        vm.startPrank(market);
+        spRegistry.reserveOfferForDeal(offerId, client2, _requestWithManifest(newHash, 100_000));
+        spRegistry.reserveOfferForDeal(secondOfferId, client1, _requestWithManifest(newHash, 100_000));
+        spRegistry.updatePendingReservation(offerId, client1, keccak256("manifest"), newHash, 1_000_000, 2_000_000);
+        vm.stopPrank();
+
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 3_000_000);
+        assertEq(spRegistry.getProviderView(provider2).pendingBytes, 1_000_000);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client2, newHash, owner1));
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner2));
+    }
+
+    function testUpdatePendingReservationReleasesOldHashAndLocksNewHash() public {
+        uint256 offerId = _setupPendingReservation();
+        bytes32 oldHash = keccak256("manifest");
+        bytes32 newHash = keccak256("replacement");
+        vm.startPrank(market);
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, 2_000_000);
+        spRegistry.reserveOfferForDeal(offerId, client1, _requestWithManifest(oldHash, 100_000));
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.MANIFEST_ALREADY_ASSIGNED)
+        );
+        spRegistry.reserveOfferForDeal(offerId, client1, _requestWithManifest(newHash, 100_000));
+        spRegistry.releasePendingCapacity(provider1, 2_000_000, client1, newHash);
+        vm.stopPrank();
+
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 1_000_000);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, oldHash, owner1));
+        assertFalse(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
+    }
+
+    function testUpdatePendingReservationDoesNotRepeatMatching() public {
+        uint256 offerId = _setupPendingReservation();
+        vm.startPrank(operator);
+        spRegistry.setOfferActive(offerId, false);
+        spRegistry.setOfferPayment(offerId, token, false, 90_000);
+        vm.stopPrank();
+        vm.startPrank(admin);
+        spRegistry.setPaymentToken(token, false, 200_000);
+        spRegistry.pauseProvider(provider1);
+        spRegistry.blockProvider(provider1);
+        vm.stopPrank();
+        bytes memory offerBefore = abi.encode(spRegistry.getOfferView(offerId));
+
+        vm.prank(market);
+        spRegistry.updatePendingReservation(
+            offerId, client1, keccak256("manifest"), keccak256("replacement"), 1_000_000, 2_000_000
+        );
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 2_000_000);
+        assertEq(abi.encode(spRegistry.getOfferView(offerId)), offerBefore);
+    }
+
+    function testUpdatePendingReservationRejectsNonMarketCaller() public {
+        uint256 offerId = _setupPendingReservation();
+        bytes32 marketRole = spRegistry.MARKET_ROLE();
+        vm.prank(admin);
+        vm.expectRevert(abi.encodeWithSignature("AccessControlUnauthorizedAccount(address,bytes32)", admin, marketRole));
+        spRegistry.updatePendingReservation(
+            offerId, client1, keccak256("manifest"), keccak256("replacement"), 1_000_000, 2_000_000
+        );
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 1_000_000);
+    }
+
+    function testUpdatePendingReservationRejectsMissingOfferAndInvalidInputs() public {
+        uint256 offerId = _setupPendingReservation();
+        bytes32 oldHash = keccak256("manifest");
+        bytes32 newHash = keccak256("replacement");
+        vm.startPrank(market);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotFound.selector, 0));
+        spRegistry.updatePendingReservation(0, client1, oldHash, newHash, 1_000_000, 2_000_000);
+        vm.expectRevert(abi.encodeWithSelector(SPRegistry.OfferNotFound.selector, 999));
+        spRegistry.updatePendingReservation(999, client1, oldHash, newHash, 1_000_000, 2_000_000);
+        vm.expectRevert(SPRegistry.InvalidManifestHash.selector);
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, bytes32(0), 1_000_000, 2_000_000);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_000, 0);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, offerId, OfferMatch.SIZE_OUT_OF_BOUNDS)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 0, 2_000_000);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.ReleasePendingExceedsPending.selector, provider1, 1_000_001, 1_000_000)
+        );
+        spRegistry.updatePendingReservation(offerId, client1, oldHash, newHash, 1_000_001, 2_000_000);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.ManifestNotAssignedToOrganizationAndClient.selector, client1, newHash, owner1
+            )
+        );
+        spRegistry.updatePendingReservation(offerId, client1, newHash, oldHash, 1_000_000, 2_000_000);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                SPRegistry.ManifestNotAssignedToOrganizationAndClient.selector, client2, oldHash, owner1
+            )
+        );
+        spRegistry.updatePendingReservation(offerId, client2, oldHash, newHash, 1_000_000, 2_000_000);
+        vm.stopPrank();
+
+        assertEq(spRegistry.getProviderView(provider1).pendingBytes, 1_000_000);
+        assertTrue(spRegistry.isManifestAssignedToOrganizationAndClient(client1, oldHash, owner1));
+        assertFalse(spRegistry.isManifestAssignedToOrganizationAndClient(client1, newHash, owner1));
     }
 
     function testCommitCapacityUsesActualBytesAndReleasesEstimatedPending() public {
