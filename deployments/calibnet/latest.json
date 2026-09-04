@@ -1,9 +1,9 @@
 {
   "status": "finalized",
-  "finalizedAt": "2026-09-04T09:48:43.132Z",
+  "finalizedAt": "2026-09-04T13:37:13.559Z",
   "deployer": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
   "release": {
-    "buildInfoSha256": "0x575ca99cc6c2878620bf01891c9ca11af8331ee0f56bf82d3d4d5352133e4830"
+    "buildInfoSha256": "0x16173065fc514795ffaa2b99d01e089f97b4ef4cfd457012b0b1dded83bdd7a5"
   },
   "contracts": {
     "AccessManager": {
@@ -66,9 +66,9 @@
       "kind": "uups",
       "artifact": "src/SPRegistry.sol:SPRegistry",
       "proxy": "0x79e88d12062Cc42A3c4cfE87d37Fbd3156790FA0",
-      "implementation": "0x94f0bc762CA396BB85C54E35533Fd93EcC75BC60",
+      "implementation": "0xbE4980c18dbdaBDeA0Faf2935530Bc7c89859035",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
-      "implementationCodeHash": "0x008a52ddcfe0a3ad72342ea1d88e1c237c8168d3a16579db11d84f8bc0e946e7"
+      "implementationCodeHash": "0x4d29b15117bd3e442eae9552e30f3ece8afdd7925db38d442b8d0b33a0c5d5be"
     },
     "Validator": {
       "kind": "implementation",
@@ -103,17 +103,17 @@
   },
   "transactions": [
     {
-      "hash": "0x9475032f2c704e4ebb5b9684f458a9f9a699ae7aa8d1f3084521044a8faedc77",
+      "hash": "0x33c42d85a56ed8514d2aa7023b97b09e2230ec4b07ae6801d796006e0c01ebbe",
       "status": 1,
-      "blockNumber": 4039622,
-      "blockHash": "0x8a8037b208679f6ea461c297bdfd31b413a1934bcc6474991cb028535c79185a",
-      "contractAddress": "0x94a22b89f7d64bb272d5a9f8013367936ccd8056"
+      "blockNumber": 4040079,
+      "blockHash": "0x2ecea530aab5bee6fd6a857f439631b08f3ded944b10b57cfc9d59eadc029abe",
+      "contractAddress": "0xbe4980c18dbdabdea0faf2935530bc7c89859035"
     },
     {
-      "hash": "0x89b8ce26c764ec8951dae9147215c8453f96583a9c5a8e251a4acc3b9a74cf3c",
+      "hash": "0xa80c26763c1df0046c7ca29e3085a182f3741ded7a4535f05760303385abcfc4",
       "status": 1,
-      "blockNumber": 4039624,
-      "blockHash": "0xc52638e4d211a731358e2947120c288297c76e540d40f849dc9f84728b226fa1",
+      "blockNumber": 4040081,
+      "blockHash": "0xe23ae67ba8d6c3b46b30ed6702e9cf473d9b57d22d65a9ce42340c1f2fa7d7da",
       "contractAddress": null
     }
   ]
