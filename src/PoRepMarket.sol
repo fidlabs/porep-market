@@ -345,6 +345,12 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     error InvalidSLIScorerAddress();
 
     /**
+     * @notice Error thrown when trying to propose a deal for an invalid client address
+     * @dev 0x4d9c0a3f
+     */
+    error InvalidClientAddress();
+
+    /**
      * @notice Error indicating that a deal has not started its service window
      * @dev 0xf73df7ce
      */
@@ -545,6 +551,7 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
         override
         onlyRole(Roles.DEFAULT_ADMIN_ROLE)
     {
+        if (client == address(0)) revert InvalidClientAddress();
         PoRepMarketStorage storage $ = s();
         _ensureValidProposalRequest(request);
         SharedTypes.ProviderDealSelection memory reservedProvider =

@@ -710,6 +710,15 @@ contract PoRepMarketTest is Test {
         poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request, clientAddress);
     }
 
+    function testProposeDealWithSpecificOfferRevertsWhenClientIsZeroAddress() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        vm.expectRevert(PoRepMarket.InvalidClientAddress.selector);
+        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request, address(0));
+    }
+
     function testProposeDealCallsReserveProviderForDealWithRequest() public {
         vm.prank(clientAddress);
         poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
