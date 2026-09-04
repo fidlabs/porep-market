@@ -344,17 +344,21 @@ test("rejects standard upgrades from manager-less legacy manifests before Forge 
   }
 });
 
-test("verifies every deployed Calibnet address idempotently", async () => {
+test("submits every deployed Calibnet address that Blockscout does not already hold", async () => {
   const manifest = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
   const calls: string[][] = [];
   const confirmed: string[] = [];
+  const submitted = new Set<string>();
   await verifyContractSources(manifest, {
     chainId: 314159,
     root: process.cwd(),
     rpcUrl: "http://calibnet.example",
     verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
-    runForge: async (args) => { calls.push([...args]); },
-    confirmVerified: async (target) => { confirmed.push(target.address); },
+    runForge: async (args) => { calls.push([...args]); submitted.add(args[1]!); },
+    confirmVerified: async (target) => {
+      if (!submitted.has(target.address)) throw new Error("not verified yet");
+      confirmed.push(target.address);
+    },
     progress: () => {},
   });
 
@@ -368,7 +372,81 @@ test("verifies every deployed Calibnet address idempotently", async () => {
   assert.ok(calls.every((args) => args.includes("--verifier") && args.includes("--watch")));
 });
 
-test("rejects a Blockscout source record for the wrong contract", async () => {
+test("skips Forge for earlier-release contracts Blockscout already holds", async () => {
+  const manifest = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
+  manifest.transactions = [];
+  const calls: string[][] = [];
+  await verifyContractSources(manifest, {
+    chainId: 314159,
+    root: process.cwd(),
+    rpcUrl: "http://calibnet.example",
+    verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
+    runForge: async (args) => { calls.push([...args]); },
+    confirmVerified: async () => {},
+    progress: () => {},
+  });
+
+  assert.equal(calls.length, 0);
+});
+
+test("always submits addresses the current operation deployed", async () => {
+  const manifest = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
+  const deployed = (manifest.transactions ?? [])
+    .map((transaction) => transaction.contractAddress)
+    .filter((address) => address !== null);
+  assert.ok(deployed.length > 0);
+  const calls: string[][] = [];
+
+  await verifyContractSources(manifest, {
+    chainId: 314159,
+    root: process.cwd(),
+    rpcUrl: "http://calibnet.example",
+    verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
+    runForge: async (args) => { calls.push([...args]); },
+    confirmVerified: async () => {},
+    progress: () => {},
+  });
+
+  const submitted = calls.map((args) => args[1]!.toLowerCase());
+  for (const address of deployed) assert.ok(submitted.includes(address.toLowerCase()));
+});
+
+test("verifies every remaining contract after one fails and reports them together", async () => {
+  const manifest = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
+  const failing = manifest.contracts.PoRepMarketClaimInspector;
+  assert.equal(failing.kind, "standalone");
+  const attempted: string[] = [];
+  const submitted = new Set<string>();
+
+  await assert.rejects(
+    verifyContractSources(manifest, {
+      chainId: 314159,
+      root: process.cwd(),
+      rpcUrl: "http://calibnet.example",
+      verifierUrl: "https://filecoin-testnet.blockscout.com/api/",
+      runForge: async (args) => {
+        const address = args[1]!;
+        attempted.push(address);
+        if (address === failing.implementation) throw new Error("Local bytecode doesn't match on-chain bytecode");
+        submitted.add(address);
+      },
+      confirmVerified: async (target) => {
+        if (!submitted.has(target.address)) throw new Error("not verified yet");
+      },
+      progress: () => {},
+    }),
+    (error: Error) => {
+      assert.match(error.message, /1 of 18 contracts failed source verification/);
+      assert.match(error.message, /PoRepMarketClaimInspector/);
+      assert.match(error.message, /Local bytecode doesn't match on-chain bytecode/);
+      return true;
+    },
+  );
+
+  assert.equal(attempted.length, 18);
+});
+
+test("rejects a Blockscout record that is not fully verified", async () => {
   const target = {
     label: "ValidatorBeacon",
     address: `0x${"1".repeat(40)}`,
@@ -376,11 +454,25 @@ test("rejects a Blockscout source record for the wrong contract", async () => {
     verifier: "blockscout" as const,
     guessConstructorArguments: false,
   };
-  const response = new Response(JSON.stringify({ result: [{ ContractName: "FilecoinMarketConsumer" }] }));
+
+  // A name alone does not mean verified: Blockscout derives it from bytecode similarity.
+  const partial = new Response(JSON.stringify({ name: "UpgradeableBeacon", is_fully_verified: false }));
   await assert.rejects(
-    confirmBlockscoutSource("https://blockscout.example/api/", target, async () => response),
-    /expected UpgradeableBeacon, got FilecoinMarketConsumer/,
+    confirmBlockscoutSource("https://blockscout.example/api/", target, async () => partial),
+    /did not fully verify .* is_fully_verified=false/,
   );
+
+  const missing = new Response("", { status: 404 });
+  await assert.rejects(
+    confirmBlockscoutSource("https://blockscout.example/api/", target, async () => missing),
+    /holds no verified source/,
+  );
+
+  const verified = new Response(JSON.stringify({ name: "UpgradeableBeacon", is_fully_verified: true }));
+  await confirmBlockscoutSource("https://blockscout.example/api/", target, async (input) => {
+    assert.match(String(input), /\/api\/v2\/smart-contracts\/0x1{40}$/);
+    return verified;
+  });
 });
 
 test("refuses an unfinished TypeScript or Bash operation", () => {
