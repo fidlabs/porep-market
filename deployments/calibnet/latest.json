@@ -1,9 +1,9 @@
 {
   "status": "finalized",
-  "finalizedAt": "2026-09-03T13:24:13.512Z",
+  "finalizedAt": "2026-09-04T09:48:43.132Z",
   "deployer": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
   "release": {
-    "buildInfoSha256": "0xb5d57e86bbab8ebb7f3473fabe105d7b023be63388a5a7fff5082931a90ffcea"
+    "buildInfoSha256": "0x575ca99cc6c2878620bf01891c9ca11af8331ee0f56bf82d3d4d5352133e4830"
   },
   "contracts": {
     "AccessManager": {
@@ -24,9 +24,9 @@
       "kind": "uups",
       "artifact": "src/PoRepMarket.sol:PoRepMarket",
       "proxy": "0xF895b2Af3B238E7D05A44cd7FBeBE10cBeb3F34b",
-      "implementation": "0x873c98F06aF15C5594a375494d6c98E58E87be67",
+      "implementation": "0x94A22b89f7D64BB272D5A9F8013367936CCd8056",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
-      "implementationCodeHash": "0xfe52eb556a42ff5320c3920302de4bd6dc8a2e988f77560e30c2e8a6e17bd800"
+      "implementationCodeHash": "0xc3b10808ef3aca760ecc65f7cf378da0e1c8f36747a20ac590a0c64645d74598"
     },
     "PoRepMarketClaimInspector": {
       "kind": "standalone",
@@ -103,17 +103,17 @@
   },
   "transactions": [
     {
-      "hash": "0x24e22ff0fbf411b77355ed802983e3acb91d6d9332fdbd4a28a769252f900f46",
+      "hash": "0x9475032f2c704e4ebb5b9684f458a9f9a699ae7aa8d1f3084521044a8faedc77",
       "status": 1,
-      "blockNumber": 4037173,
-      "blockHash": "0x1f1d25b7066ad7e4d26a37ed693883abf7a1085b1b66dce400c5e45b8972fbec",
-      "contractAddress": "0x33579fa34f1919c641304230e0896f1b50aed446"
+      "blockNumber": 4039622,
+      "blockHash": "0x8a8037b208679f6ea461c297bdfd31b413a1934bcc6474991cb028535c79185a",
+      "contractAddress": "0x94a22b89f7d64bb272d5a9f8013367936ccd8056"
     },
     {
-      "hash": "0xa8ba304e7c3c0ed936308597de17a248a85527b18a404ee3299810375394af63",
+      "hash": "0x89b8ce26c764ec8951dae9147215c8453f96583a9c5a8e251a4acc3b9a74cf3c",
       "status": 1,
-      "blockNumber": 4037175,
-      "blockHash": "0x4111a786f793203eb3add5baf820648f70d570945f5c170daab88bd2e1783cf5",
+      "blockNumber": 4039624,
+      "blockHash": "0xc52638e4d211a731358e2947120c288297c76e540d40f849dc9f84728b226fa1",
       "contractAddress": null
     }
   ]
