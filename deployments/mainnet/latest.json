@@ -1,8 +1,9 @@
 {
   "status": "finalized",
+  "finalizedAt": "2026-09-04T10:10:12.147Z",
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",
   "release": {
-    "buildInfoSha256": "0xb5d57e86bbab8ebb7f3473fabe105d7b023be63388a5a7fff5082931a90ffcea"
+    "buildInfoSha256": "0x575ca99cc6c2878620bf01891c9ca11af8331ee0f56bf82d3d4d5352133e4830"
   },
   "contracts": {
     "AccessManager": {
@@ -23,9 +24,9 @@
       "kind": "uups",
       "artifact": "src/PoRepMarket.sol:PoRepMarket",
       "proxy": "0x02328379543e47bA8AeD039B08aA8cC836584E74",
-      "implementation": "0x23a12343e8Ac1A460489a2d61807a99F2dFcF930",
+      "implementation": "0xB9Bd3ab2a854bD8a0201bA7c49F014b755497796",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
-      "implementationCodeHash": "0x3ef1ab5f5b88d9992b7fdaba9ec3380f4b629eeb3be91a866f8a4a5e558fb31d"
+      "implementationCodeHash": "0xe4d55262b33847cd924bac6465b93588d3aacccddad50c4f62f0e9ca1e18cd26"
     },
     "PoRepMarketClaimInspector": {
       "kind": "standalone",
@@ -101,188 +102,19 @@
     "TerminationOracle": "0x12E87EBc615a360BE31E27abE4aCC9caf6Ce894F",
     "USDFC": "0x80B98d3aa09ffff255c3ba4A241111Ff1262F045"
   },
-  "finalizedAt": "2026-09-03T12:56:42.603Z",
   "transactions": [
     {
-      "hash": "0x1af5b10ac128e859965abf0cd0f8297ff257f622fe11c5b6489a4a9b1172b7ef",
+      "hash": "0x1662e90c9bc3b43c6cd23bf90e192ed5d5fceaf1fecb71f09e08de3e8dde17b4",
       "status": 1,
-      "blockNumber": 6337724,
-      "blockHash": "0x0c0e9ffb5b6521e7f5c0459c447f2f237238220eaad203e1cff16efeeaf2cc06",
-      "contractAddress": "0x787ceb993dc5d4a19077f08d3b1457ad9d5f2b24"
+      "blockNumber": 6340304,
+      "blockHash": "0xb48ac7d4e8dcdff1bbdf20129e58bfad2c3394d16a26219e2682624944b24546",
+      "contractAddress": "0xb9bd3ab2a854bd8a0201ba7c49f014b755497796"
     },
     {
-      "hash": "0xb4652df8495e33461eb8d2617edf46c8ed75e5388bddade078ef32121de590fa",
+      "hash": "0x2c9a8d25a02aedf057d5603ca690d180f8dbbba449f0695f2eefa6e1e086fe6f",
       "status": 1,
-      "blockNumber": 6337726,
-      "blockHash": "0x057416ddf53cd3a3c04c1b1ba8b3fbeb61099807487211fe120803ea82654860",
-      "contractAddress": "0x76c5fe3777dd36feab4e4052bc244bd407256134"
-    },
-    {
-      "hash": "0x1d1cf294667be69a5fc439ab1cf7e314dfcf65685c944a37a4d8f149ab0d346b",
-      "status": 1,
-      "blockNumber": 6337728,
-      "blockHash": "0x760c8b8e152a0a0fd5b7f1b3e0eb97ee945556c2284acadbaded2b3e869850b7",
-      "contractAddress": "0x455c89cec04290086bc05db7e009759b11f492f6"
-    },
-    {
-      "hash": "0xef580d6a2a7ce87ed03c10753bb2b44d773917b9b99e28228fa2f61c711c94fa",
-      "status": 1,
-      "blockNumber": 6337730,
-      "blockHash": "0x588ef3ad8ff8b1e326a268fdedecd12dfdcd8f3547fe803abe3dc4dd49b2d9d9",
-      "contractAddress": "0x655634a735245fd8a7e84f7a73cadc59277e5c7c"
-    },
-    {
-      "hash": "0x04caacb988062c3704912d1cbf9bf6cb8fb69dcfab7c36af090afa7508fccd69",
-      "status": 1,
-      "blockNumber": 6337732,
-      "blockHash": "0x6560aa3ee6c016c3ff8ec9800847f0aba9832876a70df98744d872fcf41d79e4",
-      "contractAddress": "0x484be549960c43d0a5a503b3dcbc70532edff62b"
-    },
-    {
-      "hash": "0xfa8f265310dd8e56e81bd332736c4c4af448658caedf165f82f115b25261a360",
-      "status": 1,
-      "blockNumber": 6337734,
-      "blockHash": "0xe24b7d00c57e30c451fc511653eb218c2a7bfb5b0074dbe15c79d7f1aa26e56d",
-      "contractAddress": "0x929cb130db8c2186f0a16809b7e5e25d6aad5608"
-    },
-    {
-      "hash": "0xc573d9b11dc71ceb0f15f5ca3a478e6ee33514849e327290e88985c89971a230",
-      "status": 1,
-      "blockNumber": 6337736,
-      "blockHash": "0x95ec43b483d2839467e84f102cdf5b6baa0695102176bf0fdd5020ca7e652690",
-      "contractAddress": "0x2297486b95ad16aad4fbcc2ee88d4956424f6589"
-    },
-    {
-      "hash": "0x5678a2e2efd3697ea2bb4c2063c457fb0b5be89ea565be2aecd1398f191bd08c",
-      "status": 1,
-      "blockNumber": 6337738,
-      "blockHash": "0xd73747c96d6e0f29545e23824fb4487927bcd9210a67837c898d45ad4d264c90",
-      "contractAddress": "0xc95a48dd927786327da5aac7db5f5b10b4b45a02"
-    },
-    {
-      "hash": "0xa084e4d12b0d2e28be022468b83dbfdb65c10bed01ba849dd249935e3177db49",
-      "status": 1,
-      "blockNumber": 6337740,
-      "blockHash": "0x5774cd1222025bb486691fefeb4cbfc9421acc1f51a5eafa05254d36a1bce85f",
-      "contractAddress": "0x47dadbdd2e562ad4ce1d5cbbef080801887a80f5"
-    },
-    {
-      "hash": "0xa38e358c574be1713c8a6c80a199e943cba6360cc9aac0a19ce24aaa2a5e2f1f",
-      "status": 1,
-      "blockNumber": 6337742,
-      "blockHash": "0x85a0e77bb1a7f28d6a28b93d501765eaa13043573420cd69a50bcac90b2855bf",
-      "contractAddress": "0x262f148b10858a09343392d3dacc05a072a0250e"
-    },
-    {
-      "hash": "0x06e6cf2a2145cf7081649332954a3b625ada5cf31f2c610e35e2a9e782b2bcdd",
-      "status": 1,
-      "blockNumber": 6337744,
-      "blockHash": "0xf1c0a11b84fbcdcb626da4ed14d993b6a5ebdd83ebd7a1d740bc9aedb1b5803e",
-      "contractAddress": "0x7dfa871d5ef0289ffc4867bc10c3c24098e799e5"
-    },
-    {
-      "hash": "0xe98e6cd1a93d5b6906e7568641e36cfa23253959093de85829bd5d0e975c2073",
-      "status": 1,
-      "blockNumber": 6337746,
-      "blockHash": "0x7d88560b68c95713e0592627b6b266d12db08ac394028b0db102245aae7c5c8f",
-      "contractAddress": "0x4ea6b6f6125e51aa90554450aefed251d69f1d50"
-    },
-    {
-      "hash": "0x86959e39918e5271c932acf9e083b102aa7780140d5c784a711f69c27ca85245",
-      "status": 1,
-      "blockNumber": 6337749,
-      "blockHash": "0xfcb92d9607ce45993a6709f8a04516a39692c9ff2aef3690e2e26a85feb1f5c7",
-      "contractAddress": "0x23a12343e8ac1a460489a2d61807a99f2dfcf930"
-    },
-    {
-      "hash": "0x65052b1773c1d349e1c1caf58e7bf7b08c328e7921c5d83168c51284c1e23a71",
-      "status": 1,
-      "blockNumber": 6337751,
-      "blockHash": "0xa5b04bec35a6bf959ddb603055d4a2491591a0cccea5c7c1c875941d2aa75750",
-      "contractAddress": "0x02328379543e47ba8aed039b08aa8cc836584e74"
-    },
-    {
-      "hash": "0x3b441fc33c44731d539b8ebdf3d6c89bce77de5213e02c1cd173311041d040e2",
-      "status": 1,
-      "blockNumber": 6337753,
-      "blockHash": "0xfa9136b928856ddd359b8c5be4615f961b4c74e063753d677221e11e7b1e3b1f",
-      "contractAddress": null
-    },
-    {
-      "hash": "0x7a924dcde4f1c593f71fb80b52780dbd3798c7ff58d5742ae9c420861cec3ea0",
-      "status": 1,
-      "blockNumber": 6337755,
-      "blockHash": "0x315d0d74497d818e8de682b7b271826bbf3213a3d44d2a5fb6ab0b477642b5aa",
-      "contractAddress": "0x524eef25eb334e77cf6a4cf7f304a1d387ce8704"
-    },
-    {
-      "hash": "0x1accdf63ad36fd477705ce27a691e0a8d9cc06004dcced0b84f1c5bd05a55ba8",
-      "status": 1,
-      "blockNumber": 6337757,
-      "blockHash": "0x76f9c988a98d0c684e90fe33748ca1aba520f210383f287c55c2883a6a1db4cd",
-      "contractAddress": "0x4f6807ef343d553efbded8ecd6318aad6330fc5f"
-    },
-    {
-      "hash": "0x97ccb790499d72210cd75d324fc0ebe6a3addac3db376e55e94931ba0f1f2c68",
-      "status": 1,
-      "blockNumber": 6337759,
-      "blockHash": "0xde58bd43fb7b5dbb4216ea4bac68357c461c74eac223775430c0ef7b0e4a8a26",
-      "contractAddress": "0xf989f4d004409bdf185d5d1caddb2bbd8f26a025"
-    },
-    {
-      "hash": "0x3fce7506134db64013f624762ad9abd5a2a37ca4079626a813e8c0c0967f43f2",
-      "status": 1,
-      "blockNumber": 6337761,
-      "blockHash": "0x44c3e1e827d03f262f7abe909e2a2f2d7c4550631755110278138bc149acb97e",
-      "contractAddress": null
-    },
-    {
-      "hash": "0xdaa2e6be9d322d94782eb8ee1003e4d6c4959b398b3984b28fd87368449f9f9b",
-      "status": 1,
-      "blockNumber": 6337763,
-      "blockHash": "0x1dab9472a6ad2446cfa40f3232f971a88ebf5e4be5c3f305dd17e7dbe6a44a01",
-      "contractAddress": null
-    },
-    {
-      "hash": "0xfd02f8c18ee5c496bea77694a86e381fe60c4f814eef35b1f005fa2fda1138b5",
-      "status": 1,
-      "blockNumber": 6337765,
-      "blockHash": "0xd06df0dcd5d1dd586297feb2650644fd22a50a2b024fdf8eea3ea59200614002",
-      "contractAddress": null
-    },
-    {
-      "hash": "0xef5dd8249d97958dea43f15b49dca853097c40fda8ca3ccd987c12ad6fed8a76",
-      "status": 1,
-      "blockNumber": 6337767,
-      "blockHash": "0x1402d9ac0945f5f4684d93c0f6cab7b039455af39edfc4bcf6781a9b0e3f6b46",
-      "contractAddress": null
-    },
-    {
-      "hash": "0x08b0435b5ff0258650a65f7df1dc32a5de9e30a3e790a6771eb5352da33ff771",
-      "status": 1,
-      "blockNumber": 6337769,
-      "blockHash": "0x2e5038995886d9875b5ca70fc213f33a15e52b863e213b8405cd3378abaaac7f",
-      "contractAddress": null
-    },
-    {
-      "hash": "0xd7b9ec81df69ec0ab79d472500aac86596ef21f3c5d58ccc1bb719658bbeae07",
-      "status": 1,
-      "blockNumber": 6337771,
-      "blockHash": "0x20bb52ce0eff7eef3bf49c113a56be3a5b9f64fc7409c0e0867152920435e73f",
-      "contractAddress": null
-    },
-    {
-      "hash": "0x601d4122513682aafa411685f39d9e4e6da7dc2e3ca5c6cd4e1504c21407dd25",
-      "status": 1,
-      "blockNumber": 6337773,
-      "blockHash": "0xa55f418c59dadc29b7fcff0cd907a6d713fe89d282078a1ba3af1e642e0e9aa6",
-      "contractAddress": null
-    },
-    {
-      "hash": "0x9c7f6cb18538a897653623b361fc0652e5309752584f4055a43fbda95c491495",
-      "status": 1,
-      "blockNumber": 6337775,
-      "blockHash": "0xc8b932faf4bfdc8dd2fd11dc6d4f802826077152bdf2a6ce817afbee7601bd69",
+      "blockNumber": 6340306,
+      "blockHash": "0x6fcfabfdc3a2d8ae45bee022e567cbc844d6497132f7c10b8c58ef10f90d4d7b",
       "contractAddress": null
     }
   ]
