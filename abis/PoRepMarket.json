@@ -2005,6 +2005,11 @@
   },
   {
     "type": "error",
+    "name": "InvalidClientAddress",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "InvalidDealDuration",
     "inputs": []
   },
