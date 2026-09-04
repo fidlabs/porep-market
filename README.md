@@ -13,7 +13,7 @@ only the system ownership and deal lifecycle needed to navigate them.
 ### V2
 
 - [Latest Calibnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/calibnet/latest.json)
-- [Mainnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/mainnet/latest.json) — V2 alpha technical release.
+- [Mainnet deployment](https://github.com/fidlabs/porep-market/blob/main/deployments/mainnet/latest.json). V2 release candidate.
 
 ### V1
 
