@@ -1156,6 +1156,11 @@
             ]
           }
         ]
+      },
+      {
+        "name": "client",
+        "type": "address",
+        "internalType": "address"
       }
     ],
     "outputs": [],
@@ -1996,6 +2001,11 @@
   {
     "type": "error",
     "name": "InvalidBilled32GiBUnits",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "InvalidClientAddress",
     "inputs": []
   },
   {

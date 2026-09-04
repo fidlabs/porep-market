@@ -615,9 +615,9 @@ contract PoRepMarketTest is Test {
         vm.prank(adminAddress);
         vm.expectCall(
             address(spRegistry),
-            abi.encodeCall(ISPRegistry.reserveOfferForDeal, (selectedOfferId, adminAddress, request))
+            abi.encodeCall(ISPRegistry.reserveOfferForDeal, (selectedOfferId, clientAddress, request))
         );
-        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request);
+        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request, clientAddress);
 
         assertEq(spRegistry.lastReserveOfferId(), selectedOfferId);
         SharedTypes.DealRequest memory lastRequest = spRegistry.getLastReserveRequest();
@@ -653,13 +653,13 @@ contract PoRepMarketTest is Test {
 
         vm.prank(adminAddress);
         poRepMarket.proposeDealWithSpecificOffer(
-            specificOfferId, dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation)
+            specificOfferId, dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation), clientAddress
         );
 
         PoRepTypes.Deal memory deal = poRepMarket.getDeal(dealId);
         assertEq(CommonTypes.FilActorId.unwrap(deal.provider), CommonTypes.FilActorId.unwrap(selectedProvider));
         assertEq(deal.offerId, specificOfferId);
-        assertEq(deal.client, adminAddress);
+        assertEq(deal.client, clientAddress);
         assertEq(deal.state, DealState.ACCEPTED);
 
         PoRepTypes.DealCapacity memory capacity = poRepMarket.getDealCapacity(dealId);
@@ -668,6 +668,31 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealPayment memory payment = poRepMarket.getDealPayment(dealId);
         assertEq(payment.payee, selectedPayee);
         assertEq(payment.pricePer32GiBPerMonth, MIN_PRICE_PER_SECTOR_PER_MONTH + 20);
+    }
+
+    function testProposeDealWithSpecificOfferEmitsAndIndexesProvidedClient() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealCreated(
+            dealId,
+            clientAddress,
+            providerFilActorId,
+            defaultRequirements,
+            defaultManifestHash,
+            expectedManifestLocation,
+            totalDealSize,
+            block.number
+        );
+        vm.expectEmit(true, true, true, true);
+        emit PoRepMarket.DealAccepted(dealId, clientAddress, providerFilActorId);
+        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request, clientAddress);
+
+        PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
+        assertTrue(market.isDealIndexedForClient(clientAddress, dealId));
+        assertFalse(market.isDealIndexedForClient(adminAddress, dealId));
     }
 
     function testProposeDealWithSpecificOfferRevertsWhenCallerIsNotAdmin() public {
@@ -682,7 +707,16 @@ contract PoRepMarketTest is Test {
             )
         );
         vm.prank(clientAddress);
-        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request);
+        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request, clientAddress);
+    }
+
+    function testProposeDealWithSpecificOfferRevertsWhenClientIsZeroAddress() public {
+        SharedTypes.DealRequest memory request =
+            dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation);
+
+        vm.prank(adminAddress);
+        vm.expectRevert(PoRepMarket.InvalidClientAddress.selector);
+        poRepMarket.proposeDealWithSpecificOffer(selectedOfferId, request, address(0));
     }
 
     function testProposeDealCallsReserveProviderForDealWithRequest() public {
