@@ -1395,6 +1395,86 @@ contract SPRegistryTest is Test {
         );
     }
 
+    function _latencySLIs(uint16 latencyMs) internal pure returns (SharedTypes.SLIThresholds memory) {
+        return SharedTypes.SLIThresholds({
+            retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: latencyMs, indexingPct: 0
+        });
+    }
+
+    function _createOfferWithSLIs(CommonTypes.FilActorId provider, uint256 price, uint16 latencyMs)
+        internal
+        returns (uint256)
+    {
+        vm.prank(operator);
+        return spRegistry.createOffer(provider, _terms(), _latencySLIs(latencyMs), _paymentRows(price));
+    }
+
+    function testLatencyMatchingTreatsZeroOfferLatencyAsNoPromise() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+
+        uint256 zeroOffer = _createOfferWithSLIs(provider1, 90_000, 0);
+        uint256 fastOffer = _createOfferWithSLIs(provider1, 90_000, 50);
+        uint256 exactOffer = _createOfferWithSLIs(provider1, 90_000, 100);
+        uint256 slowOffer = _createOfferWithSLIs(provider1, 90_000, 101);
+
+        (, uint16 reason) = spRegistry.previewOfferForDeal(zeroOffer, client1, _requestWithSLIs(_latencySLIs(0)));
+        assertEq(reason, OfferMatch.OK);
+
+        (, reason) = spRegistry.previewOfferForDeal(exactOffer, client1, _requestWithSLIs(_latencySLIs(0)));
+        assertEq(reason, OfferMatch.OK);
+
+        (, reason) = spRegistry.previewOfferForDeal(zeroOffer, client1, _requestWithSLIs(_latencySLIs(100)));
+        assertEq(reason, OfferMatch.SLIS_NOT_MET);
+
+        (, reason) = spRegistry.previewOfferForDeal(fastOffer, client1, _requestWithSLIs(_latencySLIs(100)));
+        assertEq(reason, OfferMatch.OK);
+
+        (, reason) = spRegistry.previewOfferForDeal(exactOffer, client1, _requestWithSLIs(_latencySLIs(100)));
+        assertEq(reason, OfferMatch.OK);
+
+        (, reason) = spRegistry.previewOfferForDeal(slowOffer, client1, _requestWithSLIs(_latencySLIs(100)));
+        assertEq(reason, OfferMatch.SLIS_NOT_MET);
+    }
+
+    function testReserveOfferRejectsZeroLatencyOfferForPositiveRequirement() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        uint256 zeroOffer = _createOfferWithSLIs(provider1, 90_000, 0);
+
+        vm.prank(market);
+        vm.expectRevert(
+            abi.encodeWithSelector(SPRegistry.OfferNotEligible.selector, zeroOffer, OfferMatch.SLIS_NOT_MET)
+        );
+        spRegistry.reserveOfferForDeal(zeroOffer, client1, _requestWithSLIs(_latencySLIs(100)));
+    }
+
+    function testAutoMatchSkipsZeroLatencyOfferForPositiveRequirement() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _registerProvider(provider2, owner2);
+
+        _createOfferWithSLIs(provider1, 87_000, 0);
+        uint256 eligibleOffer = _createOfferWithSLIs(provider2, 90_000, 100);
+
+        vm.prank(market);
+        SharedTypes.ProviderDealSelection memory selection =
+            spRegistry.reserveProviderForDeal(client1, _requestWithSLIs(_latencySLIs(100)));
+
+        assertEq(selection.offerId, eligibleOffer);
+        assertEq(CommonTypes.FilActorId.unwrap(selection.provider), CommonTypes.FilActorId.unwrap(provider2));
+    }
+
+    function testAutoMatchRevertsWhenOnlyZeroLatencyOffersExist() public {
+        _allowToken();
+        _registerProvider(provider1, owner1);
+        _createOfferWithSLIs(provider1, 90_000, 0);
+
+        vm.prank(market);
+        vm.expectRevert(ISPRegistry.NoOfferMatched.selector);
+        spRegistry.reserveProviderForDeal(client1, _requestWithSLIs(_latencySLIs(100)));
+    }
+
     function testActiveOfferPaymentCannotHaveZeroPriceEvenWhenTokenMinimumIsZero() public {
         vm.prank(admin);
         spRegistry.setPaymentToken(token, true, 0);

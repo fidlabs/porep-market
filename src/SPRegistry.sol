@@ -1198,6 +1198,16 @@ contract SPRegistry is AccessControlledUpgradeable, UUPSUpgradeable, ISPRegistry
         return s()._providerCapacity[_providerId(provider)].pendingBytes;
     }
 
+    /**
+     * @notice Checks whether an offer's promised thresholds satisfy a client's required thresholds.
+     * @param caps Offer's promised SLI thresholds.
+     * @param reqs Client's required SLI thresholds.
+     * @return True when every requested dimension is satisfied.
+     * @dev A zero threshold means "unset" on both sides. For latency, lower is better, so an unset
+     *      offer latency would otherwise compare as the best possible value and satisfy any request;
+     *      it is rejected explicitly instead. The other dimensions need no such guard because a zero
+     *      promise is already their worst value.
+     */
     function _meetsRequirements(SharedTypes.SLIThresholds memory caps, SharedTypes.SLIThresholds calldata reqs)
         internal
         pure
@@ -1207,7 +1217,7 @@ contract SPRegistry is AccessControlledUpgradeable, UUPSUpgradeable, ISPRegistry
         if (reqs.bandwidthBytesPerSecond != 0 && caps.bandwidthBytesPerSecond < reqs.bandwidthBytesPerSecond) {
             return false;
         }
-        if (reqs.latencyMs != 0 && caps.latencyMs > reqs.latencyMs) return false;
+        if (reqs.latencyMs != 0 && (caps.latencyMs == 0 || caps.latencyMs > reqs.latencyMs)) return false;
         if (reqs.indexingPct != 0 && caps.indexingPct < reqs.indexingPct) return false;
         return true;
     }
