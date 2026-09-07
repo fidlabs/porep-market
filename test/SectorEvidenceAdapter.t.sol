@@ -2,6 +2,9 @@
 // solhint-disable use-natspec, one-contract-per-file
 pragma solidity =0.8.30;
 
+import {AccessManager} from "../src/AccessManager.sol";
+import {AccessControlledUpgradeable} from "../src/abstracts/AccessControlledUpgradeable.sol";
+import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {Vm} from "forge-std/Vm.sol";
@@ -178,12 +181,14 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
     SectorEvidenceMarketMock internal market;
     SectorEvidenceAdapter internal adapter;
+    AccessManager internal manager;
     FVMMinerActor internal miner;
 
     function setUp() public override {
         super.setUp();
         market = new SectorEvidenceMarketMock();
-        adapter = _deployAdapter(address(this), address(market));
+        manager = new AccessManager(address(this), address(this));
+        adapter = _deployAdapter(address(manager), address(market));
         miner = mockMiner(PROVIDER);
         market.setDeal(DEAL_ID, PROVIDER, address(adapter), PIECE_SET_COMMITMENT, REQUESTED_SIZE, DURATION, PROPOSED_AT);
     }
@@ -195,11 +200,12 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         implementation.initialize(address(this), address(market));
     }
 
-    function testInitializationRejectsZeroAdminAndMarket() public {
+    function testInitializationRejectsZeroManagerAndMarket() public {
         SectorEvidenceAdapter implementation = new SectorEvidenceAdapter();
-        SectorEvidenceAdapter zeroAdmin = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), "")));
-        vm.expectRevert(SectorEvidenceAdapter.InvalidAdminAddress.selector);
-        zeroAdmin.initialize(address(0), address(market));
+        SectorEvidenceAdapter zeroManager =
+            SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), "")));
+        vm.expectRevert(abi.encodeWithSelector(AccessControlledUpgradeable.InvalidAccessManager.selector, address(0)));
+        zeroManager.initialize(address(0), address(market));
 
         SectorEvidenceAdapter zeroMarket = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), "")));
         vm.expectRevert(SectorEvidenceAdapter.InvalidPoRepMarketAddress.selector);
@@ -209,8 +215,9 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     function testProxyInitializationSetsMarketAndUpgradeRoles() public view {
         assertEq(address(adapter.POREP_MARKET()), address(market));
         assertEq(adapter.getPoRepMarketAddress(), address(market));
-        assertTrue(adapter.hasRole(adapter.DEFAULT_ADMIN_ROLE(), address(this)));
-        assertTrue(adapter.hasRole(adapter.UPGRADER_ROLE(), address(this)));
+        assertEq(adapter.accessManager(), address(manager));
+        assertTrue(manager.hasRole(manager.DEFAULT_ADMIN_ROLE(), address(this)));
+        assertTrue(manager.hasRole(manager.UPGRADER_ROLE(), address(this)));
     }
 
     function testProxyCannotBeReinitialized() public {
@@ -272,6 +279,23 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         vm.prank(address(0xBAD));
         vm.expectRevert();
         adapter.upgradeToAndCall(address(nextImplementation), "");
+    }
+
+    function testManagerUpgraderRotationControlsAdapterUpgrade() public {
+        SectorEvidenceAdapterV2 nextImplementation = new SectorEvidenceAdapterV2();
+        address nextUpgrader = address(0xBEEF);
+        bytes32 role = manager.UPGRADER_ROLE();
+        manager.grantRole(role, nextUpgrader);
+        manager.revokeRole(role, address(this));
+
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(this), role)
+        );
+        adapter.upgradeToAndCall(address(nextImplementation), "");
+        vm.prank(nextUpgrader);
+        adapter.upgradeToAndCall(address(nextImplementation), "");
+        assertEq(SectorEvidenceAdapterV2(address(adapter)).version(), 2);
+        assertEq(adapter.accessManager(), address(manager));
     }
 
     function testOnlyAdapterCanProcessOnePiece() public {
@@ -941,9 +965,12 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         });
     }
 
-    function _deployAdapter(address admin, address poRepMarket) internal returns (SectorEvidenceAdapter deployed) {
+    function _deployAdapter(address accessManager, address poRepMarket)
+        internal
+        returns (SectorEvidenceAdapter deployed)
+    {
         SectorEvidenceAdapter implementation = new SectorEvidenceAdapter();
-        bytes memory initData = abi.encodeCall(SectorEvidenceAdapter.initialize, (admin, poRepMarket));
+        bytes memory initData = abi.encodeCall(SectorEvidenceAdapter.initialize, (accessManager, poRepMarket));
         deployed = SectorEvidenceAdapter(address(new ERC1967Proxy(address(implementation), initData)));
     }
 

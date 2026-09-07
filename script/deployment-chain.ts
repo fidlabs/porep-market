@@ -215,16 +215,13 @@ export async function verifyLiveDeployment(
     );
   }
 
-  if (sectorAdapter !== undefined) {
-    await verifyRole(run, rpcUrl, sectorAdapter.proxy, "DEFAULT_ADMIN_ROLE()(bytes32)", manifest.deployer, "SectorEvidenceAdapter admin");
-  }
-
   const roleContract = manager ?? market.proxy;
   if (manager === undefined) {
     for (const [name, contract] of [
       ["PoRepMarket", market],
       ["ValidatorFactory", validatorFactory],
       ["DataCapEvidenceAdapter", adapter],
+      ...(sectorAdapter === undefined ? [] : [["SectorEvidenceAdapter", sectorAdapter] as const]),
       ["SPRegistry", registry],
       ["SLIOracle", sliOracle],
       ["SLIScorer", sliScorer],
@@ -243,6 +240,7 @@ export async function verifyLiveDeployment(
       ["PoRepMarket", market],
       ["ValidatorFactory", validatorFactory],
       ["DataCapEvidenceAdapter", adapter],
+      ...(sectorAdapter === undefined ? [] : [["SectorEvidenceAdapter", sectorAdapter] as const]),
       ["SPRegistry", registry],
       ["SLIOracle", sliOracle],
       ["SLIScorer", sliScorer],

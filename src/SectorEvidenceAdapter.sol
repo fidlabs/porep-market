@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity =0.8.30;
 
-import {AccessControlUpgradeable} from "@openzeppelin/contracts-upgradeable/access/AccessControlUpgradeable.sol";
-import {Initializable} from "@openzeppelin/contracts-upgradeable/proxy/utils/Initializable.sol";
+import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeable.sol";
+import {Roles} from "./lib/Roles.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {CalldataSlice, CalldataUtils} from "fvm-solidity/CalldataUtils.sol";
@@ -31,7 +31,7 @@ import {SharedTypes} from "./types/SharedTypes.sol";
  * @notice Records authenticated piece placements and refreshes their sectors through FIP-0112.
  * @dev This pre-Re-Snap adapter relies on sector content remaining unchanged while a sector number is Active.
  */
-contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, AccessControlUpgradeable, UUPSUpgradeable {
+contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgradeable, UUPSUpgradeable {
     using CalldataUtils for CalldataSlice;
     using FVMAddress for address;
     using FVMMiner for uint64;
@@ -139,11 +139,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
         return _getSectorEvidenceAdapterStorage();
     }
 
-    /**
-     * @notice Role allowed to upgrade the adapter implementation.
-     */
-    bytes32 public constant UPGRADER_ROLE = keccak256("UPGRADER_ROLE");
-
     // FIP-0109 fixes this entry-point name.
     // solhint-disable func-name-mixedcase
 
@@ -223,10 +218,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
      * @dev 0x14d4a4e8
      */
     error OnlySelf();
-    /**
-     * @dev 0x05bb467c
-     */
-    error InvalidAdminAddress();
     /**
      * @dev 0xc9cc4a06
      */
@@ -319,16 +310,13 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
 
     /**
      * @notice Initializes the proxy state.
-     * @param admin Account granted the default admin and upgrader roles.
+     * @param manager Protocol AccessManager address.
      * @param poRepMarketAddress PoRep Market allowed to consume adapter lifecycle results.
      */
-    function initialize(address admin, address poRepMarketAddress) public initializer {
-        if (admin == address(0)) revert InvalidAdminAddress();
+    function initialize(address manager, address poRepMarketAddress) public initializer {
         if (poRepMarketAddress == address(0)) revert InvalidPoRepMarketAddress();
 
-        __AccessControl_init();
-        _grantRole(DEFAULT_ADMIN_ROLE, admin);
-        _grantRole(UPGRADER_ROLE, admin);
+        __AccessControlled_init(manager);
         s()._poRepMarket = IPoRepMarket(poRepMarketAddress);
     }
 
@@ -544,6 +532,11 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     /// @inheritdoc IStorageEvidenceAdapter
     function getExpiration(uint256 dealId) external view returns (CommonTypes.ChainEpoch expiration) {
         return CommonTypes.ChainEpoch.wrap(s()._refreshStates[dealId].completedExpiration);
+    }
+
+    /// @inheritdoc IStorageEvidenceAdapter
+    function hasSubmittedEvidence(uint256 dealId) external view returns (bool) {
+        return s()._manifestReceipts[dealId].acceptedPieceCount != 0;
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -847,6 +840,6 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, Initializable, Access
     }
 
     // solhint-disable no-empty-blocks
-    function _authorizeUpgrade(address newImplementation) internal override onlyRole(UPGRADER_ROLE) {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyRole(Roles.UPGRADER_ROLE) {}
     // solhint-enable no-empty-blocks
 }

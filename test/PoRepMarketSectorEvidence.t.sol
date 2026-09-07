@@ -14,6 +14,7 @@ import {
     SectorContentChangedReturn
 } from "fvm-solidity/FVMSectorContentChanged.sol";
 import {PoRepMarket} from "../src/PoRepMarket.sol";
+import {AccessManager} from "../src/AccessManager.sol";
 import {SectorEvidenceAdapter} from "../src/SectorEvidenceAdapter.sol";
 import {DealState} from "../src/types/DealState.sol";
 import {DealType} from "../src/types/DealType.sol";
@@ -71,15 +72,22 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         sliScorer = new SLIScorerMock();
         DataCapEvidenceAdapterMock initialAdapter = new DataCapEvidenceAdapterMock();
 
+        AccessManager manager = new AccessManager(admin, admin);
         PoRepMarketContractMock implementation = new PoRepMarketContractMock();
         bytes memory marketInit = abi.encodeCall(
             PoRepMarket.initialize,
-            (admin, address(validatorFactory), address(registry), address(initialAdapter), address(sliScorer))
+            (
+                address(manager),
+                address(validatorFactory),
+                address(registry),
+                address(initialAdapter),
+                address(sliScorer)
+            )
         );
         market = PoRepMarketContractMock(address(new ERC1967Proxy(address(implementation), marketInit)));
 
         SectorEvidenceAdapter adapterImplementation = new SectorEvidenceAdapter();
-        bytes memory adapterInit = abi.encodeCall(SectorEvidenceAdapter.initialize, (admin, address(market)));
+        bytes memory adapterInit = abi.encodeCall(SectorEvidenceAdapter.initialize, (address(manager), address(market)));
         adapter = SectorEvidenceAdapter(address(new ERC1967Proxy(address(adapterImplementation), adapterInit)));
 
         vm.prank(admin);
@@ -118,11 +126,18 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         SharedTypes.ActivationDecision memory empty = market.activateEvidence(DEAL_ID, "");
         assertEq(empty.result, EvidenceResult.REJECTED);
         assertEq(market.getDealCapacity(DEAL_ID).committedBytes, 0);
+        assertFalse(adapter.hasSubmittedEvidence(DEAL_ID));
+        vm.prank(admin);
+        market.updateManifestLocation(DEAL_ID, "https://example.com/replaced", REQUESTED_SIZE, PIECE_SET_COMMITMENT);
 
         int64 minimumCommitmentEpoch = CommonTypes.ChainEpoch.unwrap(proposedDeal.proposedAtEpoch) + DURATION_EPOCHS;
         SectorContentChangedReturn memory first =
             _notify(PIECE_CID_0, 0, _proof(LEAF_1), SECTOR, minimumCommitmentEpoch);
         assertEq(first.sectors[0].accepted[0], 1);
+        assertTrue(adapter.hasSubmittedEvidence(DEAL_ID));
+        vm.prank(admin);
+        vm.expectRevert(PoRepMarket.ManifestUpdateNotAllowedAfterEvidence.selector);
+        market.updateManifestLocation(DEAL_ID, "https://example.com/locked", REQUESTED_SIZE, bytes32(uint256(1)));
 
         SectorEvidenceAdapter.ManifestReceipt memory partialReceipt = adapter.getManifestReceipt(DEAL_ID);
         assertEq(partialReceipt.pieceCount, 2);
@@ -163,6 +178,7 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
 
         SharedTypes.EvidenceStatus memory evidenceStatus = market.currentEvidenceStatus(DEAL_ID);
         assertEq(evidenceStatus.result, EvidenceResult.INACTIVE);
+        assertTrue(adapter.hasSubmittedEvidence(DEAL_ID));
         assertEq(evidenceStatus.activeCoveredBytes, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(evidenceStatus.lastEvidenceRefreshEpoch), 0);
 

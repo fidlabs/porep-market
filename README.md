@@ -81,6 +81,11 @@ Fresh deployments include `SectorEvidenceAdapter`, but keep
 sector adapter for new deals when running this PoC. No existing Calibnet or
 mainnet deployment is changed by this branch.
 
+The sector adapter uses the same `AccessManager` and `UPGRADER_ROLE` as the
+other contracts. Deploy this rebased PoC fresh; existing PoC proxies initialized
+with adapter-local roles have no configured AccessManager. The first accepted
+piece locks the deal manifest, including before full activation.
+
 The code calls these storage facts **evidence**. Evidence here means the
 on-chain information used to check storage coverage; it does not mean that
 every adapter returns a cryptographic proof. The rest of this README calls it

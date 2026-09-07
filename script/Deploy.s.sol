@@ -87,7 +87,7 @@ contract Deploy is DeployUtils {
         (sliScorer, sliScorerImpl) = _deploySliScorer(accessManager, sliOracle);
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(accessManager, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(accessManager, poRepMarket, metaAllocator);
-        (sectorEvidenceAdapter, sectorEvidenceAdapterImpl) = _deploySectorEvidenceAdapter(admin, poRepMarket);
+        (sectorEvidenceAdapter, sectorEvidenceAdapterImpl) = _deploySectorEvidenceAdapter(accessManager, poRepMarket);
         claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
         sectorStatusInspector = address(new PoRepMarketSectorStatusInspector(poRepMarket));
         viewHelper = address(new PoRepMarketViewHelper(poRepMarket));
@@ -159,12 +159,12 @@ contract Deploy is DeployUtils {
         impl = address(_impl);
     }
 
-    function _deploySectorEvidenceAdapter(address _admin, address _poRepMarket)
+    function _deploySectorEvidenceAdapter(address _accessManager, address _poRepMarket)
         internal
         returns (address proxy, address impl)
     {
         SectorEvidenceAdapter _impl = new SectorEvidenceAdapter();
-        bytes memory init = abi.encodeCall(SectorEvidenceAdapter.initialize, (_admin, _poRepMarket));
+        bytes memory init = abi.encodeCall(SectorEvidenceAdapter.initialize, (_accessManager, _poRepMarket));
         proxy = createProxy(init, address(_impl));
         impl = address(_impl);
     }

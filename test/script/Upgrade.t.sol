@@ -116,11 +116,7 @@ contract DeploymentScriptsTest is Test {
             address implementation = json.readAddress(string.concat(".result.contracts.", names[i], ".implementation"));
             assertTrue(proxy.code.length > 0 && implementation.code.length > 0);
             assertEq(address(uint160(uint256(vm.load(proxy, SLOT)))), implementation);
-            if (keccak256(bytes(names[i])) == keccak256("SectorEvidenceAdapter")) {
-                assertTrue(IAccessProbe(proxy).hasRole(bytes32(0), admin));
-            } else {
-                assertEq(PoRepMarket(proxy).accessManager(), managerAddress);
-            }
+            assertEq(PoRepMarket(proxy).accessManager(), managerAddress);
         }
         address factory = json.readAddress(".result.contracts.ValidatorFactory.proxy");
         address beacon = json.readAddress(".result.contracts.ValidatorBeacon.address");

@@ -193,6 +193,19 @@ test("continues to verify deployments that predate the sector adapter", async ()
   await verifyLiveDeployment(fullRunner(manifest), "rpc", manifest);
 });
 
+test("rejects a sector adapter bound to a different AccessManager", async () => {
+  const manifest = completeManifest();
+  const run = fullRunner(manifest);
+  const wrongSectorManager: CommandRunner = async (command, args, options) => {
+    if (args[0] === "call" && args[1] === a10 && args[2] === "accessManager()(address)") return padded(a3);
+    return run(command, args, options);
+  };
+  await assert.rejects(
+    verifyLiveDeployment(wrongSectorManager, "rpc", manifest),
+    /SectorEvidenceAdapter AccessManager/,
+  );
+});
+
 test("rejects unexpected initial manager admin and upgrader independently", async () => {
   const manifest = completeManifest();
   await assert.rejects(
@@ -202,7 +215,7 @@ test("rejects unexpected initial manager admin and upgrader independently", asyn
 
   const run = fullRunner(manifest);
   const missingUpgrader: CommandRunner = async (command, args, options) => {
-    if (args[0] === "call" && args[2] === "hasRole(bytes32,address)(bool)" && args[4] === a1) return "false\n";
+    if (args[0] === "call" && args[1] === a2 && args[2] === "hasRole(bytes32,address)(bool)" && args[4] === a1) return "false\n";
     return run(command, args, options);
   };
   await assert.rejects(
