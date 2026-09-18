@@ -13,6 +13,7 @@ import {SharedTypes} from "../../src/types/SharedTypes.sol";
 contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
     mapping(uint256 dealId => DataCapEvidenceAdapter.DataCapDealEvidence dealEvidence) public deals;
     mapping(uint256 dealId => CommonTypes.FilActorId[] ids) internal allocationIds;
+    mapping(uint256 dealId => CommonTypes.FilActorId[] ids) internal claimIds;
     mapping(uint256 dealId => bytes evidenceData) public submittedEvidence;
     mapping(uint256 dealId => bytes evidenceData) public activatedEvidence;
     mapping(uint256 dealId => bytes evidenceData) public refreshedEvidence;
@@ -52,6 +53,32 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
         ids = new CommonTypes.FilActorId[](end - offset);
         for (uint256 i = 0; i < ids.length; i++) {
             ids[i] = allocationIds[dealId][offset + i];
+        }
+    }
+
+    function setClaimIds(uint256 dealId, CommonTypes.FilActorId[] calldata ids_) external {
+        delete claimIds[dealId];
+        for (uint256 i = 0; i < ids_.length; i++) {
+            claimIds[dealId].push(ids_[i]);
+        }
+    }
+
+    function getClaimIds(uint256 dealId, uint256 offset, uint256 limit)
+        external
+        view
+        returns (CommonTypes.FilActorId[] memory ids, uint256 sumOfClaims)
+    {
+        if (limit == 0) revert();
+        sumOfClaims = claimIds[dealId].length;
+        if (offset >= sumOfClaims) {
+            return (new CommonTypes.FilActorId[](0), sumOfClaims);
+        }
+
+        uint256 remaining = sumOfClaims - offset;
+        uint256 count = limit > remaining ? remaining : limit;
+        ids = new CommonTypes.FilActorId[](count);
+        for (uint256 i = 0; i < count; i++) {
+            ids[i] = claimIds[dealId][offset + i];
         }
     }
 

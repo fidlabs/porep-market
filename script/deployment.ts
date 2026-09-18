@@ -167,7 +167,6 @@ const upgradeTargets: Record<
   Validator: { artifact: "src/Validator.sol:Validator", manifestKind: "implementation", operationKind: "beacon" },
 };
 const missingHelperArtifacts = {
-  PoRepMarketSectorStatusInspector: "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
   PoRepMarketViewHelper: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
 } as const;
 async function deploy(context: Context, options: DeployOptions): Promise<void> {
