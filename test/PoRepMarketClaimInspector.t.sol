@@ -3,6 +3,9 @@
 pragma solidity =0.8.30;
 
 import {Test} from "forge-std/Test.sol";
+import {Multicall} from "@openzeppelin/contracts/utils/Multicall.sol";
+import {FVMSector, SectorStatus} from "../lib/fvm-solidity/src/FVMSector.sol";
+import {USR_NOT_FOUND} from "../lib/fvm-solidity/src/FVMErrors.sol";
 import {PoRepMarketClaimInspector} from "../src/helpers/PoRepMarketClaimInspector.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {VerifRegTypes} from "filecoin-solidity/v0.8/types/VerifRegTypes.sol";
@@ -18,6 +21,10 @@ import {DealType} from "../src/types/DealType.sol";
 
 contract PoRepMarketClaimInspectorTest is Test {
     address public constant CALL_ACTOR_ID = 0xfe00000000000000000000000000000000000005;
+
+    uint64 public constant SECTOR = 42;
+    int64 public constant DEADLINE = 3;
+    int64 public constant PARTITION = 7;
 
     address public clientAddress;
     uint256 public dealId;
@@ -72,7 +79,7 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
-        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setClaimIds(dealId, ids);
 
         porepMarketClaimInspector =
             new PoRepMarketClaimInspector(address(dataCapEvidenceAdapterMock), address(poRepMarketMock));
@@ -126,7 +133,7 @@ contract PoRepMarketClaimInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](2);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
         ids[1] = CommonTypes.FilActorId.wrap(uint64(2));
-        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setClaimIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -144,16 +151,45 @@ contract PoRepMarketClaimInspectorTest is Test {
         assertEq(claims[1].data, hex"000181E203922020071E414627E89D421B3BAFCCB24CBA13DDE9B6F388706AC8B1D48E58935C7638");
     }
 
-    function testGetClaimsReturnsEmptyResultWhenNoAllocations() public {
+    function testGetClaimsReturnsEmptyResultWhenNoClaims() public {
         actorIdMock.setGetClaimsResult(hex"8282008080");
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](0);
-        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setClaimIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(dealId);
 
         assertEq(claims.length, 0);
         assertEq(claimIds.length, 0);
+    }
+
+    function testGetClaimsIgnoresPendingAllocationIds() public {
+        actorIdMock.setGetClaimsResult(hex"8282008080");
+        CommonTypes.FilActorId[] memory noClaims = new CommonTypes.FilActorId[](0);
+        dataCapEvidenceAdapterMock.setClaimIds(dealId, noClaims);
+
+        CommonTypes.FilActorId[] memory allocations = new CommonTypes.FilActorId[](2);
+        allocations[0] = CommonTypes.FilActorId.wrap(uint64(100));
+        allocations[1] = CommonTypes.FilActorId.wrap(uint64(200));
+        dataCapEvidenceAdapterMock.setAllocationIds(dealId, allocations);
+
+        (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
+            porepMarketClaimInspector.getClaimForDeal(dealId);
+
+        assertEq(claims.length, 0);
+        assertEq(claimIds.length, 0);
+    }
+
+    function testGetClaimsReturnsSectorForValidateSectorStatus() public {
+        actorIdMock.setValidateSectorStatusResult(0, true);
+
+        (, VerifRegTypes.Claim[] memory claims) = porepMarketClaimInspector.getClaimForDeal(dealId);
+        assertEq(claims.length, 1);
+
+        uint64 sector = CommonTypes.FilActorId.unwrap(claims[0].sector);
+        bool valid =
+            porepMarketClaimInspector.validateSectorStatus(dealId, sector, SectorStatus.Active, DEADLINE, PARTITION);
+        assertTrue(valid);
     }
 
     function testGetClaimsSkipsFailedClaimIds() public {
@@ -164,7 +200,7 @@ contract PoRepMarketClaimInspectorTest is Test {
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](2);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(10));
         ids[1] = CommonTypes.FilActorId.wrap(uint64(20));
-        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setClaimIds(dealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -189,7 +225,7 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(1));
-        dataCapEvidenceAdapterMock.setAllocationIds(dealId, ids);
+        dataCapEvidenceAdapterMock.setClaimIds(dealId, ids);
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.ClaimIdsMismatch.selector, 2, 1));
         porepMarketClaimInspector.getClaimForDeal(dealId);
@@ -240,7 +276,7 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         CommonTypes.FilActorId[] memory ids = new CommonTypes.FilActorId[](1);
         ids[0] = CommonTypes.FilActorId.wrap(uint64(7));
-        dataCapEvidenceAdapterMock.setAllocationIds(secondDealId, ids);
+        dataCapEvidenceAdapterMock.setClaimIds(secondDealId, ids);
 
         (CommonTypes.FilActorId[] memory claimIds, VerifRegTypes.Claim[] memory claims) =
             porepMarketClaimInspector.getClaimForDeal(secondDealId);
@@ -342,5 +378,79 @@ contract PoRepMarketClaimInspectorTest is Test {
 
         vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.ClaimIdsMismatch.selector, 2, 1));
         porepMarketClaimInspector.getClaimsForProvider(SP1, ids);
+    }
+
+    function testValidateSectorStatusRevertsWhenDealIdIsZero() public {
+        vm.expectRevert(abi.encodeWithSelector(PoRepMarketClaimInspector.InvalidDealId.selector));
+        porepMarketClaimInspector.validateSectorStatus(0, SECTOR, SectorStatus.Active, DEADLINE, PARTITION);
+    }
+
+    function testValidateSectorStatusReturnsTrueForActiveSector() public {
+        actorIdMock.setValidateSectorStatusResult(0, true);
+
+        bool valid =
+            porepMarketClaimInspector.validateSectorStatus(dealId, SECTOR, SectorStatus.Active, DEADLINE, PARTITION);
+        assertTrue(valid);
+    }
+
+    function testValidateSectorStatusReturnsFalseOnStatusMismatch() public {
+        actorIdMock.setValidateSectorStatusResult(0, false);
+
+        bool valid =
+            porepMarketClaimInspector.validateSectorStatus(dealId, SECTOR, SectorStatus.Dead, DEADLINE, PARTITION);
+        assertFalse(valid);
+    }
+
+    function testValidateSectorStatusRevertsOnActorError() public {
+        actorIdMock.setValidateSectorStatusResult(int256(uint256(USR_NOT_FOUND)), false);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(FVMSector.ValidateSectorStatusFailed.selector, int256(uint256(USR_NOT_FOUND)))
+        );
+        porepMarketClaimInspector.validateSectorStatus(dealId, SECTOR, SectorStatus.Active, DEADLINE, PARTITION);
+    }
+
+    function testValidateSectorStatusUsesProviderFromDeal() public {
+        uint64 customMinerId = 20000;
+        poRepMarketMock.setDeal(
+            dealId,
+            PoRepTypes.Deal({
+                dealId: dealId,
+                client: clientAddress,
+                provider: CommonTypes.FilActorId.wrap(customMinerId),
+                offerId: 0,
+                state: DealState.ACCEPTED,
+                evidenceAdapter: address(dataCapEvidenceAdapterMock),
+                validator: address(validatorMock),
+                railId: 1,
+                proposedAtEpoch: CommonTypes.ChainEpoch.wrap(0),
+                dealType: DealType.PUBLIC
+            })
+        );
+
+        actorIdMock.setValidateSectorStatusResult(0, true);
+
+        bool valid =
+            porepMarketClaimInspector.validateSectorStatus(dealId, SECTOR, SectorStatus.Active, DEADLINE, PARTITION);
+        assertTrue(valid);
+    }
+
+    function testMulticallBatchesValidateSectorStatus() public {
+        actorIdMock.setValidateSectorStatusResult(0, true);
+
+        bytes[] memory calls = new bytes[](2);
+        calls[0] = abi.encodeCall(
+            PoRepMarketClaimInspector.validateSectorStatus, (dealId, SECTOR, SectorStatus.Active, DEADLINE, PARTITION)
+        );
+        calls[1] = abi.encodeCall(
+            PoRepMarketClaimInspector.validateSectorStatus,
+            (dealId, SECTOR + 1, SectorStatus.Active, DEADLINE, PARTITION)
+        );
+
+        bytes[] memory results = Multicall(address(porepMarketClaimInspector)).multicall(calls);
+
+        assertEq(results.length, 2);
+        assertTrue(abi.decode(results[0], (bool)));
+        assertTrue(abi.decode(results[1], (bool)));
     }
 }
