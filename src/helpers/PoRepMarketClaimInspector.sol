@@ -69,12 +69,8 @@ contract PoRepMarketClaimInspector is Multicall {
 
     /**
      * @notice Fetches claims for a given deal ID along with their matching claim IDs
-     * @dev Claim IDs are read from the DataCapEvidenceAdapter's claim list, i.e. allocations
-     *      already confirmed as claimed via submitEvidenceBatch. Pending allocations are not included.
-     *      VerifReg returns claims without IDs, in input order, skipping failures.
+     * @dev VerifReg returns claims without IDs, in input order, skipping failures.
      *      We re-attach the IDs so claimIds[i] matches claims[i].
-     *      The returned claims carry the sector number (claims[i].sector) which, together with
-     *      the deal ID, is the input for {validateSectorStatus}.
      * @param dealId The ID of the deal for which to fetch claims
      * @return claimIds The IDs of successfully fetched claims, aligned with claims
      * @return claims The claims associated with the deal ID
