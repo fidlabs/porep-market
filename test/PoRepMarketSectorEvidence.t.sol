@@ -219,6 +219,22 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
             CommonTypes.ChainEpoch.unwrap(market.getDealService(DEAL_ID).lastSettledEpoch),
             int64(uint64(settlementEndEpoch))
         );
+
+        miner.mockSectorStatus(SECTOR + 1, SectorStatus.Dead);
+        uint256 lossSettlementEndEpoch = settlementEndEpoch + market.EPOCHS_IN_MONTH();
+        vm.roll(lossSettlementEndEpoch);
+        SharedTypes.EvidenceStatus memory lost = market.refreshEvidenceStatus(DEAL_ID, abi.encode(locations));
+        assertEq(lost.result, EvidenceResult.COVERED_BYTES_MISMATCH);
+        assertEq(lost.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
+
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory zeroPaid =
+            market.validateDealSettlement(DEAL_ID, settlementEndEpoch, lossSettlementEndEpoch);
+        assertEq(zeroPaid.result, SettlementResult.REJECTED);
+        assertEq(zeroPaid.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(zeroPaid.settlementAmount, 0);
+        assertEq(zeroPaid.settleUpto, lossSettlementEndEpoch);
     }
 
     function testDelayedActivationRejectsProposalBoundCommitmentWithoutStartingService() public {

@@ -591,7 +591,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
     }
 
-    function testMissingSectorPublishesInactive() public {
+    function testMissingSectorPublishesCoverageMismatch() public {
         _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
         _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
         _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR);
@@ -604,7 +604,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         SharedTypes.EvidenceStatus memory status =
             market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
 
-        assertEq(status.result, EvidenceResult.INACTIVE);
+        assertEq(status.result, EvidenceResult.COVERED_BYTES_MISMATCH);
         assertEq(status.activeCoveredBytes, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch), 900);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
@@ -744,7 +744,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(adapter.getRefreshState(DEAL_ID).nextSectorIndex, 0);
     }
 
-    function testInactiveRefreshBadWitnessAndLaterActiveRecovery() public {
+    function testFaultyRefreshBadWitnessAndLaterActiveRecovery() public {
         _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
         _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
         _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1);
@@ -762,12 +762,12 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         miner.mockSectorStatus(SECTOR + 1, SectorStatus.Faulty);
         vm.roll(901);
-        SharedTypes.EvidenceStatus memory inactive =
+        SharedTypes.EvidenceStatus memory faulty =
             market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
 
-        assertEq(inactive.result, EvidenceResult.INACTIVE);
-        assertEq(inactive.activeCoveredBytes, 0);
-        assertEq(CommonTypes.ChainEpoch.unwrap(inactive.lastEvidenceRefreshEpoch), 901);
+        assertEq(faulty.result, EvidenceResult.COVERED_BYTES_MISMATCH);
+        assertEq(faulty.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(faulty.lastEvidenceRefreshEpoch), 901);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
 
         miner.mockSectorStatus(SECTOR + 1, SectorStatus.Active);
@@ -780,7 +780,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         SharedTypes.EvidenceStatus memory preserved =
             market.current(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
-        assertEq(preserved.result, EvidenceResult.INACTIVE);
+        assertEq(preserved.result, EvidenceResult.COVERED_BYTES_MISMATCH);
+        assertEq(preserved.activeCoveredBytes, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(preserved.lastEvidenceRefreshEpoch), 901);
 
         vm.roll(903);

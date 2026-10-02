@@ -489,7 +489,12 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         bool allActive;
         (sweep, allActive) = _checkRefreshBatch(context.dealId, startIndex, locations, sweep);
         if (!allActive) {
-            return _completeRefresh(context.dealId, storedState, sweep, EvidenceResult.INACTIVE, totalSectors);
+            // A Faulty or Dead sector holds no provable data. Publishing a coverage mismatch lets
+            // settlement advance with zero payment instead of holding the rail for a later catch-up.
+            return
+                _completeRefresh(
+                    context.dealId, storedState, sweep, EvidenceResult.COVERED_BYTES_MISMATCH, totalSectors
+                );
         }
 
         sweep.nextSectorIndex = startIndex + locations.length;

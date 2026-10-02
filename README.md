@@ -153,21 +153,24 @@ The adapter verifies each stored sector through FIP-0112 and reads its nominal
 expiration. It returns `PARTIAL` when the batch stops before the end of the
 sector list. Partial progress does not replace the last completed status used by
 settlement. A complete sweep publishes `ACTIVE` only when the accumulated sector
-bytes equal the authenticated manifest receipt. One verified non-Active or Dead
-sector publishes `INACTIVE`. A bad location or actor-call failure reverts and
-preserves the previous completed status.
+bytes equal the authenticated manifest receipt. One verified Faulty or Dead
+sector publishes `COVERED_BYTES_MISMATCH` with zero covered bytes. A bad location
+or actor-call failure reverts and preserves the previous completed status.
 
 Operators read `getRefreshState`, `getSectorCount`, and `getSectorNumber`, resolve
 the current sector locations off chain, estimate the exact refresh transaction,
 and submit as many consecutive locations as fit. There is no contract-level
 piece, sector, or batch cap. Repeat until `EvidenceRefreshCompleted` reports
-`ACTIVE` or `INACTIVE`. `getPiecePlacement` and `getSectorCoveredBytes` let a new
+`ACTIVE` or `COVERED_BYTES_MISMATCH`. `getPiecePlacement` and `getSectorCoveredBytes` let a new
 operator reconstruct the placement inventory from chain state without the
 original manifest host or a private database.
 
-Stale or `INACTIVE` evidence makes settlement revert with `EvidenceTooStale()`
-without advancing its stored settlement cursor. A later completed `ACTIVE`
-sweep lets the same interval be retried. This adapter relies on the current
+Stale or never-refreshed (`INACTIVE`) evidence makes settlement revert with
+`EvidenceTooStale()` without advancing its stored settlement cursor. A later
+completed `ACTIVE` sweep lets the same interval be retried. A coverage mismatch
+from a Faulty or Dead sector settles the interval with zero payment and advances
+the cursor, as the DataCap adapter does for terminated claims. A recovered
+Faulty sector is paid again from the next `ACTIVE` sweep. This adapter relies on the current
 pre-Re-Snap rule that sector content cannot change while the sector number stays
 Active. It must be replaced or upgraded with authenticated current-content
 membership before Re-Snap is enabled for these deals.
