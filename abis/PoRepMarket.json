@@ -1979,6 +1979,27 @@
   },
   {
     "type": "error",
+    "name": "EvidenceRefreshWindowEnded",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "serviceEndEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "currentEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "EvidenceTooStale",
     "inputs": []
   },
