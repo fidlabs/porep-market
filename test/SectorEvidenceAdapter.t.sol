@@ -585,7 +585,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         SharedTypes.EvidenceStatus memory current = market.current(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
 
-        assertEq(current.result, EvidenceResult.INACTIVE);
+        assertEq(current.result, EvidenceResult.NONE);
         assertEq(current.activeCoveredBytes, 0);
         assertEq(current.checkedClaims, 0);
         assertEq(current.totalClaims, 3);
@@ -633,7 +633,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
 
         SharedTypes.EvidenceStatus memory current = market.current(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
-        assertEq(current.result, EvidenceResult.INACTIVE);
+        assertEq(current.result, EvidenceResult.NONE);
         assertEq(CommonTypes.ChainEpoch.unwrap(current.lastEvidenceRefreshEpoch), 0);
     }
 

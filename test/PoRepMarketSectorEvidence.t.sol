@@ -177,7 +177,7 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         market.activateEvidence(DEAL_ID, "");
 
         SharedTypes.EvidenceStatus memory evidenceStatus = market.currentEvidenceStatus(DEAL_ID);
-        assertEq(evidenceStatus.result, EvidenceResult.INACTIVE);
+        assertEq(evidenceStatus.result, EvidenceResult.NONE);
         assertTrue(adapter.hasSubmittedEvidence(DEAL_ID));
         assertEq(evidenceStatus.activeCoveredBytes, 0);
         assertEq(CommonTypes.ChainEpoch.unwrap(evidenceStatus.lastEvidenceRefreshEpoch), 0);

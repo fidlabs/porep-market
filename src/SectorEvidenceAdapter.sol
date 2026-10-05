@@ -899,7 +899,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
             activeCoveredBytes: active ? $._manifestReceipts[dealId].acceptedBytes : 0,
             lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(refreshState.lastCompletedEpoch),
             reasonCode: 0,
-            result: completed ? refreshState.completedResult : EvidenceResult.INACTIVE,
+            // NONE until a sweep completes, so the market can tell "never checked" from a negative result.
+            result: refreshState.completedResult,
             checkedClaims: completed ? totalSectors : 0,
             totalClaims: totalSectors
         });
