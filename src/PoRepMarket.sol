@@ -377,6 +377,12 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     error EvidenceRefreshNotAllowed(uint256 dealId, uint8 state);
 
     /**
+     * @notice Error thrown when evidence is refreshed after the deal's service has ended
+     * @dev 0x9fb8b863
+     */
+    error EvidenceRefreshWindowEnded(uint256 dealId, uint256 serviceEndEpoch, uint256 currentEpoch);
+
+    /**
      * @notice Error indicating that the minimum time between settlements is invalid
      * @dev 0xf90f5b8f
      */
@@ -1135,6 +1141,7 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
         _ensureEvidenceRefreshable(deal);
+        _ensureEvidenceRefreshWindowOpen(deal);
 
         return
             IStorageEvidenceAdapter(deal.evidenceAdapter).refreshEvidenceStatus(_activationContext(deal), evidenceData);
@@ -1308,7 +1315,7 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
             revert DealServiceNotStarted(dealId);
         }
 
-        if (fromEpoch > serviceEndEpoch) {
+        if (fromEpoch >= serviceEndEpoch) {
             return _rejectedSettlement(toEpoch, SettlementReason.DEAL_ENDED, "deal ended");
         }
 
@@ -1328,8 +1335,13 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
                 settlementWasCapped = true;
             }
         } else {
+            // The final window may be shorter than the minimum interval: a terminated rail's end epoch is fixed, so
+            // enforcing the interval there could leave the remainder unsettleable.
             uint256 earliestSettlementEpoch = fromEpoch + service.minTimeBetweenSettlementsInEpochs;
-            if (effectiveToEpoch < earliestSettlementEpoch) {
+            if (
+                deal.state == DealState.ACTIVE && toEpoch < serviceEndEpoch
+                    && effectiveToEpoch < earliestSettlementEpoch
+            ) {
                 revert SettlementTooEarly(effectiveToEpoch, earliestSettlementEpoch);
             }
 
@@ -1340,7 +1352,8 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
             }
         }
 
-        // Score and size failures advance the cursor to effectiveToEpoch; stale evidence reverts for a later retry.
+        // Score and size failures advance the cursor to effectiveToEpoch; stale evidence reverts for a later retry
+        // while a refresh is still possible.
         {
             SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
             if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
@@ -1349,22 +1362,10 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
                 );
             }
         }
-        {
-            SharedTypes.EvidenceStatus memory evidenceStatus =
-                IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
-            uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
-            if (
-                evidenceStatus.result == EvidenceResult.INACTIVE
-                    || lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch
-            ) {
-                revert EvidenceTooStale();
-            }
-
-            if (evidenceStatus.activeCoveredBytes != $._dealCapacity[dealId].committedBytes) {
-                return _rejectedSettlement(
-                    effectiveToEpoch, SettlementReason.DATA_SIZE_MISMATCH, "data size does not match the deal"
-                );
-            }
+        if (!_settlementEvidenceMatches(deal, service, effectiveToEpoch)) {
+            return _rejectedSettlement(
+                effectiveToEpoch, SettlementReason.DATA_SIZE_MISMATCH, "data size does not match the deal"
+            );
         }
 
         // Only successful validation updates the market's settlement tracking.
@@ -1386,6 +1387,44 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     }
 
     // solhint-enable function-max-lines, gas-strict-inequalities, gas-small-strings
+
+    // solhint-disable gas-strict-inequalities
+    /**
+     * @notice Checks whether the deal's evidence covers its committed bytes for a settlement window
+     * @dev Refreshes stop when service ends, so evidence observed afterwards (such as sectors expiring on schedule)
+     *      never decides an earned window. From then on the last completed snapshot decides regardless of age, and
+     *      activation counts as the snapshot until the first refresh: refreshes are run by the protocol's bot, and
+     *      a missed refresh must neither lock the rail nor cost the provider an earned payment.
+     * @param deal The deal being settled
+     * @param service The deal's service schedule
+     * @param effectiveToEpoch End of the payable settlement window
+     * @return True when the evidence covers exactly the committed bytes
+     */
+    function _settlementEvidenceMatches(
+        PoRepTypes.Deal storage deal,
+        PoRepTypes.DealService storage service,
+        uint256 effectiveToEpoch
+    ) internal returns (bool) {
+        SharedTypes.EvidenceStatus memory evidenceStatus = IStorageEvidenceAdapter(deal.evidenceAdapter)
+            .currentEvidenceStatus(_activationContext(deal));
+        uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
+        bool refreshWindowOpen = deal.state == DealState.ACTIVE && block.number < _epochToUint(service.serviceEndEpoch);
+
+        if (refreshWindowOpen) {
+            if (
+                evidenceStatus.result == EvidenceResult.INACTIVE
+                    || lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch
+            ) {
+                revert EvidenceTooStale();
+            }
+        } else if (lastRefreshEpoch == 0 && evidenceStatus.result == EvidenceResult.NONE) {
+            // Adapters released before refreshes recorded their epoch on a mismatch can report one at epoch zero.
+            return true;
+        }
+        return evidenceStatus.activeCoveredBytes == s()._dealCapacity[deal.dealId].committedBytes;
+    }
+
+    // solhint-enable gas-strict-inequalities
 
     /**
      * @notice Changes the state of a deal
@@ -1527,6 +1566,21 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     function _ensureEvidenceRefreshable(PoRepTypes.Deal storage deal) internal view {
         if (deal.state != DealState.ACCEPTED && deal.state != DealState.ACTIVE) {
             revert EvidenceRefreshNotAllowed(deal.dealId, deal.state);
+        }
+    }
+
+    /**
+     * @notice Ensures the deal's service has not ended yet
+     * @dev Evidence observed after service end could reflect sectors or claims expiring on schedule rather than a
+     *      provider failure, so it must not replace the snapshot that settles the deal's earned windows. Accepted
+     *      deals have no service end yet.
+     * @param deal The deal
+     */
+    function _ensureEvidenceRefreshWindowOpen(PoRepTypes.Deal storage deal) internal view {
+        uint256 serviceEndEpoch = _epochToUint(s()._dealService[deal.dealId].serviceEndEpoch);
+        // solhint-disable-next-line gas-strict-inequalities
+        if (serviceEndEpoch != 0 && block.number >= serviceEndEpoch) {
+            revert EvidenceRefreshWindowEnded(deal.dealId, serviceEndEpoch, block.number);
         }
     }
 

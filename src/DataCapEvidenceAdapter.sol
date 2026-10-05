@@ -647,12 +647,11 @@ contract DataCapEvidenceAdapter is
 
         if (refreshStatus.checkedClaims == totalClaims) {
             refreshStatus.activeClaimedBytes = refreshStatus.pendingActiveClaimedBytes;
-            if (refreshStatus.activeClaimedBytes != deal.claimedBytes) {
-                evidenceResult = EvidenceResult.COVERED_BYTES_MISMATCH;
-            } else {
-                refreshStatus.lastEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
-                evidenceResult = EvidenceResult.ACTIVE;
-            }
+            evidenceResult = refreshStatus.activeClaimedBytes == deal.claimedBytes
+                ? EvidenceResult.ACTIVE
+                : EvidenceResult.COVERED_BYTES_MISMATCH;
+            // A completed mismatch is fresh evidence too; keeping the old epoch made settlement treat it as stale.
+            refreshStatus.lastEvidenceRefreshEpoch = CommonTypes.ChainEpoch.wrap(currentEpoch);
             refreshStatus.result = evidenceResult;
         } else {
             evidenceResult = EvidenceResult.PARTIAL;
@@ -674,24 +673,19 @@ contract DataCapEvidenceAdapter is
 
     /**
      * @notice Read current evidence status from adapter storage only
-     * @dev Must not call Filecoin actors or refresh live state
+     * @dev Returns the last completed snapshot unchanged. Freshness is judged by PoRepMarket against the settlement
+     *      window, so aging the snapshot here would only erase evidence a delayed settlement still needs.
      * @param context Activation context for the deal and market state
      * @return status Current adapter-local evidence status
      */
     function currentEvidenceStatus(SharedTypes.ActivationContext calldata context)
         external
+        view
         onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
         DataCapEvidenceAdapterStorage storage $ = s();
         RefreshStatus storage refreshStatus = $._refreshStatus[context.dealId];
-
-        uint256 lastRefresh = uint256(uint64(CommonTypes.ChainEpoch.unwrap(refreshStatus.lastEvidenceRefreshEpoch)));
-
-        if (block.number > lastRefresh + SharedTypes.EPOCHS_IN_MONTH) {
-            refreshStatus.activeClaimedBytes = 0;
-            refreshStatus.result = EvidenceResult.INACTIVE;
-        }
         // TODO: add custom reasonCode
         return SharedTypes.EvidenceStatus({
             activeCoveredBytes: refreshStatus.activeClaimedBytes,
