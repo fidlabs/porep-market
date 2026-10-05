@@ -1979,6 +1979,22 @@
   },
   {
     "type": "error",
+    "name": "EvidenceRefreshNotAllowed",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "state",
+        "type": "uint8",
+        "internalType": "uint8"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "EvidenceTooStale",
     "inputs": []
   },

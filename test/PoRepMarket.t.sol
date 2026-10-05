@@ -1817,6 +1817,28 @@ contract PoRepMarketTest is Test {
         assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
     }
 
+    function testRefreshEvidenceStatusAllowsAcceptedDeal() public {
+        bytes memory evidenceData = abi.encode("refresh");
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock(address(poRepMarket)).setDealState(dealId, DealState.ACCEPTED);
+
+        poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
+
+        assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
+    }
+
+    function testRefreshEvidenceStatusRevertsWhenStateDoesNotAllowRefresh() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock(address(poRepMarket)).setDealState(dealId, DealState.REJECTED);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.EvidenceRefreshNotAllowed.selector, dealId, DealState.REJECTED)
+        );
+        poRepMarket.refreshEvidenceStatus(dealId, "");
+    }
+
     function testCurrentEvidenceStatusIsReadableByAnyCaller() public {
         uint256 coveredBytes = defaultTerms.dealSizeBytes;
         address caller = vm.addr(0x999);

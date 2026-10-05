@@ -5,6 +5,7 @@ import {AccessControlledUpgradeable} from "./abstracts/AccessControlledUpgradeab
 import {Roles} from "./lib/Roles.sol";
 import {UUPSUpgradeable} from "@openzeppelin/contracts-upgradeable/proxy/utils/UUPSUpgradeable.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
+import {DealState} from "./types/DealState.sol";
 import {CalldataSlice, CalldataUtils} from "fvm-solidity/CalldataUtils.sol";
 import {CBOR_CODEC} from "fvm-solidity/FVMCodec.sol";
 import {FVMAddress} from "fvm-solidity/FVMAddress.sol";
@@ -30,6 +31,8 @@ import {SharedTypes} from "./types/SharedTypes.sol";
  * @title Sector evidence adapter
  * @notice Records authenticated piece placements and refreshes their sectors through FIP-0112.
  * @dev This pre-Re-Snap adapter relies on sector content remaining unchanged while a sector number is Active.
+ *      Payment covers the complete deal, not individual sectors: a refresh reports either every committed byte or
+ *      a coverage mismatch, and only Dead sectors count as lost coverage.
  */
 contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgradeable, UUPSUpgradeable {
     using CalldataUtils for CalldataSlice;
@@ -120,6 +123,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         mapping(uint256 dealId => uint64[] sectorNumbers) _sectorNumbers;
         mapping(uint256 dealId => mapping(uint64 sectorNumber => uint64 coveredBytes)) _sectorCoveredBytes;
         mapping(uint256 dealId => DealRefreshState state) _refreshStates;
+        // Inverted flag so proxies upgraded from earlier versions stay operational.
+        bool _disabled;
     }
 
     // keccak256(abi.encode(uint256(keccak256("porepmarket.storage.SectorEvidenceAdapterStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -208,6 +213,13 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
     event EvidenceRefreshCompleted(
         uint256 indexed dealId, uint8 indexed result, uint256 activeCoveredBytes, int64 refreshEpoch, int64 expiration
     );
+
+    /**
+     * @notice Emitted when the adapter is permanently non-operational
+     * @param account The account that set the adapter non-operational
+     * @param setAtBlock The block number at which the adapter was set non-operational
+     */
+    event AdapterNonOperational(address indexed account, uint256 setAtBlock);
     // solhint-enable gas-indexed-events
 
     /**
@@ -294,6 +306,18 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
      * @dev 0x9c4810ad
      */
     error RefreshCoveredBytesMismatch(uint256 expected, uint256 actual);
+    /**
+     * @dev 0x77b7ab70
+     */
+    error DealNotAccepted(uint256 dealId, uint8 state);
+    /**
+     * @dev 0x55637dd8
+     */
+    error AdapterNotOperational();
+    /**
+     * @dev 0xcdc6b3ae
+     */
+    error AdapterAlreadyNonOperational();
 
     modifier onlyPoRepMarket() {
         if (msg.sender != address(s()._poRepMarket)) revert OnlyPoRepMarket();
@@ -394,6 +418,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         int64 minimumCommitmentEpoch
     ) external {
         if (msg.sender != address(this)) revert OnlySelf();
+        if (s()._disabled) revert AdapterNotOperational();
         if (!canonicalPieceCid) revert UnexpectedPieceCidHeader();
         if (paddedSize == 0) revert InvalidPaddedSize();
         if (payloadBytes.length < 160) revert InvalidPayloadLength(payloadBytes.length);
@@ -435,12 +460,20 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
     {
         SectorEvidenceAdapterStorage storage $ = s();
         ManifestReceipt storage receipt = $._manifestReceipts[context.dealId];
+        DealRefreshState storage refreshState = $._refreshStates[context.dealId];
+        int64 commitmentEpoch = receipt.minimumCommitmentEpoch;
+        // Callback epochs are fixed at sealing; a completed sweep reads current expirations, so sector
+        // extensions made after sealing can still satisfy a delayed activation.
+        if (refreshState.completedResult == EvidenceResult.ACTIVE && refreshState.completedExpiration > commitmentEpoch)
+        {
+            commitmentEpoch = refreshState.completedExpiration;
+        }
         if (
-            receipt.activated || receipt.pieceCount == 0 || receipt.acceptedPieceCount != receipt.pieceCount
-                || receipt.acceptedBytes != context.requestedSizeBytes
-                || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
-                || receipt.minimumCommitmentEpoch < 1
-                || uint256(uint64(receipt.minimumCommitmentEpoch)) < block.number + context.durationEpochs
+            receipt.activated || !_hasCompletePieceSet(receipt, context)
+                || refreshState.completedResult == EvidenceResult.COVERED_BYTES_MISMATCH || commitmentEpoch < 1
+                // The positivity check above proves this conversion is safe.
+                // forge-lint: disable-next-line(unsafe-typecast)
+                || uint256(uint64(commitmentEpoch)) < block.number + context.durationEpochs
         ) {
             return _rejectedActivation();
         }
@@ -460,17 +493,13 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         onlyPoRepMarket
         returns (SharedTypes.EvidenceStatus memory status)
     {
-        SectorLocation[] memory locations = abi.decode(evidenceData, (SectorLocation[]));
         SectorEvidenceAdapterStorage storage $ = s();
         ManifestReceipt storage receipt = $._manifestReceipts[context.dealId];
-        uint256 totalSectors = $._sectorNumbers[context.dealId].length;
-        if (
-            !receipt.activated || receipt.providerActorId != CommonTypes.FilActorId.unwrap(context.provider)
-                || receipt.acceptedBytes != context.requestedSizeBytes || totalSectors == 0
-        ) {
-            revert RefreshUnavailable(context.dealId);
-        }
+        // Refresh also runs before activation so a sweep can prove sector extensions made after sealing.
+        if (!_hasCompletePieceSet(receipt, context)) revert RefreshUnavailable(context.dealId);
 
+        uint256 totalSectors = $._sectorNumbers[context.dealId].length;
+        SectorLocation[] memory locations = abi.decode(evidenceData, (SectorLocation[]));
         DealRefreshState storage storedState = $._refreshStates[context.dealId];
         DealRefreshState memory sweep = storedState;
         uint256 startIndex = sweep.nextSectorIndex;
@@ -486,10 +515,10 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
             sweep.sweepStartEpoch = int64(uint64(block.number));
         }
 
-        bool allActive;
-        (sweep, allActive) = _checkRefreshBatch(context.dealId, startIndex, locations, sweep);
-        if (!allActive) {
-            // A Faulty or Dead sector holds no provable data. Publishing a coverage mismatch lets
+        bool allCovered;
+        (sweep, allCovered) = _checkRefreshBatch(context.dealId, startIndex, locations, sweep);
+        if (!allCovered) {
+            // A Dead sector cannot return: sector numbers are never reused. Publishing a coverage mismatch lets
             // settlement advance with zero payment instead of holding the rail for a later catch-up.
             return
                 _completeRefresh(
@@ -545,8 +574,19 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
-    function isOperational() external pure returns (bool) {
-        return true;
+    function isOperational() external view returns (bool) {
+        return !s()._disabled;
+    }
+
+    /**
+     * @notice Permanently stops accepting new piece placements
+     * @dev Activation, refreshes, and reads stay available for deals that already have placements.
+     */
+    function disableAdapter() external onlyRole(Roles.DEFAULT_ADMIN_ROLE) {
+        SectorEvidenceAdapterStorage storage $ = s();
+        if ($._disabled) revert AdapterAlreadyNonOperational();
+        $._disabled = true;
+        emit AdapterNonOperational(msg.sender, block.number);
     }
 
     /// @inheritdoc IStorageEvidenceAdapter
@@ -654,6 +694,7 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         if (deal.evidenceAdapter != address(this)) {
             revert UnexpectedEvidenceAdapter(dealId, deal.evidenceAdapter);
         }
+        if (deal.state != DealState.ACCEPTED) revert DealNotAccepted(dealId, deal.state);
 
         uint64 expectedProvider = CommonTypes.FilActorId.unwrap(deal.provider);
         if (placement.providerActorId != expectedProvider) {
@@ -750,13 +791,23 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         return prefix == CANONICAL_COMMP_CID_PREFIX;
     }
 
+    function _hasCompletePieceSet(ManifestReceipt storage receipt, SharedTypes.ActivationContext calldata context)
+        private
+        view
+        returns (bool)
+    {
+        return receipt.pieceCount != 0 && receipt.acceptedPieceCount == receipt.pieceCount
+            && receipt.acceptedBytes == context.requestedSizeBytes
+            && receipt.providerActorId == CommonTypes.FilActorId.unwrap(context.provider);
+    }
+
     function _rejectedActivation() private pure returns (SharedTypes.ActivationDecision memory decision) {
         return SharedTypes.ActivationDecision({coveredBytes: 0, reasonCode: 0, result: EvidenceResult.REJECTED});
     }
 
     function _checkSector(uint64 providerActorId, uint64 sectorNumber, SectorLocation memory location)
         private
-        returns (bool active, int64 expiration)
+        returns (bool covered, int64 expiration)
     {
         (bool statusAvailable, bool isActive) = FVMSector.tryValidateSectorStatus(
             providerActorId, sectorNumber, SectorStatus.Active, location.deadline, location.partition
@@ -768,7 +819,17 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
             if (!absenceAvailable || !dead) revert SectorStatusUnavailable(sectorNumber);
             return (false, 0);
         }
-        if (!isActive) return (false, 0);
+        // A Faulty sector still holds the data and recovers after the next successful WindowPoSt. The network
+        // already charges fault fees and terminates sectors after 42 days of continuous faults, so a temporary
+        // fault must not zero a whole settlement window; only termination is a permanent loss.
+        if (
+            !isActive
+                && !FVMSector.validateSectorStatus(
+                    providerActorId, sectorNumber, SectorStatus.Faulty, location.deadline, location.partition
+                )
+        ) {
+            return (false, 0);
+        }
 
         uint64 nominalExpiration = FVMSector.getNominalSectorExpiration(providerActorId, sectorNumber);
         if (nominalExpiration == 0 || nominalExpiration >> 63 != 0) {
@@ -784,13 +845,13 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
         uint256 startIndex,
         SectorLocation[] memory locations,
         DealRefreshState memory sweep
-    ) private returns (DealRefreshState memory updatedSweep, bool allActive) {
+    ) private returns (DealRefreshState memory updatedSweep, bool allCovered) {
         SectorEvidenceAdapterStorage storage $ = s();
         uint64 providerActorId = $._manifestReceipts[dealId].providerActorId;
         for (uint256 i = 0; i < locations.length; ++i) {
             uint64 sectorNumber = $._sectorNumbers[dealId][startIndex + i];
-            (bool active, int64 expiration) = _checkSector(providerActorId, sectorNumber, locations[i]);
-            if (!active) return (sweep, false);
+            (bool covered, int64 expiration) = _checkSector(providerActorId, sectorNumber, locations[i]);
+            if (!covered) return (sweep, false);
 
             sweep.pendingCoveredBytes += $._sectorCoveredBytes[dealId][sectorNumber];
             if (sweep.pendingMinimumExpiration == 0 || expiration < sweep.pendingMinimumExpiration) {

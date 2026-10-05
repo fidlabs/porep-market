@@ -74,6 +74,10 @@ contract SectorEvidenceMarketMock {
             PoRepTypes.DealTerms({requestedSizeBytes: requestedSizeBytes, durationEpochs: durationEpochs});
     }
 
+    function setDealState(uint256 dealId, uint8 state) external {
+        _deals[dealId].state = state;
+    }
+
     function getDeal(uint256 dealId) external view returns (PoRepTypes.Deal memory) {
         return _deals[dealId];
     }
@@ -567,13 +571,16 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
     function testUnrefreshedStatusIsInactiveAndEmptyRefreshIsRejected() public {
         _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
         _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR + 1);
-        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 2);
 
         SectorEvidenceAdapter.SectorLocation[] memory firstLocation = new SectorEvidenceAdapter.SectorLocation[](1);
         firstLocation[0] = SectorEvidenceAdapter.SectorLocation({deadline: 4, partition: 7});
         vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.RefreshUnavailable.selector, DEAL_ID));
         market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(firstLocation));
+        // Availability is checked before the evidence payload is decoded.
+        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.RefreshUnavailable.selector, DEAL_ID));
+        market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), "");
 
+        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 2);
         market.activate(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
 
         SharedTypes.EvidenceStatus memory current = market.current(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
@@ -744,7 +751,7 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(adapter.getRefreshState(DEAL_ID).nextSectorIndex, 0);
     }
 
-    function testFaultyRefreshBadWitnessAndLaterActiveRecovery() public {
+    function testFaultySectorKeepsCoverageAndTerminatedSectorPublishesMismatch() public {
         _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
         _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
         _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1);
@@ -753,24 +760,19 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         int64 deadline = 4;
         int64 partition = 7;
         miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, 600_000);
-        miner.mockSector(SECTOR + 1, SectorStatus.Active, deadline, partition + 1, 500_000);
+        miner.mockSector(SECTOR + 1, SectorStatus.Faulty, deadline, partition + 1, 500_000);
         SectorEvidenceAdapter.SectorLocation[] memory locations = new SectorEvidenceAdapter.SectorLocation[](2);
         locations[0] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition});
         locations[1] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition + 1});
-        vm.roll(900);
-        market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
-
-        miner.mockSectorStatus(SECTOR + 1, SectorStatus.Faulty);
         vm.roll(901);
         SharedTypes.EvidenceStatus memory faulty =
             market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
 
-        assertEq(faulty.result, EvidenceResult.COVERED_BYTES_MISMATCH);
-        assertEq(faulty.activeCoveredBytes, 0);
+        assertEq(faulty.result, EvidenceResult.ACTIVE);
+        assertEq(faulty.activeCoveredBytes, REQUESTED_SIZE);
         assertEq(CommonTypes.ChainEpoch.unwrap(faulty.lastEvidenceRefreshEpoch), 901);
-        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 500_000);
 
-        miner.mockSectorStatus(SECTOR + 1, SectorStatus.Active);
         SectorEvidenceAdapter.SectorLocation[] memory badLocations = new SectorEvidenceAdapter.SectorLocation[](2);
         badLocations[0] = SectorEvidenceAdapter.SectorLocation({deadline: deadline + 1, partition: partition});
         badLocations[1] = locations[1];
@@ -780,18 +782,131 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         SharedTypes.EvidenceStatus memory preserved =
             market.current(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
-        assertEq(preserved.result, EvidenceResult.COVERED_BYTES_MISMATCH);
-        assertEq(preserved.activeCoveredBytes, 0);
+        assertEq(preserved.result, EvidenceResult.ACTIVE);
         assertEq(CommonTypes.ChainEpoch.unwrap(preserved.lastEvidenceRefreshEpoch), 901);
 
+        // A terminated sector stays in its partition until compaction and reports neither Active nor Faulty.
+        miner.mockSectorStatus(SECTOR + 1, SectorStatus.Dead);
         vm.roll(903);
-        SharedTypes.EvidenceStatus memory recovered =
+        SharedTypes.EvidenceStatus memory terminated =
             market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
 
-        assertEq(recovered.result, EvidenceResult.ACTIVE);
-        assertEq(recovered.activeCoveredBytes, REQUESTED_SIZE);
-        assertEq(CommonTypes.ChainEpoch.unwrap(recovered.lastEvidenceRefreshEpoch), 903);
-        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 500_000);
+        assertEq(terminated.result, EvidenceResult.COVERED_BYTES_MISMATCH);
+        assertEq(terminated.activeCoveredBytes, 0);
+        assertEq(CommonTypes.ChainEpoch.unwrap(terminated.lastEvidenceRefreshEpoch), 903);
+        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
+    }
+
+    function testDelayedActivationAcceptsCommitmentProvenByCompletedSweep() public {
+        _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
+        _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
+        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1);
+
+        int64 activationEpoch = PROPOSED_AT + 10;
+        vm.roll(uint256(uint64(activationEpoch)));
+        assertRejectedActivation(DEAL_ID, PROVIDER, REQUESTED_SIZE);
+
+        // The provider extended both sectors after sealing; the callback epoch cannot reflect that.
+        uint64 extendedExpiration = uint64(activationEpoch) + DURATION;
+        int64 deadline = 4;
+        int64 partition = 7;
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, extendedExpiration + 100);
+        miner.mockSector(SECTOR + 1, SectorStatus.Active, deadline, partition + 1, extendedExpiration);
+        SectorEvidenceAdapter.SectorLocation[] memory locations = new SectorEvidenceAdapter.SectorLocation[](2);
+        locations[0] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition});
+        locations[1] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition + 1});
+        SharedTypes.EvidenceStatus memory refreshed =
+            market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
+        assertEq(refreshed.result, EvidenceResult.ACTIVE);
+        assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), int64(extendedExpiration));
+
+        SharedTypes.ActivationDecision memory decision =
+            market.activate(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(decision.coveredBytes, REQUESTED_SIZE);
+    }
+
+    function testCompletedCoverageMismatchBlocksActivation() public {
+        _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
+        _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
+        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1);
+
+        int64 deadline = 4;
+        int64 partition = 7;
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, 600_000);
+        miner.mockSector(SECTOR + 1, SectorStatus.Dead, deadline, partition + 1, 600_000);
+        SectorEvidenceAdapter.SectorLocation[] memory locations = new SectorEvidenceAdapter.SectorLocation[](2);
+        locations[0] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition});
+        locations[1] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition + 1});
+        SharedTypes.EvidenceStatus memory lost =
+            market.refresh(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE), abi.encode(locations));
+        assertEq(lost.result, EvidenceResult.COVERED_BYTES_MISMATCH);
+
+        assertRejectedActivation(DEAL_ID, PROVIDER, REQUESTED_SIZE);
+        assertFalse(adapter.getManifestReceipt(DEAL_ID).activated);
+    }
+
+    function testPlacementsRequireAcceptedDeal() public {
+        market.setDealState(DEAL_ID, 10);
+        _assertRejected(_notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR));
+        _assertEmptyReceipt(DEAL_ID);
+        vm.prank(address(adapter));
+        vm.expectRevert(abi.encodeWithSelector(SectorEvidenceAdapter.DealNotAccepted.selector, DEAL_ID, uint8(10)));
+        adapter.processPieceNotification(
+            _payload(DEAL_ID, 0, PIECE_COUNT, _proof(0)),
+            true,
+            PROVIDER,
+            DIGEST_0,
+            PADDED_SIZE,
+            SECTOR,
+            MINIMUM_COMMITMENT_EPOCH
+        );
+
+        market.setDealState(DEAL_ID, 20);
+        _assertAccepted(_notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR));
+        _assertAccepted(_notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR));
+        _assertAccepted(_notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1));
+        market.activate(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
+
+        _assertRejected(_notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR));
+    }
+
+    function testDisabledAdapterRejectsPlacementsButKeepsActivation() public {
+        _notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR);
+        _notify(1, _proof(1), PIECE_CID_1, PADDED_SIZE, SECTOR);
+        _notify(2, _proof(2), PIECE_CID_2, PADDED_SIZE, SECTOR + 1);
+
+        bytes32 adminRole = manager.DEFAULT_ADMIN_ROLE();
+        vm.prank(address(0xBAD));
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, address(0xBAD), adminRole)
+        );
+        adapter.disableAdapter();
+
+        vm.expectEmit(true, false, false, true, address(adapter));
+        emit SectorEvidenceAdapter.AdapterNonOperational(address(this), block.number);
+        adapter.disableAdapter();
+        assertFalse(adapter.isOperational());
+        vm.expectRevert(SectorEvidenceAdapter.AdapterAlreadyNonOperational.selector);
+        adapter.disableAdapter();
+
+        // An exact replay is normally a no-op acceptance.
+        _assertRejected(_notify(0, _proof(0), PIECE_CID_0, PADDED_SIZE, SECTOR));
+        vm.prank(address(adapter));
+        vm.expectRevert(SectorEvidenceAdapter.AdapterNotOperational.selector);
+        adapter.processPieceNotification(
+            _payload(DEAL_ID, 0, PIECE_COUNT, _proof(0)),
+            true,
+            PROVIDER,
+            DIGEST_0,
+            PADDED_SIZE,
+            SECTOR,
+            MINIMUM_COMMITMENT_EPOCH
+        );
+
+        SharedTypes.ActivationDecision memory decision =
+            market.activate(adapter, _context(DEAL_ID, PROVIDER, REQUESTED_SIZE));
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
     }
 
     function testOnlyPoRepMarketCanCallLifecycleEntryPoints() public {

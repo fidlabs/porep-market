@@ -269,6 +269,42 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         assertFalse(adapter.getManifestReceipt(DEAL_ID).activated);
     }
 
+    function testDelayedActivationRecoversAfterSectorExtensionAndPreActivationRefresh() public {
+        vm.prank(client);
+        market.proposeDeal(_request());
+
+        PoRepTypes.Deal memory proposedDeal = market.getDeal(DEAL_ID);
+        vm.startPrank(validatorAddress);
+        market.updateValidator(DEAL_ID);
+        market.updateRailId(DEAL_ID, 1);
+        vm.stopPrank();
+        validator.setRailStatus(RailStatus.PREPARED);
+
+        int64 proposedAtEpoch = CommonTypes.ChainEpoch.unwrap(proposedDeal.proposedAtEpoch);
+        int64 minimumCommitmentEpoch = proposedAtEpoch + DURATION_EPOCHS;
+        _notify(PIECE_CID_0, 0, _proof(LEAF_1), SECTOR, minimumCommitmentEpoch);
+        _notify(PIECE_CID_1, 1, _proof(LEAF_0), SECTOR + 1, minimumCommitmentEpoch);
+
+        int64 activationEpoch = proposedAtEpoch + 1;
+        vm.roll(uint256(uint64(activationEpoch)));
+        assertEq(market.activateEvidence(DEAL_ID, "").result, EvidenceResult.REJECTED);
+
+        uint64 extendedExpiration = uint64(activationEpoch + DURATION_EPOCHS);
+        int64 deadline = 4;
+        int64 partition = 7;
+        miner.mockSector(SECTOR, SectorStatus.Active, deadline, partition, extendedExpiration);
+        miner.mockSector(SECTOR + 1, SectorStatus.Active, deadline, partition + 1, extendedExpiration);
+        SectorEvidenceAdapter.SectorLocation[] memory locations = new SectorEvidenceAdapter.SectorLocation[](2);
+        locations[0] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition});
+        locations[1] = SectorEvidenceAdapter.SectorLocation({deadline: deadline, partition: partition + 1});
+        assertEq(market.refreshEvidenceStatus(DEAL_ID, abi.encode(locations)).result, EvidenceResult.ACTIVE);
+
+        SharedTypes.ActivationDecision memory decision = market.activateEvidence(DEAL_ID, "");
+        assertEq(decision.result, EvidenceResult.ACCEPTED);
+        assertEq(market.getDeal(DEAL_ID).state, DealState.ACTIVE);
+        assertTrue(adapter.getManifestReceipt(DEAL_ID).activated);
+    }
+
     function testActivationAcceptsExactBoundaryAndRejectsConflictingReplay() public {
         vm.prank(client);
         market.proposeDeal(_request());

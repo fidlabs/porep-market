@@ -201,6 +201,13 @@
   },
   {
     "type": "function",
+    "name": "disableAdapter",
+    "inputs": [],
+    "outputs": [],
+    "stateMutability": "nonpayable"
+  },
+  {
+    "type": "function",
     "name": "getEvidenceType",
     "inputs": [],
     "outputs": [
@@ -556,7 +563,7 @@
         "internalType": "bool"
       }
     ],
-    "stateMutability": "pure"
+    "stateMutability": "view"
   },
   {
     "type": "function",
@@ -819,6 +826,25 @@
   },
   {
     "type": "event",
+    "name": "AdapterNonOperational",
+    "inputs": [
+      {
+        "name": "account",
+        "type": "address",
+        "indexed": true,
+        "internalType": "address"
+      },
+      {
+        "name": "setAtBlock",
+        "type": "uint256",
+        "indexed": false,
+        "internalType": "uint256"
+      }
+    ],
+    "anonymous": false
+  },
+  {
+    "type": "event",
     "name": "EvidenceRefreshCompleted",
     "inputs": [
       {
@@ -1040,6 +1066,16 @@
   },
   {
     "type": "error",
+    "name": "AdapterAlreadyNonOperational",
+    "inputs": []
+  },
+  {
+    "type": "error",
+    "name": "AdapterNotOperational",
+    "inputs": []
+  },
+  {
+    "type": "error",
     "name": "AddressEmptyCode",
     "inputs": [
       {
@@ -1078,6 +1114,22 @@
         "name": "pieceIndex",
         "type": "uint32",
         "internalType": "uint32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DealNotAccepted",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "state",
+        "type": "uint8",
+        "internalType": "uint8"
       }
     ]
   },
@@ -1446,6 +1498,17 @@
         "name": "actual",
         "type": "uint256",
         "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ValidateSectorStatusFailed",
+    "inputs": [
+      {
+        "name": "exitCode",
+        "type": "int256",
+        "internalType": "int256"
       }
     ]
   },
