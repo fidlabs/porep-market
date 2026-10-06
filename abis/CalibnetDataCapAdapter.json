@@ -185,12 +185,12 @@
             "internalType": "uint8"
           },
           {
-            "name": "checkedClaims",
+            "name": "checkedItems",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "totalClaims",
+            "name": "totalItems",
             "type": "uint256",
             "internalType": "uint256"
           }
@@ -608,12 +608,12 @@
             "internalType": "uint8"
           },
           {
-            "name": "checkedClaims",
+            "name": "checkedItems",
             "type": "uint256",
             "internalType": "uint256"
           },
           {
-            "name": "totalClaims",
+            "name": "totalItems",
             "type": "uint256",
             "internalType": "uint256"
           }

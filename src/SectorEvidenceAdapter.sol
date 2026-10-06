@@ -546,8 +546,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
             lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(sweep.lastCompletedEpoch),
             reasonCode: 0,
             result: EvidenceResult.PARTIAL,
-            checkedClaims: sweep.nextSectorIndex,
-            totalClaims: totalSectors
+            checkedItems: sweep.nextSectorIndex,
+            totalItems: totalSectors
         });
     }
 
@@ -884,8 +884,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
             lastEvidenceRefreshEpoch: CommonTypes.ChainEpoch.wrap(sweep.sweepStartEpoch),
             reasonCode: 0,
             result: result,
-            checkedClaims: totalSectors,
-            totalClaims: totalSectors
+            checkedItems: totalSectors,
+            totalItems: totalSectors
         });
     }
 
@@ -901,8 +901,8 @@ contract SectorEvidenceAdapter is IStorageEvidenceAdapter, AccessControlledUpgra
             reasonCode: 0,
             // NONE until a sweep completes, so the market can tell "never checked" from a negative result.
             result: refreshState.completedResult,
-            checkedClaims: completed ? totalSectors : 0,
-            totalClaims: totalSectors
+            checkedItems: completed ? totalSectors : 0,
+            totalItems: totalSectors
         });
     }
 

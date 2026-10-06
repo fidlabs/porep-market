@@ -587,8 +587,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         assertEq(current.result, EvidenceResult.NONE);
         assertEq(current.activeCoveredBytes, 0);
-        assertEq(current.checkedClaims, 0);
-        assertEq(current.totalClaims, 3);
+        assertEq(current.checkedItems, 0);
+        assertEq(current.totalItems, 3);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), 0);
 
         SectorEvidenceAdapter.SectorLocation[] memory locations = new SectorEvidenceAdapter.SectorLocation[](0);
@@ -687,8 +687,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
         assertEq(refreshed.result, EvidenceResult.ACTIVE);
         assertEq(refreshed.activeCoveredBytes, REQUESTED_SIZE);
         assertEq(CommonTypes.ChainEpoch.unwrap(refreshed.lastEvidenceRefreshEpoch), 900);
-        assertEq(refreshed.checkedClaims, 2);
-        assertEq(refreshed.totalClaims, 2);
+        assertEq(refreshed.checkedItems, 2);
+        assertEq(refreshed.totalItems, 2);
         assertEq(current.result, EvidenceResult.ACTIVE);
         assertEq(current.activeCoveredBytes, REQUESTED_SIZE);
         assertEq(CommonTypes.ChainEpoch.unwrap(adapter.getExpiration(DEAL_ID)), int64(uint64(secondExpiration)));
@@ -727,8 +727,8 @@ contract SectorEvidenceAdapterTest is MockFVMTest {
 
         assertEq(partialStatus.result, EvidenceResult.PARTIAL);
         assertEq(partialStatus.activeCoveredBytes, PADDED_SIZE);
-        assertEq(partialStatus.checkedClaims, 1);
-        assertEq(partialStatus.totalClaims, 3);
+        assertEq(partialStatus.checkedItems, 1);
+        assertEq(partialStatus.totalItems, 3);
         assertEq(current.result, EvidenceResult.ACTIVE);
         assertEq(current.activeCoveredBytes, REQUESTED_SIZE);
         assertEq(CommonTypes.ChainEpoch.unwrap(current.lastEvidenceRefreshEpoch), 900);

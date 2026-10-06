@@ -2009,8 +2009,8 @@ contract PoRepMarketTest is Test {
                     lastEvidenceRefreshEpoch: chainEpochFromBlock(lastRefreshEpoch),
                     reasonCode: 0,
                     result: EvidenceResult.INACTIVE,
-                    checkedClaims: 0,
-                    totalClaims: 0
+                    checkedItems: 0,
+                    totalItems: 0
                 })
             )
         );
