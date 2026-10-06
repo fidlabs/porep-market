@@ -1,0 +1,127 @@
+{
+  "version": 1,
+  "domains": {
+    "leaf": "0xde24299ea19a4e461e31a0be02e5c601b2f66c1f3786214aa46f553fde6f7179",
+    "node": "0xaedbcc7b5d2c40692870fd30607e9e30315a8153c6b3a368ef838aec7de83b5d",
+    "empty": "0x678499e9bc60f37870b6a17ee59af33c4f4b303a121e0769acd22450b495ed08",
+    "commitment": "0x30999723613fc3c0c783e4cfe2d089b89c98f5f609e29f18d0c8eefcc99be0b6"
+  },
+  "types": {
+    "pieceIndex": "uint32",
+    "pieceCount": "uint32",
+    "pieceCidDigest": "bytes32",
+    "paddedSize": "uint64",
+    "requestedSizeBytes": "uint256",
+    "payload": "abi.encode(uint256 dealId,uint32 pieceIndex,uint32 pieceCount,bytes32[] proof)",
+    "payloadLength": "160 + 32 * proof.length"
+  },
+  "emptyLeaf": "0x784f6484cd3db69cd3d40f6148c228e3ef179ced49d461ca765d98c6ac8fc45e",
+  "vectors": [
+    {
+      "name": "one-piece",
+      "pieceCount": 1,
+      "requestedSizeBytes": "128",
+      "rows": [
+        {
+          "index": 0,
+          "digest": "0x1111111111111111111111111111111111111111111111111111111111111111",
+          "paddedSize": "128",
+          "leaf": "0x7b3f821ecaf580689a1225ed5be95f9c22621f15ee6a361928610240c223ca2d",
+          "proof": []
+        }
+      ],
+      "root": "0x7b3f821ecaf580689a1225ed5be95f9c22621f15ee6a361928610240c223ca2d",
+      "commitment": "0xb61dd264461b3cdd244113ac78b02b1e851b311909242cc15230e4a88c0e75b3"
+    },
+    {
+      "name": "two-piece",
+      "pieceCount": 2,
+      "requestedSizeBytes": "384",
+      "rows": [
+        {
+          "index": 0,
+          "digest": "0x1111111111111111111111111111111111111111111111111111111111111111",
+          "paddedSize": "128",
+          "leaf": "0x7b3f821ecaf580689a1225ed5be95f9c22621f15ee6a361928610240c223ca2d",
+          "proof": ["0xedc035b821e84e0482006816069b1cc6b5a20171ac9d5ff1d5252e91e40f6d2f"]
+        },
+        {
+          "index": 1,
+          "digest": "0x2222222222222222222222222222222222222222222222222222222222222222",
+          "paddedSize": "256",
+          "leaf": "0xedc035b821e84e0482006816069b1cc6b5a20171ac9d5ff1d5252e91e40f6d2f",
+          "proof": ["0x7b3f821ecaf580689a1225ed5be95f9c22621f15ee6a361928610240c223ca2d"]
+        }
+      ],
+      "root": "0x05613c7fe68a92c02e6921b5ff6fb851c700b4daf9acd85e583c6d073213aec9",
+      "commitment": "0xf4ee2025495c6097306d770bbcdb4141ad797344b7cbad0d51681addbd887699"
+    },
+    {
+      "name": "three-piece-padded",
+      "pieceCount": 3,
+      "requestedSizeBytes": "896",
+      "rows": [
+        {
+          "index": 0,
+          "digest": "0x1111111111111111111111111111111111111111111111111111111111111111",
+          "paddedSize": "128",
+          "leaf": "0x7b3f821ecaf580689a1225ed5be95f9c22621f15ee6a361928610240c223ca2d",
+          "proof": [
+            "0xedc035b821e84e0482006816069b1cc6b5a20171ac9d5ff1d5252e91e40f6d2f",
+            "0x35b44e36ef6aeec3f6ebd0ab06c70a88b73225ffe2ae6b70dcd48814503711dc"
+          ]
+        },
+        {
+          "index": 1,
+          "digest": "0x2222222222222222222222222222222222222222222222222222222222222222",
+          "paddedSize": "256",
+          "leaf": "0xedc035b821e84e0482006816069b1cc6b5a20171ac9d5ff1d5252e91e40f6d2f",
+          "proof": [
+            "0x7b3f821ecaf580689a1225ed5be95f9c22621f15ee6a361928610240c223ca2d",
+            "0x35b44e36ef6aeec3f6ebd0ab06c70a88b73225ffe2ae6b70dcd48814503711dc"
+          ]
+        },
+        {
+          "index": 2,
+          "digest": "0x3333333333333333333333333333333333333333333333333333333333333333",
+          "paddedSize": "512",
+          "leaf": "0x558e19c7b594efff94ac0115d7f4a9583c918d4fffdd21d0939843946b607801",
+          "proof": [
+            "0x784f6484cd3db69cd3d40f6148c228e3ef179ced49d461ca765d98c6ac8fc45e",
+            "0x05613c7fe68a92c02e6921b5ff6fb851c700b4daf9acd85e583c6d073213aec9"
+          ]
+        }
+      ],
+      "root": "0x0ffe7f5a9fbfc28df65d7609707390a500c2f54a04f07d31632fcb20d86729a1",
+      "commitment": "0x9b09a902598a2e1320b33cebf3c66f4fc6c4afe230ec4550a8053bbef66673c9"
+    }
+  ],
+  "generatedScaleVectors": {
+    "rowRule": "digest = bytes32(uint256(index + 1)); paddedSize = 128; rows are already in canonical (digest, paddedSize) order",
+    "10": {
+      "depth": 4,
+      "root": "0xc04c1106153dd536ff6434ee8c87bbd70ed1a0f7eedb6f3b8ad922ce166da459",
+      "commitment": "0x80fc895d1597a0e5585f24048c5da56ac073f89865eee9caacea1d2ac3e0483f"
+    },
+    "64": {
+      "depth": 6,
+      "root": "0x4720a8e4009b8068597065b9edd567c440f7c25fe8794bd735999adf9a3f92d5",
+      "commitment": "0x1d7ce09d1eee8279a67687ac7d7ba55ea456144989ecbe714c574dc3d6fe65e1"
+    },
+    "305": {
+      "depth": 9,
+      "root": "0x856c9b89dec43ae1ff76ace182bcb4c00e30843f3dda20c6a832a2452f90448f",
+      "commitment": "0x638695801be8c6717a8358f7ebd44e6e6d620b43537039e10db52646f2c88a39"
+    },
+    "945": {
+      "depth": 10,
+      "root": "0x7eb3c5d490607ce0ddf92390515d6601bf2e631c4e1fc556893be610c55b0793",
+      "commitment": "0x035c98b6d35b9aaea78f73d277732a68b769769bf426bda09dccbe1db2381fcb"
+    },
+    "1393": {
+      "depth": 11,
+      "root": "0xd03e8b3d4978c1bf4b846bbd0967835e44632c708f73df9375fba8acd118e812",
+      "commitment": "0xb9ea0e43cbe5534b7b72727302701b423f32f3f89507d64f60e868a689bd52ac"
+    }
+  }
+}
