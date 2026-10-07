@@ -202,7 +202,6 @@ export async function verifyLiveDeployment(
       : readManifestAddress(managerContract.implementation, "manifest AccessManager implementation");
   const beacon = requireBeaconContract(manifest, "ValidatorBeacon");
   const claimInspector = requireStandaloneContract(manifest, "PoRepMarketClaimInspector");
-  const sectorStatusInspector = requireStandaloneContract(manifest, "PoRepMarketSectorStatusInspector");
   const viewHelper = requireStandaloneContract(manifest, "PoRepMarketViewHelper");
   const recordedBeaconFactory = readManifestAddress(beacon.factoryProxy, "manifest ValidatorBeacon factoryProxy");
   const validatorFactoryProxy = readManifestAddress(validatorFactory.proxy, "manifest ValidatorFactory proxy");
@@ -366,14 +365,6 @@ export async function verifyLiveDeployment(
     "DATA_CAP_EVIDENCE_ADAPTER()(address)",
     adapter.proxy,
     "ClaimInspector adapter",
-  );
-  await verifyAddressCall(
-    run,
-    rpcUrl,
-    sectorStatusInspector.implementation,
-    "POREPMARKET_CONTRACT()(address)",
-    market.proxy,
-    "SectorStatusInspector market",
   );
   await verifyAddressCall(
     run,

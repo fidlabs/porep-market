@@ -138,17 +138,10 @@ test("adds the configured payment tokens without replacing deployment state", ()
   assert.equal(result.externalDependencies.AxlUSDC, networkConfigs.mainnet.paymentTokens[1].address);
 });
 
-test("adds the two missing release helpers without replacing existing contracts", () => {
+test("adds the missing release helper without replacing existing contracts", () => {
   const source = parseDeploymentManifest(readFileSync("deployments/calibnet/latest.json", "utf8"));
-  delete source.contracts.PoRepMarketSectorStatusInspector;
   delete source.contracts.PoRepMarketViewHelper;
   const deployed = structuredClone(source);
-  deployed.contracts.PoRepMarketSectorStatusInspector = {
-    kind: "standalone",
-    artifact: "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
-    implementation: `0x${"a".repeat(40)}`,
-    implementationCodeHash: `0x${"b".repeat(64)}`,
-  };
   deployed.contracts.PoRepMarketViewHelper = {
     kind: "standalone",
     artifact: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
@@ -160,7 +153,6 @@ test("adds the two missing release helpers without replacing existing contracts"
 
   assert.equal(source.contracts.PoRepMarketViewHelper, undefined);
   assert.deepEqual(result.contracts.PoRepMarketViewHelper, deployed.contracts.PoRepMarketViewHelper);
-  assert.deepEqual(result.contracts.PoRepMarketSectorStatusInspector, deployed.contracts.PoRepMarketSectorStatusInspector);
   assert.deepEqual(result.transactions, source.transactions);
   assert.throws(() => mergeMissingHelpers(result, deployed, result.release.buildInfoSha256), /already exists/);
 });

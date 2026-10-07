@@ -3,7 +3,6 @@
 pragma solidity =0.8.30;
 
 import {stdJson} from "forge-std/StdJson.sol";
-import {PoRepMarketSectorStatusInspector} from "../src/helpers/PoRepMarketSectorStatusInspector.sol";
 import {PoRepMarketViewHelper} from "../src/helpers/PoRepMarketViewHelper.sol";
 import {DeployUtils} from "./utils/DeployUtils.sol";
 
@@ -16,19 +15,9 @@ contract DeployMissing is DeployUtils {
         address market = _manifestUupsTarget(manifest, "PoRepMarket");
 
         vm.startBroadcast(vm.addr(vm.envUint("PRIVATE_KEY")));
-        address sectorStatusInspector = address(new PoRepMarketSectorStatusInspector(market));
         address viewHelper = address(new PoRepMarketViewHelper(market));
         vm.stopBroadcast();
 
-        vm.writeJson(
-            _serializeStandalone(
-                "missingSectorStatusInspector",
-                "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
-                sectorStatusInspector
-            ),
-            output,
-            ".contracts.PoRepMarketSectorStatusInspector"
-        );
         vm.writeJson(
             _serializeStandalone(
                 "missingViewHelper", "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper", viewHelper
