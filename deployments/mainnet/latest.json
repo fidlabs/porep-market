@@ -31,14 +31,8 @@
     "PoRepMarketClaimInspector": {
       "kind": "standalone",
       "artifact": "src/helpers/PoRepMarketClaimInspector.sol:PoRepMarketClaimInspector",
-      "implementation": "0x524Eef25Eb334E77Cf6a4CF7f304a1d387ce8704",
-      "implementationCodeHash": "0xf25c0ca898db6576a494b105700b77ed3010cb5b68a9aa7459468ac738f1514b"
-    },
-    "PoRepMarketSectorStatusInspector": {
-      "kind": "standalone",
-      "artifact": "src/helpers/PoRepMarketSectorStatusInspector.sol:PoRepMarketSectorStatusInspector",
-      "implementation": "0x4f6807Ef343D553efbdeD8ecd6318Aad6330Fc5F",
-      "implementationCodeHash": "0x93a28b726aeadcaac93fae8a123351f5de47fda8d69448b072fc1de41c8e82a2"
+      "implementation": "0x4a8f02E86A9D02a4acEB25a8DE76e2B0B1192d32",
+      "implementationCodeHash": "0xb21fdead13b55501c80a081904dba752c6ec6152646e6f92029ffd8ab4a89ccf"
     },
     "PoRepMarketViewHelper": {
       "kind": "standalone",

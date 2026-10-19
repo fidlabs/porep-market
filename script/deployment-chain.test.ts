@@ -324,12 +324,6 @@ function completeManifest(): DeploymentManifest {
       implementation: a7,
       implementationCodeHash: codeHash,
     },
-    PoRepMarketSectorStatusInspector: {
-      kind: "standalone",
-      artifact: "SectorStatusInspector",
-      implementation: a5,
-      implementationCodeHash: codeHash,
-    },
     PoRepMarketViewHelper: {
       kind: "standalone",
       artifact: "ViewHelper",
