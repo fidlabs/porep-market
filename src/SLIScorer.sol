@@ -108,9 +108,7 @@ contract SLIScorer is ISLIScorer, AccessControlledUpgradeable, UUPSUpgradeable {
         view
         returns (uint256 score)
     {
-        if (dealId == 0) revert InvalidDealId();
-
-        SharedTypes.Attestation memory attestation = s().oracle.getAttestation(dealId);
+        SharedTypes.Attestation memory attestation = _getAttestation(dealId);
 
         if (attestation.lastUpdate == 0) revert NoAttestation(dealId);
 
@@ -119,29 +117,63 @@ contract SLIScorer is ISLIScorer, AccessControlledUpgradeable, UUPSUpgradeable {
             revert AttestationExpired(dealId);
         }
 
+        return _score(attestation.slis, required);
+    }
+
+    /// @inheritdoc ISLIScorer
+    function calculateLastScore(uint256 dealId, SharedTypes.SLIThresholds calldata required)
+        external
+        view
+        returns (uint256 score)
+    {
+        // A missing attestation reads as all-zero SLIs, which fail every defined requirement.
+        return _score(_getAttestation(dealId).slis, required);
+    }
+
+    /**
+     * @notice Reads a deal's attestation from the oracle
+     * @param dealId The id of the deal
+     * @return attestation The deal's attestation, zeroed when none was set
+     */
+    function _getAttestation(uint256 dealId) private view returns (SharedTypes.Attestation memory attestation) {
+        if (dealId == 0) revert InvalidDealId();
+        return s().oracle.getAttestation(dealId);
+    }
+
+    /**
+     * @notice Scores measured SLIs against the required thresholds
+     * @param measured The measured SLI values
+     * @param required The SLI thresholds required for the client
+     * @return score The share of defined requirements that are met, 0-100
+     */
+    function _score(SharedTypes.SLIThresholds memory measured, SharedTypes.SLIThresholds calldata required)
+        private
+        pure
+        returns (uint256 score)
+    {
         uint256 slasDefined;
         uint256 slasMet;
 
         if (required.retrievabilityBps != 0) {
             slasDefined++;
-            if (required.retrievabilityBps <= attestation.slis.retrievabilityBps) slasMet++;
+            if (required.retrievabilityBps <= measured.retrievabilityBps) slasMet++;
         }
 
         if (required.bandwidthBytesPerSecond != 0) {
             slasDefined++;
-            if (required.bandwidthBytesPerSecond <= attestation.slis.bandwidthBytesPerSecond) slasMet++;
+            if (required.bandwidthBytesPerSecond <= measured.bandwidthBytesPerSecond) slasMet++;
         }
 
         if (required.latencyMs != 0) {
             slasDefined++;
-            uint16 measuredLatencyMs = attestation.slis.latencyMs;
+            uint16 measuredLatencyMs = measured.latencyMs;
             bool latencyMeasured = measuredLatencyMs != 0 && measuredLatencyMs != SharedTypes.LATENCY_UNMEASURED;
             if (latencyMeasured && required.latencyMs >= measuredLatencyMs) slasMet++;
         }
 
         if (required.indexingPct != 0) {
             slasDefined++;
-            if (required.indexingPct <= attestation.slis.indexingPct) slasMet++;
+            if (required.indexingPct <= measured.indexingPct) slasMet++;
         }
 
         if (slasDefined == 0) return 100; // If no SLAs defined

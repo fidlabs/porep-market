@@ -1353,16 +1353,15 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
         }
 
         // Score and size failures advance the cursor to effectiveToEpoch; stale evidence reverts for a later retry
-        // while a refresh is still possible.
-        {
-            SharedTypes.SLIThresholds memory slis = $._dealSLIs[dealId];
-            if ($._SLIScorer.calculateScore(dealId, slis) != 100) {
-                return _rejectedSettlement(
-                    effectiveToEpoch, SettlementReason.SCORE_BELOW_THRESHOLD, "score below required threshold"
-                );
-            }
+        // while a refresh is still possible. Evidence is read first so a failing score cannot consume a window that
+        // stale evidence would defer.
+        bool evidenceMatches = _settlementEvidenceMatches(deal, serviceEndEpoch, effectiveToEpoch);
+        if (_settlementScore(deal, serviceEndEpoch) != 100) {
+            return _rejectedSettlement(
+                effectiveToEpoch, SettlementReason.SCORE_BELOW_THRESHOLD, "score below required threshold"
+            );
         }
-        if (!_settlementEvidenceMatches(deal, service, effectiveToEpoch)) {
+        if (!evidenceMatches) {
             return _rejectedSettlement(
                 effectiveToEpoch, SettlementReason.DATA_SIZE_MISMATCH, "data size does not match the deal"
             );
@@ -1391,37 +1390,48 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     // solhint-disable gas-strict-inequalities
     /**
      * @notice Checks whether the deal's evidence covers its committed bytes for a settlement window
-     * @dev Refreshes stop when service ends, so evidence observed afterwards (such as sectors expiring on schedule)
-     *      never decides an earned window. From then on the last completed snapshot decides regardless of age, and
-     *      activation counts as the snapshot until the first refresh: refreshes are run by the protocol's bot, and
-     *      a missed refresh must neither lock the rail nor cost the provider an earned payment.
+     * @dev A window pays only from evidence refreshed within the grace period before its end. While a refresh is
+     *      possible, stale evidence reverts so the window waits for one; once refreshes stop it pays zero so the
+     *      rail can close. Refreshes stop at service end because evidence observed later (such as sectors expiring
+     *      on schedule) must not decide an earned window. Anyone, including the provider, can refresh, so neither
+     *      side depends on the protocol's bot.
      * @param deal The deal being settled
-     * @param service The deal's service schedule
+     * @param serviceEndEpoch The epoch at which the deal's service ends
      * @param effectiveToEpoch End of the payable settlement window
      * @return True when the evidence covers exactly the committed bytes
      */
-    function _settlementEvidenceMatches(
-        PoRepTypes.Deal storage deal,
-        PoRepTypes.DealService storage service,
-        uint256 effectiveToEpoch
-    ) internal returns (bool) {
-        SharedTypes.EvidenceStatus memory evidenceStatus = IStorageEvidenceAdapter(deal.evidenceAdapter)
-            .currentEvidenceStatus(_activationContext(deal));
+    function _settlementEvidenceMatches(PoRepTypes.Deal storage deal, uint256 serviceEndEpoch, uint256 effectiveToEpoch)
+        internal
+        returns (bool)
+    {
+        SharedTypes.EvidenceStatus memory evidenceStatus =
+            IStorageEvidenceAdapter(deal.evidenceAdapter).currentEvidenceStatus(_activationContext(deal));
         uint256 lastRefreshEpoch = _epochToUint(evidenceStatus.lastEvidenceRefreshEpoch);
-        bool refreshWindowOpen = deal.state == DealState.ACTIVE && block.number < _epochToUint(service.serviceEndEpoch);
 
-        if (refreshWindowOpen) {
-            if (
-                evidenceStatus.result == EvidenceResult.INACTIVE
-                    || lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch
-            ) {
-                revert EvidenceTooStale();
-            }
-        } else if (lastRefreshEpoch == 0 && evidenceStatus.result == EvidenceResult.NONE) {
-            // Adapters released before refreshes recorded their epoch on a mismatch can report one at epoch zero.
-            return true;
+        if (lastRefreshEpoch + EVIDENCE_REFRESH_GRACE_EPOCHS < effectiveToEpoch) {
+            bool refreshWindowOpen = (deal.state == DealState.ACTIVE || deal.state == DealState.EARLY_TERMINATED)
+                && block.number < serviceEndEpoch;
+            if (refreshWindowOpen) revert EvidenceTooStale();
+            return false;
         }
         return evidenceStatus.activeCoveredBytes == s()._dealCapacity[deal.dealId].committedBytes;
+    }
+
+    /**
+     * @notice Scores the deal's SLIs for a settlement window
+     * @dev The oracle stops attesting a deal once it ends, so an ended deal is scored from its last attestation
+     *      regardless of age. Requiring a fresh one would lock the rail for any window settled a month after the end.
+     * @param deal The deal being settled
+     * @param serviceEndEpoch The epoch at which the deal's service ends
+     * @return The SLI score, 0-100
+     */
+    function _settlementScore(PoRepTypes.Deal storage deal, uint256 serviceEndEpoch) internal view returns (uint256) {
+        PoRepMarketStorage storage $ = s();
+        SharedTypes.SLIThresholds memory slis = $._dealSLIs[deal.dealId];
+        if (deal.state == DealState.ACTIVE && block.number < serviceEndEpoch) {
+            return $._SLIScorer.calculateScore(deal.dealId, slis);
+        }
+        return $._SLIScorer.calculateLastScore(deal.dealId, slis);
     }
 
     // solhint-enable gas-strict-inequalities
@@ -1560,11 +1570,16 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
 
     /**
      * @notice Ensures a deal's evidence can be refreshed
-     * @dev Refresh before activation lets an adapter prove commitment changes made after sealing.
+     * @dev Refresh before activation lets an adapter prove commitment changes made after sealing. Refresh after early
+     *      termination lets anyone prove coverage for the window that termination cut short, which otherwise waits.
      * @param deal The deal
      */
     function _ensureEvidenceRefreshable(PoRepTypes.Deal storage deal) internal view {
-        if (deal.state != DealState.ACCEPTED && deal.state != DealState.ACTIVE) {
+        bool paymentStarted = _epochToUint(s()._dealService[deal.dealId].serviceEndEpoch) != 0;
+        if (
+            deal.state != DealState.ACCEPTED && deal.state != DealState.ACTIVE
+                && (deal.state != DealState.EARLY_TERMINATED || !paymentStarted)
+        ) {
             revert EvidenceRefreshNotAllowed(deal.dealId, deal.state);
         }
     }
