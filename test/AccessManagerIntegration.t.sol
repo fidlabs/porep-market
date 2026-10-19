@@ -18,6 +18,7 @@ import {PoRepMarket} from "../src/PoRepMarket.sol";
 import {ValidatorFactory} from "../src/ValidatorFactory.sol";
 import {Validator} from "../src/Validator.sol";
 import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
+import {SectorEvidenceAdapter} from "../src/SectorEvidenceAdapter.sol";
 import {SPRegistry} from "../src/SPRegistry.sol";
 import {SLIOracle} from "../src/SLIOracle.sol";
 import {SLIScorer} from "../src/SLIScorer.sol";
@@ -32,7 +33,7 @@ contract AccessManagerDeploymentFixture is Deploy {
     // Reuse the production deployment helpers without reading keys or writing deployment manifests.
     function deploy(address initialAdmin, address paymentContract)
         external
-        returns (address manager, address[6] memory targets)
+        returns (address manager, address[7] memory targets)
     {
         vm.startBroadcast(initialAdmin);
         manager = address(new AccessManager(initialAdmin, initialAdmin));
@@ -43,10 +44,19 @@ contract AccessManagerDeploymentFixture is Deploy {
         (sliScorer,) = _deploySliScorer(manager, sliOracle);
         (poRepMarket,) = _deployPoRepMarket(manager, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(manager, poRepMarket, address(0xA110C));
+        (sectorEvidenceAdapter,) = _deploySectorEvidenceAdapter(manager, poRepMarket);
         AccessManager(manager).grantRole(Roles.MARKET_ROLE, poRepMarket);
         ValidatorFactory(validatorFactory).initialize2(paymentContract, poRepMarket);
         vm.stopBroadcast();
-        targets = [poRepMarket, validatorFactory, dataCapEvidenceAdapter, spRegistry, sliOracle, sliScorer];
+        targets = [
+            poRepMarket,
+            validatorFactory,
+            dataCapEvidenceAdapter,
+            spRegistry,
+            sliOracle,
+            sliScorer,
+            sectorEvidenceAdapter
+        ];
     }
 
     function freshFactory(address manager) external returns (ValidatorFactory factory) {
@@ -84,7 +94,7 @@ contract AccessManagerIntegrationTest is Test {
 
     AccessManagerDeploymentFixture private deployment;
     AccessManager private manager;
-    address[6] private targets;
+    address[7] private targets;
     PoRepMarket private market;
     ValidatorFactory private factory;
     DataCapEvidenceAdapter private adapter;
@@ -98,7 +108,7 @@ contract AccessManagerIntegrationTest is Test {
         vm.roll(100);
         payments = new FilecoinPayV1Mock();
         deployment = new AccessManagerDeploymentFixture();
-        (address managerAddress, address[6] memory deployed) = deployment.deploy(admin, address(payments));
+        (address managerAddress, address[7] memory deployed) = deployment.deploy(admin, address(payments));
         manager = AccessManager(managerAddress);
         targets = deployed;
         market = PoRepMarket(targets[0]);
@@ -208,7 +218,7 @@ contract AccessManagerIntegrationTest is Test {
         _assertFactoryDependencies(pendingFactory);
     }
 
-    function testGlobalUpgraderRotationCoversAllSixUupsAndExistingValidatorBeacon() public {
+    function testGlobalUpgraderRotationCoversAllSevenUupsAndExistingValidatorBeacon() public {
         _grant(Roles.ORACLE_ROLE, oracle);
         vm.prank(oracle);
         sliOracle.setSLI(1, _slis());
@@ -219,11 +229,11 @@ contract AccessManagerIntegrationTest is Test {
         market.setDealActivationPadding(1400);
         _transferAdmin();
 
-        address[6] memory replacements = _replacementImplementations();
+        address[7] memory replacements = _replacementImplementations();
         address replacementValidator = address(new Validator());
         address beacon = factory.getBeacon();
         bytes32 beforeState = _protocolState();
-        bytes32[6] memory managerSlots;
+        bytes32[7] memory managerSlots;
         for (uint256 i; i < targets.length; ++i) {
             managerSlots[i] = vm.load(targets[i], ACCESS_MANAGER_SLOT);
             _expectUnauthorized(nextAdmin, Roles.UPGRADER_ROLE);
@@ -248,7 +258,7 @@ contract AccessManagerIntegrationTest is Test {
         assertTrue(manager.hasRole(Roles.UPGRADER_ROLE, nextUpgrader));
         assertFalse(manager.hasRole(Roles.DEFAULT_ADMIN_ROLE, nextUpgrader));
 
-        address[6] memory nextImplementations = _replacementImplementations();
+        address[7] memory nextImplementations = _replacementImplementations();
         address nextValidator = address(new AccessManagerValidatorV2());
         for (uint256 i; i < targets.length; ++i) {
             _expectUnauthorized(admin, Roles.UPGRADER_ROLE);
@@ -444,14 +454,15 @@ contract AccessManagerIntegrationTest is Test {
         assertEq(registry.getProviderView(provider).pendingBytes, DEAL_BYTES);
     }
 
-    function _replacementImplementations() private returns (address[6] memory) {
+    function _replacementImplementations() private returns (address[7] memory) {
         return [
             address(new PoRepMarket()),
             address(new ValidatorFactory()),
             address(new DataCapEvidenceAdapter()),
             address(new SPRegistry()),
             address(new SLIOracle()),
-            address(new SLIScorer())
+            address(new SLIScorer()),
+            address(new SectorEvidenceAdapter())
         ];
     }
 

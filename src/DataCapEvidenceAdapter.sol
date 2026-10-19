@@ -665,8 +665,8 @@ contract DataCapEvidenceAdapter is
             lastEvidenceRefreshEpoch: refreshStatus.lastEvidenceRefreshEpoch,
             reasonCode: 0,
             result: evidenceResult,
-            checkedClaims: refreshStatus.checkedClaims,
-            totalClaims: totalClaims
+            checkedItems: refreshStatus.checkedClaims,
+            totalItems: totalClaims
         });
     }
 
@@ -698,8 +698,8 @@ contract DataCapEvidenceAdapter is
             lastEvidenceRefreshEpoch: refreshStatus.lastEvidenceRefreshEpoch,
             reasonCode: 0,
             result: refreshStatus.result,
-            checkedClaims: refreshStatus.checkedClaims,
-            totalClaims: _getStorageDeal(context.dealId).claimIds.length
+            checkedItems: refreshStatus.checkedClaims,
+            totalItems: _getStorageDeal(context.dealId).claimIds.length
         });
     }
 

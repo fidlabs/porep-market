@@ -371,6 +371,12 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     error EvidenceTooStale();
 
     /**
+     * @notice Error thrown when a deal's state does not allow an evidence refresh
+     * @dev 0x278bc5f1
+     */
+    error EvidenceRefreshNotAllowed(uint256 dealId, uint8 state);
+
+    /**
      * @notice Error indicating that the minimum time between settlements is invalid
      * @dev 0xf90f5b8f
      */
@@ -1128,7 +1134,7 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     {
         PoRepTypes.Deal storage deal = s()._deals[dealId];
         _ensureDealExists(deal);
-        _ensureDealCorrectState(deal, DealState.ACTIVE);
+        _ensureEvidenceRefreshable(deal);
 
         return
             IStorageEvidenceAdapter(deal.evidenceAdapter).refreshEvidenceStatus(_activationContext(deal), evidenceData);
@@ -1510,6 +1516,17 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     function _ensureDealCorrectState(PoRepTypes.Deal storage deal, uint8 expectedState) internal view {
         if (deal.state != expectedState) {
             revert DealNotInExpectedState(deal.dealId, deal.state, expectedState);
+        }
+    }
+
+    /**
+     * @notice Ensures a deal's evidence can be refreshed
+     * @dev Refresh before activation lets an adapter prove commitment changes made after sealing.
+     * @param deal The deal
+     */
+    function _ensureEvidenceRefreshable(PoRepTypes.Deal storage deal) internal view {
+        if (deal.state != DealState.ACCEPTED && deal.state != DealState.ACTIVE) {
+            revert EvidenceRefreshNotAllowed(deal.dealId, deal.state);
         }
     }
 

@@ -1555,7 +1555,7 @@ contract DataCapEvidenceAdapterTest is Test {
         SharedTypes.EvidenceStatus memory restarted =
             mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
         assertEq(restarted.result, EvidenceResult.PARTIAL);
-        assertEq(restarted.checkedClaims, 1);
+        assertEq(restarted.checkedItems, 1);
         assertEq(restarted.activeCoveredBytes, 2048);
     }
 
@@ -1571,7 +1571,7 @@ contract DataCapEvidenceAdapterTest is Test {
         SharedTypes.EvidenceStatus memory restarted =
             mock.refreshEvidenceStatus(_activationContext(), abi.encode(uint256(1)));
         assertEq(restarted.result, EvidenceResult.PARTIAL);
-        assertEq(restarted.checkedClaims, 1);
+        assertEq(restarted.checkedItems, 1);
         assertEq(restarted.activeCoveredBytes, 2048);
     }
 

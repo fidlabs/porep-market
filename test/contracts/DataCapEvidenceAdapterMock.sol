@@ -139,8 +139,8 @@ contract DataCapEvidenceAdapterMock is IStorageEvidenceAdapter {
             lastEvidenceRefreshEpoch: refreshEpoch,
             reasonCode: 0,
             result: activeCoveredBytes == 0 ? EvidenceResult.NONE : EvidenceResult.ACCEPTED,
-            checkedClaims: 0,
-            totalClaims: 0
+            checkedItems: 0,
+            totalItems: 0
         });
     }
 }

@@ -167,16 +167,16 @@ library SharedTypes {
      * @param lastEvidenceRefreshEpoch Epoch of the last completed check
      * @param reasonCode Adapter-specific reason code
      * @param result Current result code
-     * @param checkedClaims Claims checked in the current refresh sweep
-     * @param totalClaims Claims that must be checked for the deal
+     * @param checkedItems Claims or sectors checked in the reported refresh sweep
+     * @param totalItems Claims or sectors that must be checked for the deal
      */
     struct EvidenceStatus {
         uint256 activeCoveredBytes;
         CommonTypes.ChainEpoch lastEvidenceRefreshEpoch;
         uint16 reasonCode;
         uint8 result;
-        uint256 checkedClaims;
-        uint256 totalClaims;
+        uint256 checkedItems;
+        uint256 totalItems;
     }
 
     /**

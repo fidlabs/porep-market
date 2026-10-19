@@ -1,0 +1,39 @@
+[
+  {
+    "type": "error",
+    "name": "InvalidProofLength",
+    "inputs": [
+      {
+        "name": "expected",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "actual",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "PieceIndexOutOfBounds",
+    "inputs": [
+      {
+        "name": "pieceIndex",
+        "type": "uint32",
+        "internalType": "uint32"
+      },
+      {
+        "name": "pieceCount",
+        "type": "uint32",
+        "internalType": "uint32"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "ZeroPieceCount",
+    "inputs": []
+  }
+]
