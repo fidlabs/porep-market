@@ -11,6 +11,7 @@ import {
   installSignalHandling,
   mergeMissingHelpers,
   mergeTransactions,
+  missingSectorAdapter,
   networkConfigs,
   runProcess,
   writeAtomicFile,
@@ -57,6 +58,7 @@ test("rejects invalid command lines", () => {
   assert.match(run(["deploy", "localnet"]).stderr, /unsupported network/);
   assert.match(run(["deploy", "devnet", "bad"]).stderr, /unsupported deploy arguments/);
   assert.match(run(["deploy-missing", "devnet", "bad"]).stderr, /does not accept arguments/);
+  assert.match(run(["deploy-sector-adapter", "devnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["configure-payment-tokens", "devnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["deploy-calibnet-adapter", "calibnet", "bad"]).stderr, /does not accept arguments/);
   assert.match(run(["deploy-calibnet-adapter", "devnet"]).stderr, /only be deployed on calibnet/);
@@ -155,6 +157,36 @@ test("adds the missing release helper without replacing existing contracts", () 
   assert.deepEqual(result.contracts.PoRepMarketViewHelper, deployed.contracts.PoRepMarketViewHelper);
   assert.deepEqual(result.transactions, source.transactions);
   assert.throws(() => mergeMissingHelpers(result, deployed, result.release.buildInfoSha256), /already exists/);
+});
+
+test("adds the sector adapter to a deployment that predates it", () => {
+  const source = parseDeploymentManifest(readFileSync("deployments/mainnet/latest.json", "utf8"));
+  const deployed = structuredClone(source);
+  deployed.contracts.SectorEvidenceAdapter = {
+    kind: "uups",
+    artifact: "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter",
+    proxy: `0x${"a".repeat(40)}`,
+    implementation: `0x${"b".repeat(40)}`,
+    proxyCodeHash: `0x${"c".repeat(64)}`,
+    implementationCodeHash: `0x${"d".repeat(64)}`,
+  };
+
+  const result = mergeMissingHelpers(source, deployed, `0x${"e".repeat(64)}`, missingSectorAdapter);
+
+  assert.deepEqual(result.contracts.SectorEvidenceAdapter, deployed.contracts.SectorEvidenceAdapter);
+  assert.deepEqual(result.contracts.PoRepMarketViewHelper, source.contracts.PoRepMarketViewHelper);
+  assert.throws(
+    () => mergeMissingHelpers(result, deployed, result.release.buildInfoSha256, missingSectorAdapter),
+    /already exists/,
+  );
+  const standalone = structuredClone(deployed);
+  standalone.contracts.SectorEvidenceAdapter = {
+    kind: "standalone",
+    artifact: "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter",
+    implementation: `0x${"b".repeat(40)}`,
+    implementationCodeHash: `0x${"d".repeat(64)}`,
+  };
+  assert.throws(() => mergeMissingHelpers(source, standalone, result.release.buildInfoSha256, missingSectorAdapter), /invalid/);
 });
 
 test("appends new receipts to the receipts already recorded for the deployment", () => {

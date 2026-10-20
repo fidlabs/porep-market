@@ -47,6 +47,20 @@ contract DeployUtils is Script {
         revert InvalidUpgradeTarget(name);
     }
 
+    function _serializeUupsContract(
+        string memory objectKey,
+        string memory artifact,
+        address proxy,
+        address implementation
+    ) internal returns (string memory) {
+        objectKey.serialize("kind", string("uups"));
+        objectKey.serialize("artifact", artifact);
+        objectKey.serialize("proxy", proxy);
+        objectKey.serialize("implementation", implementation);
+        objectKey.serialize("proxyCodeHash", proxy.codehash);
+        return objectKey.serialize("implementationCodeHash", implementation.codehash);
+    }
+
     function _manifestUupsTarget(string memory json, string memory name) internal view returns (address proxy) {
         string memory key = string.concat(".contracts.", name);
         proxy = json.readAddress(string.concat(key, ".proxy"));

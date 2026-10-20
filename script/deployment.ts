@@ -43,6 +43,7 @@ const commands = [
   "deploy",
   "finalize-deploy",
   "deploy-missing",
+  "deploy-sector-adapter",
   "configure-payment-tokens",
   "deploy-calibnet-adapter",
   "upgrade",
@@ -171,9 +172,28 @@ const upgradeTargets: Record<
   SLIScorer: { artifact: "src/SLIScorer.sol:SLIScorer", manifestKind: "uups", operationKind: "uups" },
   Validator: { artifact: "src/Validator.sol:Validator", manifestKind: "implementation", operationKind: "beacon" },
 };
-const missingHelperArtifacts = {
-  PoRepMarketViewHelper: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
-} as const;
+type MissingContracts = {
+  script: string;
+  contract: string;
+  contracts: Readonly<Record<string, { kind: "standalone" | "uups"; artifact: string }>>;
+};
+const missingHelpers: MissingContracts = {
+  script: "DeployMissing.s.sol",
+  contract: "DeployMissing",
+  contracts: {
+    PoRepMarketViewHelper: {
+      kind: "standalone",
+      artifact: "src/helpers/PoRepMarketViewHelper.sol:PoRepMarketViewHelper",
+    },
+  },
+};
+export const missingSectorAdapter: MissingContracts = {
+  script: "DeploySectorEvidenceAdapter.s.sol",
+  contract: "DeploySectorEvidenceAdapter",
+  contracts: {
+    SectorEvidenceAdapter: { kind: "uups", artifact: "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter" },
+  },
+};
 async function deploy(context: Context, options: DeployOptions): Promise<void> {
   if (
     context.network === "mainnet" &&
@@ -270,7 +290,7 @@ async function finalizeDeploy(context: Context, preflightDone = false): Promise<
   await verifyPublishedSources(context);
 }
 
-async function deployMissing(context: Context): Promise<void> {
+async function deployMissing(context: Context, missing: MissingContracts): Promise<void> {
   const privateKey = required(context, networkConfigs[context.network].privateKeyVariable);
   phase("Missing-contract deployment preflight");
   await broadcastPreflight(context);
@@ -281,7 +301,7 @@ async function deployMissing(context: Context): Promise<void> {
   await ensureCleanCanonicalManifest(context);
   const sourceBytes = readFileSync(paths.latest);
   const source = parseDeploymentManifest(sourceBytes.toString("utf8"));
-  ensureHelpersAreMissing(source);
+  ensureContractsAreMissing(source, missing);
   const sourceHash = hashRawBytes(sourceBytes);
 
   const workspace = mkdtempSync(join(tmpdir(), "porep-deploy-missing-ts-"));
@@ -309,12 +329,12 @@ async function deployMissing(context: Context): Promise<void> {
     let forgeError: unknown;
     try {
       phase("Broadcast missing contracts");
-      await runDeployMissingScript(context, workspace, sourcePath, output, build, privateKey);
+      await runDeployMissingScript(context, workspace, sourcePath, output, build, privateKey, missing);
     } catch (error) {
       forgeError = error;
     }
 
-    const recorded = recordDeployMissing(context, workspace, output, build, pending, source);
+    const recorded = recordDeployMissing(context, workspace, output, build, pending, source, missing);
     if (forgeError !== undefined) throw forgeError;
     if (!recorded) throw new Error("Forge did not produce complete missing-contract deployment evidence");
   } finally {
@@ -573,7 +593,11 @@ async function runCli(args: readonly string[], signal?: AbortSignal): Promise<vo
       return;
     case "deploy-missing":
       noArguments(command, rest);
-      await deployMissing(context);
+      await deployMissing(context, missingHelpers);
+      return;
+    case "deploy-sector-adapter":
+      noArguments(command, rest);
+      await deployMissing(context, missingSectorAdapter);
       return;
     case "configure-payment-tokens":
       noArguments(command, rest);
@@ -901,8 +925,9 @@ async function runDeployMissingScript(
   output: string,
   build: Build,
   privateKey: string,
+  missing: MissingContracts,
 ): Promise<void> {
-  await runForgeScript(context, "script/DeployMissing.s.sol:DeployMissing", build, privateKey, {
+  await runForgeScript(context, `script/${missing.script}:${missing.contract}`, build, privateKey, {
     ...context.environment,
     PRIVATE_KEY: privateKey,
     RPC_URL: rpc(context),
@@ -985,12 +1010,13 @@ function recordDeployMissing(
   build: Build,
   expected: PendingDeploy,
   source: DeploymentManifest,
+  missing: MissingContracts,
 ): boolean {
-  const broadcast = findBroadcast(context, workspace, "DeployMissing.s.sol");
+  const broadcast = findBroadcast(context, workspace, missing.script);
   if (!broadcast || !existsSync(output)) return false;
 
   const deployed = parseDeploymentManifest(readFileSync(output, "utf8"));
-  const result = mergeMissingHelpers(source, deployed, build.hash);
+  const result = mergeMissingHelpers(source, deployed, build.hash, missing);
   const broadcastBytes = readFileSync(broadcast);
   const pending: PendingDeploy = {
     ...expected,
@@ -1005,13 +1031,14 @@ export function mergeMissingHelpers(
   source: DeploymentManifest,
   deployed: DeploymentManifest,
   buildHash: string,
+  missing: MissingContracts = missingHelpers,
 ): DeploymentManifest {
-  ensureHelpersAreMissing(source);
+  ensureContractsAreMissing(source, missing);
   const contracts = structuredClone(source.contracts);
 
-  for (const [name, artifact] of Object.entries(missingHelperArtifacts)) {
+  for (const [name, expected] of Object.entries(missing.contracts)) {
     const contract = deployed.contracts[name];
-    if (contract?.kind !== "standalone" || contract.artifact !== artifact) {
+    if (contract?.kind !== expected.kind || contract.artifact !== expected.artifact) {
       throw new Error(`Forge output for ${name} is invalid`);
     }
     contracts[name] = structuredClone(contract);
@@ -1051,8 +1078,8 @@ export function applyPaymentTokenPolicy(
   };
 }
 
-function ensureHelpersAreMissing(manifest: DeploymentManifest): void {
-  for (const name of Object.keys(missingHelperArtifacts)) {
+function ensureContractsAreMissing(manifest: DeploymentManifest, missing: MissingContracts): void {
+  for (const name of Object.keys(missing.contracts)) {
     if (manifest.contracts[name] !== undefined) {
       throw new Error(`${name} already exists in the canonical deployment manifest`);
     }
