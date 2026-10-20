@@ -1,6 +1,5 @@
 {
   "status": "finalized",
-  "finalizedAt": "2026-10-20T13:24:38.960Z",
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",
   "release": {
     "buildInfoSha256": "0xcf757ed59151b66775fadf25a68402a6ca32067f635fa3e3573e25f474f0d725"
@@ -84,6 +83,14 @@
       "implementation": "0x455C89CeC04290086Bc05db7E009759B11F492F6",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
       "implementationCodeHash": "0xc59ce2388e3bbfe45e2c1c932b9f09cbb837f36ec33a9fbe2f5fb462d8773efb"
+    },
+    "SectorEvidenceAdapter": {
+      "kind": "uups",
+      "artifact": "src/SectorEvidenceAdapter.sol:SectorEvidenceAdapter",
+      "proxy": "0x207E4965691D658bcD5239d689887d0E9C9e8233",
+      "implementation": "0x5a205289cCf53a20dBADD7D1B6c11A585bd6C2b7",
+      "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
+      "implementationCodeHash": "0xec2e49d03157736ec27455be060afef28fd8338b37f5dd47543612b2d6a7fb7e"
     }
   },
   "externalDependencies": {
@@ -138,6 +145,28 @@
       "blockNumber": 6473177,
       "blockHash": "0xdd8b3051d49b9a7edd0ec5787fd55d2cfae2af789227e59f0c63dcbb8d88be8b",
       "contractAddress": null
+    },
+    {
+      "hash": "0xf902b6b9427086760acce85fe9ad7a84e5dc51cc3785c72b71c0ccf8f2034b2a",
+      "status": 1,
+      "blockNumber": 6473220,
+      "blockHash": "0x7fc9d4f127570378c05b471c591a9025a205487773025cb22b6999fed4f96ff6",
+      "contractAddress": "0x5a205289ccf53a20dbadd7d1b6c11a585bd6c2b7"
+    },
+    {
+      "hash": "0x22cbbe2fc328ff37c2f2515eae8924abcf8ed95bb9a095bf18aee49e7833a984",
+      "status": 1,
+      "blockNumber": 6473222,
+      "blockHash": "0xb82713d3395f58f5f3a9b81e747b1865d14909f94fb33c9803f281bba2af79c4",
+      "contractAddress": "0x207e4965691d658bcd5239d689887d0e9c9e8233"
+    },
+    {
+      "hash": "0xd6dd52605af997b4bcef195c26284d4bafcc98e8fffdb34221843f3632b26546",
+      "status": 1,
+      "blockNumber": 6473224,
+      "blockHash": "0xdc117b17563aedc6cd49a5b911d561d8deeb203f14fc82d8f6a7c3ab0c27040f",
+      "contractAddress": null
     }
-  ]
+  ],
+  "finalizedAt": "2026-10-20T13:44:54.313Z"
 }
