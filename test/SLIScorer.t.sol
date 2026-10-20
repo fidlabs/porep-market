@@ -91,6 +91,27 @@ contract SLIScorerTest is Test {
         assertEq(score, 100);
     }
 
+    function testCalculateLastScoreIgnoresAttestationAge() public {
+        oracle.setAttestations(1000, 10000, 100, 95, 100);
+        vm.roll(1000000);
+        assertEq(sliScorer.calculateLastScore(dealId, sliParams), 100);
+    }
+
+    function testCalculateLastScoreFailsRequirementsWithoutAttestation() public view {
+        assertEq(sliScorer.calculateLastScore(dealId, sliParams), 0);
+    }
+
+    function testCalculateLastScorePassesWithoutRequirementsOrAttestation() public {
+        sliParams =
+            SharedTypes.SLIThresholds({retrievabilityBps: 0, bandwidthBytesPerSecond: 0, latencyMs: 0, indexingPct: 0});
+        assertEq(sliScorer.calculateLastScore(dealId, sliParams), 100);
+    }
+
+    function testCalculateLastScoreRevertsInvalidDealId() public {
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidDealId.selector));
+        sliScorer.calculateLastScore(0, sliParams);
+    }
+
     function testCalculateRevertAttestationExpired() public {
         oracle.setAttestations(1000, 0, 0, 40, 0);
         vm.roll(1000000);

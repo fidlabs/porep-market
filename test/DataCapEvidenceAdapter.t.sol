@@ -1584,7 +1584,8 @@ contract DataCapEvidenceAdapterTest is Test {
 
         vm.prank(address(poRepMarketMock));
         SharedTypes.EvidenceStatus memory current = mock.currentEvidenceStatus(_activationContext());
-        assertEq(current.result, EvidenceResult.INACTIVE);
+        assertEq(current.result, EvidenceResult.ACTIVE);
+        assertEq(current.activeCoveredBytes, 4096);
 
         vm.prank(address(poRepMarketMock));
         SharedTypes.EvidenceStatus memory completed =
@@ -1613,13 +1614,15 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(completed.activeCoveredBytes, 4096);
     }
 
-    function testRefreshEvidenceStatusUnderCoverageReportsMismatchAndKeepsEpoch() public {
+    function testRefreshEvidenceStatusUnderCoverageReportsMismatchAndRecordsEpoch() public {
         DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
 
         uint64[] memory claims = new uint64[](1);
         claims[0] = 1;
         vm.prank(terminationOracle);
         mock.claimsTerminatedEarly(claims);
+        // Advance past the activation refresh so the recorded epoch must come from the mismatch refresh.
+        vm.roll(block.number + 100);
 
         vm.prank(address(poRepMarketMock));
         SharedTypes.EvidenceStatus memory status =
@@ -1721,16 +1724,22 @@ contract DataCapEvidenceAdapterTest is Test {
         assertEq(status.result, EvidenceResult.ACTIVE);
     }
 
-    function testCurrentEvidenceStatusReturnsInactiveWhenStale() public {
+    function testCurrentEvidenceStatusKeepsOldCompletedSnapshot() public {
         DataCapEvidenceAdapterContractMock mock = _activateDealWithTwoClaims();
+        vm.prank(address(poRepMarketMock));
+        SharedTypes.EvidenceStatus memory fresh = mock.currentEvidenceStatus(_activationContext());
 
         vm.roll(block.number + SharedTypes.EPOCHS_IN_MONTH + 1);
 
         vm.prank(address(poRepMarketMock));
         SharedTypes.EvidenceStatus memory status = mock.currentEvidenceStatus(_activationContext());
 
-        assertEq(status.activeCoveredBytes, 0);
-        assertEq(status.result, EvidenceResult.INACTIVE);
+        assertEq(status.activeCoveredBytes, 4096);
+        assertEq(status.result, EvidenceResult.ACTIVE);
+        assertEq(
+            CommonTypes.ChainEpoch.unwrap(status.lastEvidenceRefreshEpoch),
+            CommonTypes.ChainEpoch.unwrap(fresh.lastEvidenceRefreshEpoch)
+        );
     }
 
     function testCurrentEvidenceStatusRevertsWhenCallerIsNotPoRepMarket() public {

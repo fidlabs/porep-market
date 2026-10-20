@@ -32,6 +32,52 @@
   },
   {
     "type": "function",
+    "name": "calculateLastScore",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "required",
+        "type": "tuple",
+        "internalType": "struct SharedTypes.SLIThresholds",
+        "components": [
+          {
+            "name": "retrievabilityBps",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "bandwidthBytesPerSecond",
+            "type": "uint64",
+            "internalType": "uint64"
+          },
+          {
+            "name": "latencyMs",
+            "type": "uint16",
+            "internalType": "uint16"
+          },
+          {
+            "name": "indexingPct",
+            "type": "uint8",
+            "internalType": "uint8"
+          }
+        ]
+      }
+    ],
+    "outputs": [
+      {
+        "name": "score",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "calculateScore",
     "inputs": [
       {

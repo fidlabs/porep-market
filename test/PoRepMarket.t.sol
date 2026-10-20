@@ -30,6 +30,7 @@ import {DataCapEvidenceAdapter} from "../src/DataCapEvidenceAdapter.sol";
 import {DataCapEvidenceAdapterMock} from "./contracts/DataCapEvidenceAdapterMock.sol";
 import {SLIScorerMock} from "./contracts/SLIScorerMock.sol";
 import {AccessManager} from "../src/AccessManager.sol";
+import {IOperator} from "../src/interfaces/IOperator.sol";
 
 // solhint-disable-next-line max-states-count
 contract PoRepMarketTest is Test {
@@ -1808,13 +1809,56 @@ contract PoRepMarketTest is Test {
 
     function testRefreshEvidenceStatusAllowsAnyCaller() public {
         bytes memory evidenceData = abi.encode("refresh");
-        vm.prank(clientAddress);
-        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
-        setDealActive(dealId);
+        _completeDefaultDealForSettlement();
 
         poRepMarket.refreshEvidenceStatus(dealId, evidenceData);
 
         assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), evidenceData);
+    }
+
+    function testRefreshEvidenceStatusClosesAtServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+
+        vm.roll(serviceEndEpoch - 1);
+        poRepMarket.refreshEvidenceStatus(dealId, "");
+
+        vm.roll(serviceEndEpoch);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.EvidenceRefreshWindowEnded.selector, dealId, serviceEndEpoch, serviceEndEpoch
+            )
+        );
+        poRepMarket.refreshEvidenceStatus(dealId, "");
+    }
+
+    function testRefreshEvidenceStatusAllowsEarlyTerminatedDealUntilServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        _terminateDefaultDealAfterOneMonth(service);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+
+        vm.roll(serviceEndEpoch - 1);
+        poRepMarket.refreshEvidenceStatus(dealId, "terminated");
+        assertEq(dataCapEvidenceAdapterAddress.refreshedEvidence(dealId), "terminated");
+
+        vm.roll(serviceEndEpoch);
+        vm.expectRevert(
+            abi.encodeWithSelector(
+                PoRepMarket.EvidenceRefreshWindowEnded.selector, dealId, serviceEndEpoch, serviceEndEpoch
+            )
+        );
+        poRepMarket.refreshEvidenceStatus(dealId, "");
+    }
+
+    function testRefreshEvidenceStatusRevertsForEarlyTerminatedDealWithoutPayment() public {
+        vm.prank(clientAddress);
+        poRepMarket.proposeDeal(dealRequest(defaultRequirements, defaultTerms, expectedManifestLocation));
+        PoRepMarketContractMock(address(poRepMarket)).setDealState(dealId, DealState.EARLY_TERMINATED);
+
+        vm.expectRevert(
+            abi.encodeWithSelector(PoRepMarket.EvidenceRefreshNotAllowed.selector, dealId, DealState.EARLY_TERMINATED)
+        );
+        poRepMarket.refreshEvidenceStatus(dealId, "");
     }
 
     function testRefreshEvidenceStatusAllowsAcceptedDeal() public {
@@ -1944,6 +1988,7 @@ contract PoRepMarketTest is Test {
         PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
         sliScorer.setScore(dealId, 99);
         uint256 settlementEndEpoch = _epochToUint(service.serviceStartEpoch) + poRepMarket.EPOCHS_IN_MONTH();
+        vm.roll(settlementEndEpoch);
 
         vm.prank(validatorAddress);
         SharedTypes.SettlementDecision memory decision =
@@ -1985,35 +2030,6 @@ contract PoRepMarketTest is Test {
 
         dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(lastRefreshEpoch));
         vm.roll(settlementEndEpoch);
-
-        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
-        vm.prank(validatorAddress);
-        poRepMarket.validateDealSettlement(dealId, settlementStartEpoch, settlementEndEpoch);
-    }
-
-    function testValidateDealSettlementRevertsWithInactiveEvidence() public {
-        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
-        sliScorer.setScore(dealId, 100);
-
-        uint256 settlementStartEpoch = _epochToUint(service.serviceStartEpoch);
-        uint256 settlementEndEpoch = settlementStartEpoch + poRepMarket.EPOCHS_IN_MONTH();
-        uint256 lastRefreshEpoch = settlementEndEpoch - EVIDENCE_REFRESH_GRACE_EPOCHS;
-
-        vm.roll(lastRefreshEpoch + poRepMarket.EPOCHS_IN_MONTH() + 1);
-        vm.mockCall(
-            address(dataCapEvidenceAdapterAddress),
-            IStorageEvidenceAdapter.currentEvidenceStatus.selector,
-            abi.encode(
-                SharedTypes.EvidenceStatus({
-                    activeCoveredBytes: 0,
-                    lastEvidenceRefreshEpoch: chainEpochFromBlock(lastRefreshEpoch),
-                    reasonCode: 0,
-                    result: EvidenceResult.INACTIVE,
-                    checkedItems: 0,
-                    totalItems: 0
-                })
-            )
-        );
 
         vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
         vm.prank(validatorAddress);
@@ -2113,6 +2129,272 @@ contract PoRepMarketTest is Test {
         assertEq(decision.reasonCode, SettlementReason.DEAL_TERMINATED);
         assertEq(decision.result, SettlementResult.REJECTED);
         assertEq(decision.note, "deal terminated");
+    }
+
+    function testFinalizeBeforeFinalSettlementWithStaleSnapshotPaysZero() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+        // The last refresh is older than the grace period for the final window.
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(fromEpoch));
+
+        vm.roll(serviceEndEpoch + 1);
+        vm.etch(validatorAddress, hex"00");
+        vm.mockCall(validatorAddress, abi.encodeWithSelector(IOperator.finalizeDeal.selector), "");
+        vm.prank(adminAddress);
+        poRepMarket.finalizeDeal(dealId);
+
+        vm.roll(serviceEndEpoch + 1_000_000);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, serviceEndEpoch);
+    }
+
+    function testSettlementAfterServiceEndPaysFromRefreshBeforeServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(serviceEndEpoch - 1));
+
+        vm.roll(serviceEndEpoch + 1_000_000);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch);
+
+        assertEq(decision.result, SettlementResult.ACCEPTED);
+        assertGt(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, serviceEndEpoch);
+    }
+
+    function testSettlementAfterServiceEndWithoutRefreshPaysZero() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+        _mockCurrentEvidence(0, 0, EvidenceResult.NONE);
+
+        vm.roll(serviceEndEpoch);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(decision.settlementAmount, 0);
+    }
+
+    function testSettlementAfterServiceEndWithEpochZeroMismatchPaysZero() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+        _mockCurrentEvidence(0, 0, EvidenceResult.COVERED_BYTES_MISMATCH);
+
+        vm.roll(serviceEndEpoch);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(decision.settlementAmount, 0);
+    }
+
+    function testSettlementWithoutRefreshRevertsWhileServiceRuns() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 toEpoch = fromEpoch + poRepMarket.EPOCHS_IN_MONTH();
+        _mockCurrentEvidence(0, 0, EvidenceResult.NONE);
+
+        vm.roll(toEpoch);
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
+        vm.prank(validatorAddress);
+        poRepMarket.validateDealSettlement(dealId, fromEpoch, toEpoch);
+    }
+
+    function testSettlementAfterServiceEndWithMismatchSnapshotPaysZero() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+        _mockCurrentEvidence(fromEpoch, 0, EvidenceResult.COVERED_BYTES_MISMATCH);
+
+        vm.roll(serviceEndEpoch);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, serviceEndEpoch);
+    }
+
+    function testEarlyTerminatedSettlementWaitsForFreshEvidence() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 earlyTerminationEpoch = _terminateDefaultDealAfterOneMonth(service);
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(fromEpoch));
+
+        vm.roll(earlyTerminationEpoch + poRepMarket.EPOCHS_IN_MONTH());
+        vm.prank(validatorAddress);
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
+        poRepMarket.validateDealSettlement(dealId, fromEpoch, earlyTerminationEpoch);
+    }
+
+    function testEarlyTerminatedSettlementPaysFromRefreshAfterTermination() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        sliScorer.setAttestationExpired(dealId, true);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 earlyTerminationEpoch = _terminateDefaultDealAfterOneMonth(service);
+
+        vm.roll(earlyTerminationEpoch + poRepMarket.EPOCHS_IN_MONTH());
+        poRepMarket.refreshEvidenceStatus(dealId, "");
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(block.number));
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, earlyTerminationEpoch);
+
+        assertEq(decision.result, SettlementResult.ACCEPTED);
+        assertGt(decision.settlementAmount, 0);
+        assertEq(decision.settleUpto, earlyTerminationEpoch);
+    }
+
+    function testEarlyTerminatedSettlementRejectsStaleEvidenceAfterServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 earlyTerminationEpoch = _terminateDefaultDealAfterOneMonth(service);
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(fromEpoch));
+
+        vm.roll(_epochToUint(service.serviceEndEpoch));
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, earlyTerminationEpoch);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.settlementAmount, 0);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+        assertEq(decision.settleUpto, earlyTerminationEpoch);
+    }
+
+    function testEarlyTerminatedSettlementRejectsMismatchAfterServiceEnd() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 earlyTerminationEpoch = _terminateDefaultDealAfterOneMonth(service);
+        dataCapEvidenceAdapterAddress.setDeal(createClientDealWithAllocationSize(dealId, 1));
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(earlyTerminationEpoch));
+
+        vm.roll(_epochToUint(service.serviceEndEpoch));
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, earlyTerminationEpoch);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.reasonCode, SettlementReason.DATA_SIZE_MISMATCH);
+    }
+
+    function testStaleEvidenceDefersWindowBeforeScoreFailure() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 99);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        dataCapEvidenceAdapterAddress.setLastRefreshEpoch(dealId, chainEpochFromBlock(fromEpoch));
+        uint256 settlementEndEpoch = fromEpoch + poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.roll(settlementEndEpoch);
+        vm.prank(validatorAddress);
+        vm.expectRevert(PoRepMarket.EvidenceTooStale.selector);
+        poRepMarket.validateDealSettlement(dealId, fromEpoch, settlementEndEpoch);
+    }
+
+    function testActiveDealSettlementRequiresCurrentAttestation() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        sliScorer.setAttestationExpired(dealId, true);
+        uint256 fromEpoch = _epochToUint(service.serviceStartEpoch);
+        uint256 settlementEndEpoch = fromEpoch + poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.roll(settlementEndEpoch);
+        vm.prank(validatorAddress);
+        vm.expectRevert(abi.encodeWithSelector(SLIScorerMock.AttestationExpired.selector, dealId));
+        poRepMarket.validateDealSettlement(dealId, fromEpoch, settlementEndEpoch);
+    }
+
+    function testEndedDealSettlementUsesLastAttestation() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        sliScorer.setAttestationExpired(dealId, true);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - poRepMarket.EPOCHS_IN_MONTH();
+
+        vm.roll(serviceEndEpoch + 2 * poRepMarket.EPOCHS_IN_MONTH());
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch);
+
+        assertEq(decision.result, SettlementResult.ACCEPTED);
+        assertGt(decision.settlementAmount, 0);
+    }
+
+    function testSettlementStartingAtServiceEndIsRejectedAsDealEnded() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        vm.mockCallRevert(
+            address(dataCapEvidenceAdapterAddress), IStorageEvidenceAdapter.currentEvidenceStatus.selector, ""
+        );
+
+        vm.roll(serviceEndEpoch + 10);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, serviceEndEpoch, serviceEndEpoch + 10);
+
+        assertEq(decision.result, SettlementResult.REJECTED);
+        assertEq(decision.reasonCode, SettlementReason.DEAL_ENDED);
+        assertEq(decision.settleUpto, serviceEndEpoch + 10);
+    }
+
+    function testFinalSettlementWindowMayBeShorterThanMinimumInterval() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        uint256 fromEpoch = serviceEndEpoch - 10;
+
+        vm.roll(serviceEndEpoch + 5);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, serviceEndEpoch + 5);
+
+        assertEq(decision.result, SettlementResult.MODIFIED);
+        assertEq(decision.settleUpto, serviceEndEpoch + 5);
+    }
+
+    function testFinalizedShortWindowBeforeServiceEndSkipsMinimumInterval() public {
+        PoRepTypes.DealService memory service = _completeDefaultDealForSettlement();
+        sliScorer.setScore(dealId, 100);
+        uint256 serviceEndEpoch = _epochToUint(service.serviceEndEpoch);
+        // A terminated rail can end before service end when the payer's lockup lagged.
+        uint256 fromEpoch = serviceEndEpoch - 100;
+        uint256 railEndEpoch = serviceEndEpoch - 50;
+        PoRepMarketContractMock(address(poRepMarket)).setDealState(dealId, DealState.FINALIZED);
+
+        vm.roll(serviceEndEpoch + 1);
+        vm.prank(validatorAddress);
+        SharedTypes.SettlementDecision memory decision =
+            poRepMarket.validateDealSettlement(dealId, fromEpoch, railEndEpoch);
+
+        assertEq(decision.result, SettlementResult.ACCEPTED);
+        assertEq(decision.settleUpto, railEndEpoch);
     }
 
     function testValidateDealSettlementReturnsModifiedResultWhenCappedToEarlyTermination() public {
@@ -2217,6 +2499,42 @@ contract PoRepMarketTest is Test {
         );
         vm.prank(caller);
         poRepMarket.setMinEpochsBetweenSettlements(dealId, 1000);
+    }
+
+    function _mockCurrentEvidence(uint256 lastRefreshEpoch, uint256 activeCoveredBytes, uint8 result) internal {
+        vm.mockCall(
+            address(dataCapEvidenceAdapterAddress),
+            IStorageEvidenceAdapter.currentEvidenceStatus.selector,
+            abi.encode(
+                SharedTypes.EvidenceStatus({
+                    activeCoveredBytes: activeCoveredBytes,
+                    lastEvidenceRefreshEpoch: chainEpochFromBlock(lastRefreshEpoch),
+                    reasonCode: 0,
+                    result: result,
+                    checkedItems: 0,
+                    totalItems: 0
+                })
+            )
+        );
+    }
+
+    function _terminateDefaultDealAfterOneMonth(PoRepTypes.DealService memory service)
+        internal
+        returns (uint256 earlyTerminationEpoch)
+    {
+        earlyTerminationEpoch = _epochToUint(service.serviceStartEpoch) + poRepMarket.EPOCHS_IN_MONTH();
+        PoRepMarketContractMock market = PoRepMarketContractMock(address(poRepMarket));
+        market.setDealState(dealId, DealState.EARLY_TERMINATED);
+        market.setDealService(
+            dealId,
+            PoRepTypes.DealService({
+                serviceStartEpoch: service.serviceStartEpoch,
+                serviceEndEpoch: service.serviceEndEpoch,
+                earlyTerminationEpoch: chainEpochFromBlock(earlyTerminationEpoch),
+                minTimeBetweenSettlementsInEpochs: poRepMarket.EPOCHS_IN_MONTH(),
+                lastSettledEpoch: service.lastSettledEpoch
+            })
+        );
     }
 
     function _completeDefaultDealForSettlement() internal returns (PoRepTypes.DealService memory service) {
