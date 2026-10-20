@@ -1,9 +1,9 @@
 {
   "status": "finalized",
-  "finalizedAt": "2026-09-04T13:52:24.852Z",
+  "finalizedAt": "2026-10-20T13:24:38.960Z",
   "deployer": "0xceeA434E28dc539F9A5691930Af0256a1b6c938E",
   "release": {
-    "buildInfoSha256": "0x16173065fc514795ffaa2b99d01e089f97b4ef4cfd457012b0b1dded83bdd7a5"
+    "buildInfoSha256": "0xcf757ed59151b66775fadf25a68402a6ca32067f635fa3e3573e25f474f0d725"
   },
   "contracts": {
     "AccessManager": {
@@ -16,17 +16,17 @@
       "kind": "uups",
       "artifact": "src/DataCapEvidenceAdapter.sol:DataCapEvidenceAdapter",
       "proxy": "0xc95A48dd927786327da5aaC7Db5F5B10B4B45A02",
-      "implementation": "0x2297486b95aD16aAD4fbcC2eE88D4956424f6589",
+      "implementation": "0x909dbFAdCBE7E11f7219Ca0F7825733d3F32B129",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
-      "implementationCodeHash": "0x462aa335006c1caec2a7bb6aa440dadcf9f1aa88c0a860b2a96cde382e786ff0"
+      "implementationCodeHash": "0xf44b56d90af3879c0bc5cfe9da07cc31a32c57976a879b8bab88dddca03b388c"
     },
     "PoRepMarket": {
       "kind": "uups",
       "artifact": "src/PoRepMarket.sol:PoRepMarket",
       "proxy": "0x02328379543e47bA8AeD039B08aA8cC836584E74",
-      "implementation": "0xB9Bd3ab2a854bD8a0201bA7c49F014b755497796",
+      "implementation": "0x74A2EBd16409953eBd2ACe600a6395b66eA45f6B",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
-      "implementationCodeHash": "0xe4d55262b33847cd924bac6465b93588d3aacccddad50c4f62f0e9ca1e18cd26"
+      "implementationCodeHash": "0xfbcf2ac61bffc88bad558665504269d3261d1020e5d5bf300f3488fc853b7a4e"
     },
     "PoRepMarketClaimInspector": {
       "kind": "standalone",
@@ -52,9 +52,9 @@
       "kind": "uups",
       "artifact": "src/SLIScorer.sol:SLIScorer",
       "proxy": "0x4Ea6b6f6125E51Aa90554450aefeD251D69F1D50",
-      "implementation": "0x7DFa871d5eF0289ffC4867BC10C3C24098e799e5",
+      "implementation": "0x2d862D20b2e2f39181168962B10b0c4c089b9bdf",
       "proxyCodeHash": "0xba4f7bd3ee62882c3d716fdb0f75014fd667ce8104796142517dbc9016e6e932",
-      "implementationCodeHash": "0xfc1ba07765a08767157266090473cee4c2c4dc660ea3763bbc6eefa95a1f18d4"
+      "implementationCodeHash": "0x768a1c9b987610c3e2ff7c1970faa1de62481c21369da88ff9d77f191c1119ea"
     },
     "SPRegistry": {
       "kind": "uups",
@@ -98,17 +98,45 @@
   },
   "transactions": [
     {
-      "hash": "0x96d251458e1d01c139f488ec5157dbddf6eba813b4a09ccda79e95903e4a1e32",
+      "hash": "0x464d5a2681fd62ed52d1aa5ff8ad7b6ef669ba54962fe42f217586f870b69924",
       "status": 1,
-      "blockNumber": 6340761,
-      "blockHash": "0x5c4a91b6de58b584a9a2e1818d4ab67af0a8e8f6a79edc385de7cd3c6968881c",
-      "contractAddress": "0xd39a044b8afed5b0b5ee8829b2a34e4559331adf"
+      "blockNumber": 6473167,
+      "blockHash": "0x0c363e3995ab2aa9028727f2641f9dbb5e4bfc5a4457eceeb9acd88ede38500e",
+      "contractAddress": "0x2d862d20b2e2f39181168962b10b0c4c089b9bdf"
     },
     {
-      "hash": "0x48fd81c0f7617d26a20aa0993ab9e58e667621980b993dffe83d6a7dc6e84d20",
+      "hash": "0xcc700e78d7ed46412d7e5a6253a3126819db95089d8cc0ba1b2efbca4b874a25",
       "status": 1,
-      "blockNumber": 6340763,
-      "blockHash": "0x018e628516c4d7af6b6b6aead2bd35a71b52b16466ca2ade09eee66e02f27f3b",
+      "blockNumber": 6473169,
+      "blockHash": "0x046ebd254eb8c291b04c6f714cf17f606256a7a60bab60bb90b11483b749b9d8",
+      "contractAddress": "0x909dbfadcbe7e11f7219ca0f7825733d3f32b129"
+    },
+    {
+      "hash": "0x5448e838e632a7ab3df2cd311ba637663e05a242d8b3bea4daa5f2aceccc8c5b",
+      "status": 1,
+      "blockNumber": 6473171,
+      "blockHash": "0x473290b2954d8c68b159609d1b959070543e09864f8c5d656c2edcc25a1df5b3",
+      "contractAddress": "0x74a2ebd16409953ebd2ace600a6395b66ea45f6b"
+    },
+    {
+      "hash": "0xf710bd49f138c64f18e69777a429fb692e4c686b705564e383ab3066a28678a4",
+      "status": 1,
+      "blockNumber": 6473173,
+      "blockHash": "0xf54bda29eb1a2b6662e1af2e57e58585b581ab6313d42ecffe24fc36bbc9422c",
+      "contractAddress": null
+    },
+    {
+      "hash": "0xb02d59f16a7634d301d9ba6810cac4ddb3c077f514754e1e7ed87f73c6821f42",
+      "status": 1,
+      "blockNumber": 6473175,
+      "blockHash": "0xc87f208bef58474eb56c57c481beb9deaab35a7776921fb813612bd08510cd75",
+      "contractAddress": null
+    },
+    {
+      "hash": "0x7f2d18054038251fdefca3b1a81c5eeca640e603affee12dced9bffb8f31e457",
+      "status": 1,
+      "blockNumber": 6473177,
+      "blockHash": "0xdd8b3051d49b9a7edd0ec5787fd55d2cfae2af789227e59f0c63dcbb8d88be8b",
       "contractAddress": null
     }
   ]
