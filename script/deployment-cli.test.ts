@@ -161,6 +161,7 @@ test("adds the missing release helper without replacing existing contracts", () 
 
 test("adds the sector adapter to a deployment that predates it", () => {
   const source = parseDeploymentManifest(readFileSync("deployments/mainnet/latest.json", "utf8"));
+  delete source.contracts.SectorEvidenceAdapter;
   const deployed = structuredClone(source);
   deployed.contracts.SectorEvidenceAdapter = {
     kind: "uups",
@@ -386,14 +387,14 @@ test("submits every deployed Calibnet address that Blockscout does not already h
     progress: () => {},
   });
 
-  assert.equal(calls.length, 18);
-  assert.equal(confirmed.length, 18);
-  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 10);
+  assert.equal(calls.length, 20);
+  assert.equal(confirmed.length, 20);
+  assert.equal(calls.filter((args) => args.includes("--guess-constructor-args")).length, 11);
   assert.equal(calls.filter((args) => args.includes("--constructor-args")).length, 0);
-  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 17);
-  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 17);
+  assert.equal(calls.filter((args) => args.includes("--skip-is-verified-check")).length, 19);
+  assert.equal(calls.filter((args) => args.includes("blockscout")).length, 19);
   assert.equal(calls.filter((args) => args.includes("sourcify")).length, 1);
-  assert.ok(calls.every((args) => args.includes("--verifier") && args.includes("--watch")));
+  assert.ok(calls.every((args) => args.includes("--verifier") && args.includes("--watch") && args.includes("--retries")));
 });
 
 test("skips Forge for earlier-release contracts Blockscout already holds", async () => {
@@ -460,14 +461,14 @@ test("verifies every remaining contract after one fails and reports them togethe
       progress: () => {},
     }),
     (error: Error) => {
-      assert.match(error.message, /1 of 18 contracts failed source verification/);
+      assert.match(error.message, /1 of 20 contracts failed source verification/);
       assert.match(error.message, /PoRepMarketClaimInspector/);
       assert.match(error.message, /Local bytecode doesn't match on-chain bytecode/);
       return true;
     },
   );
 
-  assert.equal(attempted.length, 18);
+  assert.equal(attempted.length, 20);
 });
 
 test("rejects a Blockscout record that is not fully verified", async () => {
