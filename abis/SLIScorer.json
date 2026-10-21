@@ -124,6 +124,25 @@
   },
   {
     "type": "function",
+    "name": "getDealHealth",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ],
+    "outputs": [
+      {
+        "name": "sectorsHealthBps",
+        "type": "uint16",
+        "internalType": "uint16"
+      }
+    ],
+    "stateMutability": "view"
+  },
+  {
+    "type": "function",
     "name": "initialize",
     "inputs": [
       {
@@ -227,6 +246,17 @@
   {
     "type": "error",
     "name": "AttestationExpired",
+    "inputs": [
+      {
+        "name": "dealId",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
+    "name": "DealHealthUnavailable",
     "inputs": [
       {
         "name": "dealId",

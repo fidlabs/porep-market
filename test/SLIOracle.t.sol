@@ -166,4 +166,102 @@ contract SLIOracleTest is Test {
         SharedTypes.Attestation memory stored = sliOracle.getAttestation(dealId);
         assertEq(stored.slis.latencyMs, highestValidLatencyMs);
     }
+
+    function testSetDealHealthStoresMeasurement() public {
+        vm.roll(1000);
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 9500);
+
+        SharedTypes.DealHealth memory stored = sliOracle.getDealHealth(dealId);
+        assertEq(stored.lastUpdate, 1000);
+        assertEq(stored.sectorsHealthBps, 9500);
+    }
+
+    function testSetDealHealthOverwritesPreviousMeasurement() public {
+        vm.roll(1000);
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 9500);
+        vm.roll(2000);
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 0);
+
+        SharedTypes.DealHealth memory stored = sliOracle.getDealHealth(dealId);
+        assertEq(stored.lastUpdate, 2000);
+        assertEq(stored.sectorsHealthBps, 0);
+    }
+
+    function testSetDealHealthEmitsEvent() public {
+        vm.roll(1000);
+        vm.expectEmit(true, false, false, true);
+        emit SLIOracle.DealHealthUpdated(dealId, SharedTypes.DealHealth({lastUpdate: 1000, sectorsHealthBps: 9500}));
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 9500);
+    }
+
+    function testSetDealHealthAcceptsMaxSectorsHealthBps() public {
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 10_000);
+
+        assertEq(sliOracle.getDealHealth(dealId).sectorsHealthBps, 10_000);
+    }
+
+    function testSetDealHealthRevertsInvalidSectorsHealthBps() public {
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 9500);
+
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidSectorsHealthBps.selector, uint16(10_001)));
+        sliOracle.setDealHealth(dealId, 10_001);
+        assertEq(sliOracle.getDealHealth(dealId).sectorsHealthBps, 9500);
+    }
+
+    function testDealHealthAndAttestationAreStoredIndependently() public {
+        vm.roll(1000);
+        vm.prank(oracle);
+        sliOracle.setSLI(dealId, slis);
+        vm.roll(2000);
+        vm.prank(oracle);
+        sliOracle.setDealHealth(dealId, 9500);
+
+        assertEq(sliOracle.getAttestation(dealId).lastUpdate, 1000);
+        assertEq(sliOracle.getAttestation(dealId).slis.retrievabilityBps, slis.retrievabilityBps);
+        assertEq(sliOracle.getDealHealth(dealId).lastUpdate, 2000);
+        assertEq(sliOracle.getDealHealth(dealId).sectorsHealthBps, 9500);
+
+        vm.roll(3000);
+        vm.prank(oracle);
+        sliOracle.setSLI(dealId, slis);
+
+        assertEq(sliOracle.getAttestation(dealId).lastUpdate, 3000);
+        assertEq(sliOracle.getDealHealth(dealId).lastUpdate, 2000);
+        assertEq(sliOracle.getDealHealth(dealId).sectorsHealthBps, 9500);
+    }
+
+    function testSetDealHealthRevertsInvalidDealId() public {
+        vm.prank(oracle);
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidDealId.selector));
+        sliOracle.setDealHealth(0, 9500);
+    }
+
+    function testSetDealHealthRevertsWhenCallerIsNotOracle() public {
+        address unauthorized = vm.addr(1);
+        bytes32 oracleRole = accessManager.ORACLE_ROLE();
+
+        vm.prank(unauthorized);
+        vm.expectRevert(
+            abi.encodeWithSelector(IAccessControl.AccessControlUnauthorizedAccount.selector, unauthorized, oracleRole)
+        );
+        sliOracle.setDealHealth(dealId, 9500);
+    }
+
+    function testGetDealHealthReturnsZeroWithoutMeasurement() public view {
+        SharedTypes.DealHealth memory stored = sliOracle.getDealHealth(dealId);
+        assertEq(stored.lastUpdate, 0);
+        assertEq(stored.sectorsHealthBps, 0);
+    }
+
+    function testGetDealHealthRevertsInvalidDealId() public {
+        vm.expectRevert(abi.encodeWithSelector(SLIOracle.InvalidDealId.selector));
+        sliOracle.getDealHealth(0);
+    }
 }

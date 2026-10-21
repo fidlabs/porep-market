@@ -10,6 +10,14 @@ import {SharedTypes} from "../types/SharedTypes.sol";
  */
 interface ISLIScorer {
     /**
+     * @notice Returns the deal's health, aggregated over its sectors, from a current measurement of the scorer's oracle.
+     * @dev Reverts when the measurement is missing, future-dated or older than 30 days.
+     * @param dealId The id of the deal.
+     * @return sectorsHealthBps Deal health in basis points.
+     */
+    function getDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps);
+
+    /**
      * @notice Calculate score based on required vs actual thresholds
      * @dev Fields with required value of 0 are skipped (not evaluated)
      * @param dealId The id of the deal
