@@ -56,6 +56,9 @@ finalize-deploy network:
 deploy-missing network:
     node script/deployment.ts deploy-missing {{ network }}
 
+deploy-sector-adapter network:
+    node script/deployment.ts deploy-sector-adapter {{ network }}
+
 configure-payment-tokens network:
     node script/deployment.ts configure-payment-tokens {{ network }}
 

@@ -193,6 +193,16 @@ test("continues to verify deployments that predate the sector adapter", async ()
   await verifyLiveDeployment(fullRunner(manifest), "rpc", manifest);
 });
 
+test("rejects a market still using the DataCap adapter once the sector adapter is deployed", async () => {
+  const manifest = completeManifest();
+  const run = fullRunner(manifest);
+  const dataCapGlobal: CommandRunner = async (command, args, options) => {
+    if (args[0] === "call" && args[2] === "getGlobalEvidenceAdapter()(address)") return padded(a5);
+    return run(command, args, options);
+  };
+  await assert.rejects(verifyLiveDeployment(dataCapGlobal, "rpc", manifest), /market evidence adapter/);
+});
+
 test("rejects a sector adapter bound to a different AccessManager", async () => {
   const manifest = completeManifest();
   const run = fullRunner(manifest);
@@ -367,7 +377,7 @@ function addressResult(manifest: DeploymentManifest, target: string, signature: 
   if (signature === "getBeacon()(address)") return beaconAddress(c.ValidatorBeacon!);
   if (signature === "getValidatorFactoryContract()(address)") return proxy(c.ValidatorFactory!);
   if (signature === "getSPRegistryContract()(address)") return proxy(c.SPRegistry!);
-  if (signature === "getGlobalEvidenceAdapter()(address)") return proxy(c.DataCapEvidenceAdapter!);
+  if (signature === "getGlobalEvidenceAdapter()(address)") return proxy(c.SectorEvidenceAdapter ?? c.DataCapEvidenceAdapter!);
   if (signature === "getPoRepMarketAddress()(address)") return proxy(c.PoRepMarket!);
   if (signature === "POREPMARKET_CONTRACT()(address)") return proxy(c.PoRepMarket!);
   if (signature === "DATA_CAP_EVIDENCE_ADAPTER()(address)") return proxy(c.DataCapEvidenceAdapter!);

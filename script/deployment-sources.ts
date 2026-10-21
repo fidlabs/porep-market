@@ -90,7 +90,9 @@ export async function verifyContractSources(
     if (target.verifier === "blockscout") {
       args.push("--verifier-url", options.verifierUrl, "--skip-is-verified-check");
     }
-    args.push("--watch");
+    // Blockscout rate-limits submissions and status checks; Forge's default 5 tries 5s apart
+    // give up before the limit resets.
+    args.push("--watch", "--retries", "10", "--delay", "30");
     if (target.guessConstructorArguments) args.push("--guess-constructor-args");
     try {
       if (!justDeployed.has(target.address.toLowerCase()) && (await alreadyVerified(options, target))) {

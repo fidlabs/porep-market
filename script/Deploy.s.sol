@@ -86,6 +86,8 @@ contract Deploy is DeployUtils {
         (poRepMarket, poRepMarketImpl) = _deployPoRepMarket(accessManager, validatorFactory, spRegistry, sliScorer);
         DataCapEvidenceAdapter(dataCapEvidenceAdapter).initialize(accessManager, poRepMarket, metaAllocator);
         (sectorEvidenceAdapter, sectorEvidenceAdapterImpl) = _deploySectorEvidenceAdapter(accessManager, poRepMarket);
+        // DataCap claims stop working after NV29, so new deals must use sector evidence.
+        PoRepMarket(poRepMarket).setGlobalEvidenceAdapter(sectorEvidenceAdapter);
         claimInspector = address(new PoRepMarketClaimInspector(dataCapEvidenceAdapter, poRepMarket));
         viewHelper = address(new PoRepMarketViewHelper(poRepMarket));
 
@@ -257,20 +259,6 @@ contract Deploy is DeployUtils {
         json.serialize("ValidatorBeacon", _serializeValidatorBeacon());
         json.serialize("PoRepMarketClaimInspector", _serializeClaimInspector());
         return json.serialize("PoRepMarketViewHelper", _serializeViewHelper());
-    }
-
-    function _serializeUupsContract(
-        string memory objectKey,
-        string memory artifact,
-        address proxy,
-        address implementation
-    ) private returns (string memory) {
-        objectKey.serialize("kind", string("uups"));
-        objectKey.serialize("artifact", artifact);
-        objectKey.serialize("proxy", proxy);
-        objectKey.serialize("implementation", implementation);
-        objectKey.serialize("proxyCodeHash", proxy.codehash);
-        return objectKey.serialize("implementationCodeHash", implementation.codehash);
     }
 
     function _serializeValidator() private returns (string memory) {
