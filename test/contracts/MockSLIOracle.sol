@@ -11,6 +11,8 @@ contract MockSLIOracle {
     uint16 public bandwidthBytesPerSecond;
     uint16 public latencyMs;
     uint8 public indexingPct;
+    uint256 public healthLastUpdate;
+    uint16 public sectorsHealthBps;
 
     function setAttestations(
         uint256 lastUpdate_,
@@ -32,5 +34,15 @@ contract MockSLIOracle {
         ret.slis.bandwidthBytesPerSecond = bandwidthBytesPerSecond;
         ret.slis.latencyMs = latencyMs;
         ret.slis.indexingPct = indexingPct;
+    }
+
+    function setHealth(uint256 healthLastUpdate_, uint16 sectorsHealthBps_) public {
+        healthLastUpdate = healthLastUpdate_;
+        sectorsHealthBps = sectorsHealthBps_;
+    }
+
+    function getDealHealth(uint256) public view returns (SharedTypes.DealHealth memory ret) {
+        ret.lastUpdate = healthLastUpdate;
+        ret.sectorsHealthBps = sectorsHealthBps;
     }
 }

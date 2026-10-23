@@ -22,6 +22,15 @@ contract SLIScorerMock is ISLIScorer {
     mapping(uint256 dealId => bool expired) public attestationExpired;
 
     /**
+     * @notice Thrown by getDealHealth for a deal without a configured health measurement
+     * @param dealId The deal id
+     */
+    error DealHealthUnavailable(uint256 dealId);
+
+    /// @notice Health measurement returned for each deal id.
+    mapping(uint256 dealId => SharedTypes.DealHealth health) internal _dealHealth;
+
+    /**
      * @notice Sets the score returned for a deal id.
      * @param dealId Deal id to configure.
      * @param score Score to return.
@@ -37,6 +46,35 @@ contract SLIScorerMock is ISLIScorer {
      */
     function setAttestationExpired(uint256 dealId, bool expired) external {
         attestationExpired[dealId] = expired;
+    }
+
+    /**
+     * @notice Sets the health measurement returned for a deal id, recorded at the current block.
+     * @param dealId Deal id to configure.
+     * @param sectorsHealthBps Sector health to return, in basis points.
+     */
+    function setDealHealth(uint256 dealId, uint16 sectorsHealthBps) external {
+        _dealHealth[dealId] = SharedTypes.DealHealth({lastUpdate: block.number, sectorsHealthBps: sectorsHealthBps});
+    }
+
+    /**
+     * @notice Removes the health measurement for a deal id, as if the oracle never measured it.
+     * @param dealId Deal id to configure.
+     */
+    function clearDealHealth(uint256 dealId) external {
+        delete _dealHealth[dealId];
+    }
+
+    /**
+     * @notice Returns the configured health for a deal id.
+     * @dev Reverts like the real scorer when no measurement is available.
+     * @param dealId Deal id to read.
+     * @return sectorsHealthBps Configured deal health, in basis points.
+     */
+    function getDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps) {
+        SharedTypes.DealHealth memory health = _dealHealth[dealId];
+        if (health.lastUpdate == 0) revert DealHealthUnavailable(dealId);
+        return health.sectorsHealthBps;
     }
 
     /**

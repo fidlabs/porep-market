@@ -41,16 +41,15 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     uint256 public constant EPOCHS_IN_MONTH = 86_400;
 
     /**
+     * @notice Denominator for health values expressed in basis points; 10_000 equals 100%.
+     */
+    uint256 private constant BASIS_POINTS_DENOMINATOR = 10_000;
+
+    /**
      * @notice Maximum settlement lead allowed beyond the latest verified evidence refresh
      * @dev 8 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 23_040 epochs
      */
     uint256 private constant EVIDENCE_REFRESH_GRACE_EPOCHS = 23_040;
-
-    /**
-     * @notice Number of epochs in one year
-     * @dev 365 days * 24 hours/day * 60 minutes/hour * 2 epochs/minute = 1_051_200 epochs
-     */
-    uint256 private constant EPOCHS_IN_YEAR = 1_051_200;
 
     /**
      * @notice Size of a single Filecoin sector in bytes (32 GiB)
@@ -1263,7 +1262,8 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
 
     /**
      * @notice Sets the minimum time between settlements for a deal
-     * @dev Only the admin may update the settlement cadence.
+     * @dev Only the admin may update the settlement cadence. Capped at one month because a settlement pays at most one
+     *      month, so a longer interval would let unpaid epochs accumulate.
      * @param dealId The deal being configured
      * @param minEpochs Minimum time between settlements in epochs
      */
@@ -1275,7 +1275,7 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
             revert InvalidMinEpochsBetweenSettlements();
         }
 
-        if (minEpochs > EPOCHS_IN_YEAR) {
+        if (minEpochs > EPOCHS_IN_MONTH) {
             revert MinEpochsBetweenSettlementsExceeded();
         }
 
@@ -1291,7 +1291,9 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
     /**
      * @notice Validates the settlement amount for a deal's service window
      * @dev Only the deal's validator may request a settlement decision. settleUpto controls how far FilecoinPay may
-     * advance its cursor, including for rejected zero-payment windows.
+     * advance its cursor, including for rejected zero-payment windows. Each payable window ends no later than
+     * max(fromEpoch, serviceStartEpoch) + EPOCHS_IN_MONTH, regardless of when settlement is requested.
+     * Remaining epochs stay unsettled.
      * @param dealId The deal being settled
      * @param fromEpoch The epoch at which the settlement window starts
      * @param toEpoch The epoch at which the settlement window ends
@@ -1321,15 +1323,18 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
 
         // Resolve the payable window before making external quality calls.
         bool settlementWasCapped;
-        // Requested end epoch after limiting it to the deal's termination or service end.
-        uint256 effectiveToEpoch = toEpoch;
+        // A daily settlement bot overshoots the monthly window on almost every call, so this limit is not reported as
+        // a modification. Termination and service end caps close the rail, so they apply only to the window that
+        // reaches them; a window reaching them exactly at the monthly limit still closes the rail.
+        uint256 effectiveToEpoch = _applyMonthlyLimit(fromEpoch, toEpoch, _epochToUint(service.serviceStartEpoch));
         uint256 earlyTerminationEpoch = _epochToUint(service.earlyTerminationEpoch);
         // Terminated deals are capped at termination; active deals must also satisfy the minimum settlement interval.
         if (earlyTerminationEpoch > 0) {
             if (fromEpoch >= earlyTerminationEpoch) {
                 return _rejectedSettlement(toEpoch, SettlementReason.DEAL_TERMINATED, "deal terminated");
             }
-            if (effectiveToEpoch > earlyTerminationEpoch) {
+            // solhint-disable-next-line gas-strict-inequalities
+            if (toEpoch > earlyTerminationEpoch && effectiveToEpoch >= earlyTerminationEpoch) {
                 effectiveToEpoch = earlyTerminationEpoch;
                 decision.note = "payment limited to deal termination epoch";
                 settlementWasCapped = true;
@@ -1338,14 +1343,12 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
             // The final window may be shorter than the minimum interval: a terminated rail's end epoch is fixed, so
             // enforcing the interval there could leave the remainder unsettleable.
             uint256 earliestSettlementEpoch = fromEpoch + service.minTimeBetweenSettlementsInEpochs;
-            if (
-                deal.state == DealState.ACTIVE && toEpoch < serviceEndEpoch
-                    && effectiveToEpoch < earliestSettlementEpoch
-            ) {
-                revert SettlementTooEarly(effectiveToEpoch, earliestSettlementEpoch);
+            if (deal.state == DealState.ACTIVE && toEpoch < serviceEndEpoch && toEpoch < earliestSettlementEpoch) {
+                revert SettlementTooEarly(toEpoch, earliestSettlementEpoch);
             }
 
-            if (effectiveToEpoch > serviceEndEpoch) {
+            // solhint-disable-next-line gas-strict-inequalities
+            if (toEpoch > serviceEndEpoch && effectiveToEpoch >= serviceEndEpoch) {
                 effectiveToEpoch = serviceEndEpoch;
                 decision.note = "payment limited to deal endepoch";
                 settlementWasCapped = true;
@@ -1367,18 +1370,20 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
             );
         }
 
+        uint16 sectorsHealthBps = $._SLIScorer.getDealHealth(dealId);
         // Only successful validation updates the market's settlement tracking.
-        PoRepTypes.DealPayment memory payment = $._dealPayments[dealId];
-        uint256 serviceStartEpoch = _epochToUint(service.serviceStartEpoch);
-        // Subtract cumulative amounts at both boundaries to price only the accepted settlement window.
-        decision.settlementAmount = _calculateDueAmount(payment, serviceStartEpoch, effectiveToEpoch)
-            - _calculateDueAmount(payment, serviceStartEpoch, fromEpoch);
+        decision.settlementAmount = _calculateSettlementAmount(
+            dealId, _epochToUint(service.serviceStartEpoch), fromEpoch, effectiveToEpoch, sectorsHealthBps
+        );
 
+        // A termination or service end cap marks the final window, so it closes the rail's tail; a monthly limit leaves
+        // the remaining epochs for the next call.
         decision.settleUpto = settlementWasCapped ? toEpoch : effectiveToEpoch;
         decision.reasonCode = SettlementReason.OK;
-        decision.result = settlementWasCapped ? SettlementResult.MODIFIED : SettlementResult.ACCEPTED;
+        bool healthReduced = sectorsHealthBps < BASIS_POINTS_DENOMINATOR;
+        decision.result = settlementWasCapped || healthReduced ? SettlementResult.MODIFIED : SettlementResult.ACCEPTED;
         if (!settlementWasCapped) {
-            decision.note = "payment validated successfully";
+            decision.note = healthReduced ? "payment reduced by sector health" : "payment validated successfully";
         }
         int64 lastSettledEpoch = int64(uint64(decision.settleUpto));
         service.lastSettledEpoch = CommonTypes.ChainEpoch.wrap(lastSettledEpoch);
@@ -1527,6 +1532,44 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
 
         uint256 monthlyTotal = payment.pricePer32GiBPerMonth * payment.billed32GiBUnits;
         amount = Math.mulDiv(monthlyTotal, epoch - serviceStartEpoch, EPOCHS_IN_MONTH);
+    }
+
+    /**
+     * @notice Limits a settlement window to one month after the later of fromEpoch and serviceStartEpoch
+     * @param fromEpoch The first epoch of the settlement window
+     * @param toEpoch The epoch at which the settlement window ends
+     * @param serviceStartEpoch The epoch at which service started
+     * @return limitedToEpoch The window end after applying the monthly limit
+     */
+    function _applyMonthlyLimit(uint256 fromEpoch, uint256 toEpoch, uint256 serviceStartEpoch)
+        internal
+        pure
+        returns (uint256 limitedToEpoch)
+    {
+        limitedToEpoch = Math.min(toEpoch, Math.max(fromEpoch, serviceStartEpoch) + EPOCHS_IN_MONTH);
+    }
+
+    /**
+     * @notice Calculates the health-adjusted payment for a settlement window
+     * @param dealId The ID of the deal
+     * @param serviceStartEpoch The epoch at which service started
+     * @param fromEpoch The first epoch of the settlement window
+     * @param toEpoch The epoch at which the settlement window ends
+     * @param sectorsHealthBps Share of the window amount to pay, in basis points
+     * @return amount Payment due for the window, scaled by sector health
+     */
+    function _calculateSettlementAmount(
+        uint256 dealId,
+        uint256 serviceStartEpoch,
+        uint256 fromEpoch,
+        uint256 toEpoch,
+        uint16 sectorsHealthBps
+    ) internal view returns (uint256 amount) {
+        PoRepTypes.DealPayment memory payment = s()._dealPayments[dealId];
+        // Subtract cumulative amounts at both boundaries to price only the accepted settlement window.
+        uint256 windowAmount = _calculateDueAmount(payment, serviceStartEpoch, toEpoch)
+            - _calculateDueAmount(payment, serviceStartEpoch, fromEpoch);
+        amount = Math.mulDiv(windowAmount, sectorsHealthBps, BASIS_POINTS_DENOMINATOR);
     }
 
     /**

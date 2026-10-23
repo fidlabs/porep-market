@@ -20,6 +20,8 @@ contract SLIScorerTest is Test {
     SharedTypes.SLIThresholds public sliParams;
     MockSLIOracle public oracle;
 
+    uint256 public constant EPOCHS_IN_MONTH = 86_400;
+
     function setUp() public {
         SLIScorer impl = new SLIScorer();
         oracle = new MockSLIOracle();
@@ -166,5 +168,71 @@ contract SLIScorerTest is Test {
         vm.roll(1001);
         uint256 score = sliScorer.calculateScore(dealId, sliParams);
         assertEq(score, 75);
+    }
+
+    function testGetDealHealthReturnsCurrentMeasurement() public {
+        oracle.setHealth(1000, 9500);
+        vm.roll(1001);
+
+        assertEq(sliScorer.getDealHealth(dealId), 9500);
+    }
+
+    function testGetDealHealthAcceptsMeasurementFromCurrentBlock() public {
+        oracle.setHealth(1000, 9500);
+        vm.roll(1000);
+
+        assertEq(sliScorer.getDealHealth(dealId), 9500);
+    }
+
+    function testGetDealHealthAcceptsMeasurementAtFreshnessBoundary() public {
+        oracle.setHealth(1000, 9500);
+        vm.roll(1000 + EPOCHS_IN_MONTH);
+
+        assertEq(sliScorer.getDealHealth(dealId), 9500);
+    }
+
+    function testGetDealHealthRevertsStaleMeasurement() public {
+        oracle.setHealth(1000, 9500);
+        vm.roll(1000 + EPOCHS_IN_MONTH + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.DealHealthUnavailable.selector, dealId));
+        sliScorer.getDealHealth(dealId);
+    }
+
+    function testGetDealHealthRevertsWithoutMeasurement() public {
+        vm.roll(1000);
+
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.DealHealthUnavailable.selector, dealId));
+        sliScorer.getDealHealth(dealId);
+    }
+
+    function testGetDealHealthRevertsFutureMeasurement() public {
+        oracle.setHealth(1001, 9500);
+        vm.roll(1000);
+
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.DealHealthUnavailable.selector, dealId));
+        sliScorer.getDealHealth(dealId);
+    }
+
+    function testGetDealHealthReturnsZeroHealthMeasurement() public {
+        oracle.setHealth(1000, 0);
+        vm.roll(1001);
+
+        assertEq(sliScorer.getDealHealth(dealId), 0);
+    }
+
+    function testGetDealHealthIgnoresExpiredAttestation() public {
+        oracle.setAttestations(1000, 10000, 100, 95, 100);
+        oracle.setHealth(1000 + EPOCHS_IN_MONTH, 9500);
+        vm.roll(1000 + EPOCHS_IN_MONTH + 1);
+
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.AttestationExpired.selector, dealId));
+        sliScorer.calculateScore(dealId, sliParams);
+        assertEq(sliScorer.getDealHealth(dealId), 9500);
+    }
+
+    function testGetDealHealthRevertsInvalidDealId() public {
+        vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidDealId.selector));
+        sliScorer.getDealHealth(0);
     }
 }

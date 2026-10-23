@@ -2,6 +2,8 @@
 // solhint-disable use-natspec, one-contract-per-file, function-max-lines, gas-small-strings
 pragma solidity =0.8.30;
 
+// forge-lint: disable-start(unsafe-typecast)
+
 import {ERC1967Proxy} from "@openzeppelin/contracts/proxy/ERC1967/ERC1967Proxy.sol";
 import {CommonTypes} from "filecoin-solidity/v0.8/types/CommonTypes.sol";
 import {FVMMinerActor} from "fvm-solidity/mocks/FVMMinerActor.sol";
@@ -183,6 +185,7 @@ contract PoRepMarketSectorEvidenceTest is MockFVMTest {
         assertEq(CommonTypes.ChainEpoch.unwrap(evidenceStatus.lastEvidenceRefreshEpoch), 0);
 
         sliScorer.setScore(DEAL_ID, 100);
+        sliScorer.setDealHealth(DEAL_ID, 10_000);
         PoRepTypes.DealService memory service = market.getDealService(DEAL_ID);
         uint256 settlementStartEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap(service.serviceStartEpoch)));
         uint256 settlementEndEpoch = settlementStartEpoch + market.EPOCHS_IN_MONTH();
