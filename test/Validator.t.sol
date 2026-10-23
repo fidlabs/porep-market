@@ -585,6 +585,20 @@ contract ValidatorTest is Test {
         validator.terminateRail();
     }
 
+    function testTerminateRailAfterDealEndRevertsWhenUnderfundedRailAlreadyHasZeroLockupPeriod() public {
+        vm.prank(admin);
+        validator.updateLockupPeriod(0);
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 dealEnd = uint256(uint64(CHAIN_EPOCH));
+        vm.roll(dealEnd + 1);
+        // FilecoinPay accepts an unchanged period from an underfunded client, so the change itself succeeds.
+        filecoinPayMock.setAccount(token, admin, 0, 0, 1, dealEnd - 1);
+
+        vm.prank(porepService);
+        vm.expectRevert(abi.encodeWithSelector(Validator.PaidPeriodNotCovered.selector, dealEnd, dealEnd - 1));
+        validator.terminateRail();
+    }
+
     function testTerminateRailAfterDealEndTerminatesWhenUnderfundedRailStillCoversDealEnd() public {
         // forge-lint: disable-next-line(unsafe-typecast)
         uint256 dealEnd = uint256(uint64(CHAIN_EPOCH));
