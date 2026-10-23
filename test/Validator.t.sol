@@ -482,8 +482,131 @@ contract ValidatorTest is Test {
         IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 10, 86_410, 1);
 
         assertEq(result.modifiedAmount, 0);
-        assertEq(result.settleUpto, 10);
+        assertEq(result.settleUpto, 86_410);
         assertEq(result.note, "deal ended");
+    }
+
+    function testValidatePaymentAfterDealEndAdvancesWithoutOracleCheck() public {
+        vm.prank(porepService);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(10)));
+
+        // Attestation older than a month makes calculateScore revert; post-deal windows must not depend on it.
+        vm.roll(block.number + EPOCHS_IN_MONTH + 100);
+
+        vm.prank(address(filecoinPayMock));
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 20, 25, 1);
+
+        assertEq(result.modifiedAmount, 0);
+        assertEq(result.settleUpto, 25);
+        assertEq(result.note, "deal ended");
+    }
+
+    function testValidatePaymentFinalWindowAtDealEndIgnoresMinInterval() public {
+        clientSCMock.setDataSizeMatching(dealId, true);
+
+        vm.prank(porepService);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
+
+        vm.prank(address(filecoinPayMock));
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 100, 990, 1000, 10);
+
+        assertEq(result.modifiedAmount, 100);
+        assertEq(result.settleUpto, 1000);
+        assertEq(result.note, "payment validated successfully");
+    }
+
+    function testValidatePaymentFinalWindowAtRailEndEpochIgnoresMinInterval() public {
+        clientSCMock.setDataSizeMatching(dealId, true);
+        filecoinPayMock.setRailEndEpoch(railId, 500);
+
+        vm.prank(porepService);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
+
+        vm.prank(address(filecoinPayMock));
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 1000, 400, 500, 10);
+
+        assertEq(result.modifiedAmount, 1000);
+        assertEq(result.settleUpto, 500);
+        assertEq(result.note, "payment validated successfully");
+    }
+
+    function testValidatePaymentShortWindowBeforeRailEndEpochIsTooEarly() public {
+        filecoinPayMock.setRailEndEpoch(railId, 500);
+
+        vm.prank(porepService);
+        validator.setDealEndEpoch(CommonTypes.ChainEpoch.wrap(int64(1000)));
+
+        vm.prank(address(filecoinPayMock));
+        IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 500, 400, 450, 10);
+
+        assertEq(result.modifiedAmount, 0);
+        assertEq(result.settleUpto, 400);
+        assertEq(result.note, "too early for settlement");
+    }
+
+    function testTerminateRailAfterDealEndSetsLockupPeriodToZero() public {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        vm.roll(uint256(uint64(CHAIN_EPOCH)));
+
+        vm.expectEmit(true, false, false, true, address(validator));
+        emit Validator.LockupPeriodUpdated(railId, 0);
+
+        vm.prank(porepService);
+        validator.terminateRail();
+
+        (uint256 lockupPeriod,) = filecoinPayMock.getRailLockup(railId);
+        assertEq(lockupPeriod, 0);
+        assertTrue(filecoinPayMock.terminated(railId));
+    }
+
+    function testTerminateRailAfterDealEndKeepsLockupWhenChangeIsRefused() public {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        vm.roll(uint256(uint64(CHAIN_EPOCH)) + 1);
+        filecoinPayMock.setRevertModifyRailLockup(true);
+
+        vm.prank(porepService);
+        validator.terminateRail();
+
+        (uint256 lockupPeriod,) = filecoinPayMock.getRailLockup(railId);
+        assertEq(lockupPeriod, EPOCHS_IN_MONTH);
+        assertTrue(filecoinPayMock.terminated(railId));
+    }
+
+    function testTerminateRailBeforeDealEndKeepsLockupPeriod() public {
+        vm.prank(admin);
+        validator.terminateRail();
+
+        (uint256 lockupPeriod,) = filecoinPayMock.getRailLockup(railId);
+        assertEq(lockupPeriod, EPOCHS_IN_MONTH);
+        assertTrue(filecoinPayMock.terminated(railId));
+    }
+
+    function testTerminateRailWithoutDealEndKeepsLockupPeriod() public {
+        Validator impl = new Validator();
+        ERC1967Proxy proxy = new ERC1967Proxy(address(impl), "");
+        Validator newValidator = Validator(address(proxy));
+        newValidator.initialize(
+            admin,
+            porepService,
+            address(filecoinPayMock),
+            address(sliScorer),
+            clientSC,
+            address(poRepMarketMock),
+            address(spRegistryMock),
+            dealId
+        );
+        filecoinPayMock.setOperatorApproval(
+            token, admin, address(newValidator), true, 1_000_000, 1_000_000, 0, 0, 86_400
+        );
+        newValidator.createRail(token);
+        uint256 newRailId = filecoinPayMock.nextRailId() - 1;
+
+        vm.prank(admin);
+        newValidator.terminateRail();
+
+        (uint256 lockupPeriod,) = filecoinPayMock.getRailLockup(newRailId);
+        assertEq(lockupPeriod, EPOCHS_IN_MONTH);
+        assertTrue(filecoinPayMock.terminated(newRailId));
     }
 
     function testValidatePaymentCapsSettlementToDealEndEpoch() public {
@@ -499,7 +622,7 @@ contract ValidatorTest is Test {
         IFilecoinPayValidator.ValidationResult memory result = validator.validatePayment(railId, 10_000, 0, 86_400, 10);
 
         assertEq(result.modifiedAmount, 10 * 1000);
-        assertEq(result.settleUpto, 1000);
+        assertEq(result.settleUpto, 86_400);
         assertEq(result.note, "payment limited to deal endepoch");
     }
 
@@ -697,7 +820,7 @@ contract ValidatorTest is Test {
             validator.validatePayment(railId, 2_000_000, 0, 200_000, 10);
 
         assertEq(result.modifiedAmount, 10);
-        assertEq(result.settleUpto, 1);
+        assertEq(result.settleUpto, 200_000);
         assertEq(result.note, "payment limited to deal endepoch");
     }
 
@@ -720,7 +843,7 @@ contract ValidatorTest is Test {
             validator.validatePayment(railId, 50000000, 0, chainEpochConversion, 10);
 
         assertEq(result.modifiedAmount, 10 * earlyTerminationEpoch);
-        assertEq(result.settleUpto, earlyTerminationEpoch);
+        assertEq(result.settleUpto, chainEpochConversion);
         assertEq(result.note, "payment limited to deal endepoch");
     }
 

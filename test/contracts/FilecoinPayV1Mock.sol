@@ -8,7 +8,9 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract FilecoinPayV1Mock is IFilecoinPayV1 {
     uint256 public nextRailId = 1;
+    bool public revertModifyRailLockup;
     mapping(uint256 => bool) public terminated;
+    mapping(uint256 => uint256) public railEndEpochs;
     mapping(IERC20 => mapping(address => mapping(address => OperatorApproval))) internal _operatorApprovals;
 
     struct OperatorApproval {
@@ -99,7 +101,16 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
         });
     }
 
+    function setRevertModifyRailLockup(bool shouldRevert) external {
+        revertModifyRailLockup = shouldRevert;
+    }
+
+    function setRailEndEpoch(uint256 railId, uint256 endEpoch) external {
+        railEndEpochs[railId] = endEpoch;
+    }
+
     function modifyRailLockup(uint256 railId, uint256 newLockupPeriod, uint256 lockupFixed) external override {
+        require(!revertModifyRailLockup, "modifyRailLockup reverted");
         Rail storage r = rails[railId];
         r.lockupPeriod = newLockupPeriod;
         r.lockupFixed = lockupFixed;
@@ -160,7 +171,7 @@ contract FilecoinPayV1Mock is IFilecoinPayV1 {
             lockupPeriod: r.lockupPeriod,
             lockupFixed: r.lockupFixed,
             settledUpTo: 0,
-            endEpoch: 0,
+            endEpoch: railEndEpochs[railId],
             commissionRateBps: r.commissionRateBps,
             serviceFeeRecipient: r.serviceFeeRecipient
         });
