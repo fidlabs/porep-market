@@ -572,6 +572,34 @@ contract ValidatorTest is Test {
         assertTrue(filecoinPayMock.terminated(railId));
     }
 
+    function testTerminateRailAfterDealEndRevertsWhenUnderfundedRailWouldEndBeforeDealEnd() public {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 dealEnd = uint256(uint64(CHAIN_EPOCH));
+        vm.roll(dealEnd + 1);
+        filecoinPayMock.setRevertModifyRailLockup(true);
+        // Client funded only until dealEnd - EPOCHS_IN_MONTH - 1, so endEpoch would be dealEnd - 1.
+        filecoinPayMock.setAccount(token, admin, 0, 0, 1, dealEnd - EPOCHS_IN_MONTH - 1);
+
+        vm.prank(porepService);
+        vm.expectRevert(abi.encodeWithSelector(Validator.PaidPeriodNotCovered.selector, dealEnd, dealEnd - 1));
+        validator.terminateRail();
+    }
+
+    function testTerminateRailAfterDealEndTerminatesWhenUnderfundedRailStillCoversDealEnd() public {
+        // forge-lint: disable-next-line(unsafe-typecast)
+        uint256 dealEnd = uint256(uint64(CHAIN_EPOCH));
+        vm.roll(dealEnd + 1);
+        filecoinPayMock.setRevertModifyRailLockup(true);
+        filecoinPayMock.setAccount(token, admin, 0, 0, 1, dealEnd - EPOCHS_IN_MONTH);
+
+        vm.prank(porepService);
+        validator.terminateRail();
+
+        (uint256 lockupPeriod,) = filecoinPayMock.getRailLockup(railId);
+        assertEq(lockupPeriod, EPOCHS_IN_MONTH);
+        assertTrue(filecoinPayMock.terminated(railId));
+    }
+
     function testTerminateRailBeforeDealEndKeepsLockupPeriod() public {
         vm.prank(admin);
         validator.terminateRail();

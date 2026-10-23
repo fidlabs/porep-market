@@ -142,6 +142,14 @@ contract Validator is
     error UnauthorizedCaller();
 
     /**
+     * @notice Error indicating that terminating now would end the rail before the paid period of the deal is over
+     * @dev 0x69988a34
+     * @param paidUntil The last epoch the deal is paid for
+     * @param railEndEpoch The end epoch the rail would get, limited by the client's funded epochs
+     */
+    error PaidPeriodNotCovered(uint256 paidUntil, uint256 railEndEpoch);
+
+    /**
      * @notice Error indicating that the provided end epoch is negative, which is invalid
      * @dev 0x122b2d2c
      */
@@ -524,6 +532,7 @@ contract Validator is
     /**
      * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
      * @dev Once the deal has ended, the lockup period is first set to 0 so the rail ends at the termination epoch.
+     *      If the client is underfunded, reverts with PaidPeriodNotCovered when the rail would end before the deal.
      */
     function terminateRail() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
@@ -533,12 +542,14 @@ contract Validator is
 
         // After the deal end nothing more is owed, so drop the lockup period first: the rail then ends now
         // instead of a month later and the client's lockup is released on the next settlement. FilecoinPay
-        // refuses the change while the client is underfunded; the rail is then terminated with its current period.
+        // refuses the change while the client is underfunded; the rail then keeps its period, and termination
+        // must not fix an end epoch that cuts unpaid deal epochs, since later deposits cannot extend it.
         if (_hasDealEnded()) {
             try IFilecoinPayV1($.filecoinPay).modifyRailLockup($.railId, 0, 0) {
                 emit LockupPeriodUpdated($.railId, 0);
-                // solhint-disable-next-line no-empty-blocks
-            } catch {}
+            } catch {
+                _ensurePaidPeriodCovered();
+            }
         }
 
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
@@ -648,6 +659,23 @@ contract Validator is
     function _hasDealEnded() internal view returns (bool) {
         uint256 paidUntil = _paidUntilEpoch();
         return paidUntil != 0 && block.number >= paidUntil;
+    }
+
+    /**
+     * @notice Reverts if terminating the rail now would set an end epoch before the paid period of the deal is over
+     * @dev Mirrors FilecoinPay.terminateRail: endEpoch = lockup-settled epoch of the client account + lockup period.
+     */
+    function _ensurePaidPeriodCovered() internal view {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        IFilecoinPayV1 filecoinPay = IFilecoinPayV1($.filecoinPay);
+        IFilecoinPayV1.RailView memory rail = filecoinPay.getRail($.railId);
+        (uint256 fundedUntil,,,) = filecoinPay.getAccountInfoIfSettled(rail.token, rail.from);
+
+        uint256 lockupSettledAt = fundedUntil < block.number ? fundedUntil : block.number;
+        uint256 railEndEpoch = lockupSettledAt + rail.lockupPeriod;
+        uint256 paidUntil = _paidUntilEpoch();
+
+        if (railEndEpoch < paidUntil) revert PaidPeriodNotCovered(paidUntil, railEndEpoch);
     }
 
     /**
