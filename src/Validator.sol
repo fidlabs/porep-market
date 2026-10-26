@@ -142,6 +142,14 @@ contract Validator is
     error UnauthorizedCaller();
 
     /**
+     * @notice Error indicating that terminating now would end the rail before the paid period of the deal is over
+     * @dev 0x69988a34
+     * @param paidUntil The last epoch the deal is paid for
+     * @param railEndEpoch The end epoch the rail would get, limited by the client's funded epochs
+     */
+    error PaidPeriodNotCovered(uint256 paidUntil, uint256 railEndEpoch);
+
+    /**
      * @notice Error indicating that the provided end epoch is negative, which is invalid
      * @dev 0x122b2d2c
      */
@@ -392,18 +400,21 @@ contract Validator is
 
         _checkRailIdValid(railId);
 
-        // forge-lint: disable-next-line(unsafe-typecast)
-        uint256 dealEndEpoch = uint256(uint64(CommonTypes.ChainEpoch.unwrap($.dealEndEpoch)));
+        uint256 dealEndEpoch = _paidUntilEpoch();
 
         if (dealEndEpoch == 0) {
             revert DealNotCompleted($.dealId);
         }
 
-        if ($.earlyTerminatedEpoch != 0 && $.earlyTerminatedEpoch < dealEndEpoch) {
-            dealEndEpoch = $.earlyTerminatedEpoch;
+        // Nothing is owed past the deal end, but settlement must still advance so the rail can reach its
+        // endEpoch and finalize; returning fromEpoch here made FilecoinPay revert with NoProgressInSettlement.
+        if (fromEpoch >= dealEndEpoch) {
+            result.settleUpto = toEpoch;
+            result.note = "deal ended";
+            return result;
         }
 
-        if (toEpoch < fromEpoch + $.minTimeBetweenSettlementsInEpochs) {
+        if (toEpoch < fromEpoch + $.minTimeBetweenSettlementsInEpochs && !_isFinalWindow(toEpoch, dealEndEpoch)) {
             result.settleUpto = fromEpoch;
             result.note = "too early for settlement";
             return result;
@@ -422,16 +433,10 @@ contract Validator is
             return result;
         }
 
-        if (fromEpoch >= dealEndEpoch) {
-            result.settleUpto = fromEpoch;
-            result.note = "deal ended";
-            return result;
-        }
-
         if (toEpoch > dealEndEpoch) {
             result.modifiedAmount = rate * (dealEndEpoch - fromEpoch);
             result.note = "payment limited to deal endepoch";
-            result.settleUpto = dealEndEpoch;
+            result.settleUpto = toEpoch;
         } else {
             result.modifiedAmount = proposedAmount;
             result.note = "payment validated successfully";
@@ -526,12 +531,27 @@ contract Validator is
 
     /**
      * @notice Terminates a payment rail, preventing further payments after the rail's lockup period. After calling this method, the lockup period cannot be changed, and the rail's rate and fixed lockup may only be reduced.
+     * @dev Once the deal has ended, the lockup period is first set to 0 so the rail ends at the termination epoch.
+     *      Reverts with PaidPeriodNotCovered if the client is underfunded and the rail would end before the deal.
      */
     function terminateRail() external override {
         ValidatorStorage storage $ = _getValidatorStorage();
         if (!hasRole(POREP_SERVICE_ROLE, msg.sender) && !hasRole(DEFAULT_ADMIN_ROLE, msg.sender)) {
             revert UnauthorizedCaller();
         }
+
+        // After the deal end nothing more is owed, so drop the lockup period first: the rail then ends now
+        // instead of a month later and the client's lockup is released on the next settlement. FilecoinPay
+        // refuses the change while the client is underfunded; the rail then keeps its period. Either way,
+        // termination must not fix an end epoch that cuts unpaid deal epochs, since later deposits cannot extend it.
+        if (_hasDealEnded()) {
+            try IFilecoinPayV1($.filecoinPay).modifyRailLockup($.railId, 0, 0) {
+                emit LockupPeriodUpdated($.railId, 0);
+                // solhint-disable-next-line no-empty-blocks
+            } catch {}
+            _ensurePaidPeriodCovered();
+        }
+
         _terminateRail(IFilecoinPayV1($.filecoinPay), $.railId);
     }
 
@@ -616,6 +636,64 @@ contract Validator is
     function getMinEpochsBetweenSettlements() external view returns (uint256 minTimeBetweenSettlementsInEpochs) {
         minTimeBetweenSettlementsInEpochs = _getValidatorStorage().minTimeBetweenSettlementsInEpochs;
     }
+
+    /**
+     * @notice Returns the last epoch the deal is paid for: the deal end, or the early termination epoch if earlier
+     * @return paidUntil The epoch, or 0 if the deal end epoch is not set yet
+     */
+    function _paidUntilEpoch() internal view returns (uint256 paidUntil) {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        // forge-lint: disable-next-line(unsafe-typecast)
+        paidUntil = uint256(uint64(CommonTypes.ChainEpoch.unwrap($.dealEndEpoch)));
+
+        if (paidUntil != 0 && $.earlyTerminatedEpoch != 0 && $.earlyTerminatedEpoch < paidUntil) {
+            paidUntil = $.earlyTerminatedEpoch;
+        }
+    }
+
+    // solhint-disable gas-strict-inequalities
+    /**
+     * @notice Checks whether the paid period of the deal is over
+     * @return True if the deal end epoch is set and has been reached
+     */
+    function _hasDealEnded() internal view returns (bool) {
+        uint256 paidUntil = _paidUntilEpoch();
+        return paidUntil != 0 && block.number >= paidUntil;
+    }
+
+    /**
+     * @notice Reverts if terminating the rail now would set an end epoch before the paid period of the deal is over
+     * @dev Mirrors FilecoinPay.terminateRail: endEpoch = lockup-settled epoch of the client account + lockup period.
+     */
+    function _ensurePaidPeriodCovered() internal view {
+        ValidatorStorage storage $ = _getValidatorStorage();
+        IFilecoinPayV1 filecoinPay = IFilecoinPayV1($.filecoinPay);
+        IFilecoinPayV1.RailView memory rail = filecoinPay.getRail($.railId);
+        (uint256 fundedUntil,,,) = filecoinPay.getAccountInfoIfSettled(rail.token, rail.from);
+
+        uint256 lockupSettledAt = fundedUntil < block.number ? fundedUntil : block.number;
+        uint256 railEndEpoch = lockupSettledAt + rail.lockupPeriod;
+        uint256 paidUntil = _paidUntilEpoch();
+
+        if (railEndEpoch < paidUntil) revert PaidPeriodNotCovered(paidUntil, railEndEpoch);
+    }
+
+    /**
+     * @notice Checks whether a settlement window is the last one owed: it reaches the deal end or the rail's end epoch
+     * @dev The last window is usually shorter than minTimeBetweenSettlementsInEpochs; without this exemption it
+     *      could never be settled and the rail could not finalize.
+     * @param toEpoch The epoch the settlement window ends at
+     * @param paidUntil The last epoch the deal is paid for
+     * @return True if no later window can be owed
+     */
+    function _isFinalWindow(uint256 toEpoch, uint256 paidUntil) internal view returns (bool) {
+        if (toEpoch >= paidUntil) return true;
+        ValidatorStorage storage $ = _getValidatorStorage();
+        uint256 railEndEpoch = IFilecoinPayV1($.filecoinPay).getRail($.railId).endEpoch;
+        return railEndEpoch != 0 && toEpoch >= railEndEpoch;
+    }
+
+    // solhint-enable gas-strict-inequalities
 
     /**
      * @notice Checks that the provided rail ID matches the expected rail ID stored in contract state

@@ -804,6 +804,22 @@
   },
   {
     "type": "error",
+    "name": "PaidPeriodNotCovered",
+    "inputs": [
+      {
+        "name": "paidUntil",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
+        "name": "railEndEpoch",
+        "type": "uint256",
+        "internalType": "uint256"
+      }
+    ]
+  },
+  {
+    "type": "error",
     "name": "RailAlreadyCreated",
     "inputs": []
   },
