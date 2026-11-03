@@ -5,7 +5,8 @@
 # Subcommands:
 #   verify     <chain_id>
 #       Verify every address in deployments/<network>/latest.json on
-#       Blockscout, then audit the result.
+#       Blockscout, then audit the result. Addresses Blockscout does not
+#       verify are verified on Sourcify and imported into Blockscout.
 #
 #   audit      <chain_id>
 #       Read-only: confirm every address in deployments/<network>/latest.json
@@ -339,7 +340,7 @@ _bs_transaction() {
 # ─────────────────────────────────────────────────────────────────────
 #
 # A single row is considered PASS only if the Blockscout v2 API reports:
-#   is_verified: true
+#   is_fully_verified: true
 #   language: "solidity"
 #   compiler_version starts with "v0.8.30"
 #   optimization_enabled: true
@@ -357,7 +358,7 @@ _audit_one() {
     if body="$(_bs_smart_contract "$api" "$addr" 2>/dev/null)"; then
       # Valid JSON response. Evaluate verification state.
       local is_verified language compiler optrun optenabled evm
-      is_verified="$(jq -r '.is_verified // false' <<<"$body")"
+      is_verified="$(jq -r '.is_fully_verified // false' <<<"$body")"
       language="$(jq -r '.language // empty' <<<"$body")"
       compiler="$(jq -r '.compiler_version // empty' <<<"$body")"
       optrun="$(jq -r '.optimization_runs // empty' <<<"$body")"
@@ -481,7 +482,10 @@ _extract_constructor_args() {
 # Handles:
 #   * already-verified → treated as success
 #   * --watch makes the call synchronous wrt Blockscout's indexer
+#   * --retries/--delay space out resubmissions Blockscout rate-limits; the
+#     status poll interval is fixed by Forge, so the audit makes the final call
 #   * --constructor-args is always passed explicitly (empty for impls)
+#   * "Fail - Unable to verify" is a failure even though Forge exits 0
 
 _forge_verify() {
   local chain="$1" api="$2" addr="$3" target="$4" args_hex="$5"
@@ -496,6 +500,8 @@ _forge_verify() {
             --verifier-url "${api%/}/api/" \
             --chain "$chain" \
             --watch \
+            --retries 10 \
+            --delay 30 \
             --skip-is-verified-check \
             --constructor-args "0x$args_hex" \
             2>&1)"
@@ -507,14 +513,17 @@ _forge_verify() {
             --verifier-url "${api%/}/api/" \
             --chain "$chain" \
             --watch \
+            --retries 10 \
+            --delay 30 \
             --skip-is-verified-check \
             2>&1)"
   fi
   rc=$?
   set -e
 
-  if [[ $rc -eq 0 ]] \
-    || grep -qiE 'already (verified|is verified)|pass - verified|successfully verified' <<<"$out"; then
+  if ! grep -q 'Fail - ' <<<"$out" \
+    && { [[ $rc -eq 0 ]] \
+      || grep -qiE 'already (verified|is verified)|pass - verified|successfully verified' <<<"$out"; }; then
     _log OK "verify-contract succeeded: $target @ $addr"
     return 0
   fi
@@ -526,10 +535,95 @@ _forge_verify() {
   return 1
 }
 
+# ─────────────────────────────────────────────────────────────────────
+# Sourcify fallback
+# ─────────────────────────────────────────────────────────────────────
+#
+# Lotus traces report 0xfe as the code of every contract created from an
+# EOA, and Blockscout stores that as the runtime code, so its own verifier
+# can reject source that matches the chain ("Fail - Unable to verify").
+# Sourcify reads the code over RPC; Blockscout's via/sourcify method then
+# imports the Sourcify match.
+
+_sourcify_verify() {
+  local chain="$1" api="$2" addr="$3" target="$4" name="$5" args_hex="$6"
+
+  local out rc
+  set +e
+  if [[ -n "$args_hex" ]]; then
+    out="$(forge verify-contract \
+            "$addr" \
+            "$target" \
+            --verifier sourcify \
+            --chain "$chain" \
+            --watch \
+            --retries 10 \
+            --delay 30 \
+            --constructor-args "0x$args_hex" \
+            2>&1)"
+  else
+    out="$(forge verify-contract \
+            "$addr" \
+            "$target" \
+            --verifier sourcify \
+            --chain "$chain" \
+            --watch \
+            --retries 10 \
+            --delay 30 \
+            2>&1)"
+  fi
+  rc=$?
+  set -e
+
+  if [[ $rc -ne 0 ]] && ! grep -qiE 'already (verified|is verified)' <<<"$out"; then
+    _log ERROR "Sourcify verification failed (rc=$rc) for $target @ $addr"
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && _log ERROR "    $line"
+    done <<<"$out"
+    return 1
+  fi
+  _log OK "Sourcify verification succeeded: $target @ $addr"
+
+  _bs_import_sourcify "$api" "$addr" "$name"
+}
+
+# Submits the build metadata and its sources to Blockscout's via/sourcify
+# method, which imports the existing Sourcify match for the address.
+_bs_import_sourcify() {
+  local api="$1" addr="$2" name="$3"
+  local art tmp path i=1 rc=0
+  art="$(_artifact_path "$name")"
+  tmp="$(mktemp -d)"
+  jq -r '.rawMetadata' "$art" >"$tmp/metadata.json"
+
+  local form=(-F "files[0]=@$tmp/metadata.json;filename=metadata.json;type=application/json")
+  while IFS= read -r path; do
+    if [[ ! -f "$path" ]]; then
+      _log ERROR "Source $path listed in $art metadata is missing"
+      rm -rf "$tmp"
+      return 1
+    fi
+    form+=(-F "files[$i]=@$path;filename=$path")
+    i=$((i + 1))
+  done < <(jq -r '.sources | keys[]' "$tmp/metadata.json")
+
+  _retry 5 curl -sS -f --connect-timeout 10 --max-time 120 \
+    -X POST "${api}/api/v2/smart-contracts/${addr}/verification/via/sourcify" \
+    "${form[@]}" >/dev/null || rc=$?
+  rm -rf "$tmp"
+
+  if (( rc != 0 )); then
+    _log ERROR "Blockscout Sourcify import failed (rc=$rc) for $name @ $addr"
+    return 1
+  fi
+  _log OK "Blockscout Sourcify import submitted: $name @ $addr"
+}
+
 # Audit with indexer-lag tolerance. Blockscout's v2 smart-contracts
 # endpoint can take up to ~60 seconds after forge's --watch returns before
 # it reports is_verified: true. Retry with backoff until the indexer catches
-# up, or give up after ~90s total.
+# up, or give up after ~90s total. The first read of an address can also
+# start a lookup of already-known sources that only lands a few seconds later.
 _audit_with_lag() {
   local api="$1" addr="$2"
   local attempt=1 max=6 delay=5 result
@@ -632,7 +726,7 @@ cmd_audit() {
 
   local failed=0 row addr kind name audit
   while IFS='|' read -r addr kind name; do
-    audit="$(_audit_one "$api" "$addr" || true)"
+    audit="$(_audit_with_lag "$api" "$addr" || true)"
     if [[ "$audit" == "ok" ]]; then
       _log OK "PASS $name @ $addr"
       _emit_row "$out_json" "$name" "$kind" "$addr" "skip" "pass" ""
@@ -716,6 +810,16 @@ cmd_verify() {
     fi
 
     audit="$(_audit_with_lag "$api" "$addr" || true)"
+    if [[ "$audit" != "ok" ]]; then
+      _log WARN "Blockscout did not verify $name @ $addr ($audit), falling back to Sourcify"
+      if _sourcify_verify "$chain" "$api" "$addr" "$target" "$name" "$args"; then
+        [[ "$submit" == "pass" ]] || submitted=$((submitted + 1))
+        submit="sourcify"
+        row_ok=1
+        note=""
+        audit="$(_audit_with_lag "$api" "$addr" || true)"
+      fi
+    fi
     if [[ "$audit" == "ok" ]]; then
       _log OK "AUDIT PASS $name @ $addr"
       _emit_row "$out_json" "$name" "$kind" "$addr" "$submit" "pass" "$note"
@@ -769,11 +873,16 @@ cmd_verify_one() {
     || _die "Constructor args extraction failed for $addr" 1
   _log INFO "Constructor args: ${args:-<empty>}"
 
-  _forge_verify "$chain" "$api" "$(_lower "$addr")" "$target" "$args" \
-    || _die "forge verify-contract failed for $addr" 1
+  _forge_verify "$chain" "$api" "$(_lower "$addr")" "$target" "$args" || true
 
   local audit
-  audit="$(_audit_one "$api" "$(_lower "$addr")" || true)"
+  audit="$(_audit_with_lag "$api" "$(_lower "$addr")" || true)"
+  if [[ "$audit" != "ok" ]]; then
+    _log WARN "Blockscout did not verify $name @ $addr ($audit), falling back to Sourcify"
+    _sourcify_verify "$chain" "$api" "$(_lower "$addr")" "$target" "$name" "$args" \
+      || _die "Sourcify fallback failed for $addr" 1
+    audit="$(_audit_with_lag "$api" "$(_lower "$addr")" || true)"
+  fi
   [[ "$audit" == "ok" ]] || _die "audit post-check failed: $audit" 1
   _log OK "verify-one: $name @ $addr is verified"
 }

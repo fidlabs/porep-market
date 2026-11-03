@@ -1,0 +1,13 @@
+{
+  "beacon": "0x403A651cE8e8695A45c6de6cDFcF5a411c499354",
+  "chainId": 314159,
+  "deployedCodeHash": "0x5f9019aca250b38fb506530da7a59cadc342f03b674f7ffdf5ccdb3904132c21",
+  "deployer": "0xEB0680e8fEF19f5B6490a083d5b59f6F04930B5B",
+  "newCodeHash": "0x5f9019aca250b38fb506530da7a59cadc342f03b674f7ffdf5ccdb3904132c21",
+  "newImpl": "0x6E79ea7f2e2a43836E2584Ff5FA60306D1C568A3",
+  "prevCodeHash": "0xe33716d87f96c88f3388edbcedd44e2863f190725b3011c20b07f8c077e9580d",
+  "prevImpl": "0x26237e7d4DE9c01E7b6f8c1852d7e119a368E9AF",
+  "prevManifestImpl": "0x26237e7d4DE9c01E7b6f8c1852d7e119a368E9AF",
+  "upgradedAt": 1793004000,
+  "validatorFactory": "0xB97628717A1455AEAB0f155563fF581d9B500ca4"
+}
