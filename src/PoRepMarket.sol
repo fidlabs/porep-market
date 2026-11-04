@@ -1370,7 +1370,9 @@ contract PoRepMarket is AccessControlledUpgradeable, UUPSUpgradeable, IPoRepMark
             );
         }
 
-        uint16 sectorsHealthBps = $._SLIScorer.getDealHealth(dealId);
+        uint16 sectorsHealthBps = deal.state == DealState.ACTIVE && block.number < serviceEndEpoch
+            ? $._SLIScorer.getDealHealth(dealId)
+            : $._SLIScorer.getLastDealHealth(dealId);
         // Only successful validation updates the market's settlement tracking.
         decision.settlementAmount = _calculateSettlementAmount(
             dealId, _epochToUint(service.serviceStartEpoch), fromEpoch, effectiveToEpoch, sectorsHealthBps

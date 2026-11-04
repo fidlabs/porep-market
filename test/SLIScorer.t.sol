@@ -231,6 +231,13 @@ contract SLIScorerTest is Test {
         assertEq(sliScorer.getDealHealth(dealId), 9500);
     }
 
+    function testGetLastDealHealthReturnsStaleMeasurement() public {
+        oracle.setHealth(1000, 9500);
+        vm.roll(1000 + EPOCHS_IN_MONTH + 1);
+
+        assertEq(sliScorer.getLastDealHealth(dealId), 9500);
+    }
+
     function testGetDealHealthRevertsInvalidDealId() public {
         vm.expectRevert(abi.encodeWithSelector(SLIScorer.InvalidDealId.selector));
         sliScorer.getDealHealth(0);

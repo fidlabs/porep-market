@@ -18,6 +18,14 @@ interface ISLIScorer {
     function getDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps);
 
     /**
+     * @notice Returns the last stored sector health for settling a deal that has ended, regardless of age.
+     * @dev Reverts when the measurement is missing or future-dated.
+     * @param dealId The id of the deal.
+     * @return sectorsHealthBps Deal health in basis points.
+     */
+    function getLastDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps);
+
+    /**
      * @notice Calculate score based on required vs actual thresholds
      * @dev Fields with required value of 0 are skipped (not evaluated)
      * @param dealId The id of the deal

@@ -67,13 +67,22 @@ contract SLIScorerMock is ISLIScorer {
 
     /**
      * @notice Returns the configured health for a deal id.
-     * @dev Reverts like the real scorer when no measurement is available.
+     * @dev Reverts like the real scorer when the measurement is missing, future-dated or stale.
      * @param dealId Deal id to read.
      * @return sectorsHealthBps Configured deal health, in basis points.
      */
     function getDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps) {
         SharedTypes.DealHealth memory health = _dealHealth[dealId];
-        if (health.lastUpdate == 0) revert DealHealthUnavailable(dealId);
+        if (health.lastUpdate == 0 || health.lastUpdate > block.number || block.number - health.lastUpdate > 86_400) {
+            revert DealHealthUnavailable(dealId);
+        }
+        return health.sectorsHealthBps;
+    }
+
+    /// @inheritdoc ISLIScorer
+    function getLastDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps) {
+        SharedTypes.DealHealth memory health = _dealHealth[dealId];
+        if (health.lastUpdate == 0 || health.lastUpdate > block.number) revert DealHealthUnavailable(dealId);
         return health.sectorsHealthBps;
     }
 

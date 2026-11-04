@@ -40,6 +40,7 @@ contract SLIOracle is ISLIOracle, AccessControlledUpgradeable, UUPSUpgradeable, 
     /**
      * @notice Error indicating that sector health exceeds 10_000 basis points.
      * @param value The invalid sector health value.
+     * @dev 0xd6be9c81
      */
     error InvalidSectorsHealthBps(uint16 value);
 
