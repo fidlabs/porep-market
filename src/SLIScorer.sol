@@ -34,6 +34,13 @@ contract SLIScorer is ISLIScorer, AccessControlledUpgradeable, UUPSUpgradeable {
     error AttestationExpired(uint256 dealId);
 
     /**
+     * @notice Thrown when a deal's health measurement is missing, future-dated or stale.
+     * @param dealId The deal ID whose health measurement is unavailable.
+     * @dev 0x74fb907c
+     */
+    error DealHealthUnavailable(uint256 dealId);
+
+    /**
      * @notice Error indicating that an invalid deal ID was provided
      * @dev 0xb06db32a
      */
@@ -97,6 +104,29 @@ contract SLIScorer is ISLIScorer, AccessControlledUpgradeable, UUPSUpgradeable {
     // solhint-enable no-empty-blocks
 
     // solhint-disable gas-strict-inequalities
+    /// @inheritdoc ISLIScorer
+    function getDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps) {
+        SharedTypes.DealHealth memory health = _readDealHealth(dealId);
+        if (block.number - health.lastUpdate > EPOCHS_IN_MONTH) revert DealHealthUnavailable(dealId);
+        return health.sectorsHealthBps;
+    }
+
+    /// @inheritdoc ISLIScorer
+    function getLastDealHealth(uint256 dealId) external view returns (uint16 sectorsHealthBps) {
+        return _readDealHealth(dealId).sectorsHealthBps;
+    }
+
+    /**
+     * @notice Reads a deal's health measurement, rejecting a missing or future-dated one
+     * @param dealId The id of the deal
+     * @return health The stored health measurement
+     */
+    function _readDealHealth(uint256 dealId) internal view returns (SharedTypes.DealHealth memory health) {
+        if (dealId == 0) revert InvalidDealId();
+        health = s().oracle.getDealHealth(dealId);
+        if (health.lastUpdate == 0 || health.lastUpdate > block.number) revert DealHealthUnavailable(dealId);
+    }
+
     /**
      * @notice Calculate the score for a given deal and required SLI thresholds.
      * @param dealId The id of the deal

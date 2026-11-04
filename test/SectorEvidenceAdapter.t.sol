@@ -2,6 +2,8 @@
 // solhint-disable use-natspec, one-contract-per-file
 pragma solidity =0.8.30;
 
+// forge-lint: disable-start(unsafe-typecast)
+
 import {AccessManager} from "../src/AccessManager.sol";
 import {AccessControlledUpgradeable} from "../src/abstracts/AccessControlledUpgradeable.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";

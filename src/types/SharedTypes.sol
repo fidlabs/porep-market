@@ -53,6 +53,16 @@ library SharedTypes {
     }
 
     /**
+     * @notice Oracle-measured sector health and its latest update epoch.
+     * @param lastUpdate Epoch when the oracle stored the measurement; zero means no measurement exists.
+     * @param sectorsHealthBps Share of time without faults, from 0 to 10_000 basis points.
+     */
+    struct DealHealth {
+        uint256 lastUpdate;
+        uint16 sectorsHealthBps;
+    }
+
+    /**
      * @notice DealRequest struct represents the client's request for a storage deal
      * @param manifestHash commitment for piece set
      * @param requestedSizeBytes requested data size in bytes

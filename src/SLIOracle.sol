@@ -37,9 +37,17 @@ contract SLIOracle is ISLIOracle, AccessControlledUpgradeable, UUPSUpgradeable, 
      */
     error InvalidDealId();
 
+    /**
+     * @notice Error indicating that sector health exceeds 10_000 basis points.
+     * @param value The invalid sector health value.
+     * @dev 0xd6be9c81
+     */
+    error InvalidSectorsHealthBps(uint16 value);
+
     /// @custom:storage-location erc7201:slioracle.storage.SLIOracleStorage
     struct SLIOracleStorage {
         mapping(uint256 dealId => SharedTypes.Attestation attestation) attestations;
+        mapping(uint256 dealId => SharedTypes.DealHealth health) _dealHealth;
     }
 
     // keccak256(abi.encode(uint256(keccak256("slioracle.storage.SLIOracleStorage")) - 1)) & ~bytes32(uint256(0xff))
@@ -66,6 +74,13 @@ contract SLIOracle is ISLIOracle, AccessControlledUpgradeable, UUPSUpgradeable, 
      * @param slis New SLI values
      */
     event SLIAttestationUpdate(uint256 indexed dealId, uint256 lastUpdate, SharedTypes.SLIThresholds slis);
+
+    /**
+     * @notice Emitted when an oracle updates a deal's sector health measurement.
+     * @param dealId The id of the deal.
+     * @param health The measurement and its update epoch.
+     */
+    event DealHealthUpdated(uint256 indexed dealId, SharedTypes.DealHealth health);
 
     /**
      * @notice Disabled constructor (proxy pattern)
@@ -111,6 +126,23 @@ contract SLIOracle is ISLIOracle, AccessControlledUpgradeable, UUPSUpgradeable, 
         if (dealId == 0) revert InvalidDealId();
         SLIOracleStorage storage $ = s();
         attestation = $.attestations[dealId];
+    }
+
+    /// @inheritdoc ISLIOracle
+    function setDealHealth(uint256 dealId, uint16 sectorsHealthBps) external onlyRole(Roles.ORACLE_ROLE) {
+        if (dealId == 0) revert InvalidDealId();
+        if (sectorsHealthBps > 10_000) revert InvalidSectorsHealthBps(sectorsHealthBps);
+
+        SharedTypes.DealHealth memory health =
+            SharedTypes.DealHealth({lastUpdate: block.number, sectorsHealthBps: sectorsHealthBps});
+        s()._dealHealth[dealId] = health;
+        emit DealHealthUpdated(dealId, health);
+    }
+
+    /// @inheritdoc ISLIOracle
+    function getDealHealth(uint256 dealId) external view returns (SharedTypes.DealHealth memory health) {
+        if (dealId == 0) revert InvalidDealId();
+        return s()._dealHealth[dealId];
     }
 
     // solhint-disable no-empty-blocks
